@@ -177,6 +177,9 @@ ${techPack.colorways.map(c => `- ${c.name}: ${c.colors.map(color => `${color.par
       {/* Tech Pack Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredTechPacks.map((techPack) => (
+          )
+          )
+          }
           <div key={techPack.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
             {/* Image */}
             <div className="aspect-w-16 aspect-h-9 bg-gray-200">
