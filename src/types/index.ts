@@ -22,6 +22,18 @@ export interface Material {
   supplier: string;
   color: string;
   consumption: string;
+  // Advanced BOM fields
+  specifications?: string;
+  position?: string;
+  quantity?: number;
+  unit?: string;
+  technicalNotes?: string;
+  subMaterials?: Array<{
+    id: string;
+    specifications: string;
+    quantity?: number;
+    unit?: string;
+  }>;
 }
 
 export interface Measurement {
@@ -43,4 +55,22 @@ export interface Activity {
   item: string;
   time: string;
   user: string;
+}
+
+export interface RevisionComment {
+  id: string;
+  user: string;
+  message: string;
+  createdAt: string;
+}
+
+export interface TechPackRevision {
+  id: string;
+  techpackId: string;
+  version: number;
+  createdAt: string;
+  user: string;
+  status: 'pending' | 'approved' | 'rejected';
+  changes: any; // minimal diff payload
+  comments: RevisionComment[];
 }

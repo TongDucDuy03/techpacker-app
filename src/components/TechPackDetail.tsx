@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import { TechPack } from '../types';
+import { RevisionsTimeline } from './RevisionsTimeline';
+import { api, isApiConfigured } from '../lib/api';
 
 interface TechPackDetailProps {
   techPack: TechPack;
@@ -10,6 +12,12 @@ interface TechPackDetailProps {
 }
 
 export const TechPackDetail: React.FC<TechPackDetailProps> = ({ techPack, onBack, onUpdate, onDelete }) => {
+  const useApi = useMemo(() => isApiConfigured(), []);
+
+  // Create a revision entry when the detail opens (demo purpose if none exist)
+  useEffect(() => {
+    // no-op: actual revision creation happens on update in App handler; here we could preload list
+  }, [techPack.id]);
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -124,6 +132,10 @@ export const TechPackDetail: React.FC<TechPackDetailProps> = ({ techPack, onBack
           </div>
         )}
       </div>
+
+      {useApi && (
+        <RevisionsTimeline techpackId={techPack.id} />
+      )}
     </div>
   );
 };

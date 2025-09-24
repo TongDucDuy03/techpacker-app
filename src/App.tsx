@@ -271,6 +271,25 @@ function App() {
     techPackData: Omit<TechPack, 'id' | 'dateCreated' | 'lastModified'>
   ) => {
     const updatedAt = new Date();
+    // Create revision (before applying update) when using API
+    if (useApi) {
+      try {
+        const before = techPacks.find(tp => tp.id === id);
+        const after = { ...before, ...techPackData, lastModified: updatedAt } as any;
+        const rev = {
+          id: `r${Date.now()}`,
+          version: Date.now(),
+          createdAt: new Date().toISOString(),
+          user: 'You',
+          status: 'pending',
+          changes: { before, after },
+          comments: []
+        };
+        await api.createRevision(id, rev);
+      } catch (e) {
+        console.error('Failed to record revision', e);
+      }
+    }
     if (useApi) {
       try {
         await api.updateTechPack(id, {

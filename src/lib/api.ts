@@ -46,6 +46,13 @@ export const api = {
   createColorway: (c: any) => http<any>('/colorways', { method: 'POST', body: JSON.stringify(c) }),
   updateColorway: (id: string, c: any) => http<any>(`/colorways/${id}`, { method: 'PUT', body: JSON.stringify(c) }),
   deleteColorway: (id: string) => fetch(`${baseUrl}/colorways/${id}`, { method: 'DELETE' }).then(() => undefined),
+
+  // Revisions
+  listRevisions: (techpackId: string) => http<any[]>(`/techpacks/${techpackId}/revisions`),
+  createRevision: (techpackId: string, rev: any) => http<any>(`/techpacks/${techpackId}/revisions`, { method: 'POST', body: JSON.stringify(rev) }),
+  addRevisionComment: (revisionId: string, comment: any) => http<any>(`/revisions/${revisionId}/comments`, { method: 'POST', body: JSON.stringify(comment) }),
+  approveRevision: (revisionId: string) => http<any>(`/revisions/${revisionId}/approve`, { method: 'POST' }),
+  rejectRevision: (revisionId: string) => http<any>(`/revisions/${revisionId}/reject`, { method: 'POST' }),
 };
 
 

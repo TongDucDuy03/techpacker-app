@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from '../lib/i18n';
 import { 
   TrendingUp, 
   Package, 
@@ -15,9 +16,10 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities = [] }) => {
+  const { t } = useI18n();
   const stats = [
     {
-      title: 'Total Tech Packs',
+      title: t('dash.stat.total'),
       value: techPacks.length.toString(),
       change: '+12%',
       trend: 'up',
@@ -25,7 +27,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities = []
       color: 'bg-blue-500'
     },
     {
-      title: 'In Production',
+      title: t('dash.stat.production'),
       value: techPacks.filter(tp => tp.status === 'production').length.toString(),
       change: '+8%',
       trend: 'up',
@@ -33,7 +35,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities = []
       color: 'bg-green-500'
     },
     {
-      title: 'Under Review',
+      title: t('dash.stat.review'),
       value: techPacks.filter(tp => tp.status === 'review').length.toString(),
       change: '-3%',
       trend: 'down',
@@ -41,7 +43,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities = []
       color: 'bg-yellow-500'
     },
     {
-      title: 'Approved',
+      title: t('dash.stat.approved'),
       value: techPacks.filter(tp => tp.status === 'approved').length.toString(),
       change: '+15%',
       trend: 'up',
@@ -88,7 +90,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities = []
         {/* Recent Tech Packs */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Recent Tech Packs</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{t('dash.recent.techpacks')}</h3>
           </div>
           <div className="p-6">
             <div className="space-y-4">
@@ -124,12 +126,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities = []
         {/* Recent Activity */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{t('dash.recent.activity')}</h3>
           </div>
           <div className="p-6">
             <div className="space-y-4">
               {recentActivity.length === 0 ? (
-                <p className="text-sm text-gray-600">No recent activity yet.</p>
+                <p className="text-sm text-gray-600">{t('dash.recent.activity.empty')}</p>
               ) : recentActivity.map((activity) => (
                 <div key={activity.id} className="flex items-start space-x-3">
                   <div className="bg-teal-100 p-2 rounded-full">
@@ -156,7 +158,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities = []
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900 flex items-center">
             <AlertTriangle className="w-5 h-5 text-yellow-500 mr-2" />
-            Alerts & Notifications
+            {t('dash.alerts.title')}
           </h3>
         </div>
         <div className="p-6">
@@ -165,7 +167,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities = []
               <div className="flex items-center">
                 <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2" />
                 <p className="text-sm text-yellow-800">
-                  <span className="font-medium">Denim Jacket</span> has been pending review for 5 days
+                  <span className="font-medium">Denim Jacket</span> {t('dash.alerts.pendingReview.suffix')}
                 </p>
               </div>
             </div>
@@ -173,7 +175,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities = []
               <div className="flex items-center">
                 <Clock className="w-5 h-5 text-blue-600 mr-2" />
                 <p className="text-sm text-blue-800">
-                  Season deadline approaching: <span className="font-medium">Spring 2024 collection</span> due in 2 weeks
+                  {t('dash.alerts.seasonDeadline.prefix')} <span className="font-medium">Spring 2024 collection</span> {t('dash.alerts.seasonDeadline.suffix')}
                 </p>
               </div>
             </div>

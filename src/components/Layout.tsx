@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from '../lib/i18n';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -17,15 +18,16 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange }) => {
+  const { t, lang, setLang } = useI18n();
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'techpacks', label: 'Tech Packs', icon: FileText },
-    { id: 'measurements', label: 'Measurements', icon: Ruler },
-    { id: 'materials', label: 'Materials', icon: Package },
-    { id: 'colorways', label: 'Colorways', icon: Palette },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'team', label: 'Team', icon: Users },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
+    { id: 'techpacks', label: t('nav.techpacks'), icon: FileText },
+    { id: 'measurements', label: t('nav.measurements'), icon: Ruler },
+    { id: 'materials', label: t('nav.materials'), icon: Package },
+    { id: 'colorways', label: t('nav.colorways'), icon: Palette },
+    { id: 'analytics', label: t('nav.analytics'), icon: BarChart3 },
+    { id: 'team', label: t('nav.team'), icon: Users },
+    { id: 'settings', label: t('nav.settings'), icon: Settings },
   ];
 
   return (
@@ -68,8 +70,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageCha
               </h2>
               <div className="flex items-center space-x-4">
                 <div className="bg-teal-100 text-teal-800 px-3 py-1 rounded-full text-sm font-medium">
-                  Production Ready
+                  {t('chip.productionReady')}
                 </div>
+                <select
+                  className="border border-gray-300 rounded px-2 py-1 text-sm bg-white"
+                  value={lang}
+                  onChange={(e) => setLang(e.target.value as any)}
+                >
+                  <option value="en">English</option>
+                  <option value="vi">Tiếng Việt</option>
+                </select>
               </div>
             </div>
           </div>

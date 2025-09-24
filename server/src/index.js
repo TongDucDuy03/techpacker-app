@@ -17,6 +17,7 @@ let activitiesCol;
 let materialsCol;
 let measurementTemplatesCol;
 let colorwaysCol;
+let revisionsCol;
 
 async function start() {
   const client = new MongoClient(MONGO_URI);
@@ -27,6 +28,7 @@ async function start() {
   materialsCol = db.collection('materials');
   measurementTemplatesCol = db.collection('measurement_templates');
   colorwaysCol = db.collection('colorways');
+  revisionsCol = db.collection('revisions');
 
   app.get('/health', (_req, res) => res.json({ ok: true }));
 
@@ -140,6 +142,40 @@ async function start() {
     const id = req.params.id;
     await colorwaysCol.deleteOne({ _id: id });
     res.status(204).end();
+  });
+
+  // Revisions
+  app.get('/techpacks/:id/revisions', async (req, res) => {
+    const techpackId = req.params.id;
+    const items = await revisionsCol.find({ techpackId }).sort({ version: -1 }).toArray();
+    res.json(items);
+  });
+  app.post('/techpacks/:id/revisions', async (req, res) => {
+    const techpackId = req.params.id;
+    const doc = req.body;
+    doc._id = doc.id;
+    doc.techpackId = techpackId;
+    await revisionsCol.insertOne(doc);
+    res.status(201).json(doc);
+  });
+  app.post('/revisions/:id/comments', async (req, res) => {
+    const id = req.params.id;
+    const comment = req.body;
+    await revisionsCol.updateOne({ _id: id }, { $push: { comments: comment } });
+    const saved = await revisionsCol.findOne({ _id: id });
+    res.json(saved);
+  });
+  app.post('/revisions/:id/approve', async (req, res) => {
+    const id = req.params.id;
+    await revisionsCol.updateOne({ _id: id }, { $set: { status: 'approved' } });
+    const saved = await revisionsCol.findOne({ _id: id });
+    res.json(saved);
+  });
+  app.post('/revisions/:id/reject', async (req, res) => {
+    const id = req.params.id;
+    await revisionsCol.updateOne({ _id: id }, { $set: { status: 'rejected' } });
+    const saved = await revisionsCol.findOne({ _id: id });
+    res.json(saved);
   });
 
   app.listen(PORT, () => {

@@ -12,6 +12,7 @@ import {
   FileText
 } from 'lucide-react';
 import { TechPack } from '../types';
+import { useI18n } from '../lib/i18n';
 import { TechPackForm } from './TechPackForm';
 
 interface TechPackListProps {
@@ -29,6 +30,7 @@ export const TechPackList: React.FC<TechPackListProps> = ({
   onUpdateTechPack, 
   onDeleteTechPack 
 }) => {
+  const { t } = useI18n();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -116,15 +118,15 @@ ${techPack.colorways.map(c => `- ${c.name}: ${c.colors.map(color => `${color.par
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Tech Pack Management</h3>
-          <p className="text-gray-600">Manage your fashion technical packages</p>
+          <h3 className="text-lg font-semibold text-gray-900">{t('tpl.header.title')}</h3>
+          <p className="text-gray-600">{t('tpl.header.subtitle')}</p>
         </div>
         <button 
           onClick={handleCreateNew}
           className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center"
         >
           <Plus className="w-4 h-4 mr-2" />
-          New Tech Pack
+          {t('tpl.new')}
         </button>
       </div>
 
@@ -135,7 +137,7 @@ ${techPack.colorways.map(c => `- ${c.name}: ${c.colors.map(color => `${color.par
             <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search tech packs..."
+              placeholder={t('tpl.search.placeholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
@@ -147,11 +149,11 @@ ${techPack.colorways.map(c => `- ${c.name}: ${c.colors.map(color => `${color.par
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           >
-            <option value="all">All Status</option>
-            <option value="draft">Draft</option>
-            <option value="review">Under Review</option>
-            <option value="approved">Approved</option>
-            <option value="production">Production</option>
+            <option value="all">{t('tpl.filter.status.all')}</option>
+            <option value="draft">{t('tpl.filter.status.draft')}</option>
+            <option value="review">{t('tpl.filter.status.review')}</option>
+            <option value="approved">{t('tpl.filter.status.approved')}</option>
+            <option value="production">{t('tpl.filter.status.production')}</option>
           </select>
           
           <select
@@ -159,7 +161,7 @@ ${techPack.colorways.map(c => `- ${c.name}: ${c.colors.map(color => `${color.par
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           >
-            <option value="all">All Categories</option>
+            <option value="all">{t('tpl.filter.category.all')}</option>
             <option value="Shirts">Shirts</option>
             <option value="Outerwear">Outerwear</option>
             <option value="Dresses">Dresses</option>
@@ -168,7 +170,7 @@ ${techPack.colorways.map(c => `- ${c.name}: ${c.colors.map(color => `${color.par
           
           <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center">
             <Filter className="w-4 h-4 mr-2" />
-            More Filters
+            {t('tpl.filter.more')}
           </button>
         </div>
       </div>
@@ -217,7 +219,7 @@ ${techPack.colorways.map(c => `- ${c.name}: ${c.colors.map(color => `${color.par
                   className="flex-1 bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center"
                 >
                   <Eye className="w-4 h-4 mr-1" />
-                  View
+                  {t('tpl.card.view')}
                 </button>
                 <button 
                   onClick={() => handleEdit(techPack)}
@@ -240,13 +242,13 @@ ${techPack.colorways.map(c => `- ${c.name}: ${c.colors.map(color => `${color.par
       {filteredTechPacks.length === 0 && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
           <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No tech packs found</h3>
-          <p className="text-gray-600 mb-6">Try adjusting your search or filter criteria</p>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">{t('tpl.empty.title')}</h3>
+          <p className="text-gray-600 mb-6">{t('tpl.empty.subtitle')}</p>
           <button 
             onClick={handleCreateNew}
             className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
           >
-            Create Your First Tech Pack
+            {t('tpl.empty.cta')}
           </button>
         </div>
       )}
