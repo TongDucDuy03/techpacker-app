@@ -4,10 +4,12 @@ import { Dashboard } from './components/Dashboard';
 import { TechPackList } from './components/TechPackList';
 import { TechPackDetail } from './components/TechPackDetail';
 import { TechPack } from './types';
+import { mockTechPacks } from './data/mockData';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [selectedTechPack, setSelectedTechPack] = useState<TechPack | null>(null);
+  const [techPacks, setTechPacks] = useState<TechPack[]>(mockTechPacks);
 
   const handleViewTechPack = (techPack: TechPack) => {
     setSelectedTechPack(techPack);
@@ -19,15 +21,59 @@ function App() {
     setCurrentPage('techpacks');
   };
 
+  const handleCreateTechPack = (techPackData: Omit<TechPack, 'id' | 'dateCreated' | 'lastModified'>) => {
+    const newTechPack: TechPack = {
+      ...techPackData,
+      id: Date.now().toString(),
+      dateCreated: new Date(),
+      lastModified: new Date(),
+    };
+    setTechPacks(prev => [...prev, newTechPack]);
+  };
+
+  const handleUpdateTechPack = (id: string, techPackData: Omit<TechPack, 'id' | 'dateCreated' | 'lastModified'>) => {
+    setTechPacks(prev => prev.map(tp => 
+      tp.id === id 
+        ? { ...techPackData, id, dateCreated: tp.dateCreated, lastModified: new Date() }
+        : tp
+    ));
+    // Update selected tech pack if it's the one being edited
+    if (selectedTechPack && selectedTechPack.id === id) {
+      setSelectedTechPack({
+        ...techPackData,
+        id,
+        dateCreated: selectedTechPack.dateCreated,
+        lastModified: new Date()
+      });
+    }
+  };
+
+  const handleDeleteTechPack = (id: string) => {
+    setTechPacks(prev => prev.filter(tp => tp.id !== id));
+  };
+
   const renderContent = () => {
     switch (currentPage) {
       case 'dashboard':
-        return <Dashboard />;
+        return <Dashboard techPacks={techPacks} />;
       case 'techpacks':
-        return <TechPackList onViewTechPack={handleViewTechPack} />;
+        return (
+          <TechPackList 
+            onViewTechPack={handleViewTechPack}
+            techPacks={techPacks}
+            onCreateTechPack={handleCreateTechPack}
+            onUpdateTechPack={handleUpdateTechPack}
+            onDeleteTechPack={handleDeleteTechPack}
+          />
+        );
       case 'techpack-detail':
         return selectedTechPack ? (
-          <TechPackDetail techPack={selectedTechPack} onBack={handleBackToList} />
+          <TechPackDetail 
+            techPack={selectedTechPack} 
+            onBack={handleBackToList}
+            onUpdate={handleUpdateTechPack}
+            onDelete={handleDeleteTechPack}
+          />
         ) : (
           <div>Tech pack not found</div>
         );
@@ -74,7 +120,7 @@ function App() {
           </div>
         );
       default:
-        return <Dashboard />;
+        return <Dashboard techPacks={techPacks} />;
     }
   };
 

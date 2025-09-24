@@ -10,17 +10,23 @@ import {
   Package,
   Ruler,
   Palette,
-  FileText
+  FileText,
+  Trash2
 } from 'lucide-react';
 import { TechPack } from '../types';
+import { TechPackForm } from './TechPackForm';
 
 interface TechPackDetailProps {
   techPack: TechPack;
   onBack: () => void;
+  onUpdate: (id: string, techPack: Omit<TechPack, 'id' | 'dateCreated' | 'lastModified'>) => void;
+  onDelete: (id: string) => void;
 }
 
-export const TechPackDetail: React.FC<TechPackDetailProps> = ({ techPack, onBack }) => {
+export const TechPackDetail: React.FC<TechPackDetailProps> = ({ techPack, onBack, onUpdate, onDelete }) => {
   const [activeTab, setActiveTab] = useState('overview');
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: FileText },
@@ -38,8 +44,71 @@ export const TechPackDetail: React.FC<TechPackDetailProps> = ({ techPack, onBack
     }
   };
 
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: techPack.name,
+        text: `Check out this tech pack: ${techPack.name} by ${techPack.designer}`,
+        url: window.location.href,
+      });
+    } else {
+      // Fallback: copy to clipboard
+      navigator.clipboard.writeText(window.location.href);
+      alert('Link copied to clipboard!');
+    }
+  };
+
+  const handleExport = () => {
+    const exportData = `
+TECH PACK EXPORT
+================
+
+Product: ${techPack.name}
+Category: ${techPack.category}
+Brand: ${techPack.brand}
+Designer: ${techPack.designer}
+Season: ${techPack.season}
+Status: ${techPack.status}
+Created: ${techPack.dateCreated.toLocaleDateString()}
+Last Modified: ${techPack.lastModified.toLocaleDateString()}
+
+MATERIALS:
+${techPack.materials.map(m => `- ${m.name}: ${m.composition} (${m.supplier}) - ${m.color} - ${m.consumption}`).join('\n')}
+
+MEASUREMENTS:
+${techPack.measurements.map(m => `- ${m.point}: ${Object.entries(m.sizes).map(([size, value]) => `${size}: ${value}`).join(', ')} (${m.tolerance})`).join('\n')}
+
+CONSTRUCTION DETAILS:
+${techPack.constructionDetails.map(d => `- ${d}`).join('\n')}
+
+COLORWAYS:
+${techPack.colorways.map(c => `- ${c.name}: ${c.colors.map(color => `${color.part}: ${color.color}${color.pantone ? ` (${color.pantone})` : ''}`).join(', ')}`).join('\n')}
+    `.trim();
+
+    const blob = new Blob([exportData], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${techPack.name.replace(/\s+/g, '_')}_techpack.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDelete = () => {
+    onDelete(techPack.id);
+    onBack();
+  };
+
+  const handleUpdate = (techPackData: Omit<TechPack, 'id' | 'dateCreated' | 'lastModified'>) => {
+    onUpdate(techPack.id, techPackData);
+    setShowEditForm(false);
+  };
+
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
@@ -62,16 +131,33 @@ export const TechPackDetail: React.FC<TechPackDetailProps> = ({ techPack, onBack
         
         <div className="flex space-x-3">
           <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center">
+          <button 
+            onClick={handleShare}
+            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center"
+          >
             <Share className="w-4 h-4 mr-2" />
             Share
           </button>
-          <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center">
+          <button 
+            onClick={handleExport}
+            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center"
+          >
             <Download className="w-4 h-4 mr-2" />
             Export
           </button>
-          <button className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center">
+          <button 
+            onClick={() => setShowEditForm(true)}
+            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center"
+          >
             <Edit className="w-4 h-4 mr-2" />
             Edit
+          </button>
+          <button 
+            onClick={() => setShowDeleteConfirm(true)}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete
           </button>
         </div>
       </div>
@@ -283,5 +369,39 @@ export const TechPackDetail: React.FC<TechPackDetailProps> = ({ techPack, onBack
         </div>
       </div>
     </div>
+
+      {showEditForm && (
+        <TechPackForm
+          techPack={techPack}
+          onSave={handleUpdate}
+          onCancel={() => setShowEditForm(false)}
+        />
+      )}
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Delete Tech Pack</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete "{techPack.name}"? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };

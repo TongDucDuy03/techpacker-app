@@ -7,13 +7,17 @@ import {
   FileText,
   AlertTriangle
 } from 'lucide-react';
-import { mockTechPacks } from '../data/mockData';
+import { TechPack } from '../types';
 
-export const Dashboard: React.FC = () => {
+interface DashboardProps {
+  techPacks: TechPack[];
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ techPacks }) => {
   const stats = [
     {
       title: 'Total Tech Packs',
-      value: mockTechPacks.length.toString(),
+      value: techPacks.length.toString(),
       change: '+12%',
       trend: 'up',
       icon: FileText,
@@ -21,7 +25,7 @@ export const Dashboard: React.FC = () => {
     },
     {
       title: 'In Production',
-      value: mockTechPacks.filter(tp => tp.status === 'production').length.toString(),
+      value: techPacks.filter(tp => tp.status === 'production').length.toString(),
       change: '+8%',
       trend: 'up',
       icon: Package,
@@ -29,7 +33,7 @@ export const Dashboard: React.FC = () => {
     },
     {
       title: 'Under Review',
-      value: mockTechPacks.filter(tp => tp.status === 'review').length.toString(),
+      value: techPacks.filter(tp => tp.status === 'review').length.toString(),
       change: '-3%',
       trend: 'down',
       icon: Clock,
@@ -37,7 +41,7 @@ export const Dashboard: React.FC = () => {
     },
     {
       title: 'Approved',
-      value: mockTechPacks.filter(tp => tp.status === 'approved').length.toString(),
+      value: techPacks.filter(tp => tp.status === 'approved').length.toString(),
       change: '+15%',
       trend: 'up',
       icon: CheckCircle,
@@ -109,7 +113,7 @@ export const Dashboard: React.FC = () => {
           </div>
           <div className="p-6">
             <div className="space-y-4">
-              {mockTechPacks.map((techPack) => (
+              {techPacks.slice(0, 5).map((techPack) => (
                 <div key={techPack.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors">
                   <div className="flex items-center space-x-3">
                     <img
