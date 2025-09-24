@@ -36,3 +36,11 @@ export interface Colorway {
   name: string;
   colors: { part: string; color: string; pantone?: string }[];
 }
+
+export interface Activity {
+  id: string;
+  action: string;
+  item: string;
+  time: string;
+  user: string;
+}

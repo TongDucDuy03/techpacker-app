@@ -7,13 +7,14 @@ import {
   FileText,
   AlertTriangle
 } from 'lucide-react';
-import { TechPack } from '../types';
+import { TechPack, Activity } from '../types';
 
 interface DashboardProps {
   techPacks: TechPack[];
+  activities?: Activity[];
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ techPacks }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities = [] }) => {
   const stats = [
     {
       title: 'Total Tech Packs',
@@ -49,29 +50,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ techPacks }) => {
     }
   ];
 
-  const recentActivity = [
-    {
-      id: 1,
-      action: 'Tech pack approved',
-      item: 'Classic Button Down Shirt',
-      time: '2 hours ago',
-      user: 'Sarah Johnson'
-    },
-    {
-      id: 2,
-      action: 'New tech pack created',
-      item: 'Summer Dress Collection',
-      time: '4 hours ago',
-      user: 'Mike Chen'
-    },
-    {
-      id: 3,
-      action: 'Measurements updated',
-      item: 'Denim Jacket',
-      time: '6 hours ago',
-      user: 'Emma Wilson'
-    }
-  ];
+  const recentActivity = activities.slice(0, 6);
 
   return (
     <div className="space-y-6">
@@ -149,7 +128,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ techPacks }) => {
           </div>
           <div className="p-6">
             <div className="space-y-4">
-              {recentActivity.map((activity) => (
+              {recentActivity.length === 0 ? (
+                <p className="text-sm text-gray-600">No recent activity yet.</p>
+              ) : recentActivity.map((activity) => (
                 <div key={activity.id} className="flex items-start space-x-3">
                   <div className="bg-teal-100 p-2 rounded-full">
                     <CheckCircle className="w-4 h-4 text-teal-600" />
