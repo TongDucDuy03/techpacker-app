@@ -1,190 +1,218 @@
 const express = require('express');
-const cors = require('cors');
-const { MongoClient, ObjectId } = require('mongodb');
+const { ApolloServer } = require('apollo-server-express');
+const { createServer } = require('http');
+const { Server } = require('socket.io');
+const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
 require('dotenv').config();
 
+// Import configurations and services
+const { connectDatabases, checkDatabaseHealth, closeDatabases } = require('./config/database');
+const { securityHeaders, corsOptions, requestLogger, errorHandler, apiLimits } = require('./middleware/security');
+const typeDefs = require('./graphql/schema');
+const resolvers = require('./graphql/resolvers');
+
+// Import routes
+const techpackRoutes = require('./routes/techpackRoutes');
+
 const PORT = process.env.PORT || 4000;
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017';
-const DB_NAME = process.env.DB_NAME || 'techpacker_app';
-
 const app = express();
-app.use(cors());
-app.use(express.json({ limit: '2mb' }));
+const httpServer = createServer(app);
 
-let db;
-let techpacksCol;
-let activitiesCol;
-let materialsCol;
-let measurementTemplatesCol;
-let colorwaysCol;
-let revisionsCol;
+// Initialize Socket.IO for real-time updates
+const io = new Server(httpServer, {
+  cors: corsOptions
+});
+
+// Swagger configuration
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'TechPacker API',
+      version: '1.0.0',
+      description: 'Comprehensive TechPack Management API with real-time updates and validation',
+    },
+    servers: [
+      {
+        url: `http://localhost:${PORT}`,
+        description: 'Development server',
+      },
+    ],
+  },
+  apis: ['./src/routes/*.js', './src/graphql/*.js'],
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+
+// Middleware
+app.use(securityHeaders);
+app.use(requestLogger);
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Swagger documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// Health check endpoint
+app.get('/health', async (req, res) => {
+  try {
+    const dbHealth = await checkDatabaseHealth();
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      databases: dbHealth,
+      uptime: process.uptime()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Health check failed',
+      error: error.message
+    });
+  }
+});
+
+// API Routes with rate limiting
+app.use('/api/techpacks', apiLimits.general, techpackRoutes);
+
+// Additional API routes can be added here
+app.get('/api/status', (req, res) => {
+  res.json({
+    success: true,
+    message: 'TechPacker API is running',
+    version: '1.0.0',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Apollo Server setup
+const apolloServer = new ApolloServer({
+  typeDefs,
+  resolvers,
+  context: ({ req }) => {
+    // Extract user from JWT token
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    let user = null;
+    
+    if (token) {
+      try {
+        const jwt = require('jsonwebtoken');
+        user = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+      } catch (error) {
+        // Invalid token, user remains null
+      }
+    }
+    
+    return { user, pubsub: io };
+  },
+  introspection: true,
+  playground: true,
+});
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
+  
+  // Join techpack-specific rooms
+  socket.on('join-techpack', (techPackId) => {
+    socket.join(`techpack-${techPackId}`);
+    console.log(`Client ${socket.id} joined techpack ${techPackId}`);
+  });
+  
+  // Leave techpack rooms
+  socket.on('leave-techpack', (techPackId) => {
+    socket.leave(`techpack-${techPackId}`);
+    console.log(`Client ${socket.id} left techpack ${techPackId}`);
+  });
+  
+  // Handle real-time updates
+  socket.on('techpack-update', async (data) => {
+    const { techPackId, module, updateData } = data;
+    
+    // Broadcast to all clients in the techpack room
+    socket.to(`techpack-${techPackId}`).emit('techpack-updated', {
+      techPackId,
+      module,
+      updateData,
+      timestamp: new Date().toISOString()
+    });
+  });
+  
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
+});
+
+// Error handling
+app.use(errorHandler);
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found',
+    path: req.originalUrl
+  });
+});
 
 async function start() {
-  const client = new MongoClient(MONGO_URI);
-  await client.connect();
-  db = client.db(DB_NAME);
-  techpacksCol = db.collection('techpacks');
-  activitiesCol = db.collection('activities');
-  materialsCol = db.collection('materials');
-  measurementTemplatesCol = db.collection('measurement_templates');
-  colorwaysCol = db.collection('colorways');
-  revisionsCol = db.collection('revisions');
+  try {
+    // Connect to databases
+    await connectDatabases();
+    console.log('✅ All databases connected successfully');
 
-  app.get('/health', (_req, res) => res.json({ ok: true }));
+    // Start Apollo Server
+    await apolloServer.start();
+    apolloServer.applyMiddleware({ app, path: '/graphql' });
+    console.log('✅ GraphQL server started at /graphql');
 
-  // Techpacks
-  app.get('/techpacks', async (_req, res) => {
-    const items = await techpacksCol.find().sort({ lastModified: -1 }).toArray();
-    res.json(items);
-  });
+    // Start HTTP server
+    httpServer.listen(PORT, () => {
+      console.log(`🚀 TechPacker API Server running on http://localhost:${PORT}`);
+      console.log(`📚 API Documentation available at http://localhost:${PORT}/api-docs`);
+      console.log(`🔍 GraphQL Playground available at http://localhost:${PORT}/graphql`);
+      console.log(`🔌 WebSocket server running on ws://localhost:${PORT}`);
+    });
 
-  app.post('/techpacks', async (req, res) => {
-    const doc = req.body;
-    doc._id = doc.id;
-    await techpacksCol.insertOne(doc);
-    res.status(201).json(doc);
-  });
+    // Graceful shutdown handling
+    process.on('SIGTERM', gracefulShutdown);
+    process.on('SIGINT', gracefulShutdown);
 
-  app.put('/techpacks/:id', async (req, res) => {
-    const id = req.params.id;
-    const update = req.body;
-    await techpacksCol.updateOne({ _id: id }, { $set: update });
-    const saved = await techpacksCol.findOne({ _id: id });
-    res.json(saved);
-  });
-
-  app.delete('/techpacks/:id', async (req, res) => {
-    const id = req.params.id;
-    await techpacksCol.deleteOne({ _id: id });
-    res.status(204).end();
-  });
-
-  // Activities
-  app.get('/activities', async (_req, res) => {
-    const items = await activitiesCol.find().sort({ _id: -1 }).toArray();
-    res.json(items);
-  });
-
-  app.post('/activities', async (req, res) => {
-    const doc = req.body;
-    doc._id = doc.id;
-    await activitiesCol.insertOne(doc);
-    res.status(201).json(doc);
-  });
-
-  // Materials Library
-  app.get('/materials', async (_req, res) => {
-    const items = await materialsCol.find().sort({ _id: -1 }).toArray();
-    res.json(items);
-  });
-  app.post('/materials', async (req, res) => {
-    const doc = req.body;
-    doc._id = doc.id;
-    await materialsCol.insertOne(doc);
-    res.status(201).json(doc);
-  });
-  app.put('/materials/:id', async (req, res) => {
-    const id = req.params.id;
-    const update = req.body;
-    await materialsCol.updateOne({ _id: id }, { $set: update });
-    const saved = await materialsCol.findOne({ _id: id });
-    res.json(saved);
-  });
-  app.delete('/materials/:id', async (req, res) => {
-    const id = req.params.id;
-    await materialsCol.deleteOne({ _id: id });
-    res.status(204).end();
-  });
-
-  // Measurement Templates
-  app.get('/measurement-templates', async (_req, res) => {
-    const items = await measurementTemplatesCol.find().sort({ _id: -1 }).toArray();
-    res.json(items);
-  });
-  app.post('/measurement-templates', async (req, res) => {
-    const doc = req.body;
-    doc._id = doc.id;
-    await measurementTemplatesCol.insertOne(doc);
-    res.status(201).json(doc);
-  });
-  app.put('/measurement-templates/:id', async (req, res) => {
-    const id = req.params.id;
-    const update = req.body;
-    await measurementTemplatesCol.updateOne({ _id: id }, { $set: update });
-    const saved = await measurementTemplatesCol.findOne({ _id: id });
-    res.json(saved);
-  });
-  app.delete('/measurement-templates/:id', async (req, res) => {
-    const id = req.params.id;
-    await measurementTemplatesCol.deleteOne({ _id: id });
-    res.status(204).end();
-  });
-
-  // Colorways Library
-  app.get('/colorways', async (_req, res) => {
-    const items = await colorwaysCol.find().sort({ _id: -1 }).toArray();
-    res.json(items);
-  });
-  app.post('/colorways', async (req, res) => {
-    const doc = req.body;
-    doc._id = doc.id;
-    await colorwaysCol.insertOne(doc);
-    res.status(201).json(doc);
-  });
-  app.put('/colorways/:id', async (req, res) => {
-    const id = req.params.id;
-    const update = req.body;
-    await colorwaysCol.updateOne({ _id: id }, { $set: update });
-    const saved = await colorwaysCol.findOne({ _id: id });
-    res.json(saved);
-  });
-  app.delete('/colorways/:id', async (req, res) => {
-    const id = req.params.id;
-    await colorwaysCol.deleteOne({ _id: id });
-    res.status(204).end();
-  });
-
-  // Revisions
-  app.get('/techpacks/:id/revisions', async (req, res) => {
-    const techpackId = req.params.id;
-    const items = await revisionsCol.find({ techpackId }).sort({ version: -1 }).toArray();
-    res.json(items);
-  });
-  app.post('/techpacks/:id/revisions', async (req, res) => {
-    const techpackId = req.params.id;
-    const doc = req.body;
-    doc._id = doc.id;
-    doc.techpackId = techpackId;
-    await revisionsCol.insertOne(doc);
-    res.status(201).json(doc);
-  });
-  app.post('/revisions/:id/comments', async (req, res) => {
-    const id = req.params.id;
-    const comment = req.body;
-    await revisionsCol.updateOne({ _id: id }, { $push: { comments: comment } });
-    const saved = await revisionsCol.findOne({ _id: id });
-    res.json(saved);
-  });
-  app.post('/revisions/:id/approve', async (req, res) => {
-    const id = req.params.id;
-    await revisionsCol.updateOne({ _id: id }, { $set: { status: 'approved' } });
-    const saved = await revisionsCol.findOne({ _id: id });
-    res.json(saved);
-  });
-  app.post('/revisions/:id/reject', async (req, res) => {
-    const id = req.params.id;
-    await revisionsCol.updateOne({ _id: id }, { $set: { status: 'rejected' } });
-    const saved = await revisionsCol.findOne({ _id: id });
-    res.json(saved);
-  });
-
-  app.listen(PORT, () => {
-    console.log(`API listening on http://localhost:${PORT}`);
-  });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
 }
 
-start().catch((err) => {
-  console.error('Failed to start server', err);
+async function gracefulShutdown(signal) {
+  console.log(`\n${signal} received. Starting graceful shutdown...`);
+  
+  try {
+    // Close HTTP server
+    httpServer.close(() => {
+      console.log('✅ HTTP server closed');
+    });
+    
+    // Close database connections
+    await closeDatabases();
+    console.log('✅ Database connections closed');
+    
+    // Close Apollo Server
+    await apolloServer.stop();
+    console.log('✅ Apollo Server stopped');
+    
+    console.log('✅ Graceful shutdown completed');
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Error during graceful shutdown:', error);
+    process.exit(1);
+  }
+}
+
+// Start the server
+start().catch((error) => {
+  console.error('❌ Failed to start server:', error);
   process.exit(1);
 });
 

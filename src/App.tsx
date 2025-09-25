@@ -1,15 +1,28 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Layout } from './components/Layout';
-import { Dashboard } from './components/Dashboard';
+import { Provider } from 'react-redux';
+import { PersistGate } from 'redux-persist/integration/react';
+import { store, persistor } from './store';
+import Layout from './components/Layout';
+import Dashboard from './components/Dashboard';
 import { TechPackList } from './components/TechPackList';
 import { TechPackDetail } from './components/TechPackDetail';
 import { MaterialsLibrary } from './components/MaterialsLibrary';
+import { BOMManager } from './components/BOMManager';
 import { MeasurementsManagement } from './components/MeasurementsManagement';
 import { ColorwaysManagement } from './components/ColorwaysManagement';
+import { SizeGradingManager } from './components/SizeGradingManager';
+import { RefitManagementManager } from './components/RefitManagementManager';
+import { ConstructionManager } from './components/ConstructionManager';
+import { CareInstructionsManager } from './components/CareInstructionsManager';
+import { RegulationDatabase } from './components/RegulationDatabase';
+import { ExportManager } from './components/ExportManager';
 import { TechPack, Activity } from './types';
 import { mockTechPacks } from './data/mockData';
 import { isSupabaseConfigured, supabase } from './lib/supabaseClient';
 import { api, isApiConfigured } from './lib/api';
+import './i18n';
+import NotificationContainer from './components/NotificationContainer';
+import LanguageProvider from './components/LanguageProvider';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -82,7 +95,7 @@ function App() {
             api.listTechPacks(),
             api.listActivities()
           ]);
-          const revivedTP: TechPack[] = tpData.map((row) => ({
+          const revivedTP: TechPack[] = (tpData as any[]).map((row: any) => ({
             ...row,
             dateCreated: new Date((row as any).dateCreated ?? (row as any).date_created ?? new Date()),
             lastModified: new Date((row as any).lastModified ?? (row as any).last_modified ?? new Date())
@@ -97,7 +110,7 @@ function App() {
       // Load from Supabase
       (async () => {
         try {
-          const { data: tpData, error: tpError } = await supabase
+          const { data: tpData, error: tpError } = await (supabase as any)
             .from('techpacks')
             .select('*')
             .order('last_modified', { ascending: false });
@@ -120,7 +133,7 @@ function App() {
           }));
           setTechPacks(revivedTP);
 
-          const { data: actData, error: actError } = await supabase
+          const { data: actData, error: actError } = await (supabase as any)
             .from('activities')
             .select('*')
             .order('created_at', { ascending: false });
@@ -214,7 +227,7 @@ function App() {
       }
     } else if (useSupabase && supabase) {
       try {
-        const { error } = await supabase.from('techpacks').insert({
+        const { error } = await (supabase as any).from('techpacks').insert({
           id: newTechPack.id,
           name: newTechPack.name,
           category: newTechPack.category,
@@ -251,7 +264,7 @@ function App() {
       }
     } else if (useSupabase && supabase) {
       try {
-        const { error } = await supabase.from('activities').insert({
+        const { error } = await (supabase as any).from('activities').insert({
           id: newActivity.id,
           action: newActivity.action,
           item: newActivity.item,
@@ -301,7 +314,7 @@ function App() {
       }
     } else if (useSupabase && supabase) {
       try {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('techpacks')
           .update({
             name: techPackData.name,
@@ -345,7 +358,7 @@ function App() {
       }
     } else if (useSupabase && supabase) {
       try {
-        const { error } = await supabase.from('activities').insert({
+        const { error } = await (supabase as any).from('activities').insert({
           id: activity.id,
           action: activity.action,
           item: activity.item,
@@ -378,7 +391,7 @@ function App() {
       }
     } else if (useSupabase && supabase) {
       try {
-        const { error } = await supabase.from('techpacks').delete().eq('id', id);
+        const { error } = await (supabase as any).from('techpacks').delete().eq('id', id);
         if (error) throw error;
       } catch (e) {
         console.error('Failed to delete techpack in Supabase', e);
@@ -395,7 +408,7 @@ function App() {
       };
       if (useSupabase && supabase) {
         try {
-          const { error } = await supabase.from('activities').insert({
+          const { error } = await (supabase as any).from('activities').insert({
             id: activity.id,
             action: activity.action,
             item: activity.item,
@@ -440,8 +453,44 @@ function App() {
         return <MeasurementsManagement />;
       case 'materials':
         return <MaterialsLibrary />;
+      case 'bom':
+        return <BOMManager />;
       case 'colorways':
         return <ColorwaysManagement />;
+      case 'size-grading':
+        return <SizeGradingManager pomSpecs={[]} />;
+      case 'refit-management':
+        return <RefitManagementManager techPack={selectedTechPack || undefined} onTechPackUpdate={(techPack) => {
+          if (selectedTechPack) {
+            handleUpdateTechPack(selectedTechPack.id, techPack);
+          }
+        }} />;
+      case 'construction':
+        return <ConstructionManager techPack={selectedTechPack || undefined} onTechPackUpdate={(techPack) => {
+          if (selectedTechPack) {
+            handleUpdateTechPack(selectedTechPack.id, techPack);
+          }
+        }} />;
+      case 'care-instructions':
+        return <CareInstructionsManager />;
+      case 'care':
+        return <CareInstructionsManager />;
+      case 'suppliers':
+        return (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Suppliers</h3>
+            <p className="text-gray-600">Chức năng đang được hoàn thiện.</p>
+          </div>
+        );
+      case 'reports':
+        return (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Reports</h3>
+            <p className="text-gray-600">Chức năng đang được hoàn thiện.</p>
+          </div>
+        );
+      case 'export':
+        return <ExportManager techPack={selectedTechPack || mockTechPacks[0]} />;
       case 'analytics':
         return (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
@@ -469,9 +518,16 @@ function App() {
   };
 
   return (
-    <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
-      {renderContent()}
-    </Layout>
+    <Provider store={store}>
+      <PersistGate loading={<div>Loading...</div>} persistor={persistor}>
+        <LanguageProvider>
+          <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
+            {renderContent()}
+          </Layout>
+          <NotificationContainer />
+        </LanguageProvider>
+      </PersistGate>
+    </Provider>
   );
 }
 

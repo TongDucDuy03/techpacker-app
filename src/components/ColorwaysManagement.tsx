@@ -1,91 +1,65 @@
-import React, { useEffect, useState } from 'react';
-import { api, isApiConfigured } from '../lib/api';
-import { useI18n } from '../lib/i18n';
+import React from 'react';
+import { Palette, Plus, Search, Filter, Download } from 'lucide-react';
 
-interface ColorwayItem {
-  id: string;
-  name: string;
-  colors: { part: string; color: string; pantone?: string }[];
-}
-
-export function ColorwaysManagement() {
-  const { t } = useI18n();
-  const [items, setItems] = useState<ColorwayItem[]>([]);
-  const [form, setForm] = useState<ColorwayItem>({ id: '', name: '', colors: [] });
-  const [newColor, setNewColor] = useState<{ part: string; color: string; pantone?: string }>({ part: '', color: '' });
-
-  useEffect(() => {
-    if (!isApiConfigured()) return;
-    (async () => {
-      const data = await api.listColorways();
-      setItems(data);
-    })();
-  }, []);
-
-  const addColor = () => {
-    if (!newColor.part || !newColor.color) return;
-    setForm({ ...form, colors: [...form.colors, newColor] });
-    setNewColor({ part: '', color: '' });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const id = form.id || Date.now().toString();
-    const payload = { ...form, id };
-    if (form.id) {
-      await api.updateColorway(form.id, payload);
-      setItems(prev => prev.map(i => i.id === form.id ? payload : i));
-    } else {
-      await api.createColorway(payload);
-      setItems(prev => [payload, ...prev]);
-    }
-    setForm({ id: '', name: '', colors: [] });
-  };
-
-  const handleEdit = (c: ColorwayItem) => setForm(c);
-  const handleDelete = async (id: string) => {
-    await api.deleteColorway(id);
-    setItems(prev => prev.filter(i => i.id !== id));
-  };
-
+export const ColorwaysManagement: React.FC = () => {
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-      <h3 className="text-xl font-semibold text-gray-900 mb-4">{t('colormgmt.title')}</h3>
-      {!isApiConfigured() && (
-        <p className="text-sm text-gray-500 mb-4">{t('colormgmt.hint')}</p>
-      )}
-      <form onSubmit={handleSubmit} className="space-y-3 mb-6">
-        <input className="border rounded px-3 py-2 w-full" placeholder={t('colormgmt.form.name')} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-        <div className="flex gap-2">
-          <input className="border rounded px-3 py-2 flex-1" placeholder={t('colormgmt.form.part')} value={newColor.part} onChange={e => setNewColor({ ...newColor, part: e.target.value })} />
-          <input className="border rounded px-3 py-2 flex-1" placeholder={t('colormgmt.form.color')} value={newColor.color} onChange={e => setNewColor({ ...newColor, color: e.target.value })} />
-          <input className="border rounded px-3 py-2 flex-1" placeholder={t('colormgmt.form.pantone')} value={newColor.pantone || ''} onChange={e => setNewColor({ ...newColor, pantone: e.target.value })} />
-          <button type="button" className="px-3 py-2 border rounded" onClick={addColor}>{t('colormgmt.btn.addColor')}</button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Colorways Management</h2>
+          <p className="text-gray-600">Manage color palettes and Pantone references for your collections</p>
         </div>
-        <div className="text-sm text-gray-600">{t('colormgmt.colorsCount').replace('{n}', String(form.colors.length))}</div>
-        <button className="bg-blue-600 text-white rounded px-4 py-2">{form.id ? t('colormgmt.btn.update') : t('colormgmt.btn.create')}</button>
-      </form>
-      <div className="divide-y">
-        {items.map(cw => (
-          <div key={cw.id} className="py-3">
-            <div className="flex items-center justify-between">
-              <div className="font-medium">{cw.name}</div>
-              <div className="flex gap-2">
-                <button className="px-3 py-1 border rounded" onClick={() => handleEdit(cw)}>{t('common.edit')}</button>
-                <button className="px-3 py-1 border rounded text-red-600" onClick={() => handleDelete(cw.id)}>{t('common.delete')}</button>
-              </div>
-            </div>
-            <ul className="list-disc ml-5 text-sm text-gray-700">
-              {cw.colors.map((p, idx) => (
-                <li key={idx}>{p.part}: {p.color}{p.pantone ? ` (${p.pantone})` : ''}</li>
-              ))}
-            </ul>
+        <div className="flex space-x-3">
+          <button className="flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <Download className="w-4 h-4 mr-2" />
+            Export
+          </button>
+          <button className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center">
+            <Plus className="w-4 h-4 mr-2" />
+            New Colorway
+          </button>
+        </div>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center space-x-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search colorways and Pantone codes..."
+              className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            />
           </div>
-        ))}
-        {items.length === 0 && <div className="text-sm text-gray-500">{t('colormgmt.empty')}</div>}
+          <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center">
+            <Filter className="w-4 h-4 mr-2" />
+            Filters
+          </button>
+        </div>
+      </div>
+
+      {/* Coming Soon Content */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+        <Palette className="w-16 h-16 text-teal-600 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">Colorways Management</h3>
+        <p className="text-gray-600 mb-6">Advanced color palette and Pantone management coming soon</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-2xl mx-auto">
+          <div className="p-4 border border-gray-200 rounded-lg">
+            <h4 className="font-medium text-gray-900 mb-2">Pantone Library</h4>
+            <p className="text-sm text-gray-600">Access to Pantone color database</p>
+          </div>
+          <div className="p-4 border border-gray-200 rounded-lg">
+            <h4 className="font-medium text-gray-900 mb-2">Color Combinations</h4>
+            <p className="text-sm text-gray-600">Create and save color combinations</p>
+          </div>
+          <div className="p-4 border border-gray-200 rounded-lg">
+            <h4 className="font-medium text-gray-900 mb-2">Seasonal Palettes</h4>
+            <p className="text-sm text-gray-600">Organize colors by season</p>
+          </div>
+        </div>
       </div>
     </div>
   );
-}
-
-
+};

@@ -213,23 +213,23 @@ ${techPack.colorways.map(c => `- ${c.name}: ${c.colors.map(color => `${color.par
               </div>
               
               {/* Actions */}
-              <div className="flex space-x-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => onViewTechPack(techPack)}
-                  className="flex-1 bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center"
+                  className="flex-1 min-w-0 whitespace-normal break-words bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center"
                 >
                   <Eye className="w-4 h-4 mr-1" />
                   {t('tpl.card.view')}
                 </button>
                 <button 
                   onClick={() => handleEdit(techPack)}
-                  className="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                  className="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex-shrink-0"
                 >
                   <Edit className="w-4 h-4" />
                 </button>
                 <button 
                   onClick={() => handleExport(techPack)}
-                  className="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                  className="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex-shrink-0"
                 >
                   <Download className="w-4 h-4" />
                 </button>
@@ -256,7 +256,7 @@ ${techPack.colorways.map(c => `- ${c.name}: ${c.colors.map(color => `${color.par
 
       {showForm && (
         <TechPackForm
-          techPack={editingTechPack}
+          techPack={editingTechPack ?? undefined}
           onSave={handleSave}
           onCancel={() => setShowForm(false)}
         />

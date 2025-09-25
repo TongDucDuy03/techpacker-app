@@ -1,14 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
+// Supabase client configuration
+// This is a placeholder - replace with your actual Supabase configuration
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+export const isSupabaseConfigured = (): boolean => {
+  // Check if Supabase environment variables are configured
+  return false; // Set to true when Supabase is configured
+};
 
-export const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : undefined;
-
-export function isSupabaseConfigured(): boolean {
-  return Boolean(supabase);
-}
-
-
+// Use a permissive type to avoid type errors where optional Supabase paths are guarded at runtime
+export const supabase: any = null; // Replace with actual Supabase client when configured

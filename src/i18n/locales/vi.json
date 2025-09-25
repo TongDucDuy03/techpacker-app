@@ -1,0 +1,537 @@
+{
+  "common": {
+    "loading": "Đang tải...",
+    "save": "Lưu",
+    "cancel": "Hủy",
+    "delete": "Xóa",
+    "edit": "Chỉnh sửa",
+    "create": "Tạo mới",
+    "update": "Cập nhật",
+    "search": "Tìm kiếm",
+    "filter": "Lọc",
+    "export": "Xuất",
+    "import": "Nhập",
+    "back": "Quay lại",
+    "next": "Tiếp theo",
+    "previous": "Trước",
+    "close": "Đóng",
+    "confirm": "Xác nhận",
+    "yes": "Có",
+    "no": "Không",
+    "ok": "OK",
+    "error": "Lỗi",
+    "success": "Thành công",
+    "warning": "Cảnh báo",
+    "info": "Thông tin",
+    "required": "Bắt buộc",
+    "optional": "Tùy chọn",
+    "name": "Tên",
+    "description": "Mô tả",
+    "status": "Trạng thái",
+    "date": "Ngày",
+    "actions": "Hành động",
+    "settings": "Cài đặt",
+    "help": "Trợ giúp",
+    "logout": "Đăng xuất",
+    "login": "Đăng nhập",
+    "register": "Đăng ký",
+    "profile": "Hồ sơ",
+    "dashboard": "Bảng điều khiển",
+    "home": "Trang chủ",
+    "about": "Giới thiệu",
+    "contact": "Liên hệ",
+    "activities": "Hoạt động",
+    "team": "Nhóm"
+  },
+  "navigation": {
+    "dashboard": "Bảng điều khiển",
+    "techpacks": "TechPack",
+    "bom": "BOM",
+    "measurements": "Kích thước",
+    "construction": "Cấu trúc",
+    "care": "Hướng dẫn bảo quản",
+    "materials": "Vật liệu",
+    "suppliers": "Nhà cung cấp",
+    "reports": "Báo cáo",
+    "settings": "Cài đặt",
+    "help": "Trợ giúp"
+  },
+  "techpack": {
+    "title": "TechPack",
+    "create": "Tạo TechPack",
+    "edit": "Chỉnh sửa TechPack",
+    "delete": "Xóa TechPack",
+    "name": "Tên TechPack",
+    "category": "Danh mục",
+    "status": "Trạng thái",
+    "season": "Mùa",
+    "brand": "Thương hiệu",
+    "designer": "Nhà thiết kế",
+    "dateCreated": "Ngày tạo",
+    "lastModified": "Lần sửa cuối",
+    "version": "Phiên bản",
+    "images": "Hình ảnh",
+    "materials": "Vật liệu",
+    "measurements": "Kích thước",
+    "construction": "Chi tiết cấu trúc",
+    "care": "Hướng dẫn bảo quản",
+    "colorways": "Màu sắc",
+    "statuses": {
+      "draft": "Bản nháp",
+      "review": "Xem xét",
+      "approved": "Đã duyệt",
+      "production": "Sản xuất"
+    },
+    "categories": {
+      "apparel": "Quần áo",
+      "accessories": "Phụ kiện",
+      "footwear": "Giày dép",
+      "other": "Khác"
+    },
+    "validation": {
+      "nameRequired": "Tên TechPack là bắt buộc",
+      "categoryRequired": "Danh mục là bắt buộc",
+      "seasonRequired": "Mùa là bắt buộc",
+      "brandRequired": "Thương hiệu là bắt buộc",
+      "designerRequired": "Nhà thiết kế là bắt buộc"
+    },
+    "messages": {
+      "created": "TechPack đã được tạo thành công",
+      "updated": "TechPack đã được cập nhật thành công",
+      "deleted": "TechPack đã được xóa thành công",
+      "error": "Đã xảy ra lỗi khi xử lý TechPack"
+    }
+  },
+  "bom": {
+    "title": "Bảng vật liệu",
+    "subtitle": "Quản lý vải, phụ kiện, nhãn và bao bì cho Tech Pack",
+    "actions": {
+      "importExcel": "Nhập Excel",
+      "exportCsv": "Xuất CSV",
+      "addItem": "Thêm mục",
+      "addComment": "Thêm ghi chú",
+      "remove": "Xóa",
+      "chooseImages": "Chọn ảnh"
+    },
+    "filters": "Bộ lọc",
+    "searchPlaceholder": "Tìm vật liệu, mã, nhà cung cấp...",
+    "placeholders": {
+      "materialCode": "VD: FAB-001, TRM-002",
+      "sizeSpecFabric": "VD: 18L, 20M",
+      "sizeSpecTrims": "VD: 3/4\"x3/4\"",
+      "supplierInput": "Chọn hoặc nhập tên nhà cung cấp",
+      "color": "VD: Xanh navy, Trắng",
+      "comment": "Nhập ghi chú kỹ thuật"
+    },
+    "form": {
+      "titleAdd": "Thêm mục BOM mới",
+      "titleEdit": "Chỉnh sửa mục BOM"
+    },
+    "create": "Thêm mục BOM",
+    "edit": "Chỉnh sửa mục BOM",
+    "delete": "Xóa mục BOM",
+    "part": "Bộ phận",
+    "materialCode": "Mã vật liệu",
+    "placement": "Vị trí",
+    "sizeSpec": "Thông số kích thước",
+    "quantity": "Số lượng",
+    "uom": "Đơn vị đo",
+    "supplier": "Nhà cung cấp",
+    "color": "Màu sắc",
+    "weight": "Trọng lượng",
+    "cost": "Chi phí",
+    "leadTime": "Thời gian giao hàng",
+    "comments": "Ghi chú",
+    "images": "Hình ảnh",
+    "parts": {
+      "fabric": "Vải",
+      "trims": "Phụ kiện",
+      "labels": "Nhãn",
+      "packaging": "Bao bì"
+    },
+    "placements": {
+      "collar": "Cổ áo",
+      "placket": "Nút áo",
+      "pocket": "Túi",
+      "sleeve": "Tay áo",
+      "body": "Thân áo",
+      "cuff": "Cổ tay",
+      "hem": "Gấu",
+      "seam": "Đường may",
+      "buttonhole": "Khuy áo",
+      "zipper": "Khóa kéo",
+      "other": "Khác"
+    },
+    "uoms": {
+      "yards": "Yards",
+      "meters": "Mét",
+      "pieces": "Cái",
+      "dozen": "Tá",
+      "rolls": "Cuộn",
+      "sheets": "Tờ",
+      "feet": "Feet",
+      "inches": "Inches",
+      "grams": "Gam",
+      "kilograms": "Kilogram"
+    },
+    "validation": {
+      "partRequired": "Bộ phận là bắt buộc",
+      "materialCodeRequired": "Mã vật liệu là bắt buộc",
+      "sizeSpecRequired": "Thông số kích thước là bắt buộc",
+      "quantityRequired": "Số lượng là bắt buộc",
+      "uomRequired": "Đơn vị đo là bắt buộc",
+      "supplierRequired": "Nhà cung cấp là bắt buộc",
+      "quantityPositive": "Số lượng phải là số dương",
+      "sizeSpecFormatFabric": "Kích thước vải dạng 18L, 20M, ...",
+      "sizeSpecFormatTrims": "Kích thước phụ kiện dạng 3/4\"x3/4\""
+    },
+    "messages": {
+      "created": "Mục BOM đã được thêm thành công",
+      "updated": "Mục BOM đã được cập nhật thành công",
+      "deleted": "Mục BOM đã được xóa thành công",
+      "error": "Đã xảy ra lỗi khi xử lý mục BOM"
+    }
+  },
+  "measurements": {
+    "title": "Điểm đo",
+    "headerTitle": "Hệ thống Điểm đo (POM)",
+    "headerSubtitle": "Quản lý thông số đo, quy tắc grading và bảng cỡ",
+    "create": "Thêm kích thước",
+    "edit": "Chỉnh sửa kích thước",
+    "delete": "Xóa kích thước",
+    "pomCode": "Mã POM",
+    "pomName": "Tên POM",
+    "tolerances": "Dung sai",
+    "measurements": "Kích thước",
+    "howToMeasure": "Cách đo",
+    "gradeRules": "Máy tính phân cỡ",
+    "comparison": "So sánh kích thước",
+    "category": "Danh mục",
+    "unit": "Đơn vị",
+    "sizeChart": "Bảng cỡ",
+    "sizeChartHint": "Chọn dải cỡ cho các kích thước của bạn",
+    "searchPlaceholder": "Tìm mã POM, tên, danh mục...",
+    "allCategories": "Tất cả danh mục",
+    "moreFilters": "Thêm bộ lọc",
+    "emptyTitle": "Không tìm thấy thông số POM nào",
+    "emptySubtitle": "Hãy tạo thông số POM đầu tiên để bắt đầu",
+    "actions": {
+      "importExcel": "Nhập Excel",
+      "exportPdf": "Xuất PDF"
+    },
+    "viewPOMCode": "Xem thông tin mã POM",
+    "form": {
+      "titleAdd": "Thêm thông số POM mới",
+      "titleEdit": "Chỉnh sửa thông số POM"
+    },
+    "placeholders": {
+      "pomCodeSearch": "Gõ để tìm mã POM...",
+      "howToMeasure": "Nhập hướng dẫn chi tiết cách đo cho POM này..."
+    },
+    "gradeRules": "Quy tắc grading",
+    "minusTol": "Dung sai trừ",
+    "plusTol": "Dung sai cộng",
+    "units": {
+      "inches": "Inch",
+      "cm": "Centimet",
+      "mm": "Milimet"
+    },
+    "validation": {
+      "pomCodeRequired": "Mã POM là bắt buộc",
+      "pomNameRequired": "Tên POM là bắt buộc",
+      "categoryRequired": "Danh mục là bắt buộc",
+      "tolerancesRequired": "Dung sai là bắt buộc",
+      "howToMeasureRequired": "Hướng dẫn cách đo là bắt buộc",
+      "measurementsRequired": "Bảng kích thước là bắt buộc",
+      "unitRequired": "Đơn vị là bắt buộc"
+    },
+    "messages": {
+      "created": "Kích thước đã được thêm thành công",
+      "updated": "Kích thước đã được cập nhật thành công",
+      "deleted": "Kích thước đã được xóa thành công",
+      "error": "Đã xảy ra lỗi khi xử lý kích thước"
+    }
+  },
+  "construction": {
+    "title": "Chi tiết cấu trúc",
+    "subtitle": "Quản lý chi tiết kỹ thuật và tài nguyên",
+    "create": "Thêm chi tiết cấu trúc",
+    "edit": "Chỉnh sửa chi tiết cấu trúc",
+    "delete": "Xóa chi tiết cấu trúc",
+    "save": "Lưu",
+    "cancel": "Hủy",
+    "details": "Chi tiết",
+    "drawings": "Bản vẽ kỹ thuật",
+    "library": "Thư viện cấu trúc",
+    "templates": "Mẫu",
+    "symbols": "Ký hiệu",
+    "specifications": "Thông số kỹ thuật",
+    "instructions": "Hướng dẫn công việc",
+    "checklist": "Checklist chất lượng",
+    "allDifficulties": "Tất cả độ khó",
+    "minutes": "phút",
+    "specs": "thông số",
+    "drawingCanvas": "Bảng vẽ kỹ thuật",
+    "drawingCanvasHint": "Bảng vẽ dựa trên SVG với công cụ và lớp sẽ sớm ra mắt",
+    "libraryHint": "Quản lý thư viện chi tiết cấu trúc và mẫu",
+    "librarySystem": "Hệ thống thư viện cấu trúc",
+    "libraryIntro": "Tổ chức và chia sẻ chi tiết cấu trúc, mẫu và ký hiệu",
+    "createLibraries": "Tạo thư viện",
+    "createLibrariesHint": "Tổ chức chi tiết cấu trúc theo danh mục hoặc dự án",
+    "shareExport": "Chia sẻ & Xuất",
+    "shareExportHint": "Chia sẻ thư viện cho nhóm và xuất để sao lưu",
+    "importTemplates": "Nhập mẫu",
+    "importTemplatesHint": "Nhập các mẫu và chi tiết cấu trúc tiêu chuẩn",
+    "category": "Danh mục",
+    "name": "Tên chi tiết",
+    "description": "Mô tả",
+    "placeholders": {
+      "name": "VD: Đường may Flat Fell",
+      "description": "Mô tả chi tiết cấu trúc...",
+      "qualityCheckpoint": "Điểm kiểm tra chất lượng...",
+      "specialInstruction": "Hướng dẫn đặc biệt...",
+      "materialName": "Tên vật liệu...",
+      "toolName": "Tên công cụ...",
+      "tagName": "Tên thẻ..."
+    },
+    "specifications": "Thông số kỹ thuật",
+    "sequence": "Thứ tự",
+    "qualityCheckpoints": "Điểm kiểm tra chất lượng",
+    "specialInstructions": "Hướng dẫn đặc biệt",
+    "materials": "Vật liệu",
+    "tools": "Công cụ",
+    "estimatedTime": "Thời gian ước tính (phút)",
+    "difficulty": "Độ khó",
+    "diagram": "Sơ đồ",
+    "photos": "Hình ảnh",
+    "tags": "Thẻ",
+    "spi": "Mũi may trên mỗi inch (SPI)",
+    "needleSize": "Cỡ kim",
+    "presserFoot": "Chân vịt",
+    "tension": "Độ căng chỉ",
+    "categories": "Danh mục",
+    "form": {
+      "basicInfo": "Thông tin cơ bản",
+      "materialsTools": "Vật liệu & Công cụ"
+    },
+    "actions": {
+      "addSpecification": "Thêm thông số",
+      "addCheckpoint": "Thêm điểm kiểm tra",
+      "addInstruction": "Thêm hướng dẫn",
+      "addMaterial": "Thêm vật liệu",
+      "addTool": "Thêm công cụ",
+      "addTag": "Thêm thẻ"
+    },
+    "seamSpecifications": "Thông số đường may",
+    "specification": "Thông số",
+    "seamTypeLabel": "Loại đường may",
+    "threadColor": "Màu chỉ",
+    "createDetail": "Tạo chi tiết",
+    "editDetail": "Chỉnh sửa chi tiết",
+    "createDrawing": "Tạo bản vẽ",
+    "editDrawing": "Chỉnh sửa bản vẽ",
+    "duplicate": "Nhân bản",
+    "deleteDetail": "Xóa chi tiết",
+    "categories": {
+      "seams": "Đường may",
+      "pockets": "Túi",
+      "collar": "Cổ áo",
+      "sleeves": "Tay áo",
+      "closures": "Khóa",
+      "hems": "Gấu",
+      "pleats": "Nếp gấp",
+      "darts": "Nếp nhọn",
+      "other": "Khác"
+    },
+    "difficulties": {
+      "easy": "Dễ",
+      "medium": "Trung bình",
+      "hard": "Khó",
+      "expert": "Chuyên gia"
+    },
+    "validation": {
+      "categoryRequired": "Danh mục là bắt buộc",
+      "nameRequired": "Tên chi tiết là bắt buộc",
+      "descriptionRequired": "Mô tả là bắt buộc",
+      "sequenceRequired": "Thứ tự là bắt buộc",
+      "estimatedTimeRequired": "Thời gian ước tính là bắt buộc",
+      "specificationsRequired": "Cần ít nhất một thông số"
+    },
+    "messages": {
+      "created": "Chi tiết cấu trúc đã được thêm thành công",
+      "updated": "Chi tiết cấu trúc đã được cập nhật thành công",
+      "deleted": "Chi tiết cấu trúc đã được xóa thành công",
+      "error": "Đã xảy ra lỗi khi xử lý chi tiết cấu trúc"
+    }
+  },
+  "care": {
+    "title": "Hướng dẫn bảo quản",
+    "create": "Thêm hướng dẫn bảo quản",
+    "edit": "Chỉnh sửa hướng dẫn bảo quản",
+    "delete": "Xóa hướng dẫn bảo quản",
+    "language": "Ngôn ngữ",
+    "symbols": "Ký hiệu",
+    "textInstructions": "Hướng dẫn bằng văn bản",
+    "specialInstructions": "Hướng dẫn đặc biệt",
+    "warnings": "Cảnh báo",
+    "languages": {
+      "en": "Tiếng Anh",
+      "vi": "Tiếng Việt",
+      "es": "Tiếng Tây Ban Nha",
+      "fr": "Tiếng Pháp",
+      "de": "Tiếng Đức",
+      "it": "Tiếng Ý",
+      "pt": "Tiếng Bồ Đào Nha",
+      "ru": "Tiếng Nga",
+      "ja": "Tiếng Nhật",
+      "ko": "Tiếng Hàn",
+      "zh": "Tiếng Trung"
+    },
+    "validation": {
+      "languageRequired": "Ngôn ngữ là bắt buộc",
+      "symbolsRequired": "Ít nhất một ký hiệu là bắt buộc",
+      "textInstructionsRequired": "Hướng dẫn bằng văn bản là bắt buộc"
+    },
+    "messages": {
+      "created": "Hướng dẫn bảo quản đã được thêm thành công",
+      "updated": "Hướng dẫn bảo quản đã được cập nhật thành công",
+      "deleted": "Hướng dẫn bảo quản đã được xóa thành công",
+      "error": "Đã xảy ra lỗi khi xử lý hướng dẫn bảo quản"
+    },
+    "tabs": {
+      "symbols": "Ký hiệu",
+      "instructions": "Hướng dẫn",
+      "compliance": "Tuân thủ",
+      "designer": "Thiết kế nhãn",
+      "regulations": "Quy định"
+    },
+    "generatedName": "Nhãn bảo quản đã tạo",
+    "progress": {
+      "title": "Tiến độ",
+      "summary": "{{completed}} / {{total}} mục đã hoàn thành"
+    },
+    "actions": {
+      "preview": "Xem trước nhãn",
+      "export": "Xuất nhãn",
+      "saving": "Đang lưu...",
+      "save": "Lưu nhãn bảo quản"
+    },
+    "preview": {
+      "title": "Xem trước nhãn",
+      "visual": "Xem trước hình ảnh",
+      "details": "Chi tiết nhãn",
+      "name": "Tên:",
+      "size": "Kích thước:",
+      "languages": "Ngôn ngữ:",
+      "symbols": "Ký hiệu:",
+      "cost": "Chi phí/nhãn:",
+      "placement": "Vị trí:",
+      "placement.sideSeam": "Sườn áo",
+      "placement.sewn": "May cố định",
+      "placement.standard": "Chuẩn"
+    }
+  },
+  "validation": {
+    "title": "Xác thực",
+    "validate": "Xác thực",
+    "isValid": "Hợp lệ",
+    "isInvalid": "Không hợp lệ",
+    "errors": "Lỗi",
+    "warnings": "Cảnh báo",
+    "suggestions": "Gợi ý",
+    "completeness": "Độ hoàn thiện",
+    "consistency": "Tính nhất quán",
+    "businessRules": "Quy tắc kinh doanh",
+    "compliance": "Tuân thủ",
+    "overall": "Tổng thể",
+    "basic": "Thông tin cơ bản",
+    "bom": "BOM",
+    "measurements": "Kích thước",
+    "construction": "Cấu trúc",
+    "care": "Hướng dẫn bảo quản",
+    "messages": {
+      "validationComplete": "Xác thực hoàn tất",
+      "validationFailed": "Xác thực thất bại",
+      "noErrors": "Không có lỗi",
+      "fixErrors": "Vui lòng sửa lỗi trước khi tiếp tục"
+    }
+  },
+  "ui": {
+    "theme": {
+      "light": "Sáng",
+      "dark": "Tối"
+    },
+    "language": {
+      "english": "English",
+      "vietnamese": "Tiếng Việt"
+    },
+    "sidebar": {
+      "collapse": "Thu gọn thanh bên",
+      "expand": "Mở rộng thanh bên"
+    },
+    "notifications": {
+      "success": "Thành công",
+      "error": "Lỗi",
+      "warning": "Cảnh báo",
+      "info": "Thông tin"
+    },
+    "forms": {
+      "required": "Trường này là bắt buộc",
+      "invalid": "Giá trị không hợp lệ",
+      "minLength": "Độ dài tối thiểu là {{count}} ký tự",
+      "maxLength": "Độ dài tối đa là {{count}} ký tự",
+      "email": "Vui lòng nhập địa chỉ email hợp lệ",
+      "url": "Vui lòng nhập URL hợp lệ",
+      "number": "Vui lòng nhập số hợp lệ",
+      "positive": "Vui lòng nhập số dương"
+    }
+  },
+  "errors": {
+    "network": "Lỗi mạng. Vui lòng kiểm tra kết nối của bạn.",
+    "server": "Lỗi máy chủ. Vui lòng thử lại sau.",
+    "unauthorized": "Bạn không có quyền thực hiện hành động này.",
+    "forbidden": "Truy cập bị từ chối.",
+    "notFound": "Không tìm thấy tài nguyên được yêu cầu.",
+    "validation": "Vui lòng kiểm tra thông tin nhập vào và thử lại.",
+    "unknown": "Đã xảy ra lỗi không xác định."
+  },
+  "success": {
+    "saved": "Thay đổi đã được lưu thành công",
+    "deleted": "Mục đã được xóa thành công",
+    "created": "Mục đã được tạo thành công",
+    "updated": "Mục đã được cập nhật thành công",
+    "exported": "Dữ liệu đã được xuất thành công",
+    "imported": "Dữ liệu đã được nhập thành công"
+  },
+  "tpl": {
+    "header": {
+      "title": "Quản lý Tech Pack",
+      "subtitle": "Quản lý bộ hồ sơ kỹ thuật thời trang"
+    },
+    "new": "Tạo Tech Pack",
+    "search": {
+      "placeholder": "Tìm kiếm Tech Pack..."
+    },
+    "filter": {
+      "status": {
+        "all": "Tất cả trạng thái",
+        "draft": "Nháp",
+        "review": "Đang duyệt",
+        "approved": "Đã duyệt",
+        "production": "Sản xuất"
+      },
+      "category": {
+        "all": "Tất cả danh mục"
+      },
+      "more": "Thêm bộ lọc"
+    },
+    "card": {
+      "view": "Xem"
+    },
+    "empty": {
+      "title": "Không tìm thấy Tech Pack nào",
+      "subtitle": "Hãy thử điều chỉnh từ khóa hoặc bộ lọc",
+      "cta": "Tạo Tech Pack đầu tiên"
+    }
+  }
+}

@@ -1,0 +1,136 @@
+version: '3.8'
+
+services:
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:80"
+    environment:
+      - REACT_APP_API_URL=http://localhost:4000
+      - REACT_APP_WS_URL=ws://localhost:4000
+    depends_on:
+      - backend
+    networks:
+      - techpacker-network
+
+  # Backend
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - PG_USER=postgres
+      - PG_PASSWORD=postgres
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_DATABASE=techpacker
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your-jwt-secret
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - techpacker-network
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=techpacker
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./supabase/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - techpacker-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - techpacker-network
+
+  # Nginx Load Balancer
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - techpacker-network
+
+  # Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - techpacker-network
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - techpacker-network
+
+  # Log Aggregation
+  elasticsearch:
+    image: elasticsearch:8.8.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - techpacker-network
+
+  # Kibana
+  kibana:
+    image: kibana:8.8.0
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - techpacker-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  grafana_data:
+  elasticsearch_data:
+
+networks:
+  techpacker-network:
+    driver: bridge

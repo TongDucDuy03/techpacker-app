@@ -1,0 +1,536 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "update": "Update",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "import": "Import",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "close": "Close",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "ok": "OK",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Info",
+    "required": "Required",
+    "optional": "Optional",
+    "name": "Name",
+    "description": "Description",
+    "status": "Status",
+    "date": "Date",
+    "actions": "Actions",
+    "settings": "Settings",
+    "help": "Help",
+    "logout": "Logout",
+    "login": "Login",
+    "register": "Register",
+    "profile": "Profile",
+    "dashboard": "Dashboard",
+    "home": "Home",
+    "about": "About",
+    "contact": "Contact",
+    "activities": "Activities",
+    "team": "Team"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "techpacks": "TechPacks",
+    "bom": "BOM",
+    "measurements": "Measurements",
+    "construction": "Construction",
+    "care": "Care Instructions",
+    "materials": "Materials",
+    "suppliers": "Suppliers",
+    "reports": "Reports",
+    "settings": "Settings",
+    "help": "Help"
+  },
+  "techpack": {
+    "title": "TechPack",
+    "create": "Create TechPack",
+    "edit": "Edit TechPack",
+    "delete": "Delete TechPack",
+    "name": "TechPack Name",
+    "category": "Category",
+    "status": "Status",
+    "season": "Season",
+    "brand": "Brand",
+    "designer": "Designer",
+    "dateCreated": "Date Created",
+    "lastModified": "Last Modified",
+    "version": "Version",
+    "images": "Images",
+    "materials": "Materials",
+    "measurements": "Measurements",
+    "construction": "Construction Details",
+    "care": "Care Instructions",
+    "colorways": "Colorways",
+    "statuses": {
+      "draft": "Draft",
+      "review": "Review",
+      "approved": "Approved",
+      "production": "Production"
+    },
+    "categories": {
+      "apparel": "Apparel",
+      "accessories": "Accessories",
+      "footwear": "Footwear",
+      "other": "Other"
+    },
+    "validation": {
+      "nameRequired": "TechPack name is required",
+      "categoryRequired": "Category is required",
+      "seasonRequired": "Season is required",
+      "brandRequired": "Brand is required",
+      "designerRequired": "Designer is required"
+    },
+    "messages": {
+      "created": "TechPack created successfully",
+      "updated": "TechPack updated successfully",
+      "deleted": "TechPack deleted successfully",
+      "error": "An error occurred while processing the TechPack"
+    }
+  },
+  "bom": {
+    "title": "Bill of Materials",
+    "subtitle": "Manage materials, trims, labels, and packaging for your tech pack",
+    "actions": {
+      "importExcel": "Import Excel",
+      "exportCsv": "Export CSV",
+      "addItem": "Add Item",
+      "addComment": "Add Comment",
+      "remove": "Remove",
+      "chooseImages": "Choose Images"
+    },
+    "filters": "Filters",
+    "searchPlaceholder": "Search materials, codes, suppliers...",
+    "placeholders": {
+      "materialCode": "e.g., FAB-001, TRM-002",
+      "sizeSpecFabric": "e.g., 18L, 20M",
+      "sizeSpecTrims": "e.g., 3/4\"x3/4\"",
+      "supplierInput": "Select or type supplier name",
+      "color": "e.g., Navy Blue, White",
+      "comment": "Enter technical comment"
+    },
+    "form": {
+      "titleAdd": "Add New BOM Item",
+      "titleEdit": "Edit BOM Item"
+    },
+    "create": "Add BOM Item",
+    "edit": "Edit BOM Item",
+    "delete": "Delete BOM Item",
+    "part": "Part",
+    "materialCode": "Material Code",
+    "placement": "Placement",
+    "sizeSpec": "Size Specification",
+    "quantity": "Quantity",
+    "uom": "Unit of Measure",
+    "supplier": "Supplier",
+    "color": "Color",
+    "weight": "Weight",
+    "cost": "Cost",
+    "leadTime": "Lead Time",
+    "comments": "Comments",
+    "images": "Images",
+    "parts": {
+      "fabric": "Fabric",
+      "trims": "Trims",
+      "labels": "Labels",
+      "packaging": "Packaging"
+    },
+    "placements": {
+      "collar": "Collar",
+      "placket": "Placket",
+      "pocket": "Pocket",
+      "sleeve": "Sleeve",
+      "body": "Body",
+      "cuff": "Cuff",
+      "hem": "Hem",
+      "seam": "Seam",
+      "buttonhole": "Buttonhole",
+      "zipper": "Zipper",
+      "other": "Other"
+    },
+    "uoms": {
+      "yards": "Yards",
+      "meters": "Meters",
+      "pieces": "Pieces",
+      "dozen": "Dozen",
+      "rolls": "Rolls",
+      "sheets": "Sheets",
+      "feet": "Feet",
+      "inches": "Inches",
+      "grams": "Grams",
+      "kilograms": "Kilograms"
+    },
+    "validation": {
+      "partRequired": "Part is required",
+      "materialCodeRequired": "Material code is required",
+      "sizeSpecRequired": "Size specification is required",
+      "quantityRequired": "Quantity is required",
+      "uomRequired": "Unit of measure is required",
+      "supplierRequired": "Supplier is required",
+      "quantityPositive": "Quantity must be positive",
+      "sizeSpecFormatFabric": "Fabric size should be like 18L, 20M, etc.",
+      "sizeSpecFormatTrims": "Trim size should be like 3/4\"x3/4\""
+    },
+    "messages": {
+      "created": "BOM item added successfully",
+      "updated": "BOM item updated successfully",
+      "deleted": "BOM item deleted successfully",
+      "error": "An error occurred while processing the BOM item"
+    }
+  },
+  "measurements": {
+    "title": "Points of Measure",
+    "headerTitle": "Point of Measurement (POM) System",
+    "headerSubtitle": "Manage measurement specifications, grading rules, and size charts",
+    "create": "Add Measurement",
+    "edit": "Edit Measurement",
+    "delete": "Delete Measurement",
+    "pomCode": "POM Code",
+    "pomName": "POM Name",
+    "tolerances": "Tolerances",
+    "measurements": "Measurements",
+    "howToMeasure": "How to Measure",
+    "gradeRules": "Grade Calculator",
+    "comparison": "Measurement Comparison",
+    "category": "Category",
+    "unit": "Unit",
+    "sizeChart": "Size Chart",
+    "sizeChartHint": "Select the size range for your measurements",
+    "searchPlaceholder": "Search POM codes, names, categories...",
+    "allCategories": "All Categories",
+    "moreFilters": "More Filters",
+    "emptyTitle": "No POM specifications found",
+    "emptySubtitle": "Create your first POM specification to get started",
+    "actions": {
+      "importExcel": "Import Excel",
+      "exportPdf": "Export PDF"
+    },
+    "viewPOMCode": "View POM Code Info",
+    "form": {
+      "titleAdd": "Add New POM Specification",
+      "titleEdit": "Edit POM Specification"
+    },
+    "placeholders": {
+      "pomCodeSearch": "Type to search POM codes...",
+      "howToMeasure": "Enter detailed instructions on how to measure this POM..."
+    },
+    "gradeRules": "Grade Rules",
+    "minusTol": "Minus Tolerance",
+    "plusTol": "Plus Tolerance",
+    "units": {
+      "inches": "Inches",
+      "cm": "Centimeters",
+      "mm": "Millimeters"
+    },
+    "validation": {
+      "pomCodeRequired": "POM code is required",
+      "pomNameRequired": "POM name is required",
+      "categoryRequired": "Category is required",
+      "tolerancesRequired": "Tolerances are required",
+      "howToMeasureRequired": "How to measure instructions are required",
+      "measurementsRequired": "Measurements are required",
+      "unitRequired": "Unit is required"
+    },
+    "messages": {
+      "created": "Measurement added successfully",
+      "updated": "Measurement updated successfully",
+      "deleted": "Measurement deleted successfully",
+      "error": "An error occurred while processing the measurement"
+    }
+  },
+  "construction": {
+    "title": "Construction Details",
+    "subtitle": "Manage technical construction details and assets",
+    "create": "Add Construction Detail",
+    "edit": "Edit Construction Detail",
+    "delete": "Delete Construction Detail",
+    "save": "Save",
+    "cancel": "Cancel",
+    "details": "Details",
+    "drawings": "Technical Drawings",
+    "library": "Construction Library",
+    "templates": "Templates",
+    "symbols": "Symbols",
+    "specifications": "Specifications",
+    "instructions": "Work Instructions",
+    "checklist": "Quality Checklist",
+    "allDifficulties": "All Difficulties",
+    "minutes": "min",
+    "specs": "specs",
+    "drawingCanvas": "Technical Drawing Canvas",
+    "drawingCanvasHint": "Advanced SVG-based drawing canvas with tools and layers coming soon",
+    "libraryHint": "Manage construction detail libraries and templates",
+    "librarySystem": "Construction library system",
+    "libraryIntro": "Organize and share construction details, templates, and symbols",
+    "createLibraries": "Create Libraries",
+    "createLibrariesHint": "Organize construction details by category or project",
+    "shareExport": "Share & Export",
+    "shareExportHint": "Share libraries with team members and export for backup",
+    "importTemplates": "Import Templates",
+    "importTemplatesHint": "Import standard construction templates and details",
+    "category": "Category",
+    "name": "Detail Name",
+    "description": "Description",
+    "placeholders": {
+      "name": "e.g., Flat Fell Seam",
+      "description": "Describe the construction detail...",
+      "qualityCheckpoint": "Quality checkpoint...",
+      "specialInstruction": "Special instruction...",
+      "materialName": "Material name...",
+      "toolName": "Tool name...",
+      "tagName": "Tag name..."
+    },
+    "sequence": "Sequence",
+    "qualityCheckpoints": "Quality Checkpoints",
+    "specialInstructions": "Special Instructions",
+    "materials": "Materials",
+    "tools": "Tools",
+    "estimatedTime": "Estimated Time (minutes)",
+    "difficulty": "Difficulty",
+    "diagram": "Diagram",
+    "photos": "Photos",
+    "tags": "Tags",
+    "spi": "Stitches per inch (SPI)",
+    "needleSize": "Needle size",
+    "presserFoot": "Presser foot",
+    "tension": "Thread tension",
+    "categoriesLabel": "Categories",
+    "form": {
+      "basicInfo": "Basic Info",
+      "materialsTools": "Materials & Tools"
+    },
+    "actions": {
+      "addSpecification": "Add Specification",
+      "addCheckpoint": "Add Checkpoint",
+      "addInstruction": "Add Instruction",
+      "addMaterial": "Add Material",
+      "addTool": "Add Tool",
+      "addTag": "Add Tag"
+    },
+    "seamSpecifications": "Seam Specifications",
+    "specification": "Specification",
+    "seamTypeLabel": "Seam Type",
+    "threadColor": "Thread Color",
+    "createDetail": "Create Detail",
+    "editDetail": "Edit Detail",
+    "createDrawing": "Create Drawing",
+    "editDrawing": "Edit Drawing",
+    "duplicate": "Duplicate",
+    "deleteDetail": "Delete Detail",
+    "categories": {
+      "seams": "Seams",
+      "pockets": "Pockets",
+      "collar": "Collar",
+      "sleeves": "Sleeves",
+      "closures": "Closures",
+      "hems": "Hems",
+      "pleats": "Pleats",
+      "darts": "Darts",
+      "other": "Other"
+    },
+    "difficulties": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard",
+      "expert": "Expert"
+    },
+    "validation": {
+      "categoryRequired": "Category is required",
+      "nameRequired": "Detail name is required",
+      "descriptionRequired": "Description is required",
+      "sequenceRequired": "Sequence is required",
+      "estimatedTimeRequired": "Estimated time is required",
+      "specificationsRequired": "At least one specification is required"
+    },
+    "messages": {
+      "created": "Construction detail added successfully",
+      "updated": "Construction detail updated successfully",
+      "deleted": "Construction detail deleted successfully",
+      "error": "An error occurred while processing the construction detail"
+    }
+  },
+  "care": {
+    "title": "Care Instructions",
+    "create": "Add Care Instruction",
+    "edit": "Edit Care Instruction",
+    "delete": "Delete Care Instruction",
+    "language": "Language",
+    "symbols": "Symbols",
+    "textInstructions": "Text Instructions",
+    "specialInstructions": "Special Instructions",
+    "warnings": "Warnings",
+    "languages": {
+      "en": "English",
+      "vi": "Vietnamese",
+      "es": "Spanish",
+      "fr": "French",
+      "de": "German",
+      "it": "Italian",
+      "pt": "Portuguese",
+      "ru": "Russian",
+      "ja": "Japanese",
+      "ko": "Korean",
+      "zh": "Chinese"
+    },
+    "validation": {
+      "languageRequired": "Language is required",
+      "symbolsRequired": "At least one symbol is required",
+      "textInstructionsRequired": "Text instructions are required"
+    },
+    "messages": {
+      "created": "Care instruction added successfully",
+      "updated": "Care instruction updated successfully",
+      "deleted": "Care instruction deleted successfully",
+      "error": "An error occurred while processing the care instruction"
+    },
+    "tabs": {
+      "symbols": "Care Symbols",
+      "instructions": "Instructions",
+      "compliance": "Compliance",
+      "designer": "Label Designer",
+      "regulations": "Regulations"
+    },
+    "generatedName": "Generated Care Label",
+    "progress": {
+      "title": "Progress",
+      "summary": "{{completed}} of {{total}} sections completed"
+    },
+    "actions": {
+      "preview": "Preview Label",
+      "export": "Export Label",
+      "saving": "Saving...",
+      "save": "Save Care Label"
+    },
+    "preview": {
+      "title": "Care Label Preview",
+      "visual": "Visual Preview",
+      "details": "Label Details",
+      "name": "Name:",
+      "size": "Size:",
+      "languages": "Languages:",
+      "symbols": "Symbols:",
+      "cost": "Cost per Label:",
+      "placement": "Placement:",
+      "placement.sideSeam": "Side seam",
+      "placement.sewn": "Sewn",
+      "placement.standard": "Standard"
+    }
+  },
+  "validation": {
+    "title": "Validation",
+    "validate": "Validate",
+    "isValid": "Valid",
+    "isInvalid": "Invalid",
+    "errors": "Errors",
+    "warnings": "Warnings",
+    "suggestions": "Suggestions",
+    "completeness": "Completeness",
+    "consistency": "Consistency",
+    "businessRules": "Business Rules",
+    "compliance": "Compliance",
+    "overall": "Overall",
+    "basic": "Basic Info",
+    "bom": "BOM",
+    "measurements": "Measurements",
+    "construction": "Construction",
+    "care": "Care Instructions",
+    "messages": {
+      "validationComplete": "Validation completed",
+      "validationFailed": "Validation failed",
+      "noErrors": "No errors found",
+      "fixErrors": "Please fix the errors before proceeding"
+    }
+  },
+  "ui": {
+    "theme": {
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "language": {
+      "english": "English",
+      "vietnamese": "Tiếng Việt"
+    },
+    "sidebar": {
+      "collapse": "Collapse Sidebar",
+      "expand": "Expand Sidebar"
+    },
+    "notifications": {
+      "success": "Success",
+      "error": "Error",
+      "warning": "Warning",
+      "info": "Information"
+    },
+    "forms": {
+      "required": "This field is required",
+      "invalid": "Invalid value",
+      "minLength": "Minimum length is {{count}} characters",
+      "maxLength": "Maximum length is {{count}} characters",
+      "email": "Please enter a valid email address",
+      "url": "Please enter a valid URL",
+      "number": "Please enter a valid number",
+      "positive": "Please enter a positive number"
+    }
+  },
+  "errors": {
+    "network": "Network error. Please check your connection.",
+    "server": "Server error. Please try again later.",
+    "unauthorized": "You are not authorized to perform this action.",
+    "forbidden": "Access denied.",
+    "notFound": "The requested resource was not found.",
+    "validation": "Please check your input and try again.",
+    "unknown": "An unknown error occurred."
+  },
+  "success": {
+    "saved": "Changes saved successfully",
+    "deleted": "Item deleted successfully",
+    "created": "Item created successfully",
+    "updated": "Item updated successfully",
+    "exported": "Data exported successfully",
+    "imported": "Data imported successfully"
+  },
+  "tpl": {
+    "header": {
+      "title": "Tech Pack Management",
+      "subtitle": "Manage your fashion technical packages"
+    },
+    "new": "New Tech Pack",
+    "search": {
+      "placeholder": "Search tech packs..."
+    },
+    "filter": {
+      "status": {
+        "all": "All Status",
+        "draft": "Draft",
+        "review": "Under Review",
+        "approved": "Approved",
+        "production": "Production"
+      },
+      "category": {
+        "all": "All Categories"
+      },
+      "more": "More Filters"
+    },
+    "card": {
+      "view": "View"
+    },
+    "empty": {
+      "title": "No tech packs found",
+      "subtitle": "Try adjusting your search or filter criteria",
+      "cta": "Create Your First Tech Pack"
+    }
+  }
+}

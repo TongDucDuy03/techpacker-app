@@ -1,85 +1,98 @@
 import React from 'react';
-import { useI18n } from '../lib/i18n';
-import { 
-  TrendingUp, 
-  Package, 
-  Clock, 
-  CheckCircle,
-  FileText,
-  AlertTriangle
-} from 'lucide-react';
-import { TechPack, Activity } from '../types';
+import { useTranslation } from '../hooks/useTranslation';
+import { useAppSelector } from '../store/hooks';
+import { Package, Users, TrendingUp, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import TranslatedText from './TranslatedText';
 
 interface DashboardProps {
-  techPacks: TechPack[];
-  activities?: Activity[];
+  techPacks: any[];
+  activities: any[];
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities = [] }) => {
-  const { t } = useI18n();
+const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities }) => {
+  const { t } = useTranslation();
+  const ui = useAppSelector(state => state.ui);
+
   const stats = [
     {
-      title: t('dash.stat.total'),
-      value: techPacks.length.toString(),
-      change: '+12%',
-      trend: 'up',
-      icon: FileText,
-      color: 'bg-blue-500'
-    },
-    {
-      title: t('dash.stat.production'),
-      value: techPacks.filter(tp => tp.status === 'production').length.toString(),
-      change: '+8%',
-      trend: 'up',
+      title: t('techpack.title'),
+      value: techPacks.length,
       icon: Package,
-      color: 'bg-green-500'
+      color: 'bg-blue-500',
+      change: '+12%',
+      changeType: 'positive'
     },
     {
-      title: t('dash.stat.review'),
-      value: techPacks.filter(tp => tp.status === 'review').length.toString(),
-      change: '-3%',
-      trend: 'down',
-      icon: Clock,
-      color: 'bg-yellow-500'
-    },
-    {
-      title: t('dash.stat.approved'),
-      value: techPacks.filter(tp => tp.status === 'approved').length.toString(),
-      change: '+15%',
-      trend: 'up',
+      title: t('common.status'),
+      value: techPacks.filter(tp => tp.status === 'approved').length,
       icon: CheckCircle,
-      color: 'bg-teal-500'
+      color: 'bg-green-500',
+      change: '+8%',
+      changeType: 'positive'
+    },
+    {
+      title: t('common.activities'),
+      value: activities.length,
+      icon: Clock,
+      color: 'bg-yellow-500',
+      change: '+15%',
+      changeType: 'positive'
+    },
+    {
+      title: t('common.team'),
+      value: 12,
+      icon: Users,
+      color: 'bg-purple-500',
+      change: '+2',
+      changeType: 'positive'
     }
   ];
 
-  const recentActivity = activities.slice(0, 6);
+  const recentActivities = activities.slice(0, 5);
 
   return (
     <div className="space-y-6">
+      {/* Welcome Section */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          <TranslatedText translationKey="common.dashboard" />
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          <TranslatedText translationKey="common.welcome" fallback="Welcome to TechPacker" />
+        </p>
+      </div>
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (
-            <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div
+              key={index}
+              className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6"
+            >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">{stat.title}</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-2">{stat.value}</p>
-                  <div className="flex items-center mt-2">
-                    <TrendingUp className={`w-4 h-4 ${
-                      stat.trend === 'up' ? 'text-green-500' : 'text-red-500'
-                    }`} />
-                    <span className={`text-sm ml-1 ${
-                      stat.trend === 'up' ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {stat.change}
-                    </span>
-                  </div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    {stat.title}
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {stat.value}
+                  </p>
                 </div>
-                <div className={`${stat.color} p-3 rounded-lg`}>
+                <div className={`p-3 rounded-full ${stat.color}`}>
                   <Icon className="w-6 h-6 text-white" />
                 </div>
+              </div>
+              <div className="mt-4 flex items-center">
+                <span className={`text-sm font-medium ${
+                  stat.changeType === 'positive' ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {stat.change}
+                </span>
+                <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
+                  vs last month
+                </span>
               </div>
             </div>
           );
@@ -87,101 +100,65 @@ export const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities = []
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Tech Packs */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">{t('dash.recent.techpacks')}</h3>
-          </div>
-          <div className="p-6">
-            <div className="space-y-4">
-              {techPacks.slice(0, 5).map((techPack) => (
-                <div key={techPack.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center space-x-3">
-                    <img
-                      src={techPack.images[0]}
-                      alt={techPack.name}
-                      className="w-12 h-12 rounded-lg object-cover"
-                    />
-                    <div>
-                      <h4 className="font-medium text-gray-900">{techPack.name}</h4>
-                      <p className="text-sm text-gray-500">{techPack.category}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      techPack.status === 'approved' ? 'bg-green-100 text-green-800' :
-                      techPack.status === 'review' ? 'bg-yellow-100 text-yellow-800' :
-                      techPack.status === 'production' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {techPack.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">{t('dash.recent.activity')}</h3>
-          </div>
-          <div className="p-6">
-            <div className="space-y-4">
-              {recentActivity.length === 0 ? (
-                <p className="text-sm text-gray-600">{t('dash.recent.activity.empty')}</p>
-              ) : recentActivity.map((activity) => (
-                <div key={activity.id} className="flex items-start space-x-3">
-                  <div className="bg-teal-100 p-2 rounded-full">
-                    <CheckCircle className="w-4 h-4 text-teal-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-900">
-                      <span className="font-medium">{activity.action}</span> for{' '}
-                      <span className="font-medium">{activity.item}</span>
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      by {activity.user} • {activity.time}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Alerts */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-            <AlertTriangle className="w-5 h-5 text-yellow-500 mr-2" />
-            {t('dash.alerts.title')}
+        {/* Recent Activities */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            <TranslatedText translationKey="common.activities" />
           </h3>
+          <div className="space-y-4">
+            {recentActivities.length > 0 ? (
+              recentActivities.map((activity, index) => (
+                <div key={index} className="flex items-start space-x-3">
+                  <div className="flex-shrink-0">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      {activity.action}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {activity.item} • {activity.time}
+                    </p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-500 dark:text-gray-400 text-sm">
+                <TranslatedText translationKey="common.noActivities" fallback="No recent activities" />
+              </p>
+            )}
+          </div>
         </div>
-        <div className="p-6">
+
+        {/* Quick Actions */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            <TranslatedText translationKey="common.quickActions" fallback="Quick Actions" />
+          </h3>
           <div className="space-y-3">
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-center">
-                <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2" />
-                <p className="text-sm text-yellow-800">
-                  <span className="font-medium">Denim Jacket</span> {t('dash.alerts.pendingReview.suffix')}
-                </p>
-              </div>
-            </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center">
-                <Clock className="w-5 h-5 text-blue-600 mr-2" />
-                <p className="text-sm text-blue-800">
-                  {t('dash.alerts.seasonDeadline.prefix')} <span className="font-medium">Spring 2024 collection</span> {t('dash.alerts.seasonDeadline.suffix')}
-                </p>
-              </div>
-            </div>
+            <button className="w-full flex items-center space-x-3 p-3 text-left rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+              <Package className="w-5 h-5 text-blue-500" />
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                <TranslatedText translationKey="techpack.create" />
+              </span>
+            </button>
+            <button className="w-full flex items-center space-x-3 p-3 text-left rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+              <TrendingUp className="w-5 h-5 text-green-500" />
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                <TranslatedText translationKey="common.reports" fallback="View Reports" />
+              </span>
+            </button>
+            <button className="w-full flex items-center space-x-3 p-3 text-left rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+              <AlertCircle className="w-5 h-5 text-yellow-500" />
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                <TranslatedText translationKey="common.alerts" fallback="View Alerts" />
+              </span>
+            </button>
           </div>
         </div>
       </div>
     </div>
   );
 };
+
+export default Dashboard;

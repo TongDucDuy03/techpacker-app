@@ -333,15 +333,30 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [lang, setLangState] = useState<LanguageCode>('en');
 
   useEffect(() => {
-    const saved = localStorage.getItem('lang') as LanguageCode | null;
-    if (saved === 'en' || saved === 'vi') {
-      setLangState(saved);
+    // Prefer unified key used by app-wide LanguageProvider
+    const savedUnified = localStorage.getItem('techpacker-language') as LanguageCode | null;
+    const savedLegacy = localStorage.getItem('lang') as LanguageCode | null;
+    const next = savedUnified ?? savedLegacy;
+    if (next === 'en' || next === 'vi') {
+      setLangState(next);
     }
+
+    // React to language changes from other contexts (e.g., i18next LanguageProvider)
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'techpacker-language' && (e.newValue === 'en' || e.newValue === 'vi')) {
+        setLangState(e.newValue as LanguageCode);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   const setLang = (next: LanguageCode) => {
     setLangState(next);
-    try { localStorage.setItem('lang', next); } catch {}
+    try {
+      localStorage.setItem('lang', next);
+      localStorage.setItem('techpacker-language', next);
+    } catch {}
   };
 
   const t = useMemo(() => {
