@@ -28,7 +28,7 @@ const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onMenuClick}
             className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-700 transition-colors"
-            aria-label={t('ui.sidebar.collapse')}
+            aria-label={t('sidebar.collapse', 'Toggle menu')}
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -48,7 +48,7 @@ const Header: React.FC<HeaderProps> = ({
           <div className="relative">
             <input
               type="text"
-              placeholder={t('common.search')}
+              placeholder={t('buttons.search')}
               className="
                 w-full px-4 py-2 pl-10 pr-4 text-sm border border-gray-300 dark:border-gray-600 
                 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white
@@ -78,7 +78,7 @@ const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onNotificationClick}
             className="relative p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-700 transition-colors"
-            aria-label={t('ui.notifications.info')}
+            aria-label={t('dashboard.alerts', 'Notifications')}
           >
             <Bell className="w-5 h-5" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -88,7 +88,7 @@ const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onSettingsClick}
             className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-700 transition-colors"
-            aria-label={t('common.settings')}
+            aria-label={t('sidebar.settings')}
           >
             <Settings className="w-5 h-5" />
           </button>
@@ -97,7 +97,7 @@ const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onProfileClick}
             className="flex items-center space-x-2 p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-700 transition-colors"
-            aria-label={t('common.profile')}
+            aria-label={t('common.profile', 'Profile')}
           >
             <User className="w-5 h-5" />
             <span className="hidden sm:block text-sm font-medium">

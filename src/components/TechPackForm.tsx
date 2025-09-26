@@ -318,7 +318,7 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {t('form.productName')} *
+                      {t('techpack.name')} *
                     </label>
                     <input
                       type="text"
@@ -330,7 +330,7 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {t('form.category')} *
+                      {t('techpack.category')} *
                     </label>
                     <select
                       required
@@ -338,16 +338,16 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
                       onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                     >
-                      <option value="Shirts">Shirts</option>
-                      <option value="Outerwear">Outerwear</option>
-                      <option value="Dresses">Dresses</option>
-                      <option value="Pants">Pants</option>
-                      <option value="Accessories">Accessories</option>
+                      <option value="Shirts">{t('techpack.categories.shirts', 'Shirts')}</option>
+                      <option value="Outerwear">{t('techpack.categories.outerwear', 'Outerwear')}</option>
+                      <option value="Dresses">{t('techpack.categories.dresses', 'Dresses')}</option>
+                      <option value="Pants">{t('techpack.categories.pants', 'Pants')}</option>
+                      <option value="Accessories">{t('techpack.categories.accessories', 'Accessories')}</option>
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {t('form.brand')} *
+                      {t('techpack.brand')} *
                     </label>
                     <input
                       type="text"
@@ -359,7 +359,7 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {t('form.designer')} *
+                      {t('techpack.designer')} *
                     </label>
                     <input
                       type="text"
@@ -371,30 +371,30 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {t('form.season')} *
+                      {t('techpack.season')} *
                     </label>
                     <input
                       type="text"
                       required
                       value={formData.season}
                       onChange={(e) => setFormData(prev => ({ ...prev, season: e.target.value }))}
-                      placeholder={t('form.season.placeholder')}
+                      placeholder={t('techpack.placeholders.season', 'e.g., Spring 2024')}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {t('form.status')}
+                      {t('techpack.status')}
                     </label>
                     <select
                       value={formData.status}
                       onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                     >
-                      <option value="draft">Draft</option>
-                      <option value="review">Under Review</option>
-                      <option value="approved">Approved</option>
-                      <option value="production">Production</option>
+                      <option value="draft">{t('techpack.statuses.draft')}</option>
+                      <option value="review">{t('techpack.statuses.review')}</option>
+                      <option value="approved">{t('techpack.statuses.approved')}</option>
+                      <option value="production">{t('techpack.statuses.production')}</option>
                     </select>
                   </div>
                 </div>
@@ -404,7 +404,7 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
             {activeTab === 'materials' && (
               <div className="space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                  <h3 className="text-lg font-medium text-gray-900">{t('materials.bom')}</h3>
+                  <h3 className="text-lg font-medium text-gray-900">{t('bom.title')}</h3>
                   <div className="flex flex-col md:flex-row gap-3 md:items-center">
                     {isApiConfigured() && (
                       <div className="flex items-center gap-2">
@@ -418,12 +418,12 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
                             <option key={m.id} value={m.id}>{m.name || m.specifications || m.id}</option>
                           ))}
                         </select>
-                        <button type="button" className="px-3 py-2 border rounded" onClick={addMaterialFromLibrary}>{t('actions.add')}</button>
+                        <button type="button" className="px-3 py-2 border rounded" onClick={addMaterialFromLibrary}>{t('buttons.add')}</button>
                       </div>
                     )}
                     <label className="inline-flex items-center gap-2 text-sm">
                       <input type="checkbox" checked={saveMaterialsToLibrary} onChange={e => setSaveMaterialsToLibrary(e.target.checked)} />
-                      {t('form.saveMaterialsToLibrary')}
+                      {t('techpack.saveMaterialsToLibrary', 'Save materials to library')}
                     </label>
                     <button
                       type="button"
@@ -606,7 +606,7 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
             {activeTab === 'measurements' && (
               <div className="space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                  <h3 className="text-lg font-medium text-gray-900">{t('form.measurements')}</h3>
+                  <h3 className="text-lg font-medium text-gray-900">{t('measurements.title')}</h3>
                   <div className="flex flex-col md:flex-row gap-3 md:items-center">
                     {isApiConfigured() && (
                       <div className="flex items-center gap-2">
@@ -620,12 +620,12 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
                             <option key={t.id} value={t.id}>{t.name}</option>
                           ))}
                         </select>
-                        <button type="button" className="px-3 py-2 border rounded" onClick={addMeasurementsFromTemplate}>{t('actions.apply')}</button>
+                        <button type="button" className="px-3 py-2 border rounded" onClick={addMeasurementsFromTemplate}>{t('buttons.apply')}</button>
                       </div>
                     )}
                     <label className="inline-flex items-center gap-2 text-sm">
                       <input type="checkbox" checked={saveMeasurementsToLibrary} onChange={e => setSaveMeasurementsToLibrary(e.target.checked)} />
-                      {t('form.saveMeasurementsToLibrary')}
+                      {t('techpack.saveMeasurementsToLibrary', 'Save measurements to library')}
                     </label>
                     <button
                       type="button"
@@ -684,7 +684,7 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
             {activeTab === 'colorways' && (
               <div className="space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                  <h3 className="text-lg font-medium text-gray-900">{t('form.colorways')}</h3>
+                  <h3 className="text-lg font-medium text-gray-900">{t('colorways.title', 'Colorways')}</h3>
                   <div className="flex flex-col md:flex-row gap-3 md:items-center">
                     {isApiConfigured() && (
                       <div className="flex items-center gap-2">
@@ -698,12 +698,12 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
                             <option key={c.id} value={c.id}>{c.name || c.id}</option>
                           ))}
                         </select>
-                        <button type="button" className="px-3 py-2 border rounded" onClick={addColorwayFromLibrary}>{t('actions.add')}</button>
+                        <button type="button" className="px-3 py-2 border rounded" onClick={addColorwayFromLibrary}>{t('buttons.add')}</button>
                       </div>
                     )}
                     <label className="inline-flex items-center gap-2 text-sm">
                       <input type="checkbox" checked={saveColorwaysToLibrary} onChange={e => setSaveColorwaysToLibrary(e.target.checked)} />
-                      {t('form.saveColorwaysToLibrary')}
+                      {t('techpack.saveColorwaysToLibrary', 'Save colorways to library')}
                     </label>
                     <button
                       type="button"
@@ -776,21 +776,21 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
             {activeTab === 'construction' && (
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-medium text-gray-900">{t('form.construction')}</h3>
+                  <h3 className="text-lg font-medium text-gray-900">{t('construction.title')}</h3>
                   <button
                     type="button"
                     onClick={addConstructionDetail}
                     className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors flex items-center"
                   >
                     <Plus className="w-4 h-4 mr-2" />
-                    Add Detail
+                    {t('construction.createDetail', 'Add Detail')}
                   </button>
                 </div>
                 {formData.constructionDetails.map((detail, index) => (
                   <div key={index} className="flex gap-2">
                     <input
                       type="text"
-                      placeholder="Construction detail"
+                      placeholder={t('construction.placeholder.detail')}
                       value={detail}
                       onChange={(e) => updateConstructionDetail(index, e.target.value)}
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
@@ -800,7 +800,7 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
                       onClick={() => removeConstructionDetail(index)}
                       className="px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
                     >
-                      {t('actions.remove')}
+                      {t('buttons.remove')}
                     </button>
                   </div>
                 ))}
@@ -812,15 +812,15 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
             <div className="flex gap-4 text-sm">
               <label className="inline-flex items-center gap-2">
                 <input type="checkbox" checked={saveMaterialsToLibrary} onChange={e => setSaveMaterialsToLibrary(e.target.checked)} />
-                {t('form.saveMaterialsToLibrary.footer')}
+                {t('techpack.saveMaterialsToLibrary', 'Save materials to library')}
               </label>
               <label className="inline-flex items-center gap-2">
                 <input type="checkbox" checked={saveMeasurementsToLibrary} onChange={e => setSaveMeasurementsToLibrary(e.target.checked)} />
-                {t('form.saveMeasurementsToLibrary.footer')}
+                {t('techpack.saveMeasurementsToLibrary', 'Save measurements to library')}
               </label>
               <label className="inline-flex items-center gap-2">
                 <input type="checkbox" checked={saveColorwaysToLibrary} onChange={e => setSaveColorwaysToLibrary(e.target.checked)} />
-                {t('form.saveColorwaysToLibrary.footer')}
+                {t('techpack.saveColorwaysToLibrary', 'Save colorways to library')}
               </label>
             </div>
             <div className="flex justify-end space-x-3">
@@ -829,14 +829,14 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
                 onClick={onCancel}
                 className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                Cancel
+                {t('buttons.cancel')}
               </button>
               <button
                 type="submit"
                 className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center"
               >
                 <Save className="w-4 h-4 mr-2" />
-                {techPack ? t('form.updateTechPack') : t('form.createTechPack')}
+                {techPack ? t('buttons.update') : t('buttons.create')}
               </button>
             </div>
           </div>

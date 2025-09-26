@@ -48,14 +48,7 @@
     "techpacks": "TechPacks",
     "bom": "BOM",
     "measurements": "Measurements",
-    "construction": "Construction",
-    "care": "Care Instructions",
-    "materials": "Materials",
-    "suppliers": "Suppliers",
-    "reports": "Reports",
-    "settings": "Settings",
-    "help": "Help"
-  },
+    "sizeAvailability": "Size Availability"
   "techpack": {
     "title": "TechPack",
     "create": "Create TechPack",
@@ -73,9 +66,17 @@
     "images": "Images",
     "materials": "Materials",
     "measurements": "Measurements",
-    "construction": "Construction Details",
-    "care": "Care Instructions",
     "colorways": "Colorways",
+    "placeholders": {
+      "season": "e.g., Spring 2024"
+    },
+    "categories": {
+      "shirts": "Shirts",
+      "outerwear": "Outerwear",
+      "dresses": "Dresses",
+      "pants": "Pants",
+      "accessories": "Accessories"
+    },
     "statuses": {
       "draft": "Draft",
       "review": "Review",
@@ -83,11 +84,52 @@
       "production": "Production"
     },
     "categories": {
-      "apparel": "Apparel",
-      "accessories": "Accessories",
-      "footwear": "Footwear",
-      "other": "Other"
-    },
+    "settings": "Settings",
+    "help": "Help"
+  },
+  "buttons": {
+    "newTechPack": "New Tech Pack",
+    "addMaterial": "Add Material",
+    "addMeasurement": "Add Measurement",
+    "addColorway": "Add Colorway",
+    "addConstruction": "Add Construction",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "view": "View",
+    "export": "Export",
+    "import": "Import",
+    "create": "Create",
+    "update": "Update",
+    "remove": "Remove",
+    "add": "Add",
+    "apply": "Apply",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "reset": "Reset",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "finish": "Finish",
+    "saveMaterialsToLibrary": "Save materials to library",
+    "saveMeasurementsToLibrary": "Save measurements to library",
+  },
+  "colorways": {
+    "title": "Colorways",
+    "add": "Add Colorway",
+    "placeholder": {
+      "name": "Colorway Name",
+      "part": "Part",
+      "color": "Color",
+      "pantone": "Pantone (optional)"
+    }
+  },
+  "techpack": {
+    "subtitle": "Manage your fashion technical packages"
+    "saveColorwaysToLibrary": "Save colorways to library",
     "validation": {
       "nameRequired": "TechPack name is required",
       "categoryRequired": "Category is required",
@@ -117,13 +159,7 @@
     "searchPlaceholder": "Search materials, codes, suppliers...",
     "placeholders": {
       "materialCode": "e.g., FAB-001, TRM-002",
-      "sizeSpecFabric": "e.g., 18L, 20M",
-      "sizeSpecTrims": "e.g., 3/4\"x3/4\"",
-      "supplierInput": "Select or type supplier name",
-      "color": "e.g., Navy Blue, White",
-      "comment": "Enter technical comment"
-    },
-    "form": {
+    "conflictResolution": "Conflict Resolution"
       "titleAdd": "Add New BOM Item",
       "titleEdit": "Edit BOM Item"
     },
@@ -419,46 +455,6 @@
       "title": "Care Label Preview",
       "visual": "Visual Preview",
       "details": "Label Details",
-      "name": "Name:",
-      "size": "Size:",
-      "languages": "Languages:",
-      "symbols": "Symbols:",
-      "cost": "Cost per Label:",
-      "placement": "Placement:",
-      "placement.sideSeam": "Side seam",
-      "placement.sewn": "Sewn",
-      "placement.standard": "Standard"
-    }
-  },
-  "validation": {
-    "title": "Validation",
-    "validate": "Validate",
-    "isValid": "Valid",
-    "isInvalid": "Invalid",
-    "errors": "Errors",
-    "warnings": "Warnings",
-    "suggestions": "Suggestions",
-    "completeness": "Completeness",
-    "consistency": "Consistency",
-    "businessRules": "Business Rules",
-    "compliance": "Compliance",
-    "overall": "Overall",
-    "basic": "Basic Info",
-    "bom": "BOM",
-    "measurements": "Measurements",
-    "construction": "Construction",
-    "care": "Care Instructions",
-    "messages": {
-      "validationComplete": "Validation completed",
-      "validationFailed": "Validation failed",
-      "noErrors": "No errors found",
-      "fixErrors": "Please fix the errors before proceeding"
-    }
-  },
-  "ui": {
-    "theme": {
-      "light": "Light",
-      "dark": "Dark"
     },
     "language": {
       "english": "English",
@@ -473,64 +469,8 @@
       "error": "Error",
       "warning": "Warning",
       "info": "Information"
-    },
-    "forms": {
-      "required": "This field is required",
-      "invalid": "Invalid value",
-      "minLength": "Minimum length is {{count}} characters",
-      "maxLength": "Maximum length is {{count}} characters",
-      "email": "Please enter a valid email address",
-      "url": "Please enter a valid URL",
-      "number": "Please enter a valid number",
-      "positive": "Please enter a positive number"
-    }
-  },
-  "errors": {
-    "network": "Network error. Please check your connection.",
-    "server": "Server error. Please try again later.",
-    "unauthorized": "You are not authorized to perform this action.",
-    "forbidden": "Access denied.",
-    "notFound": "The requested resource was not found.",
-    "validation": "Please check your input and try again.",
-    "unknown": "An unknown error occurred."
-  },
-  "success": {
-    "saved": "Changes saved successfully",
-    "deleted": "Item deleted successfully",
-    "created": "Item created successfully",
-    "updated": "Item updated successfully",
-    "exported": "Data exported successfully",
-    "imported": "Data imported successfully"
-  },
-  "tpl": {
-    "header": {
-      "title": "Tech Pack Management",
-      "subtitle": "Manage your fashion technical packages"
-    },
-    "new": "New Tech Pack",
-    "search": {
-      "placeholder": "Search tech packs..."
-    },
-    "filter": {
-      "status": {
-        "all": "All Status",
-        "draft": "Draft",
-        "review": "Under Review",
-        "approved": "Approved",
-        "production": "Production"
-      },
-      "category": {
-        "all": "All Categories"
-      },
-      "more": "More Filters"
-    },
-    "card": {
-      "view": "View"
-    },
-    "empty": {
-      "title": "No tech packs found",
-      "subtitle": "Try adjusting your search or filter criteria",
-      "cta": "Create Your First Tech Pack"
-    }
+    "name": "Tên",
+    "description": "Mô tả",
+    "category": "Danh mục"
   }
 }

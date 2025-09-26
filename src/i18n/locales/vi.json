@@ -76,18 +76,25 @@
     "construction": "Chi tiết cấu trúc",
     "care": "Hướng dẫn bảo quản",
     "colorways": "Màu sắc",
+    "placeholders": {
+      "season": "ví dụ: Xuân 2024"
+    },
+    "categories": {
+      "shirts": "Áo sơ mi",
+      "outerwear": "Áo khoác",
+      "dresses": "Váy",
+      "pants": "Quần",
+      "accessories": "Phụ kiện"
+    },
     "statuses": {
       "draft": "Bản nháp",
       "review": "Xem xét",
       "approved": "Đã duyệt",
       "production": "Sản xuất"
     },
-    "categories": {
-      "apparel": "Quần áo",
-      "accessories": "Phụ kiện",
-      "footwear": "Giày dép",
-      "other": "Khác"
-    },
+    "saveMaterialsToLibrary": "Lưu vật liệu vào thư viện",
+    "saveMeasurementsToLibrary": "Lưu kích thước vào thư viện",
+    "saveColorwaysToLibrary": "Lưu màu sắc vào thư viện",
     "validation": {
       "nameRequired": "Tên TechPack là bắt buộc",
       "categoryRequired": "Danh mục là bắt buộc",
@@ -501,7 +508,92 @@
     "created": "Mục đã được tạo thành công",
     "updated": "Mục đã được cập nhật thành công",
     "exported": "Dữ liệu đã được xuất thành công",
-    "imported": "Dữ liệu đã được nhập thành công"
+    "construction": "Cấu trúc",
+    "productName": "Tên sản phẩm",
+    "category": "Danh mục",
+    "brand": "Thương hiệu",
+    "designer": "Nhà thiết kế",
+    "season": "Mùa",
+    "status": "Trạng thái",
+    "season.placeholder": "ví dụ: Xuân 2024",
+    "saveMaterialsToLibrary": "Lưu vật liệu mới vào thư viện",
+    "saveMeasurementsToLibrary": "Lưu điểm đo hiện tại thành mẫu",
+    "saveColorwaysToLibrary": "Lưu màu sắc mới vào thư viện",
+    "saveMaterialsToLibrary.footer": "Lưu vật liệu vào thư viện",
+    "saveMeasurementsToLibrary.footer": "Lưu mẫu kích thước",
+    "saveColorwaysToLibrary.footer": "Lưu màu sắc vào thư viện",
+    "createTechPack": "Tạo Tech Pack",
+    "updateTechPack": "Cập nhật Tech Pack",
+    "createNewTechPackTitle": "Tạo Tech Pack mới",
+    "editTechPackTitle": "Chỉnh sửa Tech Pack",
+    "cancel": "Hủy"
+  },
+  "materials": {
+    "bom": "Bảng vật liệu",
+    "addRow": "Thêm dòng",
+    "addFromLibrary": "Thêm từ thư viện…",
+    "applyTemplate": "Áp dụng mẫu…",
+    "header": {
+      "stt": "STT",
+      "specifications": "Thông số kỹ thuật",
+      "position": "Vị trí",
+      "quantity": "Số lượng",
+      "unit": "Đơn vị",
+      "notes": "Ghi chú kỹ thuật",
+      "submaterials": "Vật liệu phụ"
+    },
+    "placeholder": {
+      "specifications": "Thông số kỹ thuật",
+      "name": "Tên vật liệu",
+      "composition": "Thành phần",
+      "supplier": "Nhà cung cấp",
+      "color": "Màu sắc",
+      "consumption": "Định mức tiêu hao",
+      "position": "Vị trí",
+      "qty": "SL",
+      "unit": "Đơn vị",
+      "notes": "Ghi chú kỹ thuật"
+    },
+    "addSubMaterial": "Thêm vật liệu phụ"
+  },
+  "measurements": {
+    "add": "Thêm kích thước",
+    "header": {
+      "point": "Điểm đo",
+      "tolerance": "Dung sai (ví dụ: ±0,5cm)"
+    },
+    "placeholder": {
+      "size": "Giá trị"
+    }
+  },
+  "colorways": {
+    "add": "Thêm màu sắc",
+    "placeholder": {
+      "name": "Tên màu sắc",
+      "part": "Bộ phận",
+      "color": "Màu",
+      "pantone": "Pantone (tùy chọn)"
+    }
+  },
+  "construction": {
+    "placeholder": {
+      "detail": "Chi tiết kỹ thuật"
+    }
+  },
+  "actions": {
+    "add": "Thêm",
+    "remove": "Xóa",
+    "removeColorway": "Xóa màu sắc",
+    "apply": "Áp dụng",
+    "edit": "Sửa",
+    "delete": "Xóa",
+    "save": "Lưu",
+    "cancel": "Hủy",
+    "update": "Cập nhật",
+    "create": "Tạo",
+    "view": "Xem",
+    "export": "Xuất",
+    "import": "Nhập"
   },
   "tpl": {
     "header": {
@@ -533,5 +625,155 @@
       "subtitle": "Hãy thử điều chỉnh từ khóa hoặc bộ lọc",
       "cta": "Tạo Tech Pack đầu tiên"
     }
+  },
+  "dashboard": {
+    "title": "Bảng điều khiển",
+    "welcome": "Chào mừng đến với TechPacker",
+    "stats": {
+      "total": "Tổng Tech Pack",
+      "approved": "Đã duyệt",
+      "inReview": "Đang xem xét",
+      "activities": "Hoạt động",
+      "team": "Nhóm"
+    },
+    "recentActivities": "Hoạt động gần đây",
+    "quickActions": "Hành động nhanh",
+    "noActivities": "Chưa có hoạt động gần đây",
+    "alerts": "Cảnh báo"
+  },
+  "grading": {
+    "title": "Phân cỡ & Quản lý Fit",
+    "subtitle": "Quản lý quy tắc phân cỡ, loại fit và chuyển đổi khu vực",
+    "rules": "Quy tắc phân cỡ",
+    "calculator": "Máy tính phân cỡ",
+    "templates": "Mẫu phân cỡ",
+    "analysis": "Phân tích fit",
+    "sizeRanges": "Dải cỡ",
+    "fitTypes": "Loại fit",
+    "regions": "Khu vực",
+    "baseSize": "Cỡ cơ sở",
+    "increment": "Gia tăng",
+    "curve": "Đường cong phân cỡ",
+    "linear": "Tuyến tính",
+    "exponential": "Hàm mũ",
+    "custom": "Tùy chỉnh",
+    "regular": "Thường",
+    "tall": "Cao",
+    "bigTall": "To & Cao",
+    "petite": "Nhỏ",
+    "plus": "Plus",
+    "us": "Mỹ",
+    "eu": "Châu Âu",
+    "uk": "Anh",
+    "jp": "Nhật",
+    "au": "Úc",
+    "createRule": "Tạo quy tắc phân cỡ",
+    "editRule": "Sửa quy tắc phân cỡ",
+    "deleteRule": "Xóa quy tắc",
+    "save": "Lưu",
+    "cancel": "Hủy",
+    "export": "Xuất",
+    "import": "Nhập",
+    "fitAnalysis": "Phân tích fit",
+    "regionalConversion": "Chuyển đổi khu vực"
+  },
+  "refit": {
+    "title": "Quản lý Refit & Kiểm soát phiên bản",
+    "subtitle": "Quản lý phiên bản tech pack, yêu cầu refit và quy trình phê duyệt",
+    "versions": "Lịch sử phiên bản",
+    "comparison": "So sánh phiên bản",
+    "requests": "Yêu cầu refit",
+    "approvals": "Quy trình phê duyệt",
+    "changelog": "Nhật ký thay đổi",
+    "audit": "Kiểm tra",
+    "createVersion": "Tạo phiên bản mới",
+    "createRequest": "Tạo yêu cầu refit",
+    "compareVersions": "So sánh phiên bản",
+    "approve": "Phê duyệt",
+    "reject": "Từ chối",
+    "resolve": "Giải quyết",
+    "status": {
+      "draft": "Bản nháp",
+      "review": "Xem xét",
+      "approved": "Đã phê duyệt",
+      "active": "Hoạt động",
+      "rejected": "Bị từ chối",
+      "archived": "Lưu trữ"
+    },
+    "priority": {
+      "low": "Thấp",
+      "medium": "Trung bình",
+      "high": "Cao",
+      "critical": "Nghiêm trọng"
+    },
+    "reason": {
+      "fitIssue": "Vấn đề fit",
+      "measurementError": "Lỗi đo lường",
+      "materialChange": "Thay đổi vật liệu",
+      "constructionUpdate": "Cập nhật cấu trúc",
+      "customerRequest": "Yêu cầu khách hàng",
+      "qualityIssue": "Vấn đề chất lượng",
+      "other": "Khác"
+    },
+    "changeType": {
+      "measurement": "Đo lường",
+      "material": "Vật liệu",
+      "construction": "Cấu trúc",
+      "color": "Màu sắc",
+      "size": "Kích thước",
+      "other": "Khác"
+    },
+    "approvalLevel": {
+      "designer": "Thiết kế",
+      "technical": "Kỹ thuật",
+      "production": "Sản xuất",
+      "quality": "Chất lượng",
+      "final": "Cuối cùng"
+    },
+    "beforeAfter": "So sánh trước/sau",
+    "impactAnalysis": "Phân tích tác động",
+    "implementationNotes": "Ghi chú triển khai",
+    "conflictResolution": "Giải quyết xung đột"
+    }
   }
+  },
+  "export": {
+    "title": "Xuất & Tạo PDF",
+    "subtitle": "Tạo tài liệu PDF chuyên nghiệp với định dạng nâng cao",
+    "generator": "Trình tạo PDF",
+    "templates": "Mẫu",
+    "queue": "Hàng đợi xuất",
+    "history": "Lịch sử",
+    "settings": "Cài đặt"
+  },
+  "sidebar": {
+    "dashboard": "Bảng điều khiển",
+    "techpacks": "Tech Pack",
+    "bom": "BOM",
+    "measurements": "Kích thước",
+    "construction": "Cấu trúc",
+    "care": "Bảo quản",
+    "materials": "Vật liệu",
+    "colorways": "Màu sắc",
+    "sizeGrading": "Phân cỡ",
+    "refitManagement": "Quản lý Refit",
+    "export": "Xuất",
+    "suppliers": "Nhà cung cấp",
+    "reports": "Báo cáo",
+    "analytics": "Phân tích",
+    "team": "Nhóm",
+    "settings": "Cài đặt"
+  },
+  "colorways": {
+    "title": "Màu sắc",
+    "add": "Thêm màu sắc",
+    "placeholder": {
+      "name": "Tên màu sắc",
+      "part": "Bộ phận",
+      "color": "Màu",
+      "pantone": "Pantone (tùy chọn)"
+    }
+  },
+  "techpack": {
+    "subtitle": "Quản lý bộ hồ sơ kỹ thuật thời trang của bạn"
 }

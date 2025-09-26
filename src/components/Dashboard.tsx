@@ -23,7 +23,7 @@ const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities }) => {
       changeType: 'positive'
     },
     {
-      title: t('common.status'),
+      title: t('dashboard.stats.approved'),
       value: techPacks.filter(tp => tp.status === 'approved').length,
       icon: CheckCircle,
       color: 'bg-green-500',
@@ -31,7 +31,7 @@ const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities }) => {
       changeType: 'positive'
     },
     {
-      title: t('common.activities'),
+      title: t('dashboard.stats.activities'),
       value: activities.length,
       icon: Clock,
       color: 'bg-yellow-500',
@@ -39,7 +39,7 @@ const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities }) => {
       changeType: 'positive'
     },
     {
-      title: t('common.team'),
+      title: t('dashboard.stats.team'),
       value: 12,
       icon: Users,
       color: 'bg-purple-500',
@@ -55,10 +55,10 @@ const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities }) => {
       {/* Welcome Section */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-          <TranslatedText translationKey="common.dashboard" />
+          <TranslatedText translationKey="dashboard.title" />
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          <TranslatedText translationKey="common.welcome" fallback="Welcome to TechPacker" />
+          <TranslatedText translationKey="dashboard.welcome" fallback="Welcome to TechPacker" />
         </p>
       </div>
 
@@ -103,7 +103,7 @@ const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities }) => {
         {/* Recent Activities */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            <TranslatedText translationKey="common.activities" />
+            <TranslatedText translationKey="dashboard.recentActivities" />
           </h3>
           <div className="space-y-4">
             {recentActivities.length > 0 ? (
@@ -124,7 +124,7 @@ const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities }) => {
               ))
             ) : (
               <p className="text-gray-500 dark:text-gray-400 text-sm">
-                <TranslatedText translationKey="common.noActivities" fallback="No recent activities" />
+                <TranslatedText translationKey="dashboard.noActivities" fallback="No recent activities" />
               </p>
             )}
           </div>
@@ -133,7 +133,7 @@ const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities }) => {
         {/* Quick Actions */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            <TranslatedText translationKey="common.quickActions" fallback="Quick Actions" />
+            <TranslatedText translationKey="dashboard.quickActions" fallback="Quick Actions" />
           </h3>
           <div className="space-y-3">
             <button className="w-full flex items-center space-x-3 p-3 text-left rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
@@ -145,13 +145,13 @@ const Dashboard: React.FC<DashboardProps> = ({ techPacks, activities }) => {
             <button className="w-full flex items-center space-x-3 p-3 text-left rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
               <TrendingUp className="w-5 h-5 text-green-500" />
               <span className="text-sm font-medium text-gray-900 dark:text-white">
-                <TranslatedText translationKey="common.reports" fallback="View Reports" />
+                <TranslatedText translationKey="navigation.reports" fallback="View Reports" />
               </span>
             </button>
             <button className="w-full flex items-center space-x-3 p-3 text-left rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
               <AlertCircle className="w-5 h-5 text-yellow-500" />
               <span className="text-sm font-medium text-gray-900 dark:text-white">
-                <TranslatedText translationKey="common.alerts" fallback="View Alerts" />
+                <TranslatedText translationKey="dashboard.alerts" fallback="View Alerts" />
               </span>
             </button>
           </div>

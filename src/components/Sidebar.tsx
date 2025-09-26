@@ -35,55 +35,55 @@ const Sidebar: React.FC<SidebarProps> = ({
   const menuItems = [
     {
       key: 'dashboard',
-      label: t('navigation.dashboard'),
+      label: t('sidebar.dashboard'),
       icon: LayoutDashboard,
       path: '/dashboard'
     },
     {
       key: 'techpacks',
-      label: t('navigation.techpacks'),
+      label: t('sidebar.techpacks'),
       icon: Package,
       path: '/techpacks'
     },
     {
       key: 'bom',
-      label: t('navigation.bom'),
+      label: t('sidebar.bom'),
       icon: Box,
       path: '/bom'
     },
     {
       key: 'measurements',
-      label: t('navigation.measurements'),
+      label: t('sidebar.measurements'),
       icon: Ruler,
       path: '/measurements'
     },
     {
       key: 'construction',
-      label: t('navigation.construction'),
+      label: t('sidebar.construction'),
       icon: Wrench,
       path: '/construction'
     },
     {
       key: 'care',
-      label: t('navigation.care'),
+      label: t('sidebar.care'),
       icon: Heart,
       path: '/care'
     },
     {
       key: 'materials',
-      label: t('navigation.materials'),
+      label: t('sidebar.materials'),
       icon: Box,
       path: '/materials'
     },
     {
       key: 'suppliers',
-      label: t('navigation.suppliers'),
+      label: t('sidebar.suppliers'),
       icon: Truck,
       path: '/suppliers'
     },
     {
       key: 'reports',
-      label: t('navigation.reports'),
+      label: t('sidebar.reports'),
       icon: BarChart3,
       path: '/reports'
     }
@@ -92,13 +92,13 @@ const Sidebar: React.FC<SidebarProps> = ({
   const bottomMenuItems = [
     {
       key: 'settings',
-      label: t('navigation.settings'),
+      label: t('sidebar.settings'),
       icon: Settings,
       path: '/settings'
     },
     {
       key: 'help',
-      label: t('navigation.help'),
+      label: t('sidebar.help'),
       icon: HelpCircle,
       path: '/help'
     }
