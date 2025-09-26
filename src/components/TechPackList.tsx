@@ -1,16 +1,5 @@
 import React, { useState } from 'react';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Edit, 
-  Eye, 
-  Download,
-  Calendar,
-  User,
-  Tag,
-  FileText
-} from 'lucide-react';
+import { Plus, Search, Filter, CreditCard as Edit, Eye, Download, Calendar, User, Tag, FileText } from 'lucide-react';
 import { TechPack } from '../types';
 import { useI18n } from '../lib/i18n';
 import { TechPackForm } from './TechPackForm';
