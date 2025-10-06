@@ -1,0 +1,125 @@
+<!-- Bill of Materials Table Partial -->
+<div class="section-title">BILL OF MATERIALS</div>
+
+<% if (materials && materials.length > 0) { %>
+<table class="bom-table">
+    <thead>
+        <tr>
+            <th>Part</th>
+            <th>Material Name</th>
+            <th>Placement</th>
+            <th>Size</th>
+            <th>Qty</th>
+            <th>UOM</th>
+            <th>Supplier</th>
+            <th>Comments</th>
+        </tr>
+    </thead>
+    <tbody>
+        <% materials.forEach((material, index) => { %>
+        <tr>
+            <td><%= material.part || '' %></td>
+            <td>
+                <strong><%= material.materialName || '' %></strong>
+                <% if (material.materialCode) { %>
+                <br><small style="color: #666;">Code: <%= material.materialCode %></small>
+                <% } %>
+                <% if (material.color) { %>
+                <br><small style="color: #666;">Color: <%= material.color %></small>
+                <% } %>
+                <% if (material.pantoneCode) { %>
+                <br><small style="color: #666;">Pantone: <%= material.pantoneCode %></small>
+                <% } %>
+            </td>
+            <td><%= material.placement || '' %></td>
+            <td><%= material.size || '' %></td>
+            <td style="text-align: center;"><%= material.quantity || '' %></td>
+            <td style="text-align: center;"><%= material.uom || '' %></td>
+            <td>
+                <%= material.supplier || '' %>
+                <% if (material.leadTime) { %>
+                <br><small style="color: #666;">Lead: <%= material.leadTime %> days</small>
+                <% } %>
+                <% if (material.minimumOrder) { %>
+                <br><small style="color: #666;">MOQ: <%= material.minimumOrder %></small>
+                <% } %>
+            </td>
+            <td>
+                <%= material.comments || '' %>
+                <% if (material.unitPrice) { %>
+                <br><small style="color: #666;">Unit: $<%= material.unitPrice %></small>
+                <% } %>
+                <% if (material.totalPrice) { %>
+                <br><small style="color: #666;">Total: $<%= material.totalPrice %></small>
+                <% } %>
+                <% if (material.approved) { %>
+                <br><span style="background: #e8f5e8; padding: 1px 4px; border-radius: 2px; font-size: 7px; color: #2d5a2d;">APPROVED</span>
+                <% if (material.approvedBy) { %>
+                <br><small style="color: #666;">By: <%= material.approvedBy %></small>
+                <% } %>
+                <% if (material.approvedDate) { %>
+                <br><small style="color: #666;">Date: <%= new Date(material.approvedDate).toLocaleDateString() %></small>
+                <% } %>
+                <% } %>
+            </td>
+        </tr>
+        <% }) %>
+    </tbody>
+</table>
+
+<!-- BOM Summary -->
+<div style="margin-top: 15px; padding: 10px; background: #f9f9f9; border: 1px solid #ddd; font-size: 9px;">
+    <div style="display: flex; justify-content: space-between;">
+        <div>
+            <strong>BOM Summary:</strong>
+            <span style="margin-left: 10px;">Total Items: <%= materials.length %></span>
+            <span style="margin-left: 10px;">
+                Approved: <%= materials.filter(m => m.approved).length %>/<%= materials.length %>
+            </span>
+        </div>
+        <div>
+            <% 
+            const totalCost = materials.reduce((sum, m) => sum + (m.totalPrice || 0), 0);
+            if (totalCost > 0) { 
+            %>
+            <strong>Total Cost: $<%= totalCost.toFixed(2) %></strong>
+            <% } %>
+        </div>
+    </div>
+    
+    <!-- Material Categories Summary -->
+    <% 
+    const categories = {};
+    materials.forEach(m => {
+        const category = m.part || 'Other';
+        if (!categories[category]) categories[category] = 0;
+        categories[category]++;
+    });
+    %>
+    <div style="margin-top: 8px;">
+        <strong>Categories:</strong>
+        <% Object.entries(categories).forEach(([category, count]) => { %>
+        <span style="margin-left: 10px; background: #e8f0ff; padding: 1px 4px; border-radius: 2px;">
+            <%= category %>: <%= count %>
+        </span>
+        <% }) %>
+    </div>
+</div>
+
+<% } else { %>
+<div style="text-align: center; padding: 40px; color: #999; font-style: italic;">
+    No materials defined for this tech pack.
+</div>
+<% } %>
+
+<!-- Notes section for BOM -->
+<div style="margin-top: 20px; font-size: 9px; color: #666;">
+    <p><strong>Notes:</strong></p>
+    <ul style="margin-left: 15px; margin-top: 5px;">
+        <li>All materials must be approved before production</li>
+        <li>Lead times are estimated and may vary by supplier</li>
+        <li>Minimum order quantities (MOQ) apply</li>
+        <li>Prices are subject to change based on market conditions</li>
+        <li>Color matching should be done with physical samples</li>
+    </ul>
+</div>

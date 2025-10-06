@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= pageTitle %></title>
+    <style>
+        /* CSS for PDF Generation - WFX Standard Layout */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', 'Helvetica', sans-serif;
+            font-size: 11px;
+            line-height: 1.4;
+            color: #222;
+            background: white;
+        }
+        
+        /* Page layout */
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            padding: 15mm;
+            background: white;
+            page-break-after: always;
+        }
+        
+        .page:last-child {
+            page-break-after: avoid;
+        }
+        
+        /* Header section */
+        .header {
+            border-bottom: 2px solid #000;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        
+        .logo {
+            max-width: 120px;
+            max-height: 60px;
+            object-fit: contain;
+        }
+        
+        .article-info {
+            text-align: right;
+            font-size: 10px;
+        }
+        
+        .article-info p {
+            margin-bottom: 3px;
+        }
+        
+        .article-info strong {
+            font-weight: bold;
+            color: #000;
+        }
+        
+        .tech-pack-title {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        
+        .fabric-description {
+            text-align: center;
+            font-style: italic;
+            color: #555;
+            margin-bottom: 15px;
+        }
+        
+        /* Section headers */
+        .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 5px;
+            margin: 25px 0 15px 0;
+            page-break-after: avoid;
+        }
+        
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 9px;
+        }
+        
+        th, td {
+            border: 1px solid #ccc;
+            padding: 6px 4px;
+            text-align: left;
+            vertical-align: top;
+        }
+        
+        th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 8px;
+            letter-spacing: 0.3px;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+        
+        /* BOM Table specific */
+        .bom-table th:nth-child(1) { width: 8%; }  /* Part */
+        .bom-table th:nth-child(2) { width: 25%; } /* Material Name */
+        .bom-table th:nth-child(3) { width: 15%; } /* Placement */
+        .bom-table th:nth-child(4) { width: 8%; }  /* Size */
+        .bom-table th:nth-child(5) { width: 6%; }  /* Qty */
+        .bom-table th:nth-child(6) { width: 6%; }  /* UOM */
+        .bom-table th:nth-child(7) { width: 15%; } /* Supplier */
+        .bom-table th:nth-child(8) { width: 17%; } /* Comments */
+        
+        /* Measurement Table specific */
+        .measurement-table {
+            font-size: 8px;
+        }
+        
+        .measurement-table th:nth-child(1) { width: 10%; } /* POM Code */
+        .measurement-table th:nth-child(2) { width: 25%; } /* POM Name */
+        .measurement-table th:nth-child(3) { width: 6%; }  /* -Tol */
+        .measurement-table th:nth-child(4) { width: 6%; }  /* +Tol */
+        .measurement-table th:nth-child(n+5):nth-child(-3) { width: 7%; } /* Sizes */
+        .measurement-table th:last-child { width: 15%; } /* Notes */
+        
+        /* How to Measure section */
+        .how-to-measure-item {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            page-break-inside: avoid;
+        }
+        
+        .measure-image {
+            width: 180px;
+            height: auto;
+            border: 1px solid #ddd;
+            object-fit: contain;
+        }
+        
+        .measure-content {
+            flex: 1;
+        }
+        
+        .measure-content h3 {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #000;
+        }
+        
+        .measure-content p {
+            font-size: 10px;
+            line-height: 1.5;
+            color: #333;
+        }
+        
+        /* Colorway section */
+        .colorway-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .colorway-item {
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        
+        .colorway-swatch {
+            width: 40px;
+            height: 40px;
+            border: 1px solid #999;
+            margin-bottom: 8px;
+            display: inline-block;
+        }
+        
+        .colorway-info {
+            font-size: 9px;
+        }
+        
+        /* Page breaks */
+        .page-break {
+            page-break-before: always;
+        }
+        
+        .avoid-break {
+            page-break-inside: avoid;
+        }
+        
+        /* Watermark */
+        <% if (showWatermark && watermark) { %>
+        body::after {
+            content: "<%= watermark.text %>";
+            position: fixed;
+            top: 40%;
+            left: 25%;
+            font-size: <%= watermark.fontSize || 60 %>px;
+            color: <%= watermark.color || 'rgba(180, 180, 180, 0.2)' %>;
+            transform: rotate(<%= watermark.rotation || -30 %>deg);
+            opacity: <%= watermark.opacity || 0.2 %>;
+            z-index: -1;
+            pointer-events: none;
+        }
+        <% } %>
+        
+        /* Print specific styles */
+        @media print {
+            body { margin: 0; }
+            .page { margin: 0; padding: 15mm; }
+            .page-break { page-break-before: always; }
+            .avoid-break { page-break-inside: avoid; }
+        }
+        
+        /* Footer */
+        .footer {
+            position: fixed;
+            bottom: 10mm;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 8px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <!-- Page 1: Header & Article Info -->
+    <div class="page">
+        <%- include('partials/header', { techpack, logoUrl, generatedAt }) %>
+        
+        <div class="section-title">ARTICLE INFORMATION</div>
+        <table class="avoid-break">
+            <tr>
+                <th style="width: 25%;">Field</th>
+                <th style="width: 75%;">Value</th>
+            </tr>
+            <tr><td><strong>Article Name</strong></td><td><%= techpack.name %></td></tr>
+            <tr><td><strong>Article Code</strong></td><td><%= techpack.articleCode %></td></tr>
+            <tr><td><strong>Version</strong></td><td><%= techpack.version %></td></tr>
+            <tr><td><strong>Designer</strong></td><td><%= techpack.designer %></td></tr>
+            <tr><td><strong>Supplier</strong></td><td><%= techpack.supplier %></td></tr>
+            <tr><td><strong>Season</strong></td><td><%= techpack.season %></td></tr>
+            <tr><td><strong>Category</strong></td><td><%= techpack.category || 'N/A' %></td></tr>
+            <tr><td><strong>Gender</strong></td><td><%= techpack.gender || 'N/A' %></td></tr>
+            <tr><td><strong>Fabric Description</strong></td><td><%= techpack.fabricDescription %></td></tr>
+            <tr><td><strong>Lifecycle Stage</strong></td><td><%= techpack.lifecycleStage %></td></tr>
+            <tr><td><strong>Created Date</strong></td><td><%= techpack.createdAt %></td></tr>
+            <tr><td><strong>Last Modified</strong></td><td><%= techpack.lastModified %></td></tr>
+            <% if (techpack.retailPrice) { %>
+            <tr><td><strong>Retail Price</strong></td><td><%= techpack.retailPrice %> <%= techpack.currency || 'USD' %></td></tr>
+            <% } %>
+            <% if (techpack.description) { %>
+            <tr><td><strong>Description</strong></td><td><%= techpack.description %></td></tr>
+            <% } %>
+            <% if (techpack.notes) { %>
+            <tr><td><strong>Notes</strong></td><td><%= techpack.notes %></td></tr>
+            <% } %>
+        </table>
+    </div>
+
+    <!-- Page 2-3: Bill of Materials -->
+    <div class="page">
+        <%- include('partials/bom-table', { materials }) %>
+    </div>
+
+    <!-- Page 4-5: Measurement Chart -->
+    <div class="page">
+        <%- include('partials/measurement-table', { measurements }) %>
+    </div>
+
+    <!-- Page 6+: How To Measure -->
+    <% if (howToMeasure && howToMeasure.length > 0) { %>
+    <div class="page">
+        <%- include('partials/how-to-measure', { howToMeasure }) %>
+    </div>
+    <% } %>
+
+    <!-- Colorways Section -->
+    <% if (colorways && colorways.length > 0) { %>
+    <div class="page">
+        <div class="section-title">COLORWAYS</div>
+        <div class="colorway-grid">
+            <% colorways.forEach(colorway => { %>
+            <div class="colorway-item avoid-break">
+                <div class="colorway-swatch" style="background-color: <%= colorway.hexColor || '#f0f0f0' %>;"></div>
+                <div class="colorway-info">
+                    <p><strong>Name:</strong> <%= colorway.name %></p>
+                    <p><strong>Code:</strong> <%= colorway.code %></p>
+                    <% if (colorway.pantoneCode) { %>
+                    <p><strong>Pantone:</strong> <%= colorway.pantoneCode %></p>
+                    <% } %>
+                    <p><strong>Placement:</strong> <%= colorway.placement %></p>
+                    <p><strong>Material:</strong> <%= colorway.materialType %></p>
+                    <% if (colorway.supplier) { %>
+                    <p><strong>Supplier:</strong> <%= colorway.supplier %></p>
+                    <% } %>
+                    <% if (colorway.notes) { %>
+                    <p><strong>Notes:</strong> <%= colorway.notes %></p>
+                    <% } %>
+                </div>
+            </div>
+            <% }) %>
+        </div>
+    </div>
+    <% } %>
+
+    <!-- Footer -->
+    <div class="footer">
+        Generated on <%= generatedAt %> | Powered by TechPacker App
+    </div>
+</body>
+</html>
