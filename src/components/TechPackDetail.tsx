@@ -1,23 +1,19 @@
 import React, { useEffect, useMemo } from 'react';
 import { ArrowLeft, Trash2 } from 'lucide-react';
-import { TechPack } from '../types';
+import { TechPack } from '../types/techpack';
 import { RevisionsTimeline } from './RevisionsTimeline';
 import { api, isApiConfigured } from '../lib/api';
 
 interface TechPackDetailProps {
   techPack: TechPack;
   onBack: () => void;
-  onUpdate: (id: string, data: Omit<TechPack, 'id' | 'dateCreated' | 'lastModified'>) => void;
+  onUpdate: (id: string, data: Partial<TechPack>) => void;
   onDelete: (id: string) => void;
 }
 
 export const TechPackDetail: React.FC<TechPackDetailProps> = ({ techPack, onBack, onUpdate, onDelete }) => {
   const useApi = useMemo(() => isApiConfigured(), []);
 
-  // Create a revision entry when the detail opens (demo purpose if none exist)
-  useEffect(() => {
-    // no-op: actual revision creation happens on update in App handler; here we could preload list
-  }, [techPack.id]);
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -29,7 +25,7 @@ export const TechPackDetail: React.FC<TechPackDetailProps> = ({ techPack, onBack
           Back to Tech Packs
         </button>
         <button
-          onClick={() => onDelete(techPack.id)}
+          onClick={() => onDelete(techPack._id)}
           className="flex items-center px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
         >
           <Trash2 className="w-4 h-4 mr-1" />
@@ -41,7 +37,7 @@ export const TechPackDetail: React.FC<TechPackDetailProps> = ({ techPack, onBack
         <div className="grid grid-cols-1 lg:grid-cols-2">
           <div className="bg-gray-100">
             <img
-              src={techPack.images[0]}
+              src={techPack.metadata?.images?.[0]?.thumbnail || 'https://via.placeholder.com/400x300'}
               alt={techPack.name}
               className="w-full h-80 object-cover"
             />
@@ -50,40 +46,43 @@ export const TechPackDetail: React.FC<TechPackDetailProps> = ({ techPack, onBack
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-2xl font-semibold text-gray-900">{techPack.name}</h2>
-                <p className="text-gray-600">{techPack.category} • {techPack.brand}</p>
+                <p className="text-gray-600">{techPack.articleCode} • {techPack.metadata?.category || 'No category'}</p>
               </div>
-              <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                techPack.status === 'approved' ? 'bg-green-100 text-green-800' :
+                techPack.status === 'pending_approval' ? 'bg-yellow-100 text-yellow-800' :
+                techPack.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
                 {techPack.status}
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-gray-500">Designer</p>
-                <p className="text-gray-900">{techPack.designer}</p>
+                <p className="text-sm text-gray-500">Owner</p>
+                <p className="text-gray-900">{techPack.ownerId.firstName} {techPack.ownerId.lastName}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Season</p>
-                <p className="text-gray-900">{techPack.season}</p>
+                <p className="text-gray-900">{techPack.metadata?.season || 'Not specified'}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Created</p>
-                <p className="text-gray-900">{techPack.dateCreated.toLocaleDateString()}</p>
+                <p className="text-gray-900">{new Date(techPack.createdAt).toLocaleDateString()}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Last Modified</p>
-                <p className="text-gray-900">{techPack.lastModified.toLocaleDateString()}</p>
+                <p className="text-gray-900">{new Date(techPack.updatedAt).toLocaleDateString()}</p>
               </div>
             </div>
 
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Construction Details</h3>
-              <ul className="list-disc pl-5 text-gray-700 space-y-1">
-                {techPack.constructionDetails.map((detail, index) => (
-                  <li key={index}>{detail}</li>
-                ))}
-              </ul>
-            </div>
+            {techPack.metadata?.description && (
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Description</h3>
+                <p className="text-gray-700">{techPack.metadata.description}</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -94,13 +93,13 @@ export const TechPackDetail: React.FC<TechPackDetailProps> = ({ techPack, onBack
           <p className="text-gray-600">No materials added</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {techPack.materials.map(material => (
-              <div key={material.id} className="border border-gray-200 rounded-lg p-4">
+            {techPack.materials.map((material, index) => (
+              <div key={index} className="border border-gray-200 rounded-lg p-4">
                 <p className="font-medium text-gray-900">{material.name}</p>
-                <p className="text-sm text-gray-600">{material.composition}</p>
-                <p className="text-sm text-gray-600">Supplier: {material.supplier}</p>
-                <p className="text-sm text-gray-600">Color: {material.color}</p>
-                <p className="text-sm text-gray-600">Consumption: {material.consumption}</p>
+                <p className="text-sm text-gray-600">Type: {material.type}</p>
+                <p className="text-sm text-gray-600">Supplier: {material.supplier || 'Not specified'}</p>
+                <p className="text-sm text-gray-600">Code: {material.code || 'N/A'}</p>
+                {material.notes && <p className="text-sm text-gray-600">Notes: {material.notes}</p>}
               </div>
             ))}
           </div>
@@ -113,29 +112,49 @@ export const TechPackDetail: React.FC<TechPackDetailProps> = ({ techPack, onBack
           <p className="text-gray-600">No measurements added</p>
         ) : (
           <div className="space-y-3">
-            {techPack.measurements.map(measurement => (
-              <div key={measurement.id} className="border border-gray-200 rounded-lg p-4">
+            {techPack.measurements.map((measurement, index) => (
+              <div key={index} className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="font-medium text-gray-900">{measurement.point}</p>
-                  <span className="text-sm text-gray-600">Tolerance: {measurement.tolerance}</span>
+                  <p className="font-medium text-gray-900">{measurement.pomName}</p>
+                  <span className="text-sm text-gray-600">
+                    Tolerance: -{measurement.toleranceMinus}/+{measurement.tolerancePlus}
+                  </span>
                 </div>
-                <div className="grid grid-cols-5 gap-2">
-                  {Object.entries(measurement.sizes).map(([size, value]) => (
-                    <div key={size} className="text-sm text-gray-700">
-                      <span className="font-medium mr-1">{size}:</span>
-                      <span>{value}</span>
-                    </div>
-                  ))}
-                </div>
+                <p className="text-sm text-gray-600 mb-2">Code: {measurement.pomCode}</p>
+                {measurement.sizes && Object.keys(measurement.sizes).length > 0 && (
+                  <div className="grid grid-cols-5 gap-2">
+                    {Object.entries(measurement.sizes).map(([size, value]) => (
+                      <div key={size} className="text-sm text-gray-700">
+                        <span className="font-medium mr-1">{size}:</span>
+                        <span>{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {useApi && (
-        <RevisionsTimeline techpackId={techPack.id} />
-      )}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Colorways</h3>
+        {techPack.colorways.length === 0 ? (
+          <p className="text-gray-600">No colorways added</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {techPack.colorways.map((colorway, index) => (
+              <div key={index} className="border border-gray-200 rounded-lg p-4">
+                <p className="font-medium text-gray-900">{colorway.name}</p>
+                <p className="text-sm text-gray-600">Code: {colorway.code}</p>
+                <p className="text-sm text-gray-600">Material: {colorway.materialType}</p>
+                <p className="text-sm text-gray-600">Placement: {colorway.placement}</p>
+                {colorway.pantoneCode && <p className="text-sm text-gray-600">Pantone: {colorway.pantoneCode}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

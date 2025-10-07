@@ -1,58 +1,104 @@
-import { Activity, TechPack } from '../types';
+import { TechPack, TechPackListResponse, CreateTechPackInput, BulkOperationPayload } from '../types/techpack';
 
-const baseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001/api';
 
 export function isApiConfigured(): boolean {
-  return Boolean(baseUrl);
+  return !!API_BASE_URL;
 }
 
-async function http<T>(path: string, options?: RequestInit): Promise<T> {
-  if (!baseUrl) throw new Error('API not configured');
-  const res = await fetch(`${baseUrl}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} ${res.statusText}`);
+class ApiClient {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const config: RequestInit = {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    };
+
+    const response = await fetch(url, config);
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({ error: 'Network error' }));
+      const details = Array.isArray(errorBody?.details)
+        ? `: ${errorBody.details
+            .map((d: any) => [d.field, d.message].filter(Boolean).join(' - '))
+            .join('; ')}`
+        : '';
+      const message = `${errorBody?.error || `HTTP ${response.status}`}${details}`;
+      throw new Error(message);
+    }
+
+    return response.json();
   }
-  return (await res.json()) as T;
+
+  // List tech packs with filtering and pagination
+  async listTechPacks(params: {
+    page?: number;
+    limit?: number;
+    q?: string;
+    status?: string;
+    designer?: string;
+  } = {}): Promise<TechPackListResponse> {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) {
+        searchParams.append(key, value.toString());
+      }
+    });
+
+    const queryString = searchParams.toString();
+    return this.request<TechPackListResponse>(
+      `/techpacks${queryString ? `?${queryString}` : ''}`
+    );
+  }
+
+  // Create new tech pack
+  async createTechPack(data: CreateTechPackInput): Promise<TechPack> {
+    return this.request<TechPack>('/techpacks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Get tech pack details
+  async getTechPack(id: string): Promise<TechPack> {
+    return this.request<TechPack>(`/techpacks/${id}`);
+  }
+
+  // Update tech pack
+  async updateTechPack(id: string, data: Partial<TechPack>): Promise<TechPack> {
+    return this.request<TechPack>(`/techpacks/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Soft delete tech pack
+  async deleteTechPack(id: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/techpacks/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Duplicate tech pack
+  async duplicateTechPack(id: string, keepVersion = false): Promise<TechPack> {
+    return this.request<TechPack>(`/techpacks/${id}/duplicate`, {
+      method: 'POST',
+      body: JSON.stringify({ keepVersion }),
+    });
+  }
+
+  // Bulk operations
+  async bulkOperations(data: BulkOperationPayload): Promise<{ message: string; modifiedCount: number }> {
+    return this.request<{ message: string; modifiedCount: number }>('/techpacks/bulk', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
-export const api = {
-  // Techpacks
-  listTechPacks: () => http<TechPack[]>('/techpacks'),
-  createTechPack: (tp: TechPack) => http<TechPack>('/techpacks', { method: 'POST', body: JSON.stringify(tp) }),
-  updateTechPack: (id: string, tp: Partial<TechPack>) => http<TechPack>(`/techpacks/${id}`, { method: 'PUT', body: JSON.stringify(tp) }),
-  deleteTechPack: (id: string) => fetch(`${baseUrl}/techpacks/${id}`, { method: 'DELETE' }).then(() => undefined),
-
-  // Activities
-  listActivities: () => http<Activity[]>('/activities'),
-  createActivity: (a: Activity) => http<Activity>('/activities', { method: 'POST', body: JSON.stringify(a) }),
-
-  // Materials
-  listMaterials: () => http<any[]>('/materials'),
-  createMaterial: (m: any) => http<any>('/materials', { method: 'POST', body: JSON.stringify(m) }),
-  updateMaterial: (id: string, m: any) => http<any>(`/materials/${id}`, { method: 'PUT', body: JSON.stringify(m) }),
-  deleteMaterial: (id: string) => fetch(`${baseUrl}/materials/${id}`, { method: 'DELETE' }).then(() => undefined),
-
-  // Measurement Templates
-  listMeasurementTemplates: () => http<any[]>('/measurement-templates'),
-  createMeasurementTemplate: (mt: any) => http<any>('/measurement-templates', { method: 'POST', body: JSON.stringify(mt) }),
-  updateMeasurementTemplate: (id: string, mt: any) => http<any>(`/measurement-templates/${id}`, { method: 'PUT', body: JSON.stringify(mt) }),
-  deleteMeasurementTemplate: (id: string) => fetch(`${baseUrl}/measurement-templates/${id}`, { method: 'DELETE' }).then(() => undefined),
-
-  // Colorways
-  listColorways: () => http<any[]>('/colorways'),
-  createColorway: (c: any) => http<any>('/colorways', { method: 'POST', body: JSON.stringify(c) }),
-  updateColorway: (id: string, c: any) => http<any>(`/colorways/${id}`, { method: 'PUT', body: JSON.stringify(c) }),
-  deleteColorway: (id: string) => fetch(`${baseUrl}/colorways/${id}`, { method: 'DELETE' }).then(() => undefined),
-
-  // Revisions
-  listRevisions: (techpackId: string) => http<any[]>(`/techpacks/${techpackId}/revisions`),
-  createRevision: (techpackId: string, rev: any) => http<any>(`/techpacks/${techpackId}/revisions`, { method: 'POST', body: JSON.stringify(rev) }),
-  addRevisionComment: (revisionId: string, comment: any) => http<any>(`/revisions/${revisionId}/comments`, { method: 'POST', body: JSON.stringify(comment) }),
-  approveRevision: (revisionId: string) => http<any>(`/revisions/${revisionId}/approve`, { method: 'POST' }),
-  rejectRevision: (revisionId: string) => http<any>(`/revisions/${revisionId}/reject`, { method: 'POST' }),
-};
+export const api = new ApiClient();
 
 

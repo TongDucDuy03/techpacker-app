@@ -1,257 +1,94 @@
 import { Router } from 'express';
-import { body, param, query } from 'express-validator';
 import techpackController from '../controllers/techpack.controller';
-import { requireAuth, requireRole, requireOwnershipOrRole } from '../middleware/auth.middleware';
-import { UserRole } from '../models/user.model';
+import { validate } from '../middleware/validation.middleware';
+import {
+  createTechPackSchema,
+  updateTechPackSchema,
+  getTechPackSchema,
+  listTechPacksSchema,
+  duplicateTechPackSchema,
+  bulkOperationsSchema
+} from '../validation/techpack.validation';
 
 const router = Router();
 
-// Validation rules
-const techpackValidation = [
-  body('productName')
-    .notEmpty()
-    .withMessage('Product name is required')
-    .isLength({ max: 100 })
-    .withMessage('Product name must be less than 100 characters'),
-  
-  body('articleCode')
-    .notEmpty()
-    .withMessage('Article code is required')
-    .isLength({ max: 20 })
-    .withMessage('Article code must be less than 20 characters')
-    .matches(/^[A-Z0-9\-_]+$/)
-    .withMessage('Article code can only contain uppercase letters, numbers, hyphens, and underscores'),
-  
-  body('supplier')
-    .notEmpty()
-    .withMessage('Supplier is required')
-    .isLength({ max: 100 })
-    .withMessage('Supplier name must be less than 100 characters'),
-  
-  body('season')
-    .notEmpty()
-    .withMessage('Season is required')
-    .isLength({ max: 50 })
-    .withMessage('Season must be less than 50 characters'),
-  
-  body('fabricDescription')
-    .notEmpty()
-    .withMessage('Fabric description is required')
-    .isLength({ max: 500 })
-    .withMessage('Fabric description must be less than 500 characters'),
-  
-  body('category')
-    .optional()
-    .isLength({ max: 50 })
-    .withMessage('Category must be less than 50 characters'),
-  
-  body('gender')
-    .optional()
-    .isIn(['Men', 'Women', 'Unisex', 'Kids'])
-    .withMessage('Gender must be one of: Men, Women, Unisex, Kids'),
-  
-  body('brand')
-    .optional()
-    .isLength({ max: 50 })
-    .withMessage('Brand must be less than 50 characters'),
-  
-  body('retailPrice')
-    .optional()
-    .isFloat({ min: 0 })
-    .withMessage('Retail price must be a positive number'),
-  
-  body('currency')
-    .optional()
-    .isLength({ min: 3, max: 3 })
-    .withMessage('Currency must be a 3-letter code'),
-  
-  body('bom')
-    .optional()
-    .isArray()
-    .withMessage('BOM must be an array'),
-  
-  body('bom.*.part')
-    .if(body('bom').exists())
-    .notEmpty()
-    .withMessage('BOM part is required'),
-  
-  body('bom.*.materialName')
-    .if(body('bom').exists())
-    .notEmpty()
-    .withMessage('BOM material name is required'),
-  
-  body('bom.*.quantity')
-    .if(body('bom').exists())
-    .isFloat({ min: 0 })
-    .withMessage('BOM quantity must be a positive number'),
-  
-  body('measurements')
-    .optional()
-    .isArray()
-    .withMessage('Measurements must be an array'),
-  
-  body('measurements.*.pomCode')
-    .if(body('measurements').exists())
-    .notEmpty()
-    .withMessage('POM code is required'),
-  
-  body('measurements.*.pomName')
-    .if(body('measurements').exists())
-    .notEmpty()
-    .withMessage('POM name is required'),
-  
-  body('colorways')
-    .optional()
-    .isArray()
-    .withMessage('Colorways must be an array'),
-  
-  body('colorways.*.name')
-    .if(body('colorways').exists())
-    .notEmpty()
-    .withMessage('Colorway name is required'),
-  
-  body('colorways.*.code')
-    .if(body('colorways').exists())
-    .notEmpty()
-    .withMessage('Colorway code is required')
-];
 
-const patchValidation = [
-  body('productName')
-    .optional()
-    .isLength({ max: 100 })
-    .withMessage('Product name must be less than 100 characters'),
-  
-  body('supplier')
-    .optional()
-    .isLength({ max: 100 })
-    .withMessage('Supplier name must be less than 100 characters'),
-  
-  body('season')
-    .optional()
-    .isLength({ max: 50 })
-    .withMessage('Season must be less than 50 characters'),
-  
-  body('fabricDescription')
-    .optional()
-    .isLength({ max: 500 })
-    .withMessage('Fabric description must be less than 500 characters'),
-  
-  body('retailPrice')
-    .optional()
-    .isFloat({ min: 0 })
-    .withMessage('Retail price must be a positive number')
-];
-
-const queryValidation = [
-  query('page')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Page must be a positive integer'),
-  
-  query('limit')
-    .optional()
-    .isInt({ min: 1, max: 100 })
-    .withMessage('Limit must be between 1 and 100'),
-  
-  query('status')
-    .optional()
-    .isIn(['Draft', 'In Review', 'Approved', 'Rejected', 'Archived'])
-    .withMessage('Invalid status'),
-  
-  query('sortBy')
-    .optional()
-    .isIn(['productName', 'articleCode', 'createdAt', 'updatedAt', 'status'])
-    .withMessage('Invalid sort field'),
-  
-  query('sortOrder')
-    .optional()
-    .isIn(['asc', 'desc'])
-    .withMessage('Sort order must be asc or desc')
-];
-
-const idValidation = [
-  param('id')
-    .isMongoId()
-    .withMessage('Invalid TechPack ID')
-];
 
 /**
  * @route GET /api/techpacks
- * @desc Get all TechPacks with pagination, search, and filters
- * @access Private
+ * @desc List tech packs with filtering and pagination
+ * @access Public (for demo purposes)
  */
 router.get(
   '/',
-  requireAuth,
-  queryValidation,
-  techpackController.getTechPacks
+  validate(listTechPacksSchema),
+  techpackController.listTechPacks
 );
 
 /**
  * @route POST /api/techpacks
- * @desc Create a new TechPack
- * @access Private (Designer, Merchandiser, Admin)
+ * @desc Create new tech pack
+ * @access Public (for demo purposes)
  */
 router.post(
   '/',
-  requireAuth,
-  requireRole([UserRole.Designer, UserRole.Merchandiser, UserRole.Admin]),
-  techpackValidation,
+  validate(createTechPackSchema),
   techpackController.createTechPack
 );
 
 /**
  * @route GET /api/techpacks/:id
- * @desc Get single TechPack by ID
- * @access Private
+ * @desc Get tech pack details
+ * @access Public (for demo purposes)
  */
 router.get(
   '/:id',
-  requireAuth,
-  idValidation,
+  validate(getTechPackSchema),
   techpackController.getTechPack
 );
 
 /**
  * @route PUT /api/techpacks/:id
- * @desc Update TechPack (creates new revision for significant changes)
- * @access Private (Owner or Merchandiser/Admin)
+ * @desc Update tech pack
+ * @access Public (for demo purposes)
  */
 router.put(
   '/:id',
-  requireAuth,
-  requireOwnershipOrRole([UserRole.Merchandiser, UserRole.Admin]),
-  idValidation,
-  techpackValidation,
+  validate(updateTechPackSchema),
   techpackController.updateTechPack
 );
 
 /**
- * @route PATCH /api/techpacks/:id
- * @desc Partial update TechPack (autosave, no revision)
- * @access Private (Owner or Merchandiser/Admin)
- */
-router.patch(
-  '/:id',
-  requireAuth,
-  requireOwnershipOrRole([UserRole.Merchandiser, UserRole.Admin]),
-  idValidation,
-  patchValidation,
-  techpackController.patchTechPack
-);
-
-/**
  * @route DELETE /api/techpacks/:id
- * @desc Delete TechPack (soft delete)
- * @access Private (Owner or Admin)
+ * @desc Soft delete tech pack
+ * @access Public (for demo purposes)
  */
 router.delete(
   '/:id',
-  requireAuth,
-  requireOwnershipOrRole([UserRole.Admin]),
-  idValidation,
+  validate(getTechPackSchema),
   techpackController.deleteTechPack
+);
+
+/**
+ * @route POST /api/techpacks/:id/duplicate
+ * @desc Duplicate tech pack
+ * @access Public (for demo purposes)
+ */
+router.post(
+  '/:id/duplicate',
+  validate(duplicateTechPackSchema),
+  techpackController.duplicateTechPack
+);
+
+/**
+ * @route PATCH /api/techpacks/bulk
+ * @desc Bulk operations
+ * @access Public (for demo purposes)
+ */
+router.patch(
+  '/bulk',
+  validate(bulkOperationsSchema),
+  techpackController.bulkOperations
 );
 
 export default router;

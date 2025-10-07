@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
-import { TechPack, TechPackFormState, ArticleInfo, BomItem, MeasurementPoint, HowToMeasure, Colorway, RevisionEntry } from '../types/techpack';
+import { TechPack, ArticleInfo, BomItem, MeasurementPoint, HowToMeasure, Colorway, RevisionEntry } from '../types/techpack';
 
 // Action types
 type TechPackAction =
@@ -25,6 +25,17 @@ type TechPackAction =
   | { type: 'SET_UNSAVED_CHANGES'; payload: boolean }
   | { type: 'UPDATE_TAB_STATE'; payload: { tab: string; state: Partial<any> } };
 
+// Form state interface
+interface TechPackFormState {
+  techpack: TechPack;
+  currentTab: number;
+  tabStates: Record<string, any>;
+  isLoading: boolean;
+  isSaving: boolean;
+  lastSaved?: string;
+  hasUnsavedChanges: boolean;
+}
+
 // Initial state
 const createInitialTechPack = (): TechPack => ({
   id: '',
@@ -48,7 +59,7 @@ const createInitialTechPack = (): TechPack => ({
   howToMeasures: [],
   colorways: [],
   revisionHistory: [],
-  status: 'Draft',
+  status: 'draft',
   completeness: {
     isComplete: false,
     missingItems: [],
@@ -56,8 +67,8 @@ const createInitialTechPack = (): TechPack => ({
   },
   createdBy: '',
   updatedBy: '',
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
 });
 
 const initialState: TechPackFormState = {
@@ -85,7 +96,7 @@ const techPackReducer = (state: TechPackFormState, action: TechPackAction): Tech
         techpack: {
           ...state.techpack,
           articleInfo: { ...state.techpack.articleInfo, ...action.payload },
-          updatedAt: new Date().toISOString(),
+          updatedAt: new Date(),
         },
         hasUnsavedChanges: true,
       };
@@ -96,7 +107,7 @@ const techPackReducer = (state: TechPackFormState, action: TechPackAction): Tech
         techpack: {
           ...state.techpack,
           bom: [...state.techpack.bom, action.payload],
-          updatedAt: new Date().toISOString(),
+          updatedAt: new Date(),
         },
         hasUnsavedChanges: true,
       };
@@ -109,7 +120,7 @@ const techPackReducer = (state: TechPackFormState, action: TechPackAction): Tech
           bom: state.techpack.bom.map((item, index) =>
             index === action.payload.index ? { ...item, ...action.payload.item } : item
           ),
-          updatedAt: new Date().toISOString(),
+          updatedAt: new Date(),
         },
         hasUnsavedChanges: true,
       };
@@ -120,7 +131,7 @@ const techPackReducer = (state: TechPackFormState, action: TechPackAction): Tech
         techpack: {
           ...state.techpack,
           bom: state.techpack.bom.filter((_, index) => index !== action.payload),
-          updatedAt: new Date().toISOString(),
+          updatedAt: new Date(),
         },
         hasUnsavedChanges: true,
       };
@@ -131,7 +142,7 @@ const techPackReducer = (state: TechPackFormState, action: TechPackAction): Tech
         techpack: {
           ...state.techpack,
           measurements: [...state.techpack.measurements, action.payload],
-          updatedAt: new Date().toISOString(),
+          updatedAt: new Date(),
         },
         hasUnsavedChanges: true,
       };
@@ -144,7 +155,7 @@ const techPackReducer = (state: TechPackFormState, action: TechPackAction): Tech
           measurements: state.techpack.measurements.map((item, index) =>
             index === action.payload.index ? { ...item, ...action.payload.measurement } : item
           ),
-          updatedAt: new Date().toISOString(),
+          updatedAt: new Date(),
         },
         hasUnsavedChanges: true,
       };
@@ -155,7 +166,7 @@ const techPackReducer = (state: TechPackFormState, action: TechPackAction): Tech
         techpack: {
           ...state.techpack,
           measurements: state.techpack.measurements.filter((_, index) => index !== action.payload),
-          updatedAt: new Date().toISOString(),
+          updatedAt: new Date(),
         },
         hasUnsavedChanges: true,
       };
@@ -166,7 +177,7 @@ const techPackReducer = (state: TechPackFormState, action: TechPackAction): Tech
         techpack: {
           ...state.techpack,
           colorways: [...state.techpack.colorways, action.payload],
-          updatedAt: new Date().toISOString(),
+          updatedAt: new Date(),
         },
         hasUnsavedChanges: true,
       };
@@ -179,7 +190,7 @@ const techPackReducer = (state: TechPackFormState, action: TechPackAction): Tech
           colorways: state.techpack.colorways.map((item, index) =>
             index === action.payload.index ? { ...item, ...action.payload.colorway } : item
           ),
-          updatedAt: new Date().toISOString(),
+          updatedAt: new Date(),
         },
         hasUnsavedChanges: true,
       };
@@ -190,7 +201,7 @@ const techPackReducer = (state: TechPackFormState, action: TechPackAction): Tech
         techpack: {
           ...state.techpack,
           colorways: state.techpack.colorways.filter((_, index) => index !== action.payload),
-          updatedAt: new Date().toISOString(),
+          updatedAt: new Date(),
         },
         hasUnsavedChanges: true,
       };
@@ -349,18 +360,96 @@ export const TechPackProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [state]);
 
   const saveTechPack = useCallback(async () => {
+    console.log('🔄 Starting save process...');
     dispatch({ type: 'SET_SAVING', payload: true });
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Import API dynamically to avoid circular dependencies
+      const { api, isApiConfigured } = await import('../lib/api');
       
-      // Save to localStorage as fallback
-      localStorage.setItem(`techpack_${state.techpack.id}`, JSON.stringify(state.techpack));
+      console.log('📡 API imported, checking configuration...');
       
+      // Check if API is configured
+      if (!isApiConfigured()) {
+        console.log('❌ API not configured, falling back to localStorage');
+        throw new Error('API not configured');
+      }
+      
+      console.log('✅ API is configured, proceeding with save...');
+
+      if (state.techpack.id) {
+        // Update existing tech pack
+        console.log('📝 Updating existing tech pack:', state.techpack.id);
+        await api.updateTechPack(state.techpack.id, {
+          name: state.techpack.articleInfo.productName,
+          articleCode: state.techpack.articleInfo.articleCode,
+          version: state.techpack.articleInfo.version,
+          status: state.techpack.status.toLowerCase() as any,
+          metadata: {
+            description: state.techpack.articleInfo.fabricDescription,
+            category: state.techpack.articleInfo.productClass,
+            season: state.techpack.articleInfo.season
+          },
+          materials: state.techpack.bom.map(item => ({
+            name: item.materialName,
+            type: item.materialType,
+            supplier: item.supplier,
+            code: item.materialCode,
+            notes: item.notes
+          })),
+          measurements: state.techpack.measurements.map(item => ({
+            pomCode: item.pomCode,
+            pomName: item.pomName,
+            toleranceMinus: item.toleranceMinus,
+            tolerancePlus: item.tolerancePlus,
+            sizes: item.sizes
+          })),
+          colorways: state.techpack.colorways.map(item => ({
+            name: item.name,
+            code: item.code,
+            materialType: item.materialType,
+            placement: item.placement,
+            pantoneCode: item.pantoneCode
+          }))
+        });
+      } else {
+        // Create new tech pack
+        console.log('🆕 Creating new tech pack...');
+        const newTechPack = await api.createTechPack({
+          name: state.techpack.articleInfo.productName,
+          articleCode: state.techpack.articleInfo.articleCode,
+          ownerId: '507f1f77bcf86cd799439011', // Static owner ID for demo
+          metadata: {
+            description: state.techpack.articleInfo.fabricDescription,
+            category: state.techpack.articleInfo.productClass,
+            season: state.techpack.articleInfo.season
+          }
+        });
+
+        console.log('✅ New tech pack created:', newTechPack);
+        
+        // Update the tech pack with the new ID
+        dispatch({
+          type: 'SET_TECH_PACK',
+          payload: {
+            ...state.techpack,
+            id: newTechPack._id
+          }
+        });
+      }
+
+      console.log('💾 Tech pack saved successfully!');
       dispatch({ type: 'SET_LAST_SAVED', payload: new Date().toISOString() });
       dispatch({ type: 'SET_UNSAVED_CHANGES', payload: false });
     } catch (error) {
-      console.error('Failed to save tech pack:', error);
+      console.error('❌ Failed to save tech pack:', error);
+      // Fallback to localStorage only if API fails
+      try {
+        console.log('🔄 Falling back to localStorage...');
+        localStorage.setItem(`techpack_${state.techpack.id}`, JSON.stringify(state.techpack));
+        console.warn('Saved to localStorage as fallback');
+      } catch (localError) {
+        console.error('Failed to save to localStorage:', localError);
+      }
     } finally {
       dispatch({ type: 'SET_SAVING', payload: false });
     }

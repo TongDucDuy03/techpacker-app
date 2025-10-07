@@ -1,36 +1,31 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
 export enum TechPackStatus {
-  Draft = 'Draft',
-  InReview = 'In Review',
-  Approved = 'Approved',
-  Rejected = 'Rejected',
-  Archived = 'Archived'
+  DRAFT = 'draft',
+  PENDING_APPROVAL = 'pending_approval',
+  APPROVED = 'approved',
+  REJECTED = 'rejected'
 }
 
-export interface IBOMItem {
+export interface MaterialSpec {
   _id?: Types.ObjectId;
-  part: string;
-  materialName: string;
-  materialCode?: string;
-  placement: string;
-  size: string;
-  quantity: number;
-  uom: string;
-  supplier: string;
+  name: string;
+  code?: string;
+  type: string;
+  supplier?: string;
   color?: string;
   pantoneCode?: string;
+  composition?: string;
+  weight?: number;
+  width?: number;
   unitPrice?: number;
-  totalPrice?: number;
-  leadTime?: number;
   minimumOrder?: number;
+  leadTime?: number;
   approved?: boolean;
-  approvedBy?: string;
-  approvedDate?: Date;
-  comments?: string;
+  notes?: string;
 }
 
-export interface IMeasurement {
+export interface MeasurementSpec {
   _id?: Types.ObjectId;
   pomCode: string;
   pomName: string;
@@ -52,7 +47,7 @@ export interface IMeasurement {
   category?: string;
 }
 
-export interface IColorway {
+export interface ColorwaySpec {
   _id?: Types.ObjectId;
   name: string;
   code: string;
@@ -73,71 +68,60 @@ export interface IColorway {
   notes?: string;
 }
 
-export interface IHowToMeasure {
+export interface RevisionHistory {
   _id?: Types.ObjectId;
-  pomCode: string;
-  pomName: string;
-  description: string;
-  imageUrl?: string;
-  stepNumber: number;
-  instructions: string[];
-  tips?: string[];
-  commonMistakes?: string[];
-  relatedMeasurements?: string[];
+  version: string;
+  changedBy: Types.ObjectId;
+  changedByName: string;
+  changeDate: Date;
+  changeType: 'created' | 'updated' | 'status_change' | 'approved' | 'rejected';
+  changes: {
+    field: string;
+    oldValue: any;
+    newValue: any;
+  }[];
+  notes?: string;
 }
 
 export interface ITechPack extends Document {
-  productName: string;
+  _id: Types.ObjectId;
   articleCode: string;
+  name: string;
   version: string;
-  designer: Types.ObjectId;
-  designerName: string;
-  supplier: string;
-  season: string;
-  fabricDescription: string;
   status: TechPackStatus;
-  category?: string;
-  gender?: 'Men' | 'Women' | 'Unisex' | 'Kids';
-  brand?: string;
-  collection?: string;
-  retailPrice?: number;
-  currency?: string;
-  description?: string;
-  notes?: string;
-  bom: IBOMItem[];
-  measurements: IMeasurement[];
-  colorways: IColorway[];
-  howToMeasure: IHowToMeasure[];
-  createdBy: Types.ObjectId;
-  createdByName: string;
-  updatedBy: Types.ObjectId;
-  updatedByName: string;
   createdAt: Date;
   updatedAt: Date;
+  ownerId: Types.ObjectId;
+  isDeleted: boolean;
+  metadata: {
+    description?: string;
+    category?: string;
+    season?: string;
+  };
+  materials: MaterialSpec[];
+  measurements: MeasurementSpec[];
+  colorways: ColorwaySpec[];
+  revisions: RevisionHistory[];
 }
 
-const BOMItemSchema = new Schema<IBOMItem>({
-  part: { type: String, required: true },
-  materialName: { type: String, required: true },
-  materialCode: { type: String },
-  placement: { type: String, required: true },
-  size: { type: String, required: true },
-  quantity: { type: Number, required: true, min: 0 },
-  uom: { type: String, required: true },
-  supplier: { type: String, required: true },
+const MaterialSpecSchema = new Schema<MaterialSpec>({
+  name: { type: String, required: true },
+  code: { type: String },
+  type: { type: String, required: true },
+  supplier: { type: String },
   color: { type: String },
   pantoneCode: { type: String },
+  composition: { type: String },
+  weight: { type: Number, min: 0 },
+  width: { type: Number, min: 0 },
   unitPrice: { type: Number, min: 0 },
-  totalPrice: { type: Number, min: 0 },
-  leadTime: { type: Number, min: 0 },
   minimumOrder: { type: Number, min: 0 },
+  leadTime: { type: Number, min: 0 },
   approved: { type: Boolean, default: false },
-  approvedBy: { type: String },
-  approvedDate: { type: Date },
-  comments: { type: String }
+  notes: { type: String }
 });
 
-const MeasurementSchema = new Schema<IMeasurement>({
+const MeasurementSpecSchema = new Schema<MeasurementSpec>({
   pomCode: { type: String, required: true },
   pomName: { type: String, required: true },
   toleranceMinus: { type: Number, required: true },
@@ -157,7 +141,7 @@ const MeasurementSchema = new Schema<IMeasurement>({
   category: { type: String }
 });
 
-const ColorwaySchema = new Schema<IColorway>({
+const ColorwaySpecSchema = new Schema<ColorwaySpec>({
   name: { type: String, required: true },
   code: { type: String, required: true },
   pantoneCode: { type: String },
@@ -177,25 +161,26 @@ const ColorwaySchema = new Schema<IColorway>({
   notes: { type: String }
 });
 
-const HowToMeasureSchema = new Schema<IHowToMeasure>({
-  pomCode: { type: String, required: true },
-  pomName: { type: String, required: true },
-  description: { type: String, required: true },
-  imageUrl: { type: String },
-  stepNumber: { type: Number, required: true },
-  instructions: [{ type: String }],
-  tips: [{ type: String }],
-  commonMistakes: [{ type: String }],
-  relatedMeasurements: [{ type: String }]
+const RevisionHistorySchema = new Schema<RevisionHistory>({
+  version: { type: String, required: true },
+  changedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  changedByName: { type: String, required: true },
+  changeDate: { type: Date, default: Date.now },
+  changeType: {
+    type: String,
+    enum: ['created', 'updated', 'status_change', 'approved', 'rejected'],
+    required: true
+  },
+  changes: [{
+    field: { type: String, required: true },
+    oldValue: { type: Schema.Types.Mixed },
+    newValue: { type: Schema.Types.Mixed }
+  }],
+  notes: { type: String }
 });
 
 const TechPackSchema = new Schema<ITechPack>(
   {
-    productName: {
-      type: String,
-      required: [true, 'Product name is required'],
-      trim: true
-    },
     articleCode: {
       type: String,
       required: [true, 'Article code is required'],
@@ -203,69 +188,38 @@ const TechPackSchema = new Schema<ITechPack>(
       trim: true,
       uppercase: true
     },
+    name: {
+      type: String,
+      required: [true, 'Name is required'],
+      trim: true
+    },
     version: {
       type: String,
       default: 'V1'
     },
-    designer: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
-    },
-    designerName: {
-      type: String,
-      required: true
-    },
-    supplier: {
-      type: String,
-      required: [true, 'Supplier is required'],
-      trim: true
-    },
-    season: {
-      type: String,
-      required: [true, 'Season is required'],
-      trim: true
-    },
-    fabricDescription: {
-      type: String,
-      required: [true, 'Fabric description is required'],
-      trim: true
-    },
     status: {
       type: String,
       enum: Object.values(TechPackStatus),
-      default: TechPackStatus.Draft
+      default: TechPackStatus.DRAFT
     },
-    category: { type: String, trim: true },
-    gender: { type: String, enum: ['Men', 'Women', 'Unisex', 'Kids'] },
-    brand: { type: String, trim: true },
-    collection: { type: String, trim: true },
-    retailPrice: { type: Number, min: 0 },
-    currency: { type: String, default: 'USD' },
-    description: { type: String, trim: true },
-    notes: { type: String, trim: true },
-    bom: [BOMItemSchema],
-    measurements: [MeasurementSchema],
-    colorways: [ColorwaySchema],
-    howToMeasure: [HowToMeasureSchema],
-    createdBy: {
+    ownerId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true
     },
-    createdByName: {
-      type: String,
-      required: true
+    isDeleted: {
+      type: Boolean,
+      default: false
     },
-    updatedBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
+    metadata: {
+      description: { type: String, trim: true },
+      category: { type: String, trim: true },
+      season: { type: String, trim: true }
     },
-    updatedByName: {
-      type: String,
-      required: true
-    }
+    materials: [MaterialSpecSchema],
+    measurements: [MeasurementSpecSchema],
+    colorways: [ColorwaySpecSchema],
+    revisions: [RevisionHistorySchema]
   },
   {
     timestamps: true,
@@ -274,17 +228,23 @@ const TechPackSchema = new Schema<ITechPack>(
   }
 );
 
-// Indexes for performance
+// Indexes for performance and search
 TechPackSchema.index({ articleCode: 1 });
-TechPackSchema.index({ designer: 1, createdAt: -1 });
+TechPackSchema.index({ ownerId: 1, createdAt: -1 });
 TechPackSchema.index({ status: 1, updatedAt: -1 });
-TechPackSchema.index({ season: 1, brand: 1 });
+TechPackSchema.index({ isDeleted: 1 });
 TechPackSchema.index({ createdAt: -1 });
 
-// Virtual for lifecycle stage (compatibility with PDF service)
-TechPackSchema.virtual('lifecycleStage').get(function () {
-  return this.status;
+// Text indexes for search functionality
+TechPackSchema.index({
+  name: 'text',
+  articleCode: 'text',
+  'metadata.description': 'text'
 });
+
+// Compound indexes for filtering
+TechPackSchema.index({ isDeleted: 1, status: 1, createdAt: -1 });
+TechPackSchema.index({ isDeleted: 1, ownerId: 1, createdAt: -1 });
 
 const TechPack = model<ITechPack>('TechPack', TechPackSchema);
 

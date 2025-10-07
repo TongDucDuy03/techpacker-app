@@ -1,461 +1,372 @@
 import { Response } from 'express';
-import { validationResult } from 'express-validator';
-import TechPack, { ITechPack, TechPackStatus } from '../models/techpack.model';
-import Revision from '../models/revision.model';
-import { AuthRequest } from '../middleware/auth.middleware';
-import { UserRole } from '../models/user.model';
-import { config } from '../config/config';
-import { logActivity } from '../utils/activity-logger';
-import { ActivityAction } from '../models/activity.model';
+import { Types } from 'mongoose';
+import TechPack, { ITechPack, TechPackStatus, RevisionHistory } from '../models/techpack.model';
+import { ValidatedRequest } from '../middleware/validation.middleware';
+import {
+  CreateTechPackInput,
+  UpdateTechPackInput,
+  GetTechPackInput,
+  ListTechPacksInput,
+  DuplicateTechPackInput,
+  BulkOperationsInput
+} from '../validation/techpack.validation';
 
 export class TechPackController {
   /**
-   * Get all TechPacks with pagination, search, and filters
+   * List tech packs with filtering and pagination
    * GET /api/techpacks
    */
-  async getTechPacks(req: AuthRequest, res: Response): Promise<void> {
+  async listTechPacks(req: ValidatedRequest<ListTechPacksInput>, res: Response): Promise<void> {
     try {
-      const {
-        page = 1,
-        limit = config.defaultPageSize,
-        q = '',
-        status,
-        season,
-        designer,
-        brand,
-        sortBy = 'updatedAt',
-        sortOrder = 'desc'
-      } = req.query;
+      const { query } = req.validated;
+      const page = query.page || 1;
+      const limit = query.limit || 20;
+      const skip = (page - 1) * limit;
 
-      const pageNum = Math.max(1, parseInt(page as string));
-      const limitNum = Math.min(config.maxPageSize, Math.max(1, parseInt(limit as string)));
-      const skip = (pageNum - 1) * limitNum;
+      // Build filter query
+      const filter: any = { isDeleted: false };
 
-      // Build query
-      const query: any = {};
-
-      // Search in multiple fields
-      if (q) {
-        query.$or = [
-          { productName: { $regex: q, $options: 'i' } },
-          { articleCode: { $regex: q, $options: 'i' } },
-          { supplier: { $regex: q, $options: 'i' } },
-          { fabricDescription: { $regex: q, $options: 'i' } }
-        ];
+      // Search functionality
+      if (query.q) {
+        filter.$text = { $search: query.q };
       }
 
-      // Filters
-      if (status) query.status = status;
-      if (season) query.season = season;
-      if (designer) query.designer = designer;
-      if (brand) query.brand = brand;
-
-      // Role-based filtering
-      if (req.user?.role === UserRole.Designer) {
-        query.designer = req.user._id;
+      // Status filter
+      if (query.status) {
+        filter.status = query.status;
       }
 
-      // Sort options
-      const sortOptions: any = {};
-      sortOptions[sortBy as string] = sortOrder === 'asc' ? 1 : -1;
+      // Designer filter
+      if (query.designer) {
+        filter.ownerId = query.designer;
+      }
 
-      // Execute query with lean() for performance
-      const [techpacks, total] = await Promise.all([
-        TechPack.find(query)
-          .populate('designer', 'firstName lastName username')
-          .sort(sortOptions)
+      // Execute query
+      const [techPacks, total] = await Promise.all([
+        TechPack.find(filter)
+          .populate('ownerId', 'firstName lastName username')
+          .sort({ createdAt: -1 })
           .skip(skip)
-          .limit(limitNum)
+          .limit(limit)
           .lean(),
-        TechPack.countDocuments(query)
+        TechPack.countDocuments(filter)
       ]);
 
-      const totalPages = Math.ceil(total / limitNum);
+      const totalPages = Math.ceil(total / limit);
 
       res.json({
-        success: true,
-        data: {
-          techpacks,
-          pagination: {
-            currentPage: pageNum,
-            totalPages,
-            totalItems: total,
-            itemsPerPage: limitNum,
-            hasNextPage: pageNum < totalPages,
-            hasPrevPage: pageNum > 1
-          }
-        }
+        data: techPacks,
+        total,
+        page,
+        totalPages
       });
     } catch (error: any) {
-      console.error('Get TechPacks error:', error);
+      console.error('List TechPacks error:', error);
       res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
+        error: 'Internal server error',
+        details: error.message
       });
     }
   }
 
   /**
-   * Get single TechPack by ID
+   * Create new tech pack
+   * POST /api/techpacks
+   */
+  async createTechPack(req: ValidatedRequest<CreateTechPackInput>, res: Response): Promise<void> {
+    try {
+      const { body } = req.validated;
+      const techPackData = {
+        ...body,
+        version: 'V1',
+        status: TechPackStatus.DRAFT,
+        isDeleted: false,
+        revisions: [
+          {
+            version: 'V1',
+            changedBy: new Types.ObjectId(body.ownerId), // Assuming owner is the creator
+            changedByName: 'System',
+            changeDate: new Date(),
+            changeType: 'created',
+            changes: [],
+            notes: 'Initial creation'
+          }
+        ]
+      };
+
+      const techPack = new TechPack(techPackData);
+      await techPack.save();
+
+      res.status(201).json(techPack);
+    } catch (error: any) {
+      console.error('Create TechPack error:', error);
+      if (error.code === 11000) {
+        res.status(400).json({
+          error: 'Duplicate article code',
+          details: 'An item with this article code already exists.'
+        });
+      } else {
+        res.status(500).json({
+          error: 'Internal server error',
+          details: error.message
+        });
+      }
+    }
+  }
+
+  /**
+   * Get tech pack details
    * GET /api/techpacks/:id
    */
-  async getTechPack(req: AuthRequest, res: Response): Promise<void> {
+  async getTechPack(req: ValidatedRequest<GetTechPackInput>, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const { id } = req.validated.params;
+      const techPack = await TechPack.findOne({
+        _id: id,
+        isDeleted: false
+      }).populate('ownerId', 'firstName lastName username');
 
-      const techpack = await TechPack.findById(id)
-        .populate('designer', 'firstName lastName username')
-        .populate('createdBy', 'firstName lastName username')
-        .populate('updatedBy', 'firstName lastName username')
-        .lean();
-
-      if (!techpack) {
-        res.status(404).json({
-          success: false,
-          message: 'TechPack not found'
-        });
+      if (!techPack) {
+        res.status(404).json({ error: 'TechPack not found' });
         return;
       }
 
-      // Check ownership for Designer role
-      if (req.user?.role === UserRole.Designer && 
-          techpack.designer.toString() !== req.user._id.toString()) {
-        res.status(403).json({
-          success: false,
-          message: 'Access denied. You can only view your own TechPacks.'
-        });
-        return;
-      }
-
-      res.json({
-        success: true,
-        data: { techpack }
-      });
+      res.json(techPack);
     } catch (error: any) {
       console.error('Get TechPack error:', error);
       res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
+        error: 'Internal server error',
+        details: error.message
       });
     }
   }
 
-  /**
-   * Create new TechPack
-   * POST /api/techpacks
-   */
-  async createTechPack(req: AuthRequest, res: Response): Promise<void> {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: errors.array()
-        });
-        return;
-      }
-
-      const user = req.user!;
-      const techpackData = {
-        ...req.body,
-        designer: user._id,
-        designerName: user.fullName,
-        createdBy: user._id,
-        createdByName: user.fullName,
-        updatedBy: user._id,
-        updatedByName: user.fullName,
-        version: 'V1'
-      };
-
-      const techpack = new TechPack(techpackData);
-      await techpack.save();
-
-      // Log activity
-      await logActivity({
-        userId: user._id,
-        userName: user.fullName,
-        action: ActivityAction.TECHPACK_CREATE,
-        target: {
-          type: 'TechPack',
-          id: techpack._id,
-          name: techpack.productName
-        },
-        req
-      });
-
-      res.status(201).json({
-        success: true,
-        message: 'TechPack created successfully',
-        data: { techpack }
-      });
-    } catch (error: any) {
-      console.error('Create TechPack error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
-    }
-  }
 
   /**
-   * Update TechPack (creates new revision)
+   * Update tech pack
    * PUT /api/techpacks/:id
    */
-  async updateTechPack(req: AuthRequest, res: Response): Promise<void> {
+  async updateTechPack(req: ValidatedRequest<UpdateTechPackInput>, res: Response): Promise<void> {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: errors.array()
-        });
+      const { id } = req.validated.params;
+      const updateData = req.validated.body;
+
+      const originalTechPack = await TechPack.findOne({ _id: id, isDeleted: false });
+
+      if (!originalTechPack) {
+        res.status(404).json({ error: 'TechPack not found' });
         return;
       }
 
-      const { id } = req.params;
-      const user = req.user!;
+      let newVersion = originalTechPack.version;
+      const changes: any[] = [];
+      let changeType: RevisionHistory['changeType'] = 'updated';
 
-      const existingTechPack = await TechPack.findById(id);
-      if (!existingTechPack) {
-        res.status(404).json({
-          success: false,
-          message: 'TechPack not found'
-        });
-        return;
-      }
-
-      // Check ownership for Designer role
-      if (user.role === UserRole.Designer && 
-          existingTechPack.designer.toString() !== user._id.toString()) {
-        res.status(403).json({
-          success: false,
-          message: 'Access denied. You can only update your own TechPacks.'
-        });
-        return;
-      }
-
-      // Check if significant changes require new revision
-      const significantFields = ['productName', 'fabricDescription', 'supplier', 'bom', 'measurements', 'colorways'];
-      const hasSignificantChanges = significantFields.some(field => {
-        if (field === 'bom' || field === 'measurements' || field === 'colorways') {
-          return JSON.stringify(req.body[field]) !== JSON.stringify(existingTechPack[field]);
+      // Detect significant changes
+      for (const key in updateData) {
+        if (JSON.stringify(originalTechPack[key]) !== JSON.stringify(updateData[key])) {
+          changes.push({
+            field: key,
+            oldValue: originalTechPack[key],
+            newValue: updateData[key]
+          });
         }
-        return req.body[field] !== existingTechPack[field];
-      });
-
-      let newVersion = existingTechPack.version;
-      
-      if (hasSignificantChanges) {
-        // Create revision
-        const versionNumber = parseInt(existingTechPack.version.replace('V', '')) + 1;
-        newVersion = `V${versionNumber}`;
-
-        const revision = new Revision({
-          techPackId: existingTechPack._id,
-          version: existingTechPack.version,
-          changes: this.calculateChanges(existingTechPack.toObject(), req.body),
-          createdBy: user._id,
-          createdByName: user.fullName,
-          reason: req.body.revisionReason || 'Significant changes made',
-          snapshot: existingTechPack.toObject()
-        });
-
-        await revision.save();
       }
 
-      // Update TechPack
+      // Update version if status changes from draft to approved
+      if (updateData.status === TechPackStatus.APPROVED && originalTechPack.status === TechPackStatus.DRAFT) {
+        const versionNum = parseInt(originalTechPack.version.replace('V', ''), 10) + 1;
+        newVersion = `V${versionNum}`;
+        changeType = 'approved';
+      }
+
+      const revisionEntry = this.createRevisionEntry(
+        newVersion,
+        originalTechPack.ownerId, // Placeholder for actual user
+        'System', // Placeholder for actual user name
+        changeType,
+        changes
+      );
+
       const updatedTechPack = await TechPack.findByIdAndUpdate(
         id,
         {
-          ...req.body,
-          version: newVersion,
-          updatedBy: user._id,
-          updatedByName: user.fullName
+          $set: { ...updateData, version: newVersion },
+          $push: { revisions: revisionEntry }
         },
         { new: true, runValidators: true }
       );
 
-      // Log activity
-      await logActivity({
-        userId: user._id,
-        userName: user.fullName,
-        action: ActivityAction.TECHPACK_UPDATE,
-        target: {
-          type: 'TechPack',
-          id: updatedTechPack!._id,
-          name: updatedTechPack!.productName
-        },
-        details: { hasSignificantChanges, newVersion },
-        req
-      });
-
-      res.json({
-        success: true,
-        message: 'TechPack updated successfully',
-        data: { 
-          techpack: updatedTechPack,
-          revisionCreated: hasSignificantChanges
-        }
-      });
+      res.json(updatedTechPack);
     } catch (error: any) {
       console.error('Update TechPack error:', error);
       res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
+        error: 'Internal server error',
+        details: error.message
       });
     }
   }
 
   /**
-   * Partial update TechPack (autosave, no revision)
-   * PATCH /api/techpacks/:id
-   */
-  async patchTechPack(req: AuthRequest, res: Response): Promise<void> {
-    try {
-      const { id } = req.params;
-      const user = req.user!;
-
-      const existingTechPack = await TechPack.findById(id);
-      if (!existingTechPack) {
-        res.status(404).json({
-          success: false,
-          message: 'TechPack not found'
-        });
-        return;
-      }
-
-      // Check ownership for Designer role
-      if (user.role === UserRole.Designer && 
-          existingTechPack.designer.toString() !== user._id.toString()) {
-        res.status(403).json({
-          success: false,
-          message: 'Access denied. You can only update your own TechPacks.'
-        });
-        return;
-      }
-
-      // Update only provided fields
-      const updatedTechPack = await TechPack.findByIdAndUpdate(
-        id,
-        {
-          ...req.body,
-          updatedBy: user._id,
-          updatedByName: user.fullName
-        },
-        { new: true, runValidators: true }
-      );
-
-      res.json({
-        success: true,
-        message: 'TechPack updated successfully',
-        data: { techpack: updatedTechPack }
-      });
-    } catch (error: any) {
-      console.error('Patch TechPack error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
-      });
-    }
-  }
-
-  /**
-   * Delete TechPack (soft delete)
+   * Soft delete tech pack
    * DELETE /api/techpacks/:id
    */
-  async deleteTechPack(req: AuthRequest, res: Response): Promise<void> {
+  async deleteTechPack(req: ValidatedRequest<GetTechPackInput>, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
-      const user = req.user!;
+      const { id } = req.validated.params;
 
-      const techpack = await TechPack.findById(id);
-      if (!techpack) {
-        res.status(404).json({
-          success: false,
-          message: 'TechPack not found'
-        });
+      const techPack = await TechPack.findOne({ _id: id, isDeleted: false });
+
+      if (!techPack) {
+        res.status(404).json({ error: 'TechPack not found' });
         return;
       }
 
-      // Check ownership for Designer role
-      if (user.role === UserRole.Designer && 
-          techpack.designer.toString() !== user._id.toString()) {
-        res.status(403).json({
-          success: false,
-          message: 'Access denied. You can only delete your own TechPacks.'
-        });
-        return;
-      }
+      await TechPack.findByIdAndUpdate(id, { isDeleted: true });
 
-      // Soft delete by changing status
-      techpack.status = TechPackStatus.Archived;
-      techpack.updatedBy = user._id;
-      techpack.updatedByName = user.fullName;
-      await techpack.save();
-
-      // Log activity
-      await logActivity({
-        userId: user._id,
-        userName: user.fullName,
-        action: ActivityAction.TECHPACK_DELETE,
-        target: {
-          type: 'TechPack',
-          id: techpack._id,
-          name: techpack.productName
-        },
-        req
-      });
-
-      res.json({
-        success: true,
-        message: 'TechPack archived successfully'
-      });
+      res.json({ message: 'TechPack deleted successfully' });
     } catch (error: any) {
       console.error('Delete TechPack error:', error);
       res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: error.message
+        error: 'Internal server error',
+        details: error.message
       });
     }
   }
 
   /**
-   * Calculate changes between old and new TechPack data
+   * Duplicate tech pack
+   * POST /api/techpacks/:id/duplicate
    */
-  private calculateChanges(oldData: any, newData: any): any[] {
-    const changes: any[] = [];
-    const fieldsToTrack = ['productName', 'fabricDescription', 'supplier', 'season', 'brand', 'retailPrice'];
+  async duplicateTechPack(req: ValidatedRequest<DuplicateTechPackInput>, res: Response): Promise<void> {
+    try {
+      const { id } = req.validated.params;
+      const { keepVersion = false } = req.validated.body;
 
-    fieldsToTrack.forEach(field => {
-      if (oldData[field] !== newData[field]) {
-        changes.push({
-          field,
-          oldValue: oldData[field],
-          newValue: newData[field]
-        });
+      const originalTechPack = await TechPack.findOne({ _id: id, isDeleted: false });
+
+      if (!originalTechPack) {
+        res.status(404).json({ error: 'TechPack not found' });
+        return;
       }
-    });
 
-    // Track array changes (simplified)
-    ['bom', 'measurements', 'colorways'].forEach(field => {
-      if (JSON.stringify(oldData[field]) !== JSON.stringify(newData[field])) {
-        changes.push({
-          field,
-          oldValue: `${oldData[field]?.length || 0} items`,
-          newValue: `${newData[field]?.length || 0} items`
-        });
+      // Create duplicate data
+      const duplicateData = originalTechPack.toObject();
+      delete duplicateData._id;
+      delete duplicateData.createdAt;
+      delete duplicateData.updatedAt;
+
+      // Handle version
+      if (!keepVersion) {
+        const versionMatch = originalTechPack.version.match(/V(\d+)/);
+        if (versionMatch) {
+          const versionNum = parseInt(versionMatch[1], 10) + 1;
+          duplicateData.version = `V${versionNum}`;
+        } else {
+          duplicateData.version = `${originalTechPack.version}-copy`;
+        }
       }
-    });
 
-    return changes;
+      // Update article code to ensure uniqueness
+      duplicateData.articleCode = `${originalTechPack.articleCode}-COPY-${Date.now()}`;
+
+      // Reset status and add creation revision
+      duplicateData.status = TechPackStatus.DRAFT;
+      duplicateData.revisions = [
+        this.createRevisionEntry(
+          duplicateData.version,
+          originalTechPack.ownerId,
+          'System',
+          'created',
+          [],
+          'Duplicated from original tech pack'
+        )
+      ];
+
+      const duplicatedTechPack = new TechPack(duplicateData);
+      await duplicatedTechPack.save();
+
+      res.status(201).json(duplicatedTechPack);
+    } catch (error: any) {
+      console.error('Duplicate TechPack error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        details: error.message
+      });
+    }
+  }
+
+  /**
+   * Bulk operations
+   * PATCH /api/techpacks/bulk
+   */
+  async bulkOperations(req: ValidatedRequest<BulkOperationsInput>, res: Response): Promise<void> {
+    try {
+      const { ids, action, payload } = req.validated.body;
+
+      let updateOperation: any = {};
+      let message = '';
+
+      switch (action) {
+        case 'delete':
+          updateOperation = { isDeleted: true };
+          message = `${ids.length} tech packs deleted successfully`;
+          break;
+        case 'approve':
+          updateOperation = { status: TechPackStatus.APPROVED };
+          message = `${ids.length} tech packs approved successfully`;
+          break;
+        case 'setStatus':
+          if (!payload?.status) {
+            res.status(400).json({ error: 'Status is required for setStatus action' });
+            return;
+          }
+          updateOperation = { status: payload.status };
+          message = `${ids.length} tech packs status updated successfully`;
+          break;
+        default:
+          res.status(400).json({ error: 'Invalid action' });
+          return;
+      }
+
+      const result = await TechPack.updateMany(
+        { _id: { $in: ids }, isDeleted: false },
+        updateOperation
+      );
+
+      res.json({
+        message,
+        modifiedCount: result.modifiedCount
+      });
+    } catch (error: any) {
+      console.error('Bulk operations error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        details: error.message
+      });
+    }
+  }
+
+  /**
+   * Helper method to create revision entry
+   */
+  private createRevisionEntry(
+    version: string,
+    changedBy: Types.ObjectId,
+    changedByName: string,
+    changeType: RevisionHistory['changeType'],
+    changes: any[],
+    notes?: string
+  ): RevisionHistory {
+    return {
+      version,
+      changedBy,
+      changedByName,
+      changeDate: new Date(),
+      changeType,
+      changes,
+      notes
+    };
   }
 }
 
