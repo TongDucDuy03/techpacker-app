@@ -11,63 +11,65 @@ interface KeyboardShortcut {
 }
 
 export const useKeyboardShortcuts = () => {
-  const { saveTechPack, exportToPDF, setCurrentTab, state } = useTechPack();
+  const context = useTechPack();
+  const { saveTechPack, exportToPDF, setCurrentTab, state } = context ?? {};
+  const { currentTab = 0 } = state ?? {};
 
   const shortcuts: KeyboardShortcut[] = [
     {
       key: 's',
       ctrlKey: true,
-      action: () => saveTechPack(),
+      action: () => saveTechPack?.(),
       description: 'Save tech pack'
     },
     {
       key: 'e',
       ctrlKey: true,
-      action: () => exportToPDF(),
+      action: () => exportToPDF?.(),
       description: 'Export to PDF'
     },
     {
       key: '1',
       ctrlKey: true,
-      action: () => setCurrentTab(0),
+      action: () => setCurrentTab?.(0),
       description: 'Go to Article Info tab'
     },
     {
       key: '2',
       ctrlKey: true,
-      action: () => setCurrentTab(1),
+      action: () => setCurrentTab?.(1),
       description: 'Go to BOM tab'
     },
     {
       key: '3',
       ctrlKey: true,
-      action: () => setCurrentTab(2),
+      action: () => setCurrentTab?.(2),
       description: 'Go to Measurements tab'
     },
     {
       key: '4',
       ctrlKey: true,
-      action: () => setCurrentTab(3),
+      action: () => setCurrentTab?.(3),
       description: 'Go to How to Measure tab'
     },
     {
       key: '5',
       ctrlKey: true,
-      action: () => setCurrentTab(4),
+      action: () => setCurrentTab?.(4),
       description: 'Go to Colorways tab'
     },
     {
       key: '6',
       ctrlKey: true,
-      action: () => setCurrentTab(5),
+      action: () => setCurrentTab?.(5),
       description: 'Go to Revision History tab'
     },
     {
       key: 'ArrowLeft',
       ctrlKey: true,
       action: () => {
-        const prevTab = Math.max(0, state.currentTab - 1);
-        setCurrentTab(prevTab);
+        const prevTab = Math.max(0, currentTab - 1);
+        setCurrentTab?.(prevTab);
       },
       description: 'Previous tab'
     },
@@ -75,8 +77,8 @@ export const useKeyboardShortcuts = () => {
       key: 'ArrowRight',
       ctrlKey: true,
       action: () => {
-        const nextTab = Math.min(5, state.currentTab + 1);
-        setCurrentTab(nextTab);
+        const nextTab = Math.min(5, currentTab + 1);
+        setCurrentTab?.(nextTab);
       },
       description: 'Next tab'
     }
@@ -90,7 +92,7 @@ export const useKeyboardShortcuts = () => {
         // Only allow Ctrl+S for saving even when in input fields
         if (event.ctrlKey && event.key === 's') {
           event.preventDefault();
-          saveTechPack();
+          saveTechPack?.();
         }
         return;
       }

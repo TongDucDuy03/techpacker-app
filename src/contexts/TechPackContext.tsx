@@ -1,531 +1,355 @@
-import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
-import { TechPack, ArticleInfo, BomItem, MeasurementPoint, HowToMeasure, Colorway, RevisionEntry } from '../types/techpack';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { TechPack, CreateTechPackInput, TechPackListResponse, TechPackFormState, MeasurementPoint, HowToMeasure, BomItem, Colorway } from '../types/techpack';
+import { api } from '../lib/api';
+import { showPromise, showError } from '../lib/toast';
 
-// Action types
-type TechPackAction =
-  | { type: 'SET_TECH_PACK'; payload: TechPack }
-  | { type: 'UPDATE_ARTICLE_INFO'; payload: Partial<ArticleInfo> }
-  | { type: 'ADD_BOM_ITEM'; payload: BomItem }
-  | { type: 'UPDATE_BOM_ITEM'; payload: { index: number; item: Partial<BomItem> } }
-  | { type: 'DELETE_BOM_ITEM'; payload: number }
-  | { type: 'ADD_MEASUREMENT'; payload: MeasurementPoint }
-  | { type: 'UPDATE_MEASUREMENT'; payload: { index: number; measurement: Partial<MeasurementPoint> } }
-  | { type: 'DELETE_MEASUREMENT'; payload: number }
-  | { type: 'ADD_HOW_TO_MEASURE'; payload: HowToMeasure }
-  | { type: 'UPDATE_HOW_TO_MEASURE'; payload: { index: number; howTo: Partial<HowToMeasure> } }
-  | { type: 'DELETE_HOW_TO_MEASURE'; payload: number }
-  | { type: 'ADD_COLORWAY'; payload: Colorway }
-  | { type: 'UPDATE_COLORWAY'; payload: { index: number; colorway: Partial<Colorway> } }
-  | { type: 'DELETE_COLORWAY'; payload: number }
-  | { type: 'ADD_REVISION'; payload: RevisionEntry }
-  | { type: 'SET_CURRENT_TAB'; payload: number }
-  | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'SET_SAVING'; payload: boolean }
-  | { type: 'SET_LAST_SAVED'; payload: string }
-  | { type: 'SET_UNSAVED_CHANGES'; payload: boolean }
-  | { type: 'UPDATE_TAB_STATE'; payload: { tab: string; state: Partial<any> } };
-
-// Form state interface
-interface TechPackFormState {
-  techpack: TechPack;
-  currentTab: number;
-  tabStates: Record<string, any>;
-  isLoading: boolean;
-  isSaving: boolean;
-  lastSaved?: string;
-  hasUnsavedChanges: boolean;
-}
-
-// Initial state
-const createInitialTechPack = (): TechPack => ({
-  id: '',
-  articleInfo: {
-    articleCode: '',
-    productName: '',
-    version: 1,
-    gender: 'Unisex',
-    productClass: '',
-    fitType: 'Regular',
-    supplier: '',
-    technicalDesigner: '',
-    fabricDescription: '',
-    season: 'Spring',
-    lifecycleStage: 'Concept',
-    createdDate: new Date().toISOString(),
-    lastModified: new Date().toISOString(),
-  },
-  bom: [],
-  measurements: [],
-  howToMeasures: [],
-  colorways: [],
-  revisionHistory: [],
-  status: 'draft',
-  completeness: {
-    isComplete: false,
-    missingItems: [],
-    completionPercentage: 0,
-  },
-  createdBy: '',
-  updatedBy: '',
-  createdAt: new Date(),
-  updatedAt: new Date(),
-});
-
-const initialState: TechPackFormState = {
-  techpack: createInitialTechPack(),
-  currentTab: 0,
-  tabStates: {},
-  isLoading: false,
-  isSaving: false,
-  hasUnsavedChanges: false,
-};
-
-// Reducer
-const techPackReducer = (state: TechPackFormState, action: TechPackAction): TechPackFormState => {
-  switch (action.type) {
-    case 'SET_TECH_PACK':
-      return {
-        ...state,
-        techpack: action.payload,
-        hasUnsavedChanges: false,
-      };
-
-    case 'UPDATE_ARTICLE_INFO':
-      return {
-        ...state,
-        techpack: {
-          ...state.techpack,
-          articleInfo: { ...state.techpack.articleInfo, ...action.payload },
-          updatedAt: new Date(),
-        },
-        hasUnsavedChanges: true,
-      };
-
-    case 'ADD_BOM_ITEM':
-      return {
-        ...state,
-        techpack: {
-          ...state.techpack,
-          bom: [...state.techpack.bom, action.payload],
-          updatedAt: new Date(),
-        },
-        hasUnsavedChanges: true,
-      };
-
-    case 'UPDATE_BOM_ITEM':
-      return {
-        ...state,
-        techpack: {
-          ...state.techpack,
-          bom: state.techpack.bom.map((item, index) =>
-            index === action.payload.index ? { ...item, ...action.payload.item } : item
-          ),
-          updatedAt: new Date(),
-        },
-        hasUnsavedChanges: true,
-      };
-
-    case 'DELETE_BOM_ITEM':
-      return {
-        ...state,
-        techpack: {
-          ...state.techpack,
-          bom: state.techpack.bom.filter((_, index) => index !== action.payload),
-          updatedAt: new Date(),
-        },
-        hasUnsavedChanges: true,
-      };
-
-    case 'ADD_MEASUREMENT':
-      return {
-        ...state,
-        techpack: {
-          ...state.techpack,
-          measurements: [...state.techpack.measurements, action.payload],
-          updatedAt: new Date(),
-        },
-        hasUnsavedChanges: true,
-      };
-
-    case 'UPDATE_MEASUREMENT':
-      return {
-        ...state,
-        techpack: {
-          ...state.techpack,
-          measurements: state.techpack.measurements.map((item, index) =>
-            index === action.payload.index ? { ...item, ...action.payload.measurement } : item
-          ),
-          updatedAt: new Date(),
-        },
-        hasUnsavedChanges: true,
-      };
-
-    case 'DELETE_MEASUREMENT':
-      return {
-        ...state,
-        techpack: {
-          ...state.techpack,
-          measurements: state.techpack.measurements.filter((_, index) => index !== action.payload),
-          updatedAt: new Date(),
-        },
-        hasUnsavedChanges: true,
-      };
-
-    case 'ADD_COLORWAY':
-      return {
-        ...state,
-        techpack: {
-          ...state.techpack,
-          colorways: [...state.techpack.colorways, action.payload],
-          updatedAt: new Date(),
-        },
-        hasUnsavedChanges: true,
-      };
-
-    case 'UPDATE_COLORWAY':
-      return {
-        ...state,
-        techpack: {
-          ...state.techpack,
-          colorways: state.techpack.colorways.map((item, index) =>
-            index === action.payload.index ? { ...item, ...action.payload.colorway } : item
-          ),
-          updatedAt: new Date(),
-        },
-        hasUnsavedChanges: true,
-      };
-
-    case 'DELETE_COLORWAY':
-      return {
-        ...state,
-        techpack: {
-          ...state.techpack,
-          colorways: state.techpack.colorways.filter((_, index) => index !== action.payload),
-          updatedAt: new Date(),
-        },
-        hasUnsavedChanges: true,
-      };
-
-    case 'ADD_REVISION':
-      return {
-        ...state,
-        techpack: {
-          ...state.techpack,
-          revisionHistory: [action.payload, ...state.techpack.revisionHistory],
-        },
-      };
-
-    case 'SET_CURRENT_TAB':
-      return { ...state, currentTab: action.payload };
-
-    case 'SET_LOADING':
-      return { ...state, isLoading: action.payload };
-
-    case 'SET_SAVING':
-      return { ...state, isSaving: action.payload };
-
-    case 'SET_LAST_SAVED':
-      return { ...state, lastSaved: action.payload };
-
-    case 'SET_UNSAVED_CHANGES':
-      return { ...state, hasUnsavedChanges: action.payload };
-
-    case 'UPDATE_TAB_STATE':
-      return {
-        ...state,
-        tabStates: {
-          ...state.tabStates,
-          [action.payload.tab]: { ...state.tabStates[action.payload.tab], ...action.payload.state },
-        },
-      };
-
-    default:
-      return state;
-  }
-};
-
-// Context
 interface TechPackContextType {
+  techPacks: TechPack[];
+  loading: boolean;
+  pagination: Omit<TechPackListResponse, 'data'>;
   state: TechPackFormState;
-  dispatch: React.Dispatch<TechPackAction>;
-  
-  // Helper functions
-  updateArticleInfo: (updates: Partial<ArticleInfo>) => void;
-  addBomItem: (item: BomItem) => void;
-  updateBomItem: (index: number, updates: Partial<BomItem>) => void;
-  deleteBomItem: (index: number) => void;
-  addMeasurement: (measurement: MeasurementPoint) => void;
-  updateMeasurement: (index: number, updates: Partial<MeasurementPoint>) => void;
-  deleteMeasurement: (index: number) => void;
-  addColorway: (colorway: Colorway) => void;
-  updateColorway: (index: number, updates: Partial<Colorway>) => void;
-  deleteColorway: (index: number) => void;
-  
-  // Utility functions
-  calculateCompleteness: () => void;
-  saveTechPack: () => Promise<void>;
-  loadTechPack: (id: string) => Promise<void>;
-  exportToPDF: () => void;
+  loadTechPacks: (params?: { page?: number; limit?: number; q?: string; status?: string }) => Promise<void>;
+  createTechPack: (data: CreateTechPackInput) => Promise<TechPack | undefined>;
+  updateTechPack: (id: string, data: Partial<TechPack>) => Promise<TechPack | undefined>;
+  deleteTechPack: (id: string) => Promise<void>;
+  getTechPack: (id: string) => Promise<TechPack | undefined>;
   setCurrentTab: (tab: number) => void;
+  saveTechPack: () => Promise<void>;
+  exportToPDF: () => void;
+  addMeasurement: (measurement: MeasurementPoint) => void;
+  updateMeasurement: (index: number, measurement: MeasurementPoint) => void;
+  deleteMeasurement: (index: number) => void;
+  addHowToMeasure: (howToMeasure: HowToMeasure) => void;
+  updateHowToMeasure: (index: number, howToMeasure: HowToMeasure) => void;
+  deleteHowToMeasure: (index: number) => void;
+  addBomItem: (bomItem: BomItem) => void;
+  updateBomItem: (index: number, bomItem: BomItem) => void;
+  deleteBomItem: (index: number) => void;
+  addColorway: (colorway: Colorway) => void;
+  updateColorway: (index: number, colorway: Colorway) => void;
+  deleteColorway: (index: number) => void;
 }
 
 const TechPackContext = createContext<TechPackContextType | undefined>(undefined);
 
-// Provider component
-export const TechPackProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [state, dispatch] = useReducer(techPackReducer, initialState);
+export const TechPackProvider = ({ children }: { children: ReactNode }) => {
+  const [techPacks, setTechPacks] = useState<TechPack[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [pagination, setPagination] = useState<Omit<TechPackListResponse, 'data'>>({ total: 0, page: 1, totalPages: 1 });
 
-  // Helper functions
-  const updateArticleInfo = useCallback((updates: Partial<ArticleInfo>) => {
-    dispatch({ type: 'UPDATE_ARTICLE_INFO', payload: updates });
-  }, []);
-
-  const addBomItem = useCallback((item: BomItem) => {
-    dispatch({ type: 'ADD_BOM_ITEM', payload: item });
-  }, []);
-
-  const updateBomItem = useCallback((index: number, updates: Partial<BomItem>) => {
-    dispatch({ type: 'UPDATE_BOM_ITEM', payload: { index, item: updates } });
-  }, []);
-
-  const deleteBomItem = useCallback((index: number) => {
-    dispatch({ type: 'DELETE_BOM_ITEM', payload: index });
-  }, []);
-
-  const addMeasurement = useCallback((measurement: MeasurementPoint) => {
-    dispatch({ type: 'ADD_MEASUREMENT', payload: measurement });
-  }, []);
-
-  const updateMeasurement = useCallback((index: number, updates: Partial<MeasurementPoint>) => {
-    dispatch({ type: 'UPDATE_MEASUREMENT', payload: { index, measurement: updates } });
-  }, []);
-
-  const deleteMeasurement = useCallback((index: number) => {
-    dispatch({ type: 'DELETE_MEASUREMENT', payload: index });
-  }, []);
-
-  const addColorway = useCallback((colorway: Colorway) => {
-    dispatch({ type: 'ADD_COLORWAY', payload: colorway });
-  }, []);
-
-  const updateColorway = useCallback((index: number, updates: Partial<Colorway>) => {
-    dispatch({ type: 'UPDATE_COLORWAY', payload: { index, colorway: updates } });
-  }, []);
-
-  const deleteColorway = useCallback((index: number) => {
-    dispatch({ type: 'DELETE_COLORWAY', payload: index });
-  }, []);
-
-  const setCurrentTab = useCallback((tab: number) => {
-    dispatch({ type: 'SET_CURRENT_TAB', payload: tab });
-  }, []);
-
-  // Utility functions
-  const calculateCompleteness = useCallback(() => {
-    const { techpack } = state;
-    const missingItems: string[] = [];
-    let completionPercentage = 0;
-
-    // Check article info completeness
-    if (!techpack.articleInfo.articleCode) missingItems.push('Article Code');
-    if (!techpack.articleInfo.productName) missingItems.push('Product Name');
-    if (!techpack.articleInfo.fabricDescription) missingItems.push('Fabric Description');
-    
-    // Check BOM completeness
-    if (techpack.bom.length === 0) missingItems.push('Bill of Materials');
-    
-    // Check measurements completeness
-    if (techpack.measurements.length === 0) missingItems.push('Measurement Chart');
-    
-    // Check colorways completeness
-    if (techpack.colorways.length === 0) missingItems.push('Colorways');
-
-    // Calculate completion percentage
-    const totalSections = 4; // Article, BOM, Measurements, Colorways
-    const completedSections = totalSections - missingItems.length;
-    completionPercentage = Math.round((completedSections / totalSections) * 100);
-
-    // Update techpack completeness
-    dispatch({
-      type: 'SET_TECH_PACK',
-      payload: {
-        ...techpack,
-        completeness: {
-          isComplete: missingItems.length === 0,
-          missingItems,
-          completionPercentage,
-        },
+  // Initialize default TechPack state
+  const [state, setState] = useState<TechPackFormState>({
+    techpack: {
+      id: '',
+      articleInfo: {
+        articleCode: '',
+        productName: '',
+        version: 1,
+        gender: 'Unisex',
+        productClass: '',
+        fitType: 'Regular',
+        supplier: '',
+        technicalDesigner: '',
+        fabricDescription: '',
+        season: 'SS25',
+        lifecycleStage: 'Concept',
+        createdDate: new Date().toISOString(),
+        lastModified: new Date().toISOString(),
       },
-    });
-  }, [state]);
+      bom: [],
+      measurements: [],
+      howToMeasures: [],
+      colorways: [],
+      revisionHistory: [],
+      status: 'Draft',
+      completeness: {
+        isComplete: false,
+        missingItems: [],
+        completionPercentage: 0,
+      },
+      createdBy: '',
+      updatedBy: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    currentTab: 0,
+    tabStates: {},
+    isLoading: false,
+    isSaving: false,
+    hasUnsavedChanges: false,
+  });
 
-  const saveTechPack = useCallback(async () => {
-    console.log('🔄 Starting save process...');
-    dispatch({ type: 'SET_SAVING', payload: true });
+  const loadTechPacks = useCallback(async (params = {}) => {
+    setLoading(true);
     try {
-      // Import API dynamically to avoid circular dependencies
-      const { api, isApiConfigured } = await import('../lib/api');
-      
-      console.log('📡 API imported, checking configuration...');
-      
-      // Check if API is configured
-      if (!isApiConfigured()) {
-        console.log('❌ API not configured, falling back to localStorage');
-        throw new Error('API not configured');
-      }
-      
-      console.log('✅ API is configured, proceeding with save...');
-
-      if (state.techpack.id) {
-        // Update existing tech pack
-        console.log('📝 Updating existing tech pack:', state.techpack.id);
-        await api.updateTechPack(state.techpack.id, {
-          name: state.techpack.articleInfo.productName,
-          articleCode: state.techpack.articleInfo.articleCode,
-          version: state.techpack.articleInfo.version,
-          status: state.techpack.status.toLowerCase() as any,
-          metadata: {
-            description: state.techpack.articleInfo.fabricDescription,
-            category: state.techpack.articleInfo.productClass,
-            season: state.techpack.articleInfo.season
-          },
-          materials: state.techpack.bom.map(item => ({
-            name: item.materialName,
-            type: item.materialType,
-            supplier: item.supplier,
-            code: item.materialCode,
-            notes: item.notes
-          })),
-          measurements: state.techpack.measurements.map(item => ({
-            pomCode: item.pomCode,
-            pomName: item.pomName,
-            toleranceMinus: item.toleranceMinus,
-            tolerancePlus: item.tolerancePlus,
-            sizes: item.sizes
-          })),
-          colorways: state.techpack.colorways.map(item => ({
-            name: item.name,
-            code: item.code,
-            materialType: item.materialType,
-            placement: item.placement,
-            pantoneCode: item.pantoneCode
-          }))
-        });
-      } else {
-        // Create new tech pack
-        console.log('🆕 Creating new tech pack...');
-        const newTechPack = await api.createTechPack({
-          name: state.techpack.articleInfo.productName,
-          articleCode: state.techpack.articleInfo.articleCode,
-          ownerId: '507f1f77bcf86cd799439011', // Static owner ID for demo
-          metadata: {
-            description: state.techpack.articleInfo.fabricDescription,
-            category: state.techpack.articleInfo.productClass,
-            season: state.techpack.articleInfo.season
-          }
-        });
-
-        console.log('✅ New tech pack created:', newTechPack);
-        
-        // Update the tech pack with the new ID
-        dispatch({
-          type: 'SET_TECH_PACK',
-          payload: {
-            ...state.techpack,
-            id: newTechPack._id
-          }
-        });
-      }
-
-      console.log('💾 Tech pack saved successfully!');
-      dispatch({ type: 'SET_LAST_SAVED', payload: new Date().toISOString() });
-      dispatch({ type: 'SET_UNSAVED_CHANGES', payload: false });
-    } catch (error) {
-      console.error('❌ Failed to save tech pack:', error);
-      // Fallback to localStorage only if API fails
-      try {
-        console.log('🔄 Falling back to localStorage...');
-        localStorage.setItem(`techpack_${state.techpack.id}`, JSON.stringify(state.techpack));
-        console.warn('Saved to localStorage as fallback');
-      } catch (localError) {
-        console.error('Failed to save to localStorage:', localError);
-      }
+      const response = await api.listTechPacks(params);
+      setTechPacks(response.data);
+      setPagination({ total: response.total, page: response.page, totalPages: response.totalPages });
+    } catch (error: any) {
+      showError(error.message || 'Failed to load tech packs');
     } finally {
-      dispatch({ type: 'SET_SAVING', payload: false });
-    }
-  }, [state.techpack]);
-
-  const loadTechPack = useCallback(async (id: string) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
-    try {
-      // Try to load from localStorage first
-      const saved = localStorage.getItem(`techpack_${id}`);
-      if (saved) {
-        const techpack = JSON.parse(saved);
-        dispatch({ type: 'SET_TECH_PACK', payload: techpack });
-      }
-    } catch (error) {
-      console.error('Failed to load tech pack:', error);
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      setLoading(false);
     }
   }, []);
 
-  const exportToPDF = useCallback(() => {
-    // TODO: Implement PDF export functionality
+  useEffect(() => {
+    loadTechPacks();
+  }, [loadTechPacks]);
+
+  const createTechPack = async (data: CreateTechPackInput) => {
+    try {
+      const newTechPack = await showPromise(
+        api.createTechPack(data),
+        {
+          loading: 'Creating tech pack...',
+          success: 'Tech pack created successfully!',
+          error: (err) => err.message || 'Failed to create tech pack',
+        }
+      );
+      await loadTechPacks();
+      return newTechPack;
+    } catch (error) {
+      // Error is already handled by showPromise
+    }
+  };
+
+  const updateTechPack = async (id: string, data: Partial<TechPack>) => {
+    try {
+      const updatedTechPack = await showPromise(
+        api.updateTechPack(id, data),
+        {
+          loading: 'Updating tech pack...',
+          success: 'Tech pack updated successfully!',
+          error: (err) => err.message || 'Failed to update tech pack',
+        }
+      );
+      await loadTechPacks();
+      return updatedTechPack;
+    } catch (error) {
+      // Error is already handled by showPromise
+    }
+  };
+
+  const deleteTechPack = async (id: string) => {
+    try {
+      await showPromise(
+        api.deleteTechPack(id),
+        {
+          loading: 'Deleting tech pack...',
+          success: 'Tech pack archived successfully!',
+          error: (err) => err.message || 'Failed to delete tech pack',
+        }
+      );
+      await loadTechPacks();
+    } catch (error) {
+      // Error is already handled by showPromise
+    }
+  };
+
+  const getTechPack = async (id: string) => {
+    setLoading(true);
+    try {
+      return await api.getTechPack(id);
+    } catch (error: any) {
+      showError(error.message || 'Failed to fetch tech pack');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Form-specific methods
+  const setCurrentTab = (tab: number) => {
+    setState(prev => ({ ...prev, currentTab: tab }));
+  };
+
+  const saveTechPack = async () => {
+    setState(prev => ({ ...prev, isSaving: true }));
+    try {
+      // Simulate save operation
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setState(prev => ({
+        ...prev,
+        isSaving: false,
+        hasUnsavedChanges: false,
+        lastSaved: new Date().toISOString()
+      }));
+    } catch (error) {
+      setState(prev => ({ ...prev, isSaving: false }));
+      showError('Failed to save tech pack');
+    }
+  };
+
+  const exportToPDF = () => {
+    // Simulate PDF export
     console.log('Exporting to PDF...');
-  }, []);
+  };
 
-  // Auto-save functionality
-  useEffect(() => {
-    if (state.hasUnsavedChanges && !state.isSaving) {
-      const timer = setTimeout(() => {
-        saveTechPack();
-      }, 2000); // Auto-save after 2 seconds of inactivity
+  const addMeasurement = (measurement: MeasurementPoint) => {
+    setState(prev => ({
+      ...prev,
+      techpack: {
+        ...prev.techpack,
+        measurements: [...prev.techpack.measurements, measurement]
+      },
+      hasUnsavedChanges: true
+    }));
+  };
 
-      return () => clearTimeout(timer);
-    }
-  }, [state.hasUnsavedChanges, state.isSaving, saveTechPack]);
+  const updateMeasurement = (index: number, measurement: MeasurementPoint) => {
+    setState(prev => ({
+      ...prev,
+      techpack: {
+        ...prev.techpack,
+        measurements: prev.techpack.measurements.map((m, i) => i === index ? measurement : m)
+      },
+      hasUnsavedChanges: true
+    }));
+  };
 
-  // Calculate completeness when techpack changes
-  useEffect(() => {
-    calculateCompleteness();
-  }, [state.techpack.articleInfo, state.techpack.bom, state.techpack.measurements, state.techpack.colorways]);
+  const deleteMeasurement = (index: number) => {
+    setState(prev => ({
+      ...prev,
+      techpack: {
+        ...prev.techpack,
+        measurements: prev.techpack.measurements.filter((_, i) => i !== index)
+      },
+      hasUnsavedChanges: true
+    }));
+  };
 
-  const contextValue: TechPackContextType = {
+  const addHowToMeasure = (howToMeasure: HowToMeasure) => {
+    setState(prev => ({
+      ...prev,
+      techpack: {
+        ...prev.techpack,
+        howToMeasures: [...prev.techpack.howToMeasures, howToMeasure]
+      },
+      hasUnsavedChanges: true
+    }));
+  };
+
+  const updateHowToMeasure = (index: number, howToMeasure: HowToMeasure) => {
+    setState(prev => ({
+      ...prev,
+      techpack: {
+        ...prev.techpack,
+        howToMeasures: prev.techpack.howToMeasures.map((htm, i) => i === index ? howToMeasure : htm)
+      },
+      hasUnsavedChanges: true
+    }));
+  };
+
+  const deleteHowToMeasure = (index: number) => {
+    setState(prev => ({
+      ...prev,
+      techpack: {
+        ...prev.techpack,
+        howToMeasures: prev.techpack.howToMeasures.filter((_, i) => i !== index)
+      },
+      hasUnsavedChanges: true
+    }));
+  };
+
+  const addBomItem = (bomItem: BomItem) => {
+    setState(prev => ({
+      ...prev,
+      techpack: {
+        ...prev.techpack,
+        bom: [...prev.techpack.bom, bomItem]
+      },
+      hasUnsavedChanges: true
+    }));
+  };
+
+  const updateBomItem = (index: number, bomItem: BomItem) => {
+    setState(prev => ({
+      ...prev,
+      techpack: {
+        ...prev.techpack,
+        bom: prev.techpack.bom.map((item, i) => i === index ? bomItem : item)
+      },
+      hasUnsavedChanges: true
+    }));
+  };
+
+  const deleteBomItem = (index: number) => {
+    setState(prev => ({
+      ...prev,
+      techpack: {
+        ...prev.techpack,
+        bom: prev.techpack.bom.filter((_, i) => i !== index)
+      },
+      hasUnsavedChanges: true
+    }));
+  };
+
+  const addColorway = (colorway: Colorway) => {
+    setState(prev => ({
+      ...prev,
+      techpack: {
+        ...prev.techpack,
+        colorways: [...prev.techpack.colorways, colorway]
+      },
+      hasUnsavedChanges: true
+    }));
+  };
+
+  const updateColorway = (index: number, colorway: Colorway) => {
+    setState(prev => ({
+      ...prev,
+      techpack: {
+        ...prev.techpack,
+        colorways: prev.techpack.colorways.map((item, i) => i === index ? colorway : item)
+      },
+      hasUnsavedChanges: true
+    }));
+  };
+
+  const deleteColorway = (index: number) => {
+    setState(prev => ({
+      ...prev,
+      techpack: {
+        ...prev.techpack,
+        colorways: prev.techpack.colorways.filter((_, i) => i !== index)
+      },
+      hasUnsavedChanges: true
+    }));
+  };
+
+  const value = {
+    techPacks,
+    loading,
+    pagination,
     state,
-    dispatch,
-    updateArticleInfo,
-    addBomItem,
-    updateBomItem,
-    deleteBomItem,
+    loadTechPacks,
+    createTechPack,
+    updateTechPack,
+    deleteTechPack,
+    getTechPack,
+    setCurrentTab,
+    saveTechPack,
+    exportToPDF,
     addMeasurement,
     updateMeasurement,
     deleteMeasurement,
+    addHowToMeasure,
+    updateHowToMeasure,
+    deleteHowToMeasure,
+    addBomItem,
+    updateBomItem,
+    deleteBomItem,
     addColorway,
     updateColorway,
     deleteColorway,
-    calculateCompleteness,
-    saveTechPack,
-    loadTechPack,
-    exportToPDF,
-    setCurrentTab,
   };
 
-  return (
-    <TechPackContext.Provider value={contextValue}>
-      {children}
-    </TechPackContext.Provider>
-  );
+  return <TechPackContext.Provider value={value}>{children}</TechPackContext.Provider>;
 };
 
-// Hook to use the context
 export const useTechPack = () => {
   const context = useContext(TechPackContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useTechPack must be used within a TechPackProvider');
   }
   return context;
 };
-
-export default TechPackContext;

@@ -5,6 +5,7 @@ import { UserRole } from '../models/user.model';
 import { logActivity } from '../utils/activity-logger';
 import { ActivityAction } from '../models/activity.model';
 import { TechPackData } from '../types/techpack.types';
+import { Types } from 'mongoose';
 
 // Import PDF service from existing implementation
 import pdfService from '../services/pdf.service';
@@ -77,7 +78,7 @@ export class PDFController {
         action: ActivityAction.PDF_EXPORT,
         target: {
           type: 'TechPack',
-          id: techpack._id,
+          id: techpack._id as Types.ObjectId,
           name: techpack.productName
         },
         details: {
@@ -175,7 +176,7 @@ export class PDFController {
    * Get PDF generation info
    * GET /api/techpacks/:id/pdf/info
    */
-  async getPDFInfo(req: Request, res: Response): Promise<void> {
+  async getPDFInfo(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
       const user = req.user!;

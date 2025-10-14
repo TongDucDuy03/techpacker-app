@@ -1,103 +1,187 @@
-export interface TechPack {
-  _id: string;
-  articleCode: string;
-  name: string;
-  version: string;
-  status: 'draft' | 'pending_approval' | 'approved' | 'rejected';
-  createdAt: Date;
-  updatedAt: Date;
-  ownerId: {
-    _id: string;
-    firstName: string;
-    lastName: string;
-    username: string;
-  };
-  isDeleted: boolean;
-  metadata: {
-    description?: string;
-    category?: string;
-    season?: string;
-  };
-  materials: MaterialSpec[];
-  measurements: MeasurementSpec[];
-  colorways: ColorwaySpec[];
-  revisions: RevisionHistory[];
-}
+// =====================================================
+// Tech Pack Management System - TypeScript Interfaces
+// =====================================================
 
-export interface MaterialSpec {
-  _id?: string;
-  name: string;
-  code?: string;
-  type: string;
-  supplier?: string;
-  color?: string;
-  pantoneCode?: string;
-  composition?: string;
-  weight?: number;
-  width?: number;
-  unitPrice?: number;
-  minimumOrder?: number;
-  leadTime?: number;
-  approved?: boolean;
+export interface ArticleInfo {
+  id?: string;
+  articleCode: string;
+  productName: string;
+  version: number;
+  gender: 'Men' | 'Women' | 'Unisex' | 'Kids';
+  productClass: string;
+  fitType: 'Regular' | 'Slim' | 'Loose' | 'Relaxed' | 'Oversized';
+  supplier: string;
+  technicalDesigner: string;
+  fabricDescription: string;
+  season: 'Spring' | 'Summer' | 'Autumn' | 'Winter' | 'SS25' | 'FW25' | 'SS26' | 'FW26';
+  lifecycleStage: 'Concept' | 'Design' | 'Development' | 'Pre-production' | 'Production' | 'Shipped';
+  createdDate: string;
+  lastModified: string;
+  brand?: string;
+  collection?: string;
+  targetMarket?: string;
+  pricePoint?: 'Value' | 'Mid-range' | 'Premium' | 'Luxury';
   notes?: string;
 }
 
-export interface MeasurementSpec {
-  _id?: string;
+export interface BomItem {
+  id: string;
+  part: string;
+  materialName: string;
+  placement: string;
+  size: string;
+  quantity: number;
+  uom: 'm' | 'cm' | 'mm' | 'pcs' | 'kg' | 'g' | 'yards' | 'inches';
+  supplier: string;
+  comments?: string;
+  imageUrl?: string;
+  materialComposition?: string;
+  colorCode?: string;
+  supplierCode?: string;
+  weight?: string;
+  width?: string;
+  shrinkage?: string;
+  careInstructions?: string;
+  testingRequirements?: string;
+}
+
+export interface MeasurementPoint {
+  id: string;
   pomCode: string;
   pomName: string;
-  toleranceMinus: number;
-  tolerancePlus: number;
-  sizes: {
-    XS?: number;
-    S?: number;
-    M?: number;
-    L?: number;
-    XL?: number;
-    XXL?: number;
-    XXXL?: number;
-    [key: string]: number | undefined;
-  };
+  minusTolerance: string;
+  plusTolerance: string;
+  sizes: Record<string, number>; // XS, S, M, L, XL, XXL, etc.
   notes?: string;
-  critical?: boolean;
-  measurementType?: 'Body' | 'Garment' | 'Finished';
-  category?: string;
+  measurementMethod?: string;
+  isActive: boolean;
 }
 
-export interface ColorwaySpec {
-  _id?: string;
-  name: string;
-  code: string;
+export interface HowToMeasure {
+  id: string;
+  pomCode: string;
+  description: string;
+  imageUrl?: string;
+  steps?: string[];
+  videoUrl?: string;
+  language: 'en-US' | 'vi-VN' | 'zh-CN' | 'es-ES';
+}
+
+export interface ColorwayPart {
+  id: string;
+  partName: string;
+  colorName: string;
   pantoneCode?: string;
-  hexColor?: string;
-  rgbColor?: {
-    r: number;
-    g: number;
-    b: number;
-  };
-  placement: string;
-  materialType: string;
+  hexCode?: string;
+  rgbCode?: string;
+  imageUrl?: string;
   supplier?: string;
-  approved?: boolean;
-  isDefault?: boolean;
-  season?: string;
-  collection?: string;
-  notes?: string;
+  colorType: 'Solid' | 'Print' | 'Embroidery' | 'Applique';
 }
 
-export interface RevisionHistory {
-  _id?: string;
-  version: string;
-  changedBy: string;
-  changedByName: string;
-  changeDate: Date;
-  changeType: 'created' | 'updated' | 'status_change' | 'approved' | 'rejected';
-  changes: {
+export interface Colorway {
+  id: string;
+  colorwayName: string;
+  colorwayCode: string;
+  season?: string;
+  isDefault: boolean;
+  parts: ColorwayPart[];
+  approvalStatus: 'Pending' | 'Approved' | 'Rejected';
+  productionStatus: 'Lab Dip' | 'Bulk Fabric' | 'Finished';
+}
+
+export interface RevisionEntry {
+  id: string;
+  version: number;
+  changeType: 'CREATE' | 'UPDATE' | 'STATUS_CHANGE' | 'DELETE';
+  changedFields: Array<{
     field: string;
-    oldValue: any;
+    previousValue: any;
     newValue: any;
-  }[];
-  notes?: string;
+  }>;
+  userId: string;
+  userName: string;
+  userRole: string;
+  timestamp: string;
+  description?: string;
+  approvalRequired: boolean;
+  approvedBy?: string;
+  approvalDate?: string;
+  rejectionReason?: string;
+}
+
+export interface TechPack {
+  id: string;
+  articleInfo: ArticleInfo;
+  bom: BomItem[];
+  measurements: MeasurementPoint[];
+  howToMeasures: HowToMeasure[];
+  colorways: Colorway[];
+  revisionHistory: RevisionEntry[];
+  status: 'Draft' | 'In Review' | 'Approved' | 'Rejected' | 'Archived';
+  completeness: {
+    isComplete: boolean;
+    missingItems: string[];
+    completionPercentage: number;
+  };
+  createdBy: string;
+  updatedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Form state interfaces
+export interface FormErrors {
+  [key: string]: string | undefined;
+}
+
+export interface TabState {
+  isValid: boolean;
+  isDirty: boolean;
+  errors: FormErrors;
+}
+
+export interface TechPackFormState {
+  techpack: TechPack;
+  currentTab: number;
+  tabStates: Record<string, TabState>;
+  isLoading: boolean;
+  isSaving: boolean;
+  lastSaved?: string;
+  hasUnsavedChanges: boolean;
+}
+
+// Safe destructuring helper types
+export type SafeTechPackContext = {
+  techPacks: TechPack[];
+  loading: boolean;
+  pagination: Omit<TechPackListResponse, 'data'>;
+  state: TechPackFormState;
+  loadTechPacks: (params?: { page?: number; limit?: number; q?: string; status?: string }) => Promise<void>;
+  createTechPack: (data: CreateTechPackInput) => Promise<TechPack | undefined>;
+  updateTechPack: (id: string, data: Partial<TechPack>) => Promise<TechPack | undefined>;
+  deleteTechPack: (id: string) => Promise<void>;
+  getTechPack: (id: string) => Promise<TechPack | undefined>;
+  setCurrentTab: (tab: number) => void;
+  saveTechPack: () => Promise<void>;
+  exportToPDF: () => void;
+  addMeasurement: (measurement: MeasurementPoint) => void;
+  updateMeasurement: (index: number, measurement: MeasurementPoint) => void;
+  deleteMeasurement: (index: number) => void;
+  addHowToMeasure: (howToMeasure: HowToMeasure) => void;
+  updateHowToMeasure: (index: number, howToMeasure: HowToMeasure) => void;
+  deleteHowToMeasure: (index: number) => void;
+  addBomItem: (bomItem: BomItem) => void;
+  updateBomItem: (index: number, bomItem: BomItem) => void;
+  deleteBomItem: (index: number) => void;
+  addColorway: (colorway: Colorway) => void;
+  updateColorway: (index: number, colorway: Colorway) => void;
+  deleteColorway: (index: number) => void;
+};
+
+// API Response Types
+export interface CreateTechPackInput {
+  articleInfo: Partial<ArticleInfo>;
 }
 
 export interface TechPackListResponse {
@@ -107,32 +191,91 @@ export interface TechPackListResponse {
   totalPages: number;
 }
 
-export interface CreateTechPackInput {
-  articleCode: string;
-  name: string;
-  ownerId: string;
-  metadata?: {
-    description?: string;
-    category?: string;
-    season?: string;
-  };
-  materials?: MaterialSpec[];
-  measurements?: MeasurementSpec[];
-  colorways?: ColorwaySpec[];
+// UI Component Props
+export interface InputProps {
+  label: string;
+  value: string | number;
+  onChange: (value: string | number) => void;
+  type?: 'text' | 'number' | 'email' | 'tel' | 'url';
+  placeholder?: string;
+  required?: boolean;
+  disabled?: boolean;
+  error?: string;
+  className?: string;
+  maxLength?: number;
+  min?: number;
+  max?: number;
 }
 
-export interface BulkOperationPayload {
-  ids: string[];
-  action: 'delete' | 'approve' | 'setStatus';
-  payload?: {
-    status?: TechPack['status'];
-  };
+export interface SelectProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }> | string[];
+  placeholder?: string;
+  required?: boolean;
+  disabled?: boolean;
+  error?: string;
+  className?: string;
 }
 
-// Constants cho các dropdown và form
+export interface TextareaProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  required?: boolean;
+  disabled?: boolean;
+  error?: string;
+  className?: string;
+  rows?: number;
+  maxLength?: number;
+}
+
+export interface TableColumn<T> {
+  key: keyof T;
+  header: string;
+  width?: string;
+  render?: (value: any, item: T, index: number) => React.ReactNode;
+  sortable?: boolean;
+  editable?: boolean;
+  type?: 'text' | 'number' | 'select' | 'color' | 'image';
+  options?: string[];
+}
+
+export interface DataTableProps<T> {
+  data: T[];
+  columns: TableColumn<T>[];
+  onAdd?: () => void;
+  onEdit?: (item: T, index: number) => void;
+  onDelete?: (item: T, index: number) => void;
+  onSort?: (key: keyof T, direction: 'asc' | 'desc') => void;
+  className?: string;
+  maxHeight?: string;
+  showActions?: boolean;
+  addButtonText?: string;
+  emptyMessage?: string;
+}
+
+// Validation schemas
+export interface ValidationRule {
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+  pattern?: RegExp;
+  custom?: (value: any) => string | undefined;
+}
+
+export interface ValidationSchema {
+  [field: string]: ValidationRule;
+}
+
+// Constants
 export const PRODUCT_CLASSES = [
   'Shirts',
-  'Blouses',
+  'Blouses', 
   'T-Shirts',
   'Polo Shirts',
   'Pants',

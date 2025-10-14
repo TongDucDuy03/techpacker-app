@@ -7,7 +7,7 @@ interface CacheOptions {
   ttl?: number;
   keyGenerator?: (req: AuthRequest) => string;
   condition?: (req: AuthRequest) => boolean;
-  invalidatePatterns?: string[] | ((req: AuthRequest) => string[]);
+  invalidatePatterns?: string[];
 }
 
 /**
@@ -60,14 +60,8 @@ export const createCacheMiddleware = (options: CacheOptions = {}) => {
             ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
           setImmediate(async () => {
             try {
-              const patternsToInvalidate = typeof invalidatePatterns === 'function'
-                ? invalidatePatterns(req)
-                : invalidatePatterns;
-
-              if (patternsToInvalidate && patternsToInvalidate.length > 0) {
-                for (const pattern of patternsToInvalidate) {
-                  await cacheService.delPattern(pattern);
-                }
+              for (const pattern of invalidatePatterns) {
+                await cacheService.delPattern(pattern);
               }
             } catch (error) {
               console.error('Cache invalidation error:', error);
@@ -120,7 +114,7 @@ export const cacheMiddleware = {
     ttl: CacheTTL.LONG,
     keyGenerator: (req) => CacheKeys.techpack(req.params.id),
     condition: (req) => req.method === 'GET',
-    invalidatePatterns: (req) => [CacheKeys.techpackPattern(req.params.id || '')]
+    invalidatePatterns: [CacheKeys.techpackPattern('*')]
   }),
 
   // User profile caching
@@ -224,7 +218,7 @@ export const cacheWarming = {
 /**
  * Cache statistics middleware
  */
-export const cacheStatsMiddleware = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+export const cacheStatsMiddleware = async (_req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   const startTime = Date.now();
   
   const originalJson = res.json;

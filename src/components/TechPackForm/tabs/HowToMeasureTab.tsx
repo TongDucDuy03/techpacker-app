@@ -1,14 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { useTechPack } from '../../../contexts/TechPackContext';
-import { HowToMeasure } from '../../../types/techpack';
+import { HowToMeasure, MeasurementPoint } from '../../../types/techpack';
 import Input from '../shared/Input';
 import Select from '../shared/Select';
 import Textarea from '../shared/Textarea';
-import { Plus, Upload, Image, Video, Eye, Edit, Trash2, Link, Globe } from 'lucide-react';
+import { Plus, Upload, Image, Video, Eye, Edit, Trash2, Globe } from 'lucide-react';
 
 const HowToMeasureTab: React.FC = () => {
-  const { state, addMeasurement, updateMeasurement, deleteMeasurement } = useTechPack();
-  const { howToMeasures, measurements } = state.techpack;
+  const context = useTechPack();
+  const { state, addHowToMeasure, updateHowToMeasure, deleteHowToMeasure } = context ?? {};
+  const { howToMeasures = [], measurements = [] } = state?.techpack ?? {};
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -36,16 +37,16 @@ const HowToMeasureTab: React.FC = () => {
 
   // Get available POM codes from measurements
   const availablePomCodes = useMemo(() => {
-    return measurements.map(m => ({ value: m.pomCode, label: `${m.pomCode} - ${m.pomName}` }));
+    return measurements.map((m: MeasurementPoint) => ({ value: m.pomCode, label: `${m.pomCode} - ${m.pomName}` }));
   }, [measurements]);
 
   // Filter how-to-measures by selected language
   const filteredHowToMeasures = useMemo(() => {
-    return howToMeasures.filter(htm => htm.language === selectedLanguage);
+    return howToMeasures.filter((htm: HowToMeasure) => htm.language === selectedLanguage);
   }, [howToMeasures, selectedLanguage]);
 
-  const handleInputChange = (field: keyof HowToMeasure) => (value: string | string[]) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (field: keyof HowToMeasure) => (value: string | string[] | number) => {
+    setFormData(prev => ({ ...prev, [field]: typeof value === 'number' ? value.toString() : value }));
   };
 
   const handleAddStep = () => {
@@ -84,14 +85,10 @@ const HowToMeasureTab: React.FC = () => {
     };
 
     if (editingIndex !== null) {
-      // Note: This should be updateHowToMeasure, but using updateMeasurement for now
-      // You'll need to add the proper function to the context
-      console.log('Update how to measure:', howToMeasure);
+      updateHowToMeasure(editingIndex, howToMeasure);
       setEditingIndex(null);
     } else {
-      // Note: This should be addHowToMeasure, but using addMeasurement for now
-      // You'll need to add the proper function to the context
-      console.log('Add how to measure:', howToMeasure);
+      addHowToMeasure(howToMeasure);
     }
 
     resetForm();
@@ -119,8 +116,7 @@ const HowToMeasureTab: React.FC = () => {
 
   const handleDelete = (howTo: HowToMeasure, index: number) => {
     if (window.confirm(`Are you sure you want to delete instructions for "${howTo.pomCode}"?`)) {
-      // Note: This should be deleteHowToMeasure
-      console.log('Delete how to measure:', howTo);
+      deleteHowToMeasure(index);
     }
   };
 
@@ -316,7 +312,7 @@ const HowToMeasureTab: React.FC = () => {
                     onChange={(e) => setCurrentStep(e.target.value)}
                     placeholder="Add a new step..."
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onKeyPress={(e) => e.key === 'Enter' && handleAddStep()}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddStep()}
                   />
                   <button
                     onClick={handleAddStep}
@@ -449,7 +445,7 @@ const HowToMeasureTab: React.FC = () => {
             <p className="text-sm">Add measurement instructions to help with accurate measurements.</p>
           </div>
         ) : (
-          filteredHowToMeasures.map((howTo, index) => (
+          filteredHowToMeasures.map((howTo: HowToMeasure, index: number) => (
             <div key={howTo.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
               <div className="p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -490,7 +486,7 @@ const HowToMeasureTab: React.FC = () => {
                       {howTo.steps.length} steps
                     </p>
                     <ol className="list-decimal list-inside text-xs text-gray-600 space-y-1">
-                      {howTo.steps.slice(0, 2).map((step, stepIndex) => (
+                      {howTo.steps.slice(0, 2).map((step: string, stepIndex: number) => (
                         <li key={stepIndex} className="line-clamp-1">{step}</li>
                       ))}
                       {howTo.steps.length > 2 && (

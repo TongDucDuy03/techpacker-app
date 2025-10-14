@@ -2,6 +2,10 @@ import { Request, Response, NextFunction } from 'express';
 import { validationResult, ValidationError } from 'express-validator';
 import { PDFErrorCode } from '@/types/techpack.types';
 
+interface MulterRequest extends Request {
+  file?: Express.Multer.File;
+}
+
 /**
  * Middleware to handle validation errors
  */
@@ -38,7 +42,7 @@ export const handleValidationErrors = (
  * Middleware to validate file uploads
  */
 export const validateFileUpload = (
-  req: Request,
+  req: MulterRequest,
   res: Response,
   next: NextFunction
 ): void => {

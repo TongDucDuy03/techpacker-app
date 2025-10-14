@@ -64,7 +64,7 @@ export class SubdocumentController {
         action: ActivityAction.BOM_ADD,
         target: {
           type: 'TechPack',
-          id: techpack._id,
+          id: techpack._id as Types.ObjectId,
           name: techpack.productName
         },
         details: { bomItem: newBOMItem },
@@ -125,7 +125,7 @@ export class SubdocumentController {
       }
 
       // Find and update BOM item
-      const bomItem = techpack.bom.id(bomId);
+      const bomItem = (techpack.bom as any).id(bomId);
       if (!bomItem) {
         res.status(404).json({
           success: false,
@@ -146,7 +146,7 @@ export class SubdocumentController {
         action: ActivityAction.BOM_UPDATE,
         target: {
           type: 'TechPack',
-          id: techpack._id,
+          id: techpack._id as Types.ObjectId,
           name: techpack.productName
         },
         details: { bomItemId: bomId, updates: req.body },
@@ -197,7 +197,7 @@ export class SubdocumentController {
       }
 
       // Find and remove BOM item
-      const bomItem = techpack.bom.id(bomId);
+      const bomItem = (techpack.bom as any).id(bomId);
       if (!bomItem) {
         res.status(404).json({
           success: false,
@@ -207,7 +207,7 @@ export class SubdocumentController {
       }
 
       const deletedItem = bomItem.toObject();
-      techpack.bom.pull(bomId);
+      (techpack.bom as any).pull(bomId);
       techpack.updatedBy = user._id;
       techpack.updatedByName = user.fullName;
       await techpack.save();
@@ -219,7 +219,7 @@ export class SubdocumentController {
         action: ActivityAction.BOM_DELETE,
         target: {
           type: 'TechPack',
-          id: techpack._id,
+          id: techpack._id as Types.ObjectId,
           name: techpack.productName
         },
         details: { deletedBomItem: deletedItem },
@@ -296,7 +296,7 @@ export class SubdocumentController {
         action: ActivityAction.MEASUREMENT_ADD,
         target: {
           type: 'TechPack',
-          id: techpack._id,
+          id: techpack._id as Types.ObjectId,
           name: techpack.productName
         },
         details: { measurement: newMeasurement },
@@ -357,7 +357,7 @@ export class SubdocumentController {
       }
 
       // Find and update measurement
-      const measurement = techpack.measurements.id(measurementId);
+      const measurement = (techpack.measurements as any).id(measurementId);
       if (!measurement) {
         res.status(404).json({
           success: false,
@@ -378,7 +378,7 @@ export class SubdocumentController {
         action: ActivityAction.MEASUREMENT_UPDATE,
         target: {
           type: 'TechPack',
-          id: techpack._id,
+          id: techpack._id as Types.ObjectId,
           name: techpack.productName
         },
         details: { measurementId, updates: req.body },
@@ -429,7 +429,7 @@ export class SubdocumentController {
       }
 
       // Find and remove measurement
-      const measurement = techpack.measurements.id(measurementId);
+      const measurement = (techpack.measurements as any).id(measurementId);
       if (!measurement) {
         res.status(404).json({
           success: false,
@@ -439,7 +439,7 @@ export class SubdocumentController {
       }
 
       const deletedMeasurement = measurement.toObject();
-      techpack.measurements.pull(measurementId);
+      (techpack.measurements as any).pull(measurementId);
       techpack.updatedBy = user._id;
       techpack.updatedByName = user.fullName;
       await techpack.save();
@@ -451,7 +451,7 @@ export class SubdocumentController {
         action: ActivityAction.MEASUREMENT_DELETE,
         target: {
           type: 'TechPack',
-          id: techpack._id,
+          id: techpack._id as Types.ObjectId,
           name: techpack.productName
         },
         details: { deletedMeasurement },
@@ -528,7 +528,7 @@ export class SubdocumentController {
         action: ActivityAction.COLORWAY_ADD,
         target: {
           type: 'TechPack',
-          id: techpack._id,
+          id: techpack._id as Types.ObjectId,
           name: techpack.productName
         },
         details: { colorway: newColorway },
@@ -589,7 +589,7 @@ export class SubdocumentController {
       }
 
       // Find and update colorway
-      const colorway = techpack.colorways.id(colorwayId);
+      const colorway = (techpack.colorways as any).id(colorwayId);
       if (!colorway) {
         res.status(404).json({
           success: false,
@@ -610,7 +610,7 @@ export class SubdocumentController {
         action: ActivityAction.COLORWAY_UPDATE,
         target: {
           type: 'TechPack',
-          id: techpack._id,
+          id: techpack._id as Types.ObjectId,
           name: techpack.productName
         },
         details: { colorwayId, updates: req.body },
@@ -661,7 +661,7 @@ export class SubdocumentController {
       }
 
       // Find and remove colorway
-      const colorway = techpack.colorways.id(colorwayId);
+      const colorway = (techpack.colorways as any).id(colorwayId);
       if (!colorway) {
         res.status(404).json({
           success: false,
@@ -671,7 +671,7 @@ export class SubdocumentController {
       }
 
       const deletedColorway = colorway.toObject();
-      techpack.colorways.pull(colorwayId);
+      (techpack.colorways as any).pull(colorwayId);
       techpack.updatedBy = user._id;
       techpack.updatedByName = user.fullName;
       await techpack.save();
@@ -683,7 +683,7 @@ export class SubdocumentController {
         action: ActivityAction.COLORWAY_DELETE,
         target: {
           type: 'TechPack',
-          id: techpack._id,
+          id: techpack._id as Types.ObjectId,
           name: techpack.productName
         },
         details: { deletedColorway },

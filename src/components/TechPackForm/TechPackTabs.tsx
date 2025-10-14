@@ -22,8 +22,9 @@ import {
 } from 'lucide-react';
 
 const TechPackTabs: React.FC = () => {
-  const { state, setCurrentTab, saveTechPack, exportToPDF } = useTechPack();
-  const { currentTab, techpack, isSaving, lastSaved, hasUnsavedChanges } = state;
+  const context = useTechPack();
+  const { state, setCurrentTab, saveTechPack, exportToPDF } = context ?? {};
+  const { currentTab = 0, techpack, isSaving = false, lastSaved, hasUnsavedChanges = false } = state ?? {};
 
   const [showSaveNotification, setShowSaveNotification] = useState(false);
 
@@ -248,7 +249,18 @@ const TechPackTabs: React.FC = () => {
 
       {/* Tab Content */}
       <div className="flex-1">
-        <CurrentTabComponent />
+        <CurrentTabComponent 
+          techPack={techpack}
+          onUpdate={(updates) => {
+            // Update context state
+            setState(prev => ({
+              ...prev,
+              techpack: { ...prev.techpack, ...updates },
+              hasUnsavedChanges: true
+            }));
+          }}
+          setCurrentTab={setCurrentTab}
+        />
       </div>
 
       {/* Save Notification */}

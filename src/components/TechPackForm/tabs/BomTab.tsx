@@ -8,8 +8,9 @@ import Textarea from '../shared/Textarea';
 import { Plus, Upload, Download, Search, Filter, Package } from 'lucide-react';
 
 const BomTab: React.FC = () => {
-  const { state, addBomItem, updateBomItem, deleteBomItem } = useTechPack();
-  const { bom } = state.techpack;
+  const context = useTechPack();
+  const { state, addBomItem, updateBomItem, deleteBomItem } = context ?? {};
+  const { bom = [] } = state?.techpack ?? {};
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);

@@ -4,9 +4,9 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
-
 import { config } from './config/config';
 import connectDatabase from './config/database';
+import { sendSuccess, sendError } from './utils/response.util';
 
 // Routes
 import authRoutes from './routes/auth.routes';
@@ -17,7 +17,6 @@ import pdfRoutes from './routes/pdf.routes';
 import activityRoutes from './routes/activity.routes';
 
 // Middleware
-import { cacheStatsMiddleware } from './middleware/cache.middleware';
 import { setupSwagger } from './utils/swagger';
 
 const app = express();
@@ -28,14 +27,6 @@ app.set('trust proxy', 1);
 // Security middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
 }));
 
 // CORS configuration
@@ -50,14 +41,7 @@ app.use(cors({
 const limiter = rateLimit({
   windowMs: config.rateLimitWindowMs,
   max: config.rateLimitMaxRequests,
-  message: {
-    success: false,
-    message: 'Too many requests from this IP, please try again later.',
-    error: {
-      code: 'RATE_LIMIT_EXCEEDED',
-      retryAfter: Math.ceil(config.rateLimitWindowMs / 1000)
-    }
-  },
+  handler: (_req, res) => sendError(res, 'Too many requests, please try again later.', 429, 'RATE_LIMIT_EXCEEDED'),
   standardHeaders: true,
   legacyHeaders: false
 });
@@ -72,103 +56,69 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(compression());
 app.use(morgan(config.nodeEnv === 'production' ? 'combined' : 'dev'));
 
-// Cache statistics
-app.use(cacheStatsMiddleware);
-
 // Setup Swagger documentation
 setupSwagger(app);
 
+// API Versioning
+const v1Router = express.Router();
+
 // API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/techpacks', techpackRoutes);
-app.use('/api/techpacks', subdocumentRoutes);
-app.use('/api/techpacks', workflowRoutes);
-app.use('/api/techpacks', pdfRoutes);
-app.use('/api/activities', activityRoutes);
+v1Router.use('/auth', authRoutes);
+v1Router.use('/techpacks', techpackRoutes);
+v1Router.use('/techpacks', subdocumentRoutes);
+v1Router.use('/techpacks', workflowRoutes);
+v1Router.use('/techpacks', pdfRoutes);
+v1Router.use('/activities', activityRoutes);
+
+app.use('/api/v1', v1Router);
 
 // Health check
 app.get('/health', (_req, res) => {
-  res.json({
-    success: true,
-    message: 'TechPacker API is healthy',
+  sendSuccess(res, {
+    status: 'healthy',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
     environment: config.nodeEnv
-  });
+  }, 'TechPacker API is healthy');
 });
 
 // Root endpoint
 app.get('/', (_req, res) => {
-  res.json({
-    success: true,
-    message: 'TechPacker API - Fashion Tech Pack Management System',
+  sendSuccess(res, {
+    name: 'TechPacker API',
     version: '1.0.0',
     documentation: '/api/docs',
     health: '/health'
-  });
+  }, 'Welcome to the TechPacker API');
 });
 
 // 404 handler
 app.use('*', (_req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found',
-    error: {
-      code: 'ROUTE_NOT_FOUND',
-      message: 'The requested endpoint does not exist'
-    }
-  });
+  sendError(res, 'The requested endpoint does not exist', 404, 'ROUTE_NOT_FOUND');
 });
 
 // Global error handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Unhandled error:', err);
 
-  // Mongoose validation error
   if (err.name === 'ValidationError') {
-    return res.status(400).json({
-      success: false,
-      message: 'Validation failed',
-      error: {
-        code: 'VALIDATION_ERROR',
-        details: Object.values(err.errors).map((e: any) => e.message)
-      }
-    });
+    const errors = Object.values(err.errors).map((e: any) => ({ message: e.message, field: e.path }));
+    return sendError(res, 'Validation failed', 400, 'VALIDATION_ERROR', errors);
   }
 
-  // Mongoose cast error
   if (err.name === 'CastError') {
-    return res.status(400).json({
-      success: false,
-      message: 'Invalid ID format',
-      error: {
-        code: 'INVALID_ID',
-        message: 'The provided ID is not valid'
-      }
-    });
+    return sendError(res, 'Invalid ID format', 400, 'INVALID_ID', [{ field: err.path, message: 'The provided ID is not a valid format' }]);
   }
 
-  // JWT errors
   if (err.name === 'JsonWebTokenError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Invalid token',
-      error: {
-        code: 'INVALID_TOKEN',
-        message: 'The provided token is not valid'
-      }
-    });
+    return sendError(res, 'Invalid or expired token', 401, 'INVALID_TOKEN');
   }
 
-  // Default error
-  return res.status(err.status || 500).json({
-    success: false,
-    message: err.message || 'Internal Server Error',
-    error: {
-      code: err.code || 'INTERNAL_ERROR',
-      message: config.nodeEnv === 'production' ? 'Something went wrong' : err.message
-    }
-  });
+  const statusCode = err.status || 500;
+  const message = err.message || 'An unexpected internal server error occurred';
+  const code = err.code || 'INTERNAL_ERROR';
+
+  return sendError(res, message, statusCode, code);
 });
 
 // Start server
@@ -183,6 +133,7 @@ async function startServer() {
       console.log(`📝 Environment: ${config.nodeEnv}`);
       console.log(`🗄️  Database: Connected`);
       console.log(`📊 Health check: http://localhost:${config.port}/health`);
+      console.log(`📚 API Documentation: http://localhost:${config.port}/api/docs`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

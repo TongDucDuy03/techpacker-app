@@ -1,6 +1,5 @@
 import { Response } from 'express';
-import { validationResult } from 'express-validator';
-import Activity, { ActivityAction } from '../models/activity.model';
+import Activity from '../models/activity.model';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { UserRole } from '../models/user.model';
 import { createPaginatedResponse, extractPaginationFromQuery } from '../utils/pagination';

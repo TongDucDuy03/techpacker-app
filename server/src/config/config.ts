@@ -8,11 +8,18 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
 
   // Database
+  dbProvider: (process.env.DB_PROVIDER as 'mongodb' | 'postgresql') || 'mongodb',
   mongoUri: process.env.MONGO_URI || 'mongodb://localhost:27017/techpacker',
+  databaseUrl: process.env.DATABASE_URL || 'postgresql://user:password@localhost:5432/techpacker?schema=public',
 
   // JWT
   jwtSecret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production',
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1h',
+  refreshTokenSecret: process.env.REFRESH_TOKEN_SECRET || 'your-super-secret-refresh-token-key',
+  refreshTokenExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '7d',
+
+  // Security
+  bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || '10', 10),
 
   // Redis (for caching)
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -34,9 +41,6 @@ export const config = {
 
   // Logging
   logLevel: process.env.LOG_LEVEL || 'info',
-
-  // Security
-  bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || '10', 10),
   
   // Email (for future notifications)
   emailService: process.env.EMAIL_SERVICE || 'gmail',

@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import User, { IUser, UserRole } from '../models/user.model';
 import { config } from '../config/config';
+import { authService } from '../services/auth.service';
+import { db } from '../services/database.service';
 
 export interface AuthRequest extends Request {
   user?: IUser;
@@ -23,21 +25,15 @@ export const requireAuth = async (
       return;
     }
 
-    const decoded = jwt.verify(token, config.jwtSecret) as { userId: string };
-    const user = await User.findById(decoded.userId).select('-password');
+    // Verify token using auth service
+    const decoded = authService.verifyAccessToken(token);
 
+    // Get user from database
+    const user = await db.findUserById(decoded.userId);
     if (!user) {
       res.status(401).json({
         success: false,
-        message: 'Invalid token. User not found.'
-      });
-      return;
-    }
-
-    if (!user.isActive) {
-      res.status(401).json({
-        success: false,
-        message: 'Account is deactivated.'
+        message: 'Access denied. User not found.'
       });
       return;
     }
@@ -47,7 +43,7 @@ export const requireAuth = async (
   } catch (error) {
     res.status(401).json({
       success: false,
-      message: 'Invalid token.'
+      message: 'Access denied. Invalid token.'
     });
   }
 };
@@ -100,7 +96,7 @@ export const requireOwnershipOrRole = (roles: UserRole[]) => {
 
 export const optionalAuth = async (
   req: AuthRequest,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {

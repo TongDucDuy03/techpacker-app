@@ -1,4 +1,4 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Types } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 export enum UserRole {
@@ -9,6 +9,7 @@ export enum UserRole {
 }
 
 export interface IUser extends Document {
+  _id: Types.ObjectId;
   username: string;
   email: string;
   password?: string;
@@ -18,6 +19,8 @@ export interface IUser extends Document {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  fullName: string; // Virtual property
+  requiresOwnershipCheck?: boolean; // For middleware
   comparePassword(password: string): Promise<boolean>;
 }
 

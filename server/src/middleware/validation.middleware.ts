@@ -6,14 +6,14 @@ export interface ValidatedRequest<T = any> extends Request {
 }
 
 export const validate = (schema: ZodSchema) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     try {
       const validated = schema.parse({
         body: req.body,
         query: req.query,
         params: req.params
       });
-      
+
       (req as ValidatedRequest).validated = validated;
       next();
     } catch (error) {
@@ -22,42 +22,46 @@ export const validate = (schema: ZodSchema) => {
           field: err.path.join('.'),
           message: err.message
         }));
-        
-        return res.status(400).json({
+
+        res.status(400).json({
           error: 'Validation failed',
           details: errorMessages
         });
+        return;
       }
-      
-      return res.status(500).json({
+
+      res.status(500).json({
         error: 'Internal server error during validation'
       });
+      return;
     }
   };
 };
 
-export const handleValidationError = (error: any, req: Request, res: Response, next: NextFunction) => {
+export const handleValidationError = (error: any, _req: Request, res: Response, next: NextFunction): void => {
   if (error.name === 'ValidationError') {
     const errors = Object.values(error.errors).map((err: any) => ({
       field: err.path,
       message: err.message
     }));
     
-    return res.status(400).json({
+    res.status(400).json({
       error: 'Validation failed',
       details: errors
     });
+    return;
   }
   
   if (error.code === 11000) {
     const field = Object.keys(error.keyPattern)[0];
-    return res.status(400).json({
+    res.status(400).json({
       error: 'Duplicate value',
       details: [{
         field,
         message: `${field} already exists`
       }]
     });
+    return;
   }
   
   next(error);

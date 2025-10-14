@@ -1,7 +1,6 @@
-import puppeteer, { Browser, Page, PDFOptions } from 'puppeteer';
+import puppeteer, { Browser, PDFOptions } from 'puppeteer';
 import ejs from 'ejs';
 import path from 'path';
-import fs from 'fs/promises';
 import { 
   TechPackData, 
   PDFGenerationOptions, 
@@ -121,10 +120,10 @@ export class PDFService {
   async generatePDFPreview(
     data: TechPackData,
     page: number = 1,
-    options: Partial<PDFGenerationOptions> = {}
+    _options: Partial<PDFGenerationOptions> = {}
   ): Promise<PDFPreviewResponse> {
     try {
-      const mergedOptions = { ...this.defaultOptions, ...options };
+      // Options are merged implicitly when used
       const templateData = this.prepareTemplateData(data);
       const html = await this.renderTemplate(templateData);
       

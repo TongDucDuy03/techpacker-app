@@ -53,7 +53,7 @@ export class LogoGenerator {
   /**
    * Generate icon-based logo
    */
-  private static generateIconLogo(name: string, color: string, width: number, height: number): string {
+  private static generateIconLogo(_name: string, color: string, width: number, height: number): string {
     const iconSize = Math.min(width, height) * 0.6;
     const centerX = width / 2;
     const centerY = height / 2;

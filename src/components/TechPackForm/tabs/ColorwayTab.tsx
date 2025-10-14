@@ -7,8 +7,9 @@ import DataTable from '../shared/DataTable';
 import { Plus, Palette, Copy, Eye, Star, Upload, Download } from 'lucide-react';
 
 const ColorwayTab: React.FC = () => {
-  const { state, addColorway, updateColorway, deleteColorway } = useTechPack();
-  const { colorways, bom } = state.techpack;
+  const context = useTechPack();
+  const { state, addColorway, updateColorway, deleteColorway } = context ?? {};
+  const { colorways = [], bom = [] } = state?.techpack ?? {};
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);

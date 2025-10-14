@@ -5,8 +5,9 @@ import Input from '../shared/Input';
 import { Plus, Upload, Download, Ruler, AlertTriangle, Info } from 'lucide-react';
 
 const MeasurementTab: React.FC = () => {
-  const { state, addMeasurement, updateMeasurement, deleteMeasurement } = useTechPack();
-  const { measurements, articleInfo } = state.techpack;
+  const context = useTechPack();
+  const { state, addMeasurement, updateMeasurement, deleteMeasurement } = context ?? {};
+  const { measurements = [], articleInfo } = state?.techpack ?? {};
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);

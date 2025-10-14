@@ -7,16 +7,17 @@ interface UseAutoSaveOptions {
 }
 
 export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
-  const { delay = 2000, enabled = true } = options;
-  const { state, saveTechPack } = useTechPack();
-  const { hasUnsavedChanges, isSaving } = state;
+  const { delay = 2000, enabled = true } = options ?? {};
+  const context = useTechPack();
+  const { state, saveTechPack } = context ?? {};
+  const { hasUnsavedChanges = false, isSaving = false } = state ?? {};
   
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSaveRef = useRef<string>('');
 
   const performAutoSave = useCallback(async () => {
-    if (!enabled || isSaving) return;
-    
+    if (!enabled || isSaving || !saveTechPack) return;
+
     try {
       await saveTechPack();
       lastSaveRef.current = new Date().toISOString();

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Toaster } from 'react-hot-toast';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { TechPackList } from './components/TechPackList';
@@ -7,45 +8,15 @@ import { MaterialsLibrary } from './components/MaterialsLibrary';
 import { MeasurementsManagement } from './components/MeasurementsManagement';
 import { ColorwaysManagement } from './components/ColorwaysManagement';
 import { TechPack, CreateTechPackInput } from './types/techpack';
+import { TechPackProvider, useTechPack } from './contexts/TechPackContext';
 import { api, isApiConfigured } from './lib/api';
+import { showPromise, showError } from './lib/toast';
 
-function App() {
+function AppContent() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [selectedTechPack, setSelectedTechPack] = useState<TechPack | null>(null);
-  const [techPacks, setTechPacks] = useState<TechPack[]>([]);
-  
-
-  const useApi = useMemo(() => isApiConfigured(), []);
-
-  // Load data from API on component mount
-  useEffect(() => {
-    if (!useApi) {
-      console.error('API is not configured. Please check your backend server.');
-      return;
-    }
-
-    const loadData = async () => {
-      try {
-        const response = await api.listTechPacks({ page: 1, limit: 20 });
-        setTechPacks(response.data);
-      } catch (error) {
-        console.error('Failed to load data from API:', error);
-      }
-    };
-
-    loadData();
-  }, [useApi]);
-
-
-
-  const loadTechPacks = async () => {
-    try {
-      const response = await api.listTechPacks({ page: 1, limit: 20 });
-      setTechPacks(response.data);
-    } catch (error) {
-      console.error('Failed to load tech packs:', error);
-    }
-  };
+  const context = useTechPack();
+  const { techPacks = [], createTechPack, updateTechPack, deleteTechPack } = context ?? {};
 
   const handleViewTechPack = (techPack: TechPack) => {
     setSelectedTechPack(techPack);
@@ -57,38 +28,21 @@ function App() {
     setCurrentPage('techpacks');
   };
 
-  const handleCreateTechPack = async (techPackData: CreateTechPackInput) => {
-    try {
-      await api.createTechPack({ ...techPackData, ownerId: '507f1f77bcf86cd799439011' });
-      loadTechPacks(); // Refresh list after creating
-    } catch (error) {
-      console.error('Failed to create tech pack:', error);
-    }
-  };
-
-  const handleUpdateTechPack = async (id: string, techPackData: Partial<TechPack>) => {
-    try {
-      await api.updateTechPack(id, techPackData);
-      loadTechPacks(); // Refresh list after updating
-      if (selectedTechPack && selectedTechPack._id === id) {
-        // Refresh the selected tech pack with the latest data
-        const updatedTechPack = { ...selectedTechPack, ...techPackData };
-        setSelectedTechPack(updatedTechPack as TechPack);
+  const handleUpdate = async (id: string, data: Partial<TechPack>) => {
+    if (updateTechPack) {
+      await updateTechPack(id, data);
+      if (selectedTechPack?.id === id) {
+        setSelectedTechPack(prev => (prev ? { ...prev, ...data } as TechPack : null));
       }
-    } catch (error) {
-      console.error('Failed to update tech pack:', error);
     }
   };
 
-  const handleDeleteTechPack = async (id: string) => {
-    try {
-      await api.deleteTechPack(id);
-      if (selectedTechPack && selectedTechPack._id === id) {
+  const handleDelete = async (id: string) => {
+    if (deleteTechPack) {
+      await deleteTechPack(id);
+      if (selectedTechPack?.id === id) {
         handleBackToList();
       }
-      loadTechPacks(); // Refresh list after deleting
-    } catch (error) {
-      console.error('Failed to delete tech pack:', error);
     }
   };
 
@@ -101,9 +55,9 @@ function App() {
           <TechPackList
             techPacks={techPacks}
             onViewTechPack={handleViewTechPack}
-            onCreateTechPack={handleCreateTechPack}
-            onUpdateTechPack={handleUpdateTechPack}
-            onDeleteTechPack={handleDeleteTechPack}
+            onCreateTechPack={createTechPack}
+            onUpdateTechPack={handleUpdate}
+            onDeleteTechPack={handleDelete}
           />
         );
       case 'techpack-detail':
@@ -111,8 +65,8 @@ function App() {
           <TechPackDetail
             techPack={selectedTechPack}
             onBack={handleBackToList}
-            onUpdate={handleUpdateTechPack}
-            onDelete={handleDeleteTechPack}
+            onUpdate={handleUpdate}
+            onDelete={handleDelete}
           />
         ) : (
           <div>Tech pack not found</div>
@@ -153,6 +107,15 @@ function App() {
     <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
       {renderContent()}
     </Layout>
+  );
+}
+
+function App() {
+  return (
+    <TechPackProvider>
+      <Toaster position="top-right" reverseOrder={false} />
+      <AppContent />
+    </TechPackProvider>
   );
 }
 

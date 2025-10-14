@@ -117,12 +117,25 @@ export function validatePaginationParams(options: PaginationOptions): {
  * Extract pagination options from query parameters
  */
 export function extractPaginationFromQuery(query: any): PaginationOptions {
-  return {
-    page: query.page ? parseInt(query.page, 10) : undefined,
-    limit: query.limit ? parseInt(query.limit, 10) : undefined,
-    sortBy: query.sortBy || undefined,
-    sortOrder: query.sortOrder || undefined
-  };
+  const result: PaginationOptions = {};
+
+  if (query.page) {
+    result.page = parseInt(query.page, 10);
+  }
+
+  if (query.limit) {
+    result.limit = parseInt(query.limit, 10);
+  }
+
+  if (query.sortBy) {
+    result.sortBy = query.sortBy;
+  }
+
+  if (query.sortOrder) {
+    result.sortOrder = query.sortOrder;
+  }
+
+  return result;
 }
 
 /**
@@ -272,11 +285,16 @@ export class CursorPagination {
       nextCursor = this.createCursor(lastItem, sortField);
     }
 
-    return {
+    const result: { data: T[]; hasNextPage: boolean; nextCursor?: string } = {
       data: items,
-      hasNextPage,
-      nextCursor
+      hasNextPage
     };
+
+    if (nextCursor) {
+      result.nextCursor = nextCursor;
+    }
+
+    return result;
   }
 }
 

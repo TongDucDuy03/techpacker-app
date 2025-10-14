@@ -1,11 +1,12 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { AuthRequest } from './auth.middleware';
 import { logActivity } from '../utils/activity-logger';
 import { ActivityAction } from '../models/activity.model';
+import { Types } from 'mongoose';
 
 interface ActivityLoggerOptions {
   action: ActivityAction;
-  getTarget?: (req: AuthRequest, res: Response) => Promise<{ type: string; id: string; name: string } | null>;
+  getTarget?: (req: AuthRequest, res: Response) => Promise<{ type: string; id: Types.ObjectId; name: string } | null>;
   getDetails?: (req: AuthRequest, res: Response) => any;
   skipCondition?: (req: AuthRequest, res: Response) => boolean;
 }
@@ -34,13 +35,13 @@ export const createActivityLogger = (options: ActivityLoggerOptions) => {
               if (id) {
                 target = {
                   type: 'TechPack',
-                  id,
+                  id: new Types.ObjectId(id),
                   name: body?.data?.techpack?.productName || body?.data?.productName || 'Unknown'
                 };
               }
             }
             
-            if (target) {
+            if (target && req.user) {
               await logActivity({
                 userId: req.user._id,
                 userName: req.user.fullName,
@@ -190,7 +191,7 @@ export const activityLoggers = {
       format: req.query.format || 'A4',
       options: req.query.options
     }),
-    skipCondition: (req, res) => res.statusCode !== 200 // Only log successful PDF exports
+    skipCondition: (_req, res) => res.statusCode !== 200 // Only log successful PDF exports
   }),
 
   // User actions
@@ -198,7 +199,7 @@ export const activityLoggers = {
     action: ActivityAction.USER_LOGIN,
     getTarget: async (req) => ({
       type: 'User',
-      id: req.user!._id.toString(),
+      id: req.user!._id as Types.ObjectId,
       name: req.user!.fullName
     }),
     getDetails: (req) => ({
@@ -211,7 +212,7 @@ export const activityLoggers = {
     action: ActivityAction.USER_LOGOUT,
     getTarget: async (req) => ({
       type: 'User',
-      id: req.user!._id.toString(),
+      id: req.user!._id as Types.ObjectId,
       name: req.user!.fullName
     })
   })
@@ -229,7 +230,7 @@ export const logLoginActivity = async (req: AuthRequest, res: Response, next: Ne
         action: ActivityAction.USER_LOGIN,
         target: {
           type: 'User',
-          id: req.user._id,
+          id: req.user._id as Types.ObjectId,
           name: req.user.fullName
         },
         details: {
@@ -251,11 +252,11 @@ export const logLoginActivity = async (req: AuthRequest, res: Response, next: Ne
 export const logGenericActivity = (action: ActivityAction, targetType: string = 'TechPack') => {
   return createActivityLogger({
     action,
-    getTarget: async (req) => {
+    getTarget: async (req, _res) => {
       const { id } = req.params;
       return id ? {
         type: targetType,
-        id,
+        id: new Types.ObjectId(id),
         name: `${targetType} ${id}`
       } : null;
     }

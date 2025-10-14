@@ -1,14 +1,35 @@
 import React, { useMemo } from 'react';
-import { useTechPack } from '../../../contexts/TechPackContext';
-import { PRODUCT_CLASSES } from '../../../types/techpack';
+import { TechPack, PRODUCT_CLASSES, ArticleInfo } from '../../../types/techpack';
 import Input from '../shared/Input';
 import Select from '../shared/Select';
 import Textarea from '../shared/Textarea';
 import { Save, RotateCcw, ArrowRight, Calendar, User } from 'lucide-react';
 
-const ArticleInfoTab: React.FC = () => {
-  const { state, updateArticleInfo, saveTechPack, setCurrentTab } = useTechPack();
-  const { articleInfo } = state.techpack;
+interface ArticleInfoTabProps {
+  techPack?: TechPack;
+  onUpdate?: (updates: Partial<TechPack>) => void;
+  setCurrentTab?: (tab: number) => void;
+}
+
+const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, onUpdate, setCurrentTab }) => {
+  const { articleInfo } = techPack ?? {};
+
+  // Fallback if no techPack is passed
+  const safeArticleInfo = articleInfo ?? {
+    articleCode: '',
+    productName: '',
+    version: 1,
+    gender: 'Unisex',
+    productClass: '',
+    fitType: 'Regular',
+    supplier: '',
+    technicalDesigner: '',
+    fabricDescription: '',
+    season: 'SS25',
+    lifecycleStage: 'Concept',
+    createdDate: new Date().toISOString(),
+    lastModified: new Date().toISOString(),
+  };
 
   // Gender options
   const genderOptions = [
@@ -60,40 +81,43 @@ const ArticleInfoTab: React.FC = () => {
     { value: 'Luxury', label: 'Luxury' }
   ];
 
-  const handleInputChange = (field: keyof typeof articleInfo) => (value: string | number) => {
-    updateArticleInfo({ [field]: value });
+  const handleInputChange = (field: keyof ArticleInfo) => (value: string | number) => {
+    onUpdate?.({ articleInfo: { ...safeArticleInfo, [field]: value } });
   };
 
   const handleReset = () => {
     const confirmed = window.confirm('Are you sure you want to reset all fields? This action cannot be undone.');
     if (confirmed) {
-      updateArticleInfo({
-        articleCode: '',
-        productName: '',
-        version: 1,
-        gender: 'Unisex',
-        productClass: '',
-        fitType: 'Regular',
-        supplier: '',
-        technicalDesigner: '',
-        fabricDescription: '',
-        season: 'Spring',
-        lifecycleStage: 'Concept',
-        brand: '',
-        collection: '',
-        targetMarket: '',
-        pricePoint: undefined,
-        notes: ''
+      onUpdate?.({
+        articleInfo: {
+          ...safeArticleInfo, // Keep id and other fields
+          articleCode: '',
+          productName: '',
+          version: 1,
+          gender: 'Unisex',
+          productClass: '',
+          fitType: 'Regular',
+          supplier: '',
+          technicalDesigner: '',
+          fabricDescription: '',
+          season: 'Spring',
+          lifecycleStage: 'Concept',
+          brand: '',
+          collection: '',
+          targetMarket: '',
+          pricePoint: undefined,
+          notes: ''
+        }
       });
     }
   };
 
-  const handleSave = async () => {
-    await saveTechPack();
+  const handleSave = () => {
+    onUpdate?.(techPack ?? {});
   };
 
   const handleNextTab = () => {
-    setCurrentTab(1); // Go to BOM tab
+    setCurrentTab?.(1); // Go to BOM tab
   };
 
   // Calculate form completion percentage
@@ -102,15 +126,15 @@ const ArticleInfoTab: React.FC = () => {
     const optionalFields = ['supplier', 'technicalDesigner', 'productClass'];
     
     const requiredCompleted = requiredFields.filter(field => 
-      articleInfo[field as keyof typeof articleInfo]
+      safeArticleInfo[field as keyof typeof safeArticleInfo]
     ).length;
     
     const optionalCompleted = optionalFields.filter(field => 
-      articleInfo[field as keyof typeof articleInfo]
+      safeArticleInfo[field as keyof typeof safeArticleInfo]
     ).length;
     
     return Math.round(((requiredCompleted * 2 + optionalCompleted) / (requiredFields.length * 2 + optionalFields.length)) * 100);
-  }, [articleInfo]);
+  }, [safeArticleInfo]);
 
   return (
     <div className="max-w-7xl mx-auto p-6">
@@ -152,7 +176,7 @@ const ArticleInfoTab: React.FC = () => {
 
               <Input
                 label="Article Code"
-                value={articleInfo.articleCode}
+                value={safeArticleInfo.articleCode}
                 onChange={handleInputChange('articleCode')}
                 placeholder="e.g., SHRT-001-SS25"
                 required
@@ -161,7 +185,7 @@ const ArticleInfoTab: React.FC = () => {
 
               <Input
                 label="Product Name"
-                value={articleInfo.productName}
+                value={safeArticleInfo.productName}
                 onChange={handleInputChange('productName')}
                 placeholder="e.g., Men's Oxford Button-Down Shirt"
                 required
@@ -170,7 +194,7 @@ const ArticleInfoTab: React.FC = () => {
 
               <Input
                 label="Version"
-                value={articleInfo.version}
+                value={safeArticleInfo.version}
                 onChange={handleInputChange('version')}
                 type="number"
                 min={1}
@@ -179,7 +203,7 @@ const ArticleInfoTab: React.FC = () => {
 
               <Select
                 label="Gender"
-                value={articleInfo.gender}
+                value={safeArticleInfo.gender}
                 onChange={handleInputChange('gender')}
                 options={genderOptions}
                 required
@@ -187,7 +211,7 @@ const ArticleInfoTab: React.FC = () => {
 
               <Select
                 label="Product Class"
-                value={articleInfo.productClass}
+                value={safeArticleInfo.productClass}
                 onChange={handleInputChange('productClass')}
                 options={productClassOptions}
                 placeholder="Select product category..."
@@ -196,7 +220,7 @@ const ArticleInfoTab: React.FC = () => {
 
               <Select
                 label="Fit Type"
-                value={articleInfo.fitType}
+                value={safeArticleInfo.fitType}
                 onChange={handleInputChange('fitType')}
                 options={fitTypeOptions}
                 required
@@ -212,7 +236,7 @@ const ArticleInfoTab: React.FC = () => {
 
               <Input
                 label="Supplier"
-                value={articleInfo.supplier}
+                value={safeArticleInfo.supplier}
                 onChange={handleInputChange('supplier')}
                 placeholder="Supplier name or code"
                 maxLength={255}
@@ -220,7 +244,7 @@ const ArticleInfoTab: React.FC = () => {
 
               <Input
                 label="Technical Designer"
-                value={articleInfo.technicalDesigner}
+                value={safeArticleInfo.technicalDesigner}
                 onChange={handleInputChange('technicalDesigner')}
                 placeholder="Designer name"
                 maxLength={255}
@@ -228,7 +252,7 @@ const ArticleInfoTab: React.FC = () => {
 
               <Select
                 label="Season"
-                value={articleInfo.season}
+                value={safeArticleInfo.season}
                 onChange={handleInputChange('season')}
                 options={seasonOptions}
                 required
@@ -236,7 +260,7 @@ const ArticleInfoTab: React.FC = () => {
 
               <Select
                 label="Lifecycle Stage"
-                value={articleInfo.lifecycleStage}
+                value={safeArticleInfo.lifecycleStage}
                 onChange={handleInputChange('lifecycleStage')}
                 options={lifecycleOptions}
                 required
@@ -252,7 +276,7 @@ const ArticleInfoTab: React.FC = () => {
 
               <Input
                 label="Brand"
-                value={articleInfo.brand || ''}
+                value={safeArticleInfo.brand || ''}
                 onChange={handleInputChange('brand')}
                 placeholder="Brand name"
                 maxLength={255}
@@ -260,7 +284,7 @@ const ArticleInfoTab: React.FC = () => {
 
               <Input
                 label="Collection"
-                value={articleInfo.collection || ''}
+                value={safeArticleInfo.collection || ''}
                 onChange={handleInputChange('collection')}
                 placeholder="Collection name"
                 maxLength={255}
@@ -268,7 +292,7 @@ const ArticleInfoTab: React.FC = () => {
 
               <Input
                 label="Target Market"
-                value={articleInfo.targetMarket || ''}
+                value={safeArticleInfo.targetMarket || ''}
                 onChange={handleInputChange('targetMarket')}
                 placeholder="e.g., US, EU, Asia"
                 maxLength={255}
@@ -276,7 +300,7 @@ const ArticleInfoTab: React.FC = () => {
 
               <Select
                 label="Price Point"
-                value={articleInfo.pricePoint || ''}
+                value={safeArticleInfo.pricePoint || ''}
                 onChange={handleInputChange('pricePoint')}
                 options={pricePointOptions}
                 placeholder="Select price range..."
@@ -285,7 +309,7 @@ const ArticleInfoTab: React.FC = () => {
               <div className="md:col-span-2">
                 <Textarea
                   label="Fabric Description"
-                  value={articleInfo.fabricDescription}
+                  value={safeArticleInfo.fabricDescription}
                   onChange={handleInputChange('fabricDescription')}
                   placeholder="Detailed fabric composition, weight, and specifications..."
                   required
@@ -297,7 +321,7 @@ const ArticleInfoTab: React.FC = () => {
               <div className="md:col-span-2">
                 <Textarea
                   label="Notes"
-                  value={articleInfo.notes || ''}
+                  value={safeArticleInfo.notes || ''}
                   onChange={handleInputChange('notes')}
                   placeholder="Additional notes or special instructions..."
                   rows={3}
@@ -319,11 +343,10 @@ const ArticleInfoTab: React.FC = () => {
                 
                 <button
                   onClick={handleSave}
-                  disabled={state.isSaving}
-                  className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   <Save className="w-4 h-4 mr-2" />
-                  {state.isSaving ? 'Saving...' : 'Save Draft'}
+                  Save Draft
                 </button>
               </div>
 
@@ -346,44 +369,44 @@ const ArticleInfoTab: React.FC = () => {
             <div className="space-y-4">
               <div className="p-4 bg-gray-50 rounded-lg">
                 <h4 className="font-medium text-gray-900 mb-2">
-                  {articleInfo.productName || 'Product Name'}
+                  {safeArticleInfo.productName || 'Product Name'}
                 </h4>
                 <p className="text-sm text-gray-600 mb-2">
-                  {articleInfo.articleCode || 'Article Code'}
+                  {safeArticleInfo.articleCode || 'Article Code'}
                 </p>
                 <div className="flex items-center text-xs text-gray-500 space-x-2">
-                  <span>v{articleInfo.version}</span>
+                  <span>v{safeArticleInfo.version}</span>
                   <span>•</span>
-                  <span>{articleInfo.gender}</span>
+                  <span>{safeArticleInfo.gender}</span>
                   <span>•</span>
-                  <span>{articleInfo.season}</span>
+                  <span>{safeArticleInfo.season}</span>
                 </div>
               </div>
 
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Class:</span>
-                  <span className="font-medium">{articleInfo.productClass || '-'}</span>
+                  <span className="font-medium">{safeArticleInfo.productClass || '-'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Fit:</span>
-                  <span className="font-medium">{articleInfo.fitType}</span>
+                  <span className="font-medium">{safeArticleInfo.fitType}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Stage:</span>
-                  <span className="font-medium">{articleInfo.lifecycleStage}</span>
+                  <span className="font-medium">{safeArticleInfo.lifecycleStage}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Supplier:</span>
-                  <span className="font-medium">{articleInfo.supplier || '-'}</span>
+                  <span className="font-medium">{safeArticleInfo.supplier || '-'}</span>
                 </div>
               </div>
 
-              {articleInfo.fabricDescription && (
+              {safeArticleInfo.fabricDescription && (
                 <div className="pt-4 border-t border-gray-200">
                   <h5 className="text-sm font-medium text-gray-700 mb-2">Fabric</h5>
                   <p className="text-xs text-gray-600 line-clamp-3">
-                    {articleInfo.fabricDescription}
+                    {safeArticleInfo.fabricDescription}
                   </p>
                 </div>
               )}
@@ -391,11 +414,11 @@ const ArticleInfoTab: React.FC = () => {
               <div className="pt-4 border-t border-gray-200 space-y-2 text-xs text-gray-500">
                 <div className="flex items-center">
                   <Calendar className="w-3 h-3 mr-1" />
-                  Created: {new Date(articleInfo.createdDate).toLocaleDateString()}
+                  Created: {new Date(safeArticleInfo.createdDate).toLocaleDateString()}
                 </div>
                 <div className="flex items-center">
                   <User className="w-3 h-3 mr-1" />
-                  Designer: {articleInfo.technicalDesigner || 'Not assigned'}
+                  Designer: {safeArticleInfo.technicalDesigner || 'Not assigned'}
                 </div>
               </div>
             </div>

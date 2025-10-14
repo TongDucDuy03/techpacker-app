@@ -6,6 +6,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { UserRole } from '../models/user.model';
 import { logActivity } from '../utils/activity-logger';
 import { ActivityAction } from '../models/activity.model';
+import { Types } from 'mongoose';
 
 export class WorkflowController {
   /**
@@ -112,7 +113,7 @@ export class WorkflowController {
         action: activityAction,
         target: {
           type: 'TechPack',
-          id: techpack._id,
+          id: techpack._id as Types.ObjectId,
           name: techpack.productName
         },
         details: {
@@ -318,7 +319,7 @@ export class WorkflowController {
         action: ActivityAction.TECHPACK_UPDATE,
         target: {
           type: 'TechPack',
-          id: techpack._id,
+          id: techpack._id as Types.ObjectId,
           name: techpack.productName
         },
         details: {
