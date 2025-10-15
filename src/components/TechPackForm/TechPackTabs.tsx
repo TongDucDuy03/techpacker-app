@@ -1,32 +1,83 @@
 import React, { useState, useEffect } from 'react';
 import { useTechPack } from '../../contexts/TechPackContext';
+import { ApiTechPack } from '../../types/techpack';
 import ArticleInfoTab from './tabs/ArticleInfoTab';
 import BomTab from './tabs/BomTab';
 import MeasurementTab from './tabs/MeasurementTab';
 import HowToMeasureTab from './tabs/HowToMeasureTab';
 import ColorwayTab from './tabs/ColorwayTab';
 import RevisionTab from './tabs/RevisionTab';
-import { 
-  FileText, 
-  Package, 
-  Ruler, 
-  BookOpen, 
-  Palette, 
+import {
+  FileText,
+  Package,
+  Ruler,
+  BookOpen,
+  Palette,
   Clock,
   Save,
   Download,
   Eye,
   CheckCircle,
   AlertCircle,
-  Loader2
+  Loader2,
+  ArrowLeft
 } from 'lucide-react';
 
-const TechPackTabs: React.FC = () => {
+interface TechPackTabsProps {
+  onBackToList: () => void;
+  mode?: 'create' | 'edit' | 'view';
+  techPack?: ApiTechPack;
+}
+
+const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'create', techPack: initialTechPack }) => {
   const context = useTechPack();
-  const { state, setCurrentTab, saveTechPack, exportToPDF } = context ?? {};
+  const { state, setCurrentTab, updateFormState, saveTechPack, exportToPDF, resetFormState } = context ?? {};
   const { currentTab = 0, techpack, isSaving = false, lastSaved, hasUnsavedChanges = false } = state ?? {};
 
   const [showSaveNotification, setShowSaveNotification] = useState(false);
+
+  useEffect(() => {
+    if ((mode === 'edit' || mode === 'view') && initialTechPack) {
+      // Map the ApiTechPack structure to the expected TechPack structure
+      const mappedTechPack = {
+        id: initialTechPack._id,
+        articleInfo: {
+          articleCode: initialTechPack.articleCode || '',
+          productName: initialTechPack.name || '',
+          version: parseInt(initialTechPack.version) || 1,
+          gender: 'Unisex' as const,
+          productClass: initialTechPack.metadata?.category || '',
+          fitType: 'Regular' as const,
+          supplier: '',
+          technicalDesigner: '',
+          fabricDescription: '',
+          season: (initialTechPack.metadata?.season || 'SS25') as any,
+          lifecycleStage: 'Concept' as const,
+          createdDate: initialTechPack.createdAt,
+          lastModified: initialTechPack.updatedAt,
+        },
+        bom: initialTechPack.materials || [],
+        measurements: initialTechPack.measurements || [],
+        howToMeasures: [],
+        colorways: initialTechPack.colorways || [],
+        revisionHistory: initialTechPack.revisions || [],
+        status: initialTechPack.status,
+        completeness: {
+          isComplete: false,
+          missingItems: [],
+          completionPercentage: 0,
+        },
+        createdBy: initialTechPack.ownerId,
+        updatedBy: initialTechPack.ownerId,
+        createdAt: initialTechPack.createdAt,
+        updatedAt: initialTechPack.updatedAt,
+      };
+      updateFormState(mappedTechPack);
+    } else if (mode === 'create') {
+      // Reset the form for creating a new tech pack
+      resetFormState?.();
+    }
+  }, [mode, initialTechPack, updateFormState, resetFormState]);
 
   // Tab configuration
   const tabs = [
@@ -132,6 +183,21 @@ const TechPackTabs: React.FC = () => {
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
+              <button
+                onClick={() => {
+                  console.log('Back to List clicked, onBackToList:', onBackToList);
+                  if (onBackToList) {
+                    onBackToList();
+                  } else {
+                    console.error('onBackToList is not defined');
+                  }
+                }}
+                className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to List
+              </button>
+              <div className="border-l border-gray-300 h-6"></div>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">
                   {techpack.articleInfo.productName || 'New Tech Pack'}
@@ -142,9 +208,9 @@ const TechPackTabs: React.FC = () => {
                   <span>Version {techpack.articleInfo.version}</span>
                   <span>•</span>
                   <span className={`font-medium ${
-                    techpack.status === 'Approved' ? 'text-green-600' :
-                    techpack.status === 'In Review' ? 'text-blue-600' :
-                    techpack.status === 'Rejected' ? 'text-red-600' : 'text-gray-600'
+                    techpack.status === 'approved' ? 'text-green-600' :
+                    techpack.status === 'pending_approval' ? 'text-blue-600' :
+                    techpack.status === 'rejected' ? 'text-red-600' : 'text-gray-600'
                   }`}>
                     {techpack.status}
                   </span>
@@ -186,14 +252,16 @@ const TechPackTabs: React.FC = () => {
               </div>
 
               {/* Action Buttons */}
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-              >
-                <Save className="w-4 h-4 mr-2" />
-                Save
-              </button>
+              {mode !== 'view' && (
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {mode === 'edit' ? 'Update' : 'Save'}
+                </button>
+              )}
 
               <button
                 onClick={handleExportPDF}
@@ -203,10 +271,12 @@ const TechPackTabs: React.FC = () => {
                 Export PDF
               </button>
 
-              <button className="flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                <Eye className="w-4 h-4 mr-2" />
-                Preview
-              </button>
+              {mode === 'view' && (
+                <button className="flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                  <Eye className="w-4 h-4 mr-2" />
+                  Preview
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -249,15 +319,14 @@ const TechPackTabs: React.FC = () => {
 
       {/* Tab Content */}
       <div className="flex-1">
-        <CurrentTabComponent 
+        <CurrentTabComponent
           techPack={techpack}
+          mode={mode}
           onUpdate={(updates) => {
-            // Update context state
-            setState(prev => ({
-              ...prev,
-              techpack: { ...prev.techpack, ...updates },
-              hasUnsavedChanges: true
-            }));
+            // Update context state using updateFormState
+            if (mode !== 'view') {
+              updateFormState(updates);
+            }
           }}
           setCurrentTab={setCurrentTab}
         />

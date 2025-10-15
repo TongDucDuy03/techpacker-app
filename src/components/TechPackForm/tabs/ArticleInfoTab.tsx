@@ -7,11 +7,12 @@ import { Save, RotateCcw, ArrowRight, Calendar, User } from 'lucide-react';
 
 interface ArticleInfoTabProps {
   techPack?: TechPack;
+  mode?: 'create' | 'edit' | 'view';
   onUpdate?: (updates: Partial<TechPack>) => void;
   setCurrentTab?: (tab: number) => void;
 }
 
-const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, onUpdate, setCurrentTab }) => {
+const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, mode = 'create', onUpdate, setCurrentTab }) => {
   const { articleInfo } = techPack ?? {};
 
   // Fallback if no techPack is passed
@@ -181,6 +182,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, onUpdate, set
                 placeholder="e.g., SHRT-001-SS25"
                 required
                 maxLength={50}
+                disabled={mode === 'view'}
               />
 
               <Input
@@ -190,6 +192,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, onUpdate, set
                 placeholder="e.g., Men's Oxford Button-Down Shirt"
                 required
                 maxLength={255}
+                disabled={mode === 'view'}
               />
 
               <Input
@@ -199,6 +202,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, onUpdate, set
                 type="number"
                 min={1}
                 max={999}
+                disabled={mode === 'view'}
               />
 
               <Select
@@ -207,6 +211,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, onUpdate, set
                 onChange={handleInputChange('gender')}
                 options={genderOptions}
                 required
+                disabled={mode === 'view'}
               />
 
               <Select
@@ -216,6 +221,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, onUpdate, set
                 options={productClassOptions}
                 placeholder="Select product category..."
                 required
+                disabled={mode === 'view'}
               />
 
               <Select
@@ -224,6 +230,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, onUpdate, set
                 onChange={handleInputChange('fitType')}
                 options={fitTypeOptions}
                 required
+                disabled={mode === 'view'}
               />
 
               {/* Product Details */}
@@ -240,6 +247,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, onUpdate, set
                 onChange={handleInputChange('supplier')}
                 placeholder="Supplier name or code"
                 maxLength={255}
+                disabled={mode === 'view'}
               />
 
               <Input
@@ -248,6 +256,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, onUpdate, set
                 onChange={handleInputChange('technicalDesigner')}
                 placeholder="Designer name"
                 maxLength={255}
+                disabled={mode === 'view'}
               />
 
               <Select
@@ -256,6 +265,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, onUpdate, set
                 onChange={handleInputChange('season')}
                 options={seasonOptions}
                 required
+                disabled={mode === 'view'}
               />
 
               <Select
@@ -264,6 +274,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, onUpdate, set
                 onChange={handleInputChange('lifecycleStage')}
                 options={lifecycleOptions}
                 required
+                disabled={mode === 'view'}
               />
 
               {/* Optional Fields */}
@@ -280,6 +291,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, onUpdate, set
                 onChange={handleInputChange('brand')}
                 placeholder="Brand name"
                 maxLength={255}
+                disabled={mode === 'view'}
               />
 
               <Input
@@ -288,6 +300,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, onUpdate, set
                 onChange={handleInputChange('collection')}
                 placeholder="Collection name"
                 maxLength={255}
+                disabled={mode === 'view'}
               />
 
               <Input
@@ -296,6 +309,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, onUpdate, set
                 onChange={handleInputChange('targetMarket')}
                 placeholder="e.g., US, EU, Asia"
                 maxLength={255}
+                disabled={mode === 'view'}
               />
 
               <Select
@@ -304,6 +318,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, onUpdate, set
                 onChange={handleInputChange('pricePoint')}
                 options={pricePointOptions}
                 placeholder="Select price range..."
+                disabled={mode === 'view'}
               />
 
               <div className="md:col-span-2">
@@ -315,6 +330,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, onUpdate, set
                   required
                   rows={4}
                   maxLength={1000}
+                  disabled={mode === 'view'}
                 />
               </div>
 
@@ -326,38 +342,41 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, onUpdate, set
                   placeholder="Additional notes or special instructions..."
                   rows={3}
                   maxLength={500}
+                  disabled={mode === 'view'}
                 />
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
-              <div className="flex items-center space-x-4">
+            {mode !== 'view' && (
+              <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
+                <div className="flex items-center space-x-4">
+                  <button
+                    onClick={handleReset}
+                    className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Reset
+                  </button>
+
+                  <button
+                    onClick={handleSave}
+                    className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Draft
+                  </button>
+                </div>
+
                 <button
-                  onClick={handleReset}
-                  className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  onClick={handleNextTab}
+                  className="flex items-center px-6 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                 >
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Reset
-                </button>
-                
-                <button
-                  onClick={handleSave}
-                  className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Draft
+                  Next: Bill of Materials
+                  <ArrowRight className="w-4 h-4 ml-2" />
                 </button>
               </div>
-
-              <button
-                onClick={handleNextTab}
-                className="flex items-center px-6 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-              >
-                Next: Bill of Materials
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </button>
-            </div>
+            )}
           </div>
         </div>
 

@@ -1,38 +1,60 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Toaster } from 'react-hot-toast';
-import { Layout } from './components/Layout';
-import { Dashboard } from './components/Dashboard';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+
 import { TechPackList } from './components/TechPackList';
 import { TechPackDetail } from './components/TechPackDetail';
-import { MaterialsLibrary } from './components/MaterialsLibrary';
-import { MeasurementsManagement } from './components/MeasurementsManagement';
-import { ColorwaysManagement } from './components/ColorwaysManagement';
-import { TechPack, CreateTechPackInput } from './types/techpack';
-import { TechPackProvider, useTechPack } from './contexts/TechPackContext';
-import { api, isApiConfigured } from './lib/api';
-import { showPromise, showError } from './lib/toast';
+import TechPackTabs from './components/TechPackForm/TechPackTabs';
+import { ApiTechPack } from './types/techpack';
+import { useTechPack } from './contexts/TechPackContext';
+import { useAuth } from './contexts/AuthContext';
+
+import { Plus, List, Settings } from 'lucide-react';
+
+// Admin Navigation Component
+const AdminNavigation: React.FC = () => {
+  const { user } = useAuth();
+
+  if (user?.role !== 'admin') {
+    return null;
+  }
+
+  return (
+    <Link
+      to="/admin/users"
+      className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+    >
+      <Settings className="w-4 h-4" />
+      Admin Panel
+    </Link>
+  );
+};
 
 function AppContent() {
-  const [currentPage, setCurrentPage] = useState('dashboard');
-  const [selectedTechPack, setSelectedTechPack] = useState<TechPack | null>(null);
+  const [currentTab, setCurrentTab] = useState('list');
+  const [selectedTechPack, setSelectedTechPack] = useState<ApiTechPack | null>(null);
   const context = useTechPack();
-  const { techPacks = [], createTechPack, updateTechPack, deleteTechPack } = context ?? {};
+  const { techPacks = [], updateTechPack, deleteTechPack } = context ?? {};
 
-  const handleViewTechPack = (techPack: TechPack) => {
+  const handleViewTechPack = (techPack: ApiTechPack) => {
     setSelectedTechPack(techPack);
-    setCurrentPage('techpack-detail');
+    setCurrentTab('view');
+  };
+
+  const handleEditTechPack = (techPack: ApiTechPack) => {
+    setSelectedTechPack(techPack);
+    setCurrentTab('edit');
   };
 
   const handleBackToList = () => {
     setSelectedTechPack(null);
-    setCurrentPage('techpacks');
+    setCurrentTab('list');
   };
 
-  const handleUpdate = async (id: string, data: Partial<TechPack>) => {
+  const handleUpdate = async (id: string, data: Partial<ApiTechPack>) => {
     if (updateTechPack) {
       await updateTechPack(id, data);
-      if (selectedTechPack?.id === id) {
-        setSelectedTechPack(prev => (prev ? { ...prev, ...data } as TechPack : null));
+      if (selectedTechPack?._id === id) {
+        setSelectedTechPack(prev => (prev ? { ...prev, ...data } as ApiTechPack : null));
       }
     }
   };
@@ -40,27 +62,42 @@ function AppContent() {
   const handleDelete = async (id: string) => {
     if (deleteTechPack) {
       await deleteTechPack(id);
-      if (selectedTechPack?.id === id) {
+      if (selectedTechPack?._id === id) {
         handleBackToList();
       }
     }
   };
 
   const renderContent = () => {
-    switch (currentPage) {
-      case 'dashboard':
-        return <Dashboard techPacks={techPacks} activities={[]} />;
-      case 'techpacks':
+    switch (currentTab) {
+      case 'list':
         return (
           <TechPackList
             techPacks={techPacks}
             onViewTechPack={handleViewTechPack}
-            onCreateTechPack={createTechPack}
+            onEditTechPack={handleEditTechPack}
+            onCreateTechPack={() => setCurrentTab('create')}
             onUpdateTechPack={handleUpdate}
             onDeleteTechPack={handleDelete}
           />
         );
-      case 'techpack-detail':
+      case 'create':
+        return (
+          <TechPackTabs onBackToList={handleBackToList} />
+        );
+      case 'edit':
+        return selectedTechPack ? (
+          <TechPackTabs onBackToList={handleBackToList} mode="edit" techPack={selectedTechPack} />
+        ) : (
+          <div>Tech pack not found</div>
+        );
+      case 'view':
+        return selectedTechPack ? (
+          <TechPackTabs onBackToList={handleBackToList} mode="view" techPack={selectedTechPack} />
+        ) : (
+          <div>Tech pack not found</div>
+        );
+      case 'detail':
         return selectedTechPack ? (
           <TechPackDetail
             techPack={selectedTechPack}
@@ -71,52 +108,68 @@ function AppContent() {
         ) : (
           <div>Tech pack not found</div>
         );
-      case 'measurements':
-        return <MeasurementsManagement />;
-      case 'materials':
-        return <MaterialsLibrary />;
-      case 'colorways':
-        return <ColorwaysManagement />;
-      case 'analytics':
-        return (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Analytics Dashboard</h3>
-            <p className="text-gray-600">Coming soon - Production insights and performance metrics</p>
-          </div>
-        );
-      case 'team':
-        return (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Team Management</h3>
-            <p className="text-gray-600">Coming soon - Manage team members and permissions</p>
-          </div>
-        );
-      case 'settings':
-        return (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Settings</h3>
-            <p className="text-gray-600">Coming soon - Application preferences and configurations</p>
-          </div>
-        );
       default:
-        return <Dashboard techPacks={techPacks} activities={[]} />;
+        return (
+          <TechPackList
+            techPacks={techPacks}
+            onViewTechPack={handleViewTechPack}
+            onEditTechPack={handleEditTechPack}
+            onCreateTechPack={() => setCurrentTab('create')}
+            onUpdateTechPack={handleUpdate}
+            onDeleteTechPack={handleDelete}
+          />
+        );
     }
   };
 
   return (
-    <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
-      {renderContent()}
-    </Layout>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <h1 className="text-2xl font-bold text-gray-900">TechPacker Pro</h1>
+            </div>
+            
+            {/* Tab Navigation */}
+            <div className="flex items-center space-x-4">
+              <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setCurrentTab('list')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    currentTab === 'list'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <List className="w-4 h-4" />
+                  Tech Packs
+                </button>
+                <button
+                  onClick={() => setCurrentTab('create')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    currentTab === 'create'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Plus className="w-4 h-4" />
+                  Create New
+                </button>
+              </div>
+              <AdminNavigation />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {renderContent()}
+      </div>
+    </div>
   );
 }
 
-function App() {
-  return (
-    <TechPackProvider>
-      <Toaster position="top-right" reverseOrder={false} />
-      <AppContent />
-    </TechPackProvider>
-  );
-}
-
-export default App;
+export default AppContent;

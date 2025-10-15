@@ -15,10 +15,21 @@ export const sendSuccess = <T>(
   statusCode = 200,
   pagination?: Pagination
 ): void => {
+  // Ensure we don't send a response if headers are already sent
+  if (res.headersSent) {
+    console.error('Attempted to send success response after headers were sent:', { message, statusCode });
+    return;
+  }
+
+  // Set proper headers for JSON response
+  res.setHeader('Content-Type', 'application/json');
+
   const response: any = { success: true, message, data };
   if (pagination) {
     response.pagination = pagination;
   }
+
+  console.log('Sending success response:', { statusCode, message });
   res.status(statusCode).json(response);
 };
 
@@ -34,14 +45,26 @@ export const sendError = (
   code = 'INTERNAL_ERROR',
   errors?: ErrorDetail[]
 ): void => {
-  res.status(statusCode).json({
+  // Ensure we don't send a response if headers are already sent
+  if (res.headersSent) {
+    console.error('Attempted to send error response after headers were sent:', { message, statusCode, code });
+    return;
+  }
+
+  // Set proper headers for JSON response
+  res.setHeader('Content-Type', 'application/json');
+
+  const response = {
     success: false,
     message,
     error: {
       code,
       details: errors,
     },
-  });
+  };
+
+  console.log('Sending error response:', { statusCode, message, code });
+  res.status(statusCode).json(response);
 };
 
 // Utility function để convert ValidationError[] thành ErrorDetail[]

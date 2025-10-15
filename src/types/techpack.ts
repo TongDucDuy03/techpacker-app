@@ -110,6 +110,30 @@ export interface RevisionEntry {
   rejectionReason?: string;
 }
 
+// Backend API TechPack type (matches database response)
+export interface ApiTechPack {
+  _id: string;
+  name: string;
+  articleCode: string;
+  version: string;
+  status: 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'archived';
+  ownerId: string;
+  isDeleted: boolean;
+  metadata?: {
+    description?: string;
+    category?: string;
+    season?: string;
+  };
+  revisions: any[];
+  materials: any[];
+  measurements: any[];
+  colorways: any[];
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
+}
+
+// Frontend TechPack type (for form state)
 export interface TechPack {
   id: string;
   articleInfo: ArticleInfo;
@@ -118,7 +142,7 @@ export interface TechPack {
   howToMeasures: HowToMeasure[];
   colorways: Colorway[];
   revisionHistory: RevisionEntry[];
-  status: 'Draft' | 'In Review' | 'Approved' | 'Rejected' | 'Archived';
+  status: 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'archived';
   completeness: {
     isComplete: boolean;
     missingItems: string[];
@@ -153,15 +177,15 @@ export interface TechPackFormState {
 
 // Safe destructuring helper types
 export type SafeTechPackContext = {
-  techPacks: TechPack[];
+  techPacks: ApiTechPack[];
   loading: boolean;
   pagination: Omit<TechPackListResponse, 'data'>;
   state: TechPackFormState;
   loadTechPacks: (params?: { page?: number; limit?: number; q?: string; status?: string }) => Promise<void>;
-  createTechPack: (data: CreateTechPackInput) => Promise<TechPack | undefined>;
-  updateTechPack: (id: string, data: Partial<TechPack>) => Promise<TechPack | undefined>;
+  createTechPack: (data: CreateTechPackInput) => Promise<ApiTechPack | undefined>;
+  updateTechPack: (id: string, data: Partial<ApiTechPack>) => Promise<ApiTechPack | undefined>;
   deleteTechPack: (id: string) => Promise<void>;
-  getTechPack: (id: string) => Promise<TechPack | undefined>;
+  getTechPack: (id: string) => Promise<ApiTechPack | undefined>;
   setCurrentTab: (tab: number) => void;
   saveTechPack: () => Promise<void>;
   exportToPDF: () => void;
@@ -185,7 +209,7 @@ export interface CreateTechPackInput {
 }
 
 export interface TechPackListResponse {
-  data: TechPack[];
+  data: ApiTechPack[];
   total: number;
   page: number;
   totalPages: number;

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { body, param } from 'express-validator';
 import subdocumentController from '../controllers/subdocument.controller';
-import { requireAuth, requireOwnershipOrRole } from '../middleware/auth.middleware';
+import { requireAuth, requireRole } from '../middleware/auth.middleware';
 import { UserRole } from '../models/user.model';
 
 const router = Router();
@@ -69,7 +69,7 @@ const colorwayValidation = [
 router.post(
   '/:id/bom',
   requireAuth,
-  requireOwnershipOrRole([UserRole.Merchandiser, UserRole.Admin]),
+  requireRole([UserRole.Merchandiser, UserRole.Admin]),
   idValidation,
   bomValidation,
   subdocumentController.addBOMItem
@@ -83,7 +83,7 @@ router.post(
 router.put(
   '/:id/bom/:bomId',
   requireAuth,
-  requireOwnershipOrRole([UserRole.Merchandiser, UserRole.Admin]),
+  requireRole([UserRole.Merchandiser, UserRole.Admin]),
   idValidation,
   bomValidation,
   subdocumentController.updateBOMItem
@@ -97,7 +97,7 @@ router.put(
 router.delete(
   '/:id/bom/:bomId',
   requireAuth,
-  requireOwnershipOrRole([UserRole.Merchandiser, UserRole.Admin]),
+  requireRole([UserRole.Merchandiser, UserRole.Admin]),
   idValidation,
   subdocumentController.deleteBOMItem
 );
@@ -111,7 +111,7 @@ router.delete(
 router.post(
   '/:id/measurements',
   requireAuth,
-  requireOwnershipOrRole([UserRole.Merchandiser, UserRole.Admin]),
+  requireRole([UserRole.Merchandiser, UserRole.Admin]),
   idValidation,
   measurementValidation,
   subdocumentController.addMeasurement
@@ -125,7 +125,7 @@ router.post(
 router.put(
   '/:id/measurements/:measurementId',
   requireAuth,
-  requireOwnershipOrRole([UserRole.Merchandiser, UserRole.Admin]),
+  requireRole([UserRole.Merchandiser, UserRole.Admin]),
   idValidation,
   measurementValidation,
   subdocumentController.updateMeasurement
@@ -139,7 +139,7 @@ router.put(
 router.delete(
   '/:id/measurements/:measurementId',
   requireAuth,
-  requireOwnershipOrRole([UserRole.Merchandiser, UserRole.Admin]),
+  requireRole([UserRole.Merchandiser, UserRole.Admin]),
   idValidation,
   subdocumentController.deleteMeasurement
 );
@@ -153,7 +153,7 @@ router.delete(
 router.post(
   '/:id/colorways',
   requireAuth,
-  requireOwnershipOrRole([UserRole.Merchandiser, UserRole.Admin]),
+  requireRole([UserRole.Merchandiser, UserRole.Admin]),
   idValidation,
   colorwayValidation,
   subdocumentController.addColorway
@@ -167,7 +167,7 @@ router.post(
 router.put(
   '/:id/colorways/:colorwayId',
   requireAuth,
-  requireOwnershipOrRole([UserRole.Merchandiser, UserRole.Admin]),
+  requireRole([UserRole.Merchandiser, UserRole.Admin]),
   idValidation,
   colorwayValidation,
   subdocumentController.updateColorway
@@ -181,7 +181,7 @@ router.put(
 router.delete(
   '/:id/colorways/:colorwayId',
   requireAuth,
-  requireOwnershipOrRole([UserRole.Merchandiser, UserRole.Admin]),
+  requireRole([UserRole.Merchandiser, UserRole.Admin]),
   idValidation,
   subdocumentController.deleteColorway
 );

@@ -54,13 +54,13 @@ export class SubdocumentController {
 
       techpack.bom.push(newBOMItem);
       techpack.updatedBy = user._id;
-      techpack.updatedByName = user.fullName;
+      techpack.updatedByName = `${user.firstName} ${user.lastName}`;
       await techpack.save();
 
       // Log activity
       await logActivity({
         userId: user._id,
-        userName: user.fullName,
+        userName: `${user.firstName} ${user.lastName}`,
         action: ActivityAction.BOM_ADD,
         target: {
           type: 'TechPack',
@@ -136,13 +136,13 @@ export class SubdocumentController {
 
       Object.assign(bomItem, req.body);
       techpack.updatedBy = user._id;
-      techpack.updatedByName = user.fullName;
+      techpack.updatedByName = `${user.firstName} ${user.lastName}`;
       await techpack.save();
 
       // Log activity
       await logActivity({
         userId: user._id,
-        userName: user.fullName,
+        userName: `${user.firstName} ${user.lastName}`,
         action: ActivityAction.BOM_UPDATE,
         target: {
           type: 'TechPack',
@@ -209,13 +209,13 @@ export class SubdocumentController {
       const deletedItem = bomItem.toObject();
       (techpack.bom as any).pull(bomId);
       techpack.updatedBy = user._id;
-      techpack.updatedByName = user.fullName;
+      techpack.updatedByName = `${user.firstName} ${user.lastName}`;
       await techpack.save();
 
       // Log activity
       await logActivity({
         userId: user._id,
-        userName: user.fullName,
+        userName: `${user.firstName} ${user.lastName}`,
         action: ActivityAction.BOM_DELETE,
         target: {
           type: 'TechPack',
@@ -286,13 +286,13 @@ export class SubdocumentController {
 
       techpack.measurements.push(newMeasurement);
       techpack.updatedBy = user._id;
-      techpack.updatedByName = user.fullName;
+      techpack.updatedByName = `${user.firstName} ${user.lastName}`;
       await techpack.save();
 
       // Log activity
       await logActivity({
         userId: user._id,
-        userName: user.fullName,
+        userName: `${user.firstName} ${user.lastName}`,
         action: ActivityAction.MEASUREMENT_ADD,
         target: {
           type: 'TechPack',
@@ -368,13 +368,13 @@ export class SubdocumentController {
 
       Object.assign(measurement, req.body);
       techpack.updatedBy = user._id;
-      techpack.updatedByName = user.fullName;
+      techpack.updatedByName = `${user.firstName} ${user.lastName}`;
       await techpack.save();
 
       // Log activity
       await logActivity({
         userId: user._id,
-        userName: user.fullName,
+        userName: `${user.firstName} ${user.lastName}`,
         action: ActivityAction.MEASUREMENT_UPDATE,
         target: {
           type: 'TechPack',
@@ -441,13 +441,13 @@ export class SubdocumentController {
       const deletedMeasurement = measurement.toObject();
       (techpack.measurements as any).pull(measurementId);
       techpack.updatedBy = user._id;
-      techpack.updatedByName = user.fullName;
+      techpack.updatedByName = `${user.firstName} ${user.lastName}`;
       await techpack.save();
 
       // Log activity
       await logActivity({
         userId: user._id,
-        userName: user.fullName,
+        userName: `${user.firstName} ${user.lastName}`,
         action: ActivityAction.MEASUREMENT_DELETE,
         target: {
           type: 'TechPack',
@@ -518,13 +518,13 @@ export class SubdocumentController {
 
       techpack.colorways.push(newColorway);
       techpack.updatedBy = user._id;
-      techpack.updatedByName = user.fullName;
+      techpack.updatedByName = `${user.firstName} ${user.lastName}`;
       await techpack.save();
 
       // Log activity
       await logActivity({
         userId: user._id,
-        userName: user.fullName,
+        userName: `${user.firstName} ${user.lastName}`,
         action: ActivityAction.COLORWAY_ADD,
         target: {
           type: 'TechPack',
@@ -600,13 +600,13 @@ export class SubdocumentController {
 
       Object.assign(colorway, req.body);
       techpack.updatedBy = user._id;
-      techpack.updatedByName = user.fullName;
+      techpack.updatedByName = `${user.firstName} ${user.lastName}`;
       await techpack.save();
 
       // Log activity
       await logActivity({
         userId: user._id,
-        userName: user.fullName,
+        userName: `${user.firstName} ${user.lastName}`,
         action: ActivityAction.COLORWAY_UPDATE,
         target: {
           type: 'TechPack',
@@ -673,13 +673,13 @@ export class SubdocumentController {
       const deletedColorway = colorway.toObject();
       (techpack.colorways as any).pull(colorwayId);
       techpack.updatedBy = user._id;
-      techpack.updatedByName = user.fullName;
+      techpack.updatedByName = `${user.firstName} ${user.lastName}`;
       await techpack.save();
 
       // Log activity
       await logActivity({
         userId: user._id,
-        userName: user.fullName,
+        userName: `${user.firstName} ${user.lastName}`,
         action: ActivityAction.COLORWAY_DELETE,
         target: {
           type: 'TechPack',

@@ -1,19 +1,21 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { TechPack, CreateTechPackInput, TechPackListResponse, TechPackFormState, MeasurementPoint, HowToMeasure, BomItem, Colorway } from '../types/techpack';
+import { ApiTechPack, CreateTechPackInput, TechPackListResponse, TechPackFormState, MeasurementPoint, HowToMeasure, BomItem, Colorway } from '../types/techpack';
 import { api } from '../lib/api';
 import { showPromise, showError } from '../lib/toast';
 
 interface TechPackContextType {
-  techPacks: TechPack[];
+  techPacks: ApiTechPack[];
   loading: boolean;
   pagination: Omit<TechPackListResponse, 'data'>;
   state: TechPackFormState;
   loadTechPacks: (params?: { page?: number; limit?: number; q?: string; status?: string }) => Promise<void>;
-  createTechPack: (data: CreateTechPackInput) => Promise<TechPack | undefined>;
-  updateTechPack: (id: string, data: Partial<TechPack>) => Promise<TechPack | undefined>;
+  createTechPack: (data: CreateTechPackInput) => Promise<ApiTechPack | undefined>;
+  updateTechPack: (id: string, data: Partial<ApiTechPack>) => Promise<ApiTechPack | undefined>;
   deleteTechPack: (id: string) => Promise<void>;
-  getTechPack: (id: string) => Promise<TechPack | undefined>;
+  getTechPack: (id: string) => Promise<ApiTechPack | undefined>;
   setCurrentTab: (tab: number) => void;
+  updateFormState: (updates: Partial<ApiTechPack>) => void;
+  resetFormState: () => void;
   saveTechPack: () => Promise<void>;
   exportToPDF: () => void;
   addMeasurement: (measurement: MeasurementPoint) => void;
@@ -33,7 +35,7 @@ interface TechPackContextType {
 const TechPackContext = createContext<TechPackContextType | undefined>(undefined);
 
 export const TechPackProvider = ({ children }: { children: ReactNode }) => {
-  const [techPacks, setTechPacks] = useState<TechPack[]>([]);
+  const [techPacks, setTechPacks] = useState<ApiTechPack[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [pagination, setPagination] = useState<Omit<TechPackListResponse, 'data'>>({ total: 0, page: 1, totalPages: 1 });
 
@@ -80,12 +82,15 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
   });
 
   const loadTechPacks = useCallback(async (params = {}) => {
+    console.log('🔄 Loading tech packs...', params);
     setLoading(true);
     try {
       const response = await api.listTechPacks(params);
+      console.log('✅ Tech packs loaded:', response);
       setTechPacks(response.data);
       setPagination({ total: response.total, page: response.page, totalPages: response.totalPages });
     } catch (error: any) {
+      console.error('❌ Failed to load tech packs:', error);
       showError(error.message || 'Failed to load tech packs');
     } finally {
       setLoading(false);
@@ -113,7 +118,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const updateTechPack = async (id: string, data: Partial<TechPack>) => {
+  const updateTechPack = async (id: string, data: Partial<ApiTechPack>) => {
     try {
       const updatedTechPack = await showPromise(
         api.updateTechPack(id, data),
@@ -140,7 +145,10 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           error: (err) => err.message || 'Failed to delete tech pack',
         }
       );
-      await loadTechPacks();
+      // Update local state to remove the deleted tech pack immediately
+      setTechPacks(prev => prev.filter(tp => tp._id !== id));
+      // Update pagination count
+      setPagination(prev => ({ ...prev, total: prev.total - 1 }));
     } catch (error) {
       // Error is already handled by showPromise
     }
@@ -162,11 +170,109 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     setState(prev => ({ ...prev, currentTab: tab }));
   };
 
+  const updateFormState = useCallback((updates: Partial<ApiTechPack>) => {
+    setState(prev => ({
+      ...prev,
+      techpack: { ...prev.techpack, ...updates },
+      hasUnsavedChanges: true
+    }));
+  }, []);
+
+  const resetFormState = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      techpack: {
+        id: '',
+        articleInfo: {
+          articleCode: '',
+          productName: '',
+          version: 1,
+          gender: 'Unisex',
+          productClass: '',
+          fitType: 'Regular',
+          supplier: '',
+          technicalDesigner: '',
+          fabricDescription: '',
+          season: 'SS25',
+          lifecycleStage: 'Concept',
+          createdDate: new Date().toISOString(),
+          lastModified: new Date().toISOString(),
+        },
+        bom: [],
+        measurements: [],
+        howToMeasures: [],
+        colorways: [],
+        revisionHistory: [],
+        status: 'Draft',
+        completeness: {
+          isComplete: false,
+          missingItems: [],
+          completionPercentage: 0,
+        },
+        createdBy: '',
+        updatedBy: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      currentTab: 0,
+      hasUnsavedChanges: false
+    }));
+  }, []);
+
   const saveTechPack = async () => {
     setState(prev => ({ ...prev, isSaving: true }));
     try {
-      // Simulate save operation
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const techpackData = state.techpack;
+      
+      // If techpack has an ID, update existing; otherwise create new
+      if (techpackData.id && techpackData.id !== '') {
+        // Map the frontend TechPack to the backend model structure
+        const backendTechPackData = {
+          productName: techpackData.articleInfo.productName,
+          articleCode: techpackData.articleInfo.articleCode,
+          version: techpackData.articleInfo.version.toString(),
+          supplier: techpackData.articleInfo.supplier || '',
+          season: techpackData.articleInfo.season,
+          fabricDescription: techpackData.articleInfo.fabricDescription || '',
+          status: techpackData.status,
+          category: techpackData.articleInfo.productClass,
+          gender: techpackData.articleInfo.gender,
+          description: techpackData.articleInfo.notes,
+          bom: techpackData.bom,
+          measurements: techpackData.measurements,
+          colorways: techpackData.colorways,
+          howToMeasure: techpackData.howToMeasures,
+        };
+        // Update existing tech pack
+        await updateTechPack(techpackData.id, backendTechPackData);
+      } else {
+        // Map the frontend TechPack to the backend model structure
+        const backendTechPackData = {
+          productName: techpackData.articleInfo.productName,
+          articleCode: techpackData.articleInfo.articleCode,
+          version: techpackData.articleInfo.version.toString(),
+          supplier: techpackData.articleInfo.supplier || '',
+          season: techpackData.articleInfo.season,
+          fabricDescription: techpackData.articleInfo.fabricDescription || '',
+          status: techpackData.status,
+          category: techpackData.articleInfo.productClass,
+          gender: techpackData.articleInfo.gender,
+          description: techpackData.articleInfo.notes,
+          bom: techpackData.bom,
+          measurements: techpackData.measurements,
+          colorways: techpackData.colorways,
+          howToMeasure: techpackData.howToMeasures,
+        };
+        // Create new tech pack
+        const newTechPack = await createTechPack(backendTechPackData as any);
+
+        // Update the state with the new ID
+        setState(prev => ({
+          ...prev,
+          techpack: { ...prev.techpack, id: newTechPack?._id || newTechPack?.id || '' }
+        }));
+      }
+      
       setState(prev => ({
         ...prev,
         isSaving: false,
@@ -327,6 +433,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     deleteTechPack,
     getTechPack,
     setCurrentTab,
+    updateFormState,
+    resetFormState,
     saveTechPack,
     exportToPDF,
     addMeasurement,

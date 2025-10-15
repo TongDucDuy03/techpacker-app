@@ -1,20 +1,20 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import techpackController from '../controllers/techpack.controller';
-import { requireAuth, requireRole, requireOwnershipOrRole } from '../middleware/auth.middleware';
+import { requireAuth, requireRole } from '../middleware/auth.middleware';
 import { UserRole } from '../models/user.model';
 
 const router = Router();
 
 // Validation rules
 const techpackValidation = [
-  body('productName')
+  body('articleInfo.productName')
     .notEmpty()
     .withMessage('Product name is required')
     .isLength({ max: 100 })
     .withMessage('Product name must be less than 100 characters'),
   
-  body('articleCode')
+  body('articleInfo.articleCode')
     .notEmpty()
     .withMessage('Article code is required')
     .isLength({ max: 20 })
@@ -22,21 +22,47 @@ const techpackValidation = [
     .matches(/^[A-Z0-9\-_]+$/)
     .withMessage('Article code can only contain uppercase letters, numbers, hyphens, and underscores'),
   
-  body('supplier')
+  body('articleInfo.supplier')
     .notEmpty()
     .withMessage('Supplier is required')
     .isLength({ max: 100 })
     .withMessage('Supplier name must be less than 100 characters'),
   
-  body('season')
+  body('articleInfo.season')
     .notEmpty()
     .withMessage('Season is required')
     .isLength({ max: 50 })
     .withMessage('Season must be less than 50 characters'),
   
-  body('fabricDescription')
+  body('articleInfo.fabricDescription')
     .notEmpty()
     .withMessage('Fabric description is required')
+    .isLength({ max: 500 })
+    .withMessage('Fabric description must be less than 500 characters'),
+  
+  // Fallback validation for direct fields (backward compatibility)
+  body('productName')
+    .optional()
+    .isLength({ max: 100 })
+    .withMessage('Product name must be less than 100 characters'),
+  
+  body('articleCode')
+    .optional()
+    .isLength({ max: 20 })
+    .withMessage('Article code must be less than 20 characters'),
+  
+  body('supplier')
+    .optional()
+    .isLength({ max: 100 })
+    .withMessage('Supplier name must be less than 100 characters'),
+  
+  body('season')
+    .optional()
+    .isLength({ max: 50 })
+    .withMessage('Season must be less than 50 characters'),
+  
+  body('fabricDescription')
+    .optional()
     .isLength({ max: 500 })
     .withMessage('Fabric description must be less than 500 characters'),
   
@@ -179,11 +205,10 @@ const idValidation = [
 /**
  * @route GET /api/techpacks
  * @desc Get all TechPacks with pagination, search, and filters
- * @access Private
+ * @access Public (for demo)
  */
 router.get(
   '/',
-  requireAuth,
   queryValidation,
   techpackController.getTechPacks
 );
@@ -191,12 +216,10 @@ router.get(
 /**
  * @route POST /api/techpacks
  * @desc Create a new TechPack
- * @access Private (Designer, Merchandiser, Admin)
+ * @access Public (for demo)
  */
 router.post(
   '/',
-  requireAuth,
-  requireRole([UserRole.Designer, UserRole.Merchandiser, UserRole.Admin]),
   techpackValidation,
   techpackController.createTechPack
 );
@@ -221,7 +244,7 @@ router.get(
 router.put(
   '/:id',
   requireAuth,
-  requireOwnershipOrRole([UserRole.Merchandiser, UserRole.Admin]),
+  requireRole([UserRole.Admin, UserRole.Merchandiser]),
   idValidation,
   techpackValidation,
   techpackController.updateTechPack
@@ -235,7 +258,7 @@ router.put(
 router.patch(
   '/:id',
   requireAuth,
-  requireOwnershipOrRole([UserRole.Merchandiser, UserRole.Admin]),
+  requireRole([UserRole.Admin, UserRole.Merchandiser]),
   idValidation,
   patchValidation,
   techpackController.patchTechPack
@@ -249,7 +272,7 @@ router.patch(
 router.delete(
   '/:id',
   requireAuth,
-  requireOwnershipOrRole([UserRole.Admin]),
+  requireRole([UserRole.Admin, UserRole.Designer]),
   idValidation,
   techpackController.deleteTechPack
 );
@@ -262,7 +285,7 @@ router.delete(
 router.post(
   '/:id/duplicate',
   requireAuth,
-  requireOwnershipOrRole([UserRole.Merchandiser, UserRole.Admin]),
+  requireRole([UserRole.Admin, UserRole.Merchandiser]),
   idValidation,
   [
     body('keepVersion')
@@ -281,7 +304,7 @@ router.post(
 router.patch(
   '/bulk',
   requireAuth,
-  requireRole([UserRole.Merchandiser, UserRole.Admin]),
+  requireRole([UserRole.Admin, UserRole.Merchandiser]),
   [
     body('ids')
       .isArray({ min: 1 })

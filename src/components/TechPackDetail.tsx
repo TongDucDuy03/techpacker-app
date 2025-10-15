@@ -1,79 +1,179 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Trash2, FileText, Ruler, Palette, Info } from 'lucide-react';
-import { TechPack } from '../types/techpack';
-import ArticleInfoTab from './TechPackForm/tabs/ArticleInfoTab';
+import React from 'react';
+import { ApiTechPack } from '../types/techpack';
+import { ArrowLeft, Edit, Trash2, Download } from 'lucide-react';
 
 interface TechPackDetailProps {
-  techPack: TechPack;
+  techPack: ApiTechPack;
   onBack: () => void;
-  onUpdate: (id: string, data: Partial<TechPack>) => void;
+  onUpdate: (id: string, data: Partial<ApiTechPack>) => void;
   onDelete: (id: string) => void;
 }
 
-const TABS = [
-  { name: 'Article Info', icon: Info },
-  { name: 'Bill of Materials', icon: FileText },
-  { name: 'Measurements', icon: Ruler },
-  { name: 'Colorways', icon: Palette },
-];
-
-export const TechPackDetail: React.FC<TechPackDetailProps> = ({ techPack: initialTechPack, onBack, onUpdate, onDelete }) => {
-  const [techPack, setTechPack] = useState<TechPack>(initialTechPack);
-  const [currentTab, setCurrentTab] = useState(0);
-
-  useEffect(() => {
-    setTechPack(initialTechPack);
-  }, [initialTechPack]);
-
-  const handleUpdate = (field: keyof TechPack, value: any) => {
-    const updatedTechPack = { ...techPack, [field]: value };
-    setTechPack(updatedTechPack);
-    onUpdate(techPack._id, { [field]: value });
+export const TechPackDetail: React.FC<TechPackDetailProps> = ({
+  techPack,
+  onBack,
+  onUpdate,
+  onDelete,
+}) => {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'approved': return 'bg-green-100 text-green-800';
+      case 'pending_approval': return 'bg-yellow-100 text-yellow-800';
+      case 'draft': return 'bg-blue-100 text-blue-800';
+      case 'rejected': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   };
 
-  const renderTabContent = () => {
-    switch (currentTab) {
-      case 0:
-        return <ArticleInfoTab techPack={techPack} onUpdate={handleUpdate} setCurrentTab={setCurrentTab} />;
-      // Future tabs will be added here
-      default:
-        return <div className="p-6">Select a tab</div>;
-    }
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
   };
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <button onClick={onBack} className="flex items-center text-teal-700 hover:text-teal-800">
-          <ArrowLeft className="w-5 h-5 mr-2" />
-          Back to Tech Packs
-        </button>
-        <button onClick={() => onDelete(techPack._id)} className="flex items-center px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors">
-          <Trash2 className="w-4 h-4 mr-1" />
-          Delete
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to List
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{techPack.name}</h1>
+            <p className="text-gray-600">Tech Pack Details</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onUpdate(techPack._id, {})}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Edit className="w-4 h-4" />
+            Edit
+          </button>
+          <button
+            onClick={() => {/* TODO: Implement PDF export */}}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Export PDF
+          </button>
+          <button
+            onClick={() => onDelete(techPack._id)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete
+          </button>
+        </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-6 px-6" aria-label="Tabs">
-            {TABS.map((tab, index) => (
-              <button
-                key={tab.name}
-                onClick={() => setCurrentTab(index)}
-                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center ${
-                  currentTab === index
-                    ? 'border-teal-500 text-teal-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <tab.icon className="mr-2 h-5 w-5" />
-                {tab.name}
-              </button>
-            ))}
-          </nav>
+      {/* Tech Pack Info */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Basic Information */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Product Name</label>
+                <p className="mt-1 text-sm text-gray-900">{techPack.name}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Article Code</label>
+                <p className="mt-1 text-sm text-gray-900">{techPack.articleCode}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Version</label>
+                <p className="mt-1 text-sm text-gray-900">{techPack.version || 'V1'}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Status</label>
+                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(techPack.status)}`}>
+                  {techPack.status}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Metadata */}
+          {techPack.metadata && (
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {techPack.metadata.description && (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">Description</label>
+                    <p className="mt-1 text-sm text-gray-900">{techPack.metadata.description}</p>
+                  </div>
+                )}
+                {techPack.metadata.category && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Category</label>
+                    <p className="mt-1 text-sm text-gray-900">{techPack.metadata.category}</p>
+                  </div>
+                )}
+                {techPack.metadata.season && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Season</label>
+                    <p className="mt-1 text-sm text-gray-900">{techPack.metadata.season}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-        <div>{renderTabContent()}</div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Timeline */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Timeline</h3>
+            <div className="space-y-3">
+              <div>
+                <div className="text-sm font-medium text-gray-900">Created</div>
+                <div className="text-sm text-gray-600">{formatDate(techPack.createdAt)}</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-900">Last Updated</div>
+                <div className="text-sm text-gray-600">{formatDate(techPack.updatedAt)}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Stats</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Materials</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {techPack.materials?.length || 0}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Measurements</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {techPack.measurements?.length || 0}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Colorways</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {techPack.colorways?.length || 0}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,42 +1,119 @@
 import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
+import User from '../models/user.model';
 import { authService } from '../services/auth.service';
-import { AuthRequest } from '../middleware/auth.middleware';
 import { sendSuccess, sendError, formatValidationErrors } from '../utils/response.util';
+import { AuthRequest } from '../middleware/auth.middleware';
 
-export class AuthController {
+class AuthController {
+  constructor() {
+    this.register = this.register.bind(this);
+    this.login = this.login.bind(this);
+    this.logout = this.logout.bind(this);
+    this.refreshToken = this.refreshToken.bind(this);
+    this.getProfile = this.getProfile.bind(this);
+    this.updateProfile = this.updateProfile.bind(this);
+  }
+
   async register(req: Request, res: Response): Promise<void> {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      sendError(res, 'Validation failed', 400, 'VALIDATION_ERROR', formatValidationErrors(errors.array()));
-      return;
+      return sendError(res, 'Validation failed', 400, 'VALIDATION_ERROR', formatValidationErrors(errors.array()));
     }
 
     try {
-      const result = await authService.register(req.body);
-      sendSuccess(res, result, 'User registered successfully', 201);
-    } catch (error: any) {
-      if (error.message.includes('already exists')) {
-        sendError(res, error.message, 409, 'USER_EXISTS');
-        return;
+      const { firstName, lastName, email, password, role } = req.body;
+
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return sendError(res, 'An account with this email already exists', 409, 'CONFLICT');
       }
-      sendError(res, 'Internal server error during registration', 500, 'REGISTRATION_FAILED');
+
+      const newUser = new User({ firstName, lastName, email, password, role });
+      await newUser.save();
+
+      // Exclude password from the returned user object
+      const userResponse = newUser.toObject();
+      delete userResponse.password;
+
+      sendSuccess(res, { user: userResponse }, 'User registered successfully', 201);
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      sendError(res, 'Failed to register user');
     }
   }
 
   async login(req: Request, res: Response): Promise<void> {
+    console.log('Login attempt:', { email: req.body?.email, hasPassword: !!req.body?.password });
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      sendError(res, 'Validation failed', 400, 'VALIDATION_ERROR', formatValidationErrors(errors.array()));
-      return;
+      console.log('Login validation errors:', errors.array());
+      return sendError(res, 'Validation failed', 400, 'VALIDATION_ERROR', formatValidationErrors(errors.array()));
     }
 
     try {
       const { email, password } = req.body;
-      const result = await authService.login(email, password);
-      sendSuccess(res, result, 'Login successful');
+
+      if (!email || !password) {
+        console.log('Missing email or password in request body');
+        return sendError(res, 'Email and password are required', 400, 'BAD_REQUEST');
+      }
+
+      const user = await User.findOne({ email }).select('+password');
+      console.log('User found:', !!user);
+
+      if (!user) {
+        console.log('User not found for email:', email);
+        return sendError(res, 'Invalid email or password', 401, 'UNAUTHORIZED');
+      }
+
+      const isPasswordValid = await user.comparePassword(password);
+      console.log('Password valid:', isPasswordValid);
+
+      if (!isPasswordValid) {
+        console.log('Invalid password for user:', email);
+        return sendError(res, 'Invalid email or password', 401, 'UNAUTHORIZED');
+      }
+
+      const accessToken = authService.generateAccessToken(user);
+      const refreshToken = authService.generateRefreshToken(user);
+
+      // Store refresh token in the database
+      user.refreshTokens.push(refreshToken);
+      user.lastLogin = new Date();
+      await user.save();
+
+      // Exclude sensitive data from the response
+      const { password: _, refreshTokens: __, ...userResponse } = user.toObject();
+
+      console.log('Login successful for user:', email);
+      sendSuccess(res, {
+        user: userResponse,
+        tokens: {
+          accessToken,
+          refreshToken
+        }
+      }, 'Login successful');
     } catch (error: any) {
-      sendError(res, error.message, 401, 'AUTHENTICATION_FAILED');
+      console.error('Login error:', error);
+      sendError(res, 'Failed to log in', 500, 'INTERNAL_ERROR');
+    }
+  }
+
+  async logout(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { refreshToken } = req.body;
+      const user = req.user!;
+
+      // Remove the specific refresh token
+      user.refreshTokens = user.refreshTokens.filter(token => token !== refreshToken);
+      await user.save();
+
+      sendSuccess(res, {}, 'Logged out successfully');
+    } catch (error: any) {
+      console.error('Logout error:', error);
+      sendError(res, 'Failed to log out');
     }
   }
 
@@ -44,86 +121,59 @@ export class AuthController {
     try {
       const { refreshToken } = req.body;
       if (!refreshToken) {
-        sendError(res, 'Refresh token is required', 400, 'REFRESH_TOKEN_REQUIRED');
-        return;
+        return sendError(res, 'Refresh token is required', 400, 'BAD_REQUEST');
       }
-      const newAccessToken = await authService.refreshAccessToken(refreshToken);
-      sendSuccess(res, { accessToken: newAccessToken }, 'Token refreshed successfully');
-    } catch (error: any) {
-      sendError(res, 'Invalid or expired refresh token', 401, 'INVALID_REFRESH_TOKEN');
-    }
-  }
 
-  async logout(req: Request, res: Response): Promise<void> {
-    try {
-      const { refreshToken } = req.body;
-      if (!refreshToken) {
-        sendError(res, 'Refresh token is required', 400, 'REFRESH_TOKEN_REQUIRED');
-        return;
+      const decoded = authService.verifyRefreshToken(refreshToken);
+      const user = await User.findById(decoded.userId);
+
+      if (!user || !user.refreshTokens.includes(refreshToken)) {
+        return sendError(res, 'Invalid or expired refresh token', 401, 'UNAUTHORIZED');
       }
-      await authService.logout(refreshToken);
-      sendSuccess(res, {}, 'Logged out successfully');
+
+      const accessToken = authService.generateAccessToken(user);
+      sendSuccess(res, { accessToken });
     } catch (error: any) {
-      sendError(res, 'Internal server error during logout', 500, 'LOGOUT_FAILED');
+      console.error('Refresh token error:', error);
+      sendError(res, 'Failed to refresh token', 401, 'UNAUTHORIZED');
     }
   }
 
   async getProfile(req: AuthRequest, res: Response): Promise<void> {
-    if (!req.user) {
-        sendError(res, 'User not authenticated', 401, 'UNAUTHENTICATED');
-        return;
+    try {
+      // req.user is populated by the requireAuth middleware
+      const user = req.user!;
+      const userResponse = user.toObject();
+      delete userResponse.refreshTokens;
+
+      sendSuccess(res, { user: userResponse });
+    } catch (error: any) {
+      console.error('Get profile error:', error);
+      sendError(res, 'Failed to retrieve profile');
     }
-    sendSuccess(res, { user: req.user }, 'Profile retrieved successfully');
   }
 
   async updateProfile(req: AuthRequest, res: Response): Promise<void> {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      sendError(res, 'Validation failed', 400, 'VALIDATION_ERROR', formatValidationErrors(errors.array()));
-      return;
-    }
-    if (!req.user) {
-        sendError(res, 'User not authenticated', 401, 'UNAUTHENTICATED');
-        return;
+      return sendError(res, 'Validation failed', 400, 'VALIDATION_ERROR', formatValidationErrors(errors.array()));
     }
 
     try {
-        // Type assertion để đảm bảo _id là string
-        const userId = req.user._id?.toString() || '';
-        const updatedUser = await authService.updateProfile(userId, req.body);
-        sendSuccess(res, { user: updatedUser }, 'Profile updated successfully');
-    } catch (error: any) {
-        if (error.message.includes('already taken')) {
-            sendError(res, error.message, 409, 'USERNAME_TAKEN');
-            return;
-        }
-        sendError(res, 'Internal server error during profile update', 500, 'PROFILE_UPDATE_FAILED');
-    }
-  }
+      const user = req.user!;
+      const { firstName, lastName } = req.body;
 
-  async changePassword(req: AuthRequest, res: Response): Promise<void> {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      sendError(res, 'Validation failed', 400, 'VALIDATION_ERROR', formatValidationErrors(errors.array()));
-      return;
-    }
-    if (!req.user) {
-        sendError(res, 'User not authenticated', 401, 'UNAUTHENTICATED');
-        return;
-    }
+      user.firstName = firstName || user.firstName;
+      user.lastName = lastName || user.lastName;
+      await user.save();
 
-    try {
-        const { currentPassword, newPassword } = req.body;
-        // Type assertion để đảm bảo _id là string
-        const userId = req.user._id?.toString() || '';
-        await authService.changePassword(userId, currentPassword, newPassword);
-        sendSuccess(res, {}, 'Password changed successfully');
+      const userResponse = user.toObject();
+      delete userResponse.refreshTokens;
+
+      sendSuccess(res, { user: userResponse }, 'Profile updated successfully');
     } catch (error: any) {
-        if (error.message.includes('Current password is incorrect')) {
-            sendError(res, error.message, 400, 'INVALID_CURRENT_PASSWORD');
-            return;
-        }
-        sendError(res, 'Internal server error during password change', 500, 'PASSWORD_CHANGE_FAILED');
+      console.error('Update profile error:', error);
+      sendError(res, 'Failed to update profile');
     }
   }
 }

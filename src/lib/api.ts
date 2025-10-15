@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
-import { TechPack, TechPackListResponse, CreateTechPackInput, BulkOperationPayload } from '../types/techpack';
+import { TechPack, TechPackListResponse, CreateTechPackInput, BulkOperationPayload, ApiTechPack } from '../types/techpack';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001/api/v1';
 
 export function isApiConfigured(): boolean {
   return !!API_BASE_URL;
@@ -63,7 +63,11 @@ class ApiClient {
       async (error: AxiosError<ApiError>) => {
         const originalRequest = error.config as any;
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        // Don't try to refresh token for login/register requests
+        const isAuthRequest = originalRequest?.url?.includes('/auth/login') ||
+                             originalRequest?.url?.includes('/auth/register');
+
+        if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
           originalRequest._retry = true;
 
           try {
@@ -139,7 +143,11 @@ class ApiClient {
 
   private handleAuthError() {
     this.clearTokens();
-    window.location.href = '/login';
+    // Only redirect if not already on login page
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login';
+    }
+    console.error('Authentication error. Redirecting to login.');
   }
 
   private formatError(error: AxiosError<ApiError>): Error {
@@ -233,20 +241,24 @@ class ApiClient {
 
   // Tech Pack methods
   async listTechPacks(params: { page?: number; limit?: number; q?: string; status?: string; designer?: string; } = {}): Promise<TechPackListResponse> {
+    console.log('📡 API: listTechPacks called with params:', params);
     const response = await this.axiosInstance.get<ApiResponse<TechPack[]>>('/techpacks', { params });
+    console.log('📡 API: Raw response:', response.data);
     const responseData = response.data ?? {};
     const { data = [], pagination } = responseData;
 
-    return {
+    const result = {
       data,
       total: pagination?.total || 0,
       page: pagination?.page || 1,
       totalPages: pagination?.totalPages || 1,
     };
+    console.log('📡 API: Processed result:', result);
+    return result;
   }
 
-  async createTechPack(data: CreateTechPackInput): Promise<TechPack> {
-    const response = await this.axiosInstance.post<ApiResponse<TechPack>>('/techpacks', data);
+  async createTechPack(data: CreateTechPackInput): Promise<ApiTechPack> {
+    const response = await this.axiosInstance.post<ApiResponse<ApiTechPack>>('/techpacks', data);
     const techPack = response.data?.data;
     if (!techPack) {
       throw new Error('Invalid create tech pack response');
@@ -254,8 +266,8 @@ class ApiClient {
     return techPack;
   }
 
-  async getTechPack(id: string): Promise<TechPack> {
-    const response = await this.axiosInstance.get<ApiResponse<TechPack>>(`/techpacks/${id}`);
+  async getTechPack(id: string): Promise<ApiTechPack> {
+    const response = await this.axiosInstance.get<ApiResponse<ApiTechPack>>(`/techpacks/${id}`);
     const techPack = response.data?.data;
     if (!techPack) {
       throw new Error('Tech pack not found');
@@ -263,8 +275,8 @@ class ApiClient {
     return techPack;
   }
 
-  async updateTechPack(id: string, data: Partial<TechPack>): Promise<TechPack> {
-    const response = await this.axiosInstance.put<ApiResponse<TechPack>>(`/techpacks/${id}`, data);
+  async updateTechPack(id: string, data: Partial<ApiTechPack>): Promise<ApiTechPack> {
+    const response = await this.axiosInstance.put<ApiResponse<ApiTechPack>>(`/techpacks/${id}`, data);
     const techPack = response.data?.data;
     if (!techPack) {
       throw new Error('Invalid update tech pack response');
@@ -272,8 +284,8 @@ class ApiClient {
     return techPack;
   }
 
-  async patchTechPack(id: string, data: Partial<TechPack>): Promise<TechPack> {
-    const response = await this.axiosInstance.patch<ApiResponse<TechPack>>(`/techpacks/${id}`, data);
+  async patchTechPack(id: string, data: Partial<ApiTechPack>): Promise<ApiTechPack> {
+    const response = await this.axiosInstance.patch<ApiResponse<ApiTechPack>>(`/techpacks/${id}`, data);
     const techPack = response.data?.data;
     if (!techPack) {
       throw new Error('Invalid patch tech pack response');
@@ -286,8 +298,8 @@ class ApiClient {
     return { message: response.data?.message || 'Tech pack deleted successfully' };
   }
 
-  async duplicateTechPack(id: string, keepVersion = false): Promise<TechPack> {
-    const response = await this.axiosInstance.post<ApiResponse<TechPack>>(`/techpacks/${id}/duplicate`, { keepVersion });
+  async duplicateTechPack(id: string, keepVersion = false): Promise<ApiTechPack> {
+    const response = await this.axiosInstance.post<ApiResponse<ApiTechPack>>(`/techpacks/${id}/duplicate`, { keepVersion });
     const techPack = response.data?.data;
     if (!techPack) {
       throw new Error('Invalid duplicate tech pack response');
@@ -301,6 +313,106 @@ class ApiClient {
     return {
       message: responseData.message || 'Bulk operation completed',
       modifiedCount: responseData.data?.modifiedCount || 0
+    };
+  }
+
+  // Admin User Management methods
+  async getAllUsers(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    role?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  } = {}): Promise<{
+    users: any[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  }> {
+    const response = await this.axiosInstance.get<ApiResponse<{
+      users: any[];
+      pagination: any;
+    }>>('/admin/users', { params });
+    const responseData = response.data?.data ?? {};
+    return {
+      users: responseData.users || [],
+      pagination: responseData.pagination || { page: 1, limit: 10, total: 0, totalPages: 0 }
+    };
+  }
+
+  async getUserById(id: string): Promise<any> {
+    const response = await this.axiosInstance.get<ApiResponse<{ user: any }>>(`/admin/users/${id}`);
+    const user = response.data?.data?.user;
+    if (!user) {
+      throw new Error('User not found');
+    }
+    return user;
+  }
+
+  async createUser(userData: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    role?: string;
+  }): Promise<any> {
+    const response = await this.axiosInstance.post<ApiResponse<{ user: any }>>('/admin/users', userData);
+    const user = response.data?.data?.user;
+    if (!user) {
+      throw new Error('Invalid create user response');
+    }
+    return user;
+  }
+
+  async updateUser(id: string, userData: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    role?: string;
+  }): Promise<any> {
+    const response = await this.axiosInstance.put<ApiResponse<{ user: any }>>(`/admin/users/${id}`, userData);
+    const user = response.data?.data?.user;
+    if (!user) {
+      throw new Error('Invalid update user response');
+    }
+    return user;
+  }
+
+  async deleteUser(id: string): Promise<{ message: string }> {
+    const response = await this.axiosInstance.delete<ApiResponse<{}>>(`/admin/users/${id}`);
+    return { message: response.data?.message || 'User deleted successfully' };
+  }
+
+  async updateUserRole(id: string, role: string): Promise<{ role: string }> {
+    const response = await this.axiosInstance.patch<ApiResponse<{ role: string }>>(`/admin/users/${id}/role`, { role });
+    const responseData = response.data?.data ?? {};
+    return { role: responseData.role || role };
+  }
+
+  async resetUserPassword(id: string, newPassword: string): Promise<{ message: string }> {
+    const response = await this.axiosInstance.patch<ApiResponse<{}>>(`/admin/users/${id}/password`, { newPassword });
+    return { message: response.data?.message || 'Password reset successfully' };
+  }
+
+  async getUserStats(): Promise<{
+    totalUsers: number;
+    roleDistribution: Record<string, number>;
+    recentUsers: any[];
+  }> {
+    const response = await this.axiosInstance.get<ApiResponse<{
+      totalUsers: number;
+      roleDistribution: Record<string, number>;
+      recentUsers: any[];
+    }>>('/admin/users/stats');
+    const responseData = response.data?.data ?? {};
+    return {
+      totalUsers: responseData.totalUsers || 0,
+      roleDistribution: responseData.roleDistribution || {},
+      recentUsers: responseData.recentUsers || []
     };
   }
 }

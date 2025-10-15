@@ -76,7 +76,7 @@ export class WorkflowController {
       
       techpack.status = newStatus;
       techpack.updatedBy = user._id;
-      techpack.updatedByName = user.fullName;
+      techpack.updatedByName = `${user.firstName} ${user.lastName}`;
 
       // Create revision for status changes
       if (oldStatus !== newStatus) {
@@ -89,14 +89,14 @@ export class WorkflowController {
             newValue: newStatus
           }],
           createdBy: user._id,
-          createdByName: user.fullName,
+          createdByName: `${user.firstName} ${user.lastName}`,
           reason: comments || `Status changed from ${oldStatus} to ${newStatus}`,
           snapshot: techpack.toObject()
         });
 
         if (action === 'approve') {
           revision.approvedBy = user._id;
-          revision.approvedByName = user.fullName;
+          revision.approvedByName = `${user.firstName} ${user.lastName}`;
           revision.approvedAt = new Date();
         }
 
@@ -109,7 +109,7 @@ export class WorkflowController {
       const activityAction = this.getActivityAction(action);
       await logActivity({
         userId: user._id,
-        userName: user.fullName,
+        userName: `${user.firstName} ${user.lastName}`,
         action: activityAction,
         target: {
           type: 'TechPack',
@@ -139,7 +139,7 @@ export class WorkflowController {
           statusChange: {
             from: oldStatus,
             to: newStatus,
-            actionBy: user.fullName,
+            actionBy: `${user.firstName} ${user.lastName}`,
             comments
           }
         }
@@ -296,7 +296,7 @@ export class WorkflowController {
           newValue: `Reverted to ${revision.version}`
         }],
         createdBy: user._id,
-        createdByName: user.fullName,
+        createdByName: `${user.firstName} ${user.lastName}`,
         reason: reason || `Reverted to revision ${revision.version}`,
         snapshot: currentSnapshot
       });
@@ -305,7 +305,7 @@ export class WorkflowController {
       const { _id, createdAt, updatedAt, __v, ...snapshotData } = revision.snapshot;
       Object.assign(techpack, snapshotData);
       techpack.updatedBy = user._id;
-      techpack.updatedByName = user.fullName;
+      techpack.updatedByName = `${user.firstName} ${user.lastName}`;
 
       await Promise.all([
         newRevision.save(),
@@ -315,7 +315,7 @@ export class WorkflowController {
       // Log activity
       await logActivity({
         userId: user._id,
-        userName: user.fullName,
+        userName: `${user.firstName} ${user.lastName}`,
         action: ActivityAction.TECHPACK_UPDATE,
         target: {
           type: 'TechPack',

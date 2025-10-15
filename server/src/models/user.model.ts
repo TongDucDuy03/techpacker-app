@@ -1,71 +1,37 @@
-import { Schema, model, Document, Types } from 'mongoose';
+import { Schema, Document, model, Types } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 export enum UserRole {
-  Admin = 'Admin',
-  Designer = 'Designer',
-  Merchandiser = 'Merchandiser',
-  Viewer = 'Viewer'
+  Designer = 'designer',
+  Merchandiser = 'merchandiser',
+  Admin = 'admin',
+  Viewer = 'viewer',
 }
 
 export interface IUser extends Document {
   _id: Types.ObjectId;
-  username: string;
-  email: string;
-  password?: string;
   firstName: string;
   lastName: string;
+  email: string;
+  password?: string;
   role: UserRole;
   isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  fullName: string; // Virtual property
-  requiresOwnershipCheck?: boolean; // For middleware
+  lastLogin: Date;
+  refreshTokens: string[];
+  fullName: string;
   comparePassword(password: string): Promise<boolean>;
 }
 
 const UserSchema = new Schema<IUser>(
   {
-    username: {
-      type: String,
-      required: [true, 'Username is required'],
-      unique: true,
-      trim: true,
-      minlength: [3, 'Username must be at least 3 characters long']
-    },
-    email: {
-      type: String,
-      required: [true, 'Email is required'],
-      unique: true,
-      trim: true,
-      lowercase: true,
-      match: [/.+\@.+\..+/, 'Please fill a valid email address']
-    },
-    password: {
-      type: String,
-      required: [true, 'Password is required'],
-      minlength: [6, 'Password must be at least 6 characters long'],
-      select: false // Do not return password by default
-    },
-    firstName: {
-      type: String,
-      required: [true, 'First name is required'],
-      trim: true
-    },
-    lastName: {
-      type: String,
-      required: [true, 'Last name is required'],
-      trim: true
-    },
-    role: {
-      type: String,
-      enum: Object.values(UserRole),
-      default: UserRole.Viewer
-    },
-    isActive: {
-      type: Boolean,
-      default: true
-    }
+    firstName: { type: String, required: true, trim: true },
+    lastName: { type: String, required: true, trim: true },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    password: { type: String, required: true, select: false },
+    role: { type: String, enum: Object.values(UserRole), default: UserRole.Designer },
+    isActive: { type: Boolean, default: true },
+    lastLogin: { type: Date },
+    refreshTokens: [{ type: String }],
   },
   {
     timestamps: true,
@@ -73,11 +39,6 @@ const UserSchema = new Schema<IUser>(
     toObject: { virtuals: true }
   }
 );
-
-// Virtual for full name
-UserSchema.virtual('fullName').get(function () {
-  return `${this.firstName} ${this.lastName}`;
-});
 
 // Hash password before saving
 UserSchema.pre<IUser>('save', async function (next) {
@@ -91,6 +52,11 @@ UserSchema.pre<IUser>('save', async function (next) {
   } catch (error: any) {
     next(error);
   }
+});
+
+// Virtual property for fullName
+UserSchema.virtual('fullName').get(function() {
+  return `${this.firstName} ${this.lastName}`;
 });
 
 // Method to compare password for login

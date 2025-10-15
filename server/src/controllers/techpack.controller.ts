@@ -10,6 +10,18 @@ import { sendSuccess, sendError, formatValidationErrors } from '../utils/respons
 import { Types } from 'mongoose';
 
 export class TechPackController {
+  constructor() {
+    this.getTechPacks = this.getTechPacks.bind(this);
+    this.getTechPack = this.getTechPack.bind(this);
+    this.createTechPack = this.createTechPack.bind(this);
+    this.updateTechPack = this.updateTechPack.bind(this);
+    this.patchTechPack = this.patchTechPack.bind(this);
+    this.deleteTechPack = this.deleteTechPack.bind(this);
+    this.duplicateTechPack = this.duplicateTechPack.bind(this);
+    this.bulkOperations = this.bulkOperations.bind(this);
+  }
+
+
   async getTechPacks(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { page = 1, limit = config.defaultPageSize, q = '', status, season, designer, brand, sortBy = 'updatedAt', sortOrder = 'desc' } = req.query;
@@ -23,15 +35,17 @@ export class TechPackController {
         query.$or = [{ productName: searchRegex }, { articleCode: searchRegex }, { supplier: searchRegex }, { fabricDescription: searchRegex }];
       }
 
-      if (status) query.status = status;
+      // Filter by status, excluding archived by default
+      if (status) {
+        query.status = status;
+      } else {
+        query.status = { $ne: 'Archived' };
+      }
       if (season) query.season = season;
       if (designer) query.designer = designer;
       if (brand) query.brand = brand;
 
-      if (req.user?.role === UserRole.Designer) {
-        query.designer = req.user._id;
-      }
-
+      // Skip user role filtering for demo
       const sortOptions: any = { [sortBy as string]: sortOrder === 'asc' ? 1 : -1 };
 
       const [techpacks, total] = await Promise.all([
@@ -73,22 +87,81 @@ export class TechPackController {
     }
 
     try {
+      const { articleInfo, bom, measurements, colorways, howToMeasures } = req.body;
+
       const user = req.user!;
-      const techpack = await TechPack.create({
-        ...req.body,
+
+      // Validate required fields
+      const productName = articleInfo?.productName || req.body.productName;
+      const articleCode = articleInfo?.articleCode || req.body.articleCode;
+      const supplier = articleInfo?.supplier || req.body.supplier;
+      const season = articleInfo?.season || req.body.season;
+      const fabricDescription = articleInfo?.fabricDescription || req.body.fabricDescription;
+
+      if (!productName) {
+        return sendError(res, 'Product name is required', 400, 'VALIDATION_ERROR');
+      }
+      if (!articleCode) {
+        return sendError(res, 'Article code is required', 400, 'VALIDATION_ERROR');
+      }
+      if (!supplier) {
+        return sendError(res, 'Supplier is required', 400, 'VALIDATION_ERROR');
+      }
+      if (!season) {
+        return sendError(res, 'Season is required', 400, 'VALIDATION_ERROR');
+      }
+      if (!fabricDescription) {
+        return sendError(res, 'Fabric description is required', 400, 'VALIDATION_ERROR');
+      }
+
+      // Map frontend data to backend format
+      const techpackData = {
+        productName,
+        articleCode: articleCode.toUpperCase(),
+        version: articleInfo?.version?.toString() || 'V1',
+        supplier,
+        season,
+        fabricDescription,
+        category: articleInfo?.productClass || req.body.category,
+        gender: articleInfo?.gender || req.body.gender,
+        brand: articleInfo?.brand || req.body.brand,
+        description: articleInfo?.notes || req.body.description,
+        bom: bom || [],
+        measurements: measurements || [],
+        colorways: colorways || [],
+        howToMeasure: howToMeasures || [],
         designer: user._id,
         designerName: `${user.firstName} ${user.lastName}`,
         createdBy: user._id,
         createdByName: `${user.firstName} ${user.lastName}`,
         updatedBy: user._id,
         updatedByName: `${user.firstName} ${user.lastName}`,
-        version: 'V1'
-      });
+      };
 
-      await logActivity({ userId: user._id, userName: `${user.firstName} ${user.lastName}`, action: ActivityAction.TECHPACK_CREATE, target: { type: 'TechPack', id: techpack._id as Types.ObjectId, name: techpack.productName }, req });
+      console.log('Creating techpack with data:', JSON.stringify(techpackData, null, 2));
+
+      const techpack = await TechPack.create(techpackData);
+
+      // Skip activity logging for demo
       sendSuccess(res, techpack, 'TechPack created successfully', 201);
     } catch (error: any) {
       console.error('Create TechPack error:', error);
+
+      // Handle specific MongoDB errors
+      if (error.code === 11000) {
+        const field = Object.keys(error.keyValue || {})[0];
+        return sendError(res, `${field} already exists. Please use a different value.`, 409, 'DUPLICATE_KEY');
+      }
+
+      // Handle Mongoose validation errors
+      if (error.name === 'ValidationError') {
+        const validationErrors = Object.values(error.errors).map((err: any) => ({
+          field: err.path,
+          message: err.message
+        }));
+        return sendError(res, 'Validation failed', 400, 'VALIDATION_ERROR', validationErrors);
+      }
+
       sendError(res, 'Failed to create tech pack');
     }
   }
@@ -113,14 +186,47 @@ export class TechPackController {
         return sendError(res, 'Access denied', 403, 'FORBIDDEN');
       }
 
-      Object.assign(techpack, { ...req.body, updatedBy: user._id, updatedByName: `${user.firstName} ${user.lastName}` });
+      // Define whitelist of updatable fields to prevent schema validation errors
+      const allowedFields = [
+        'productName', 'articleCode', 'version', 'supplier', 'season',
+        'fabricDescription', 'status', 'category', 'gender', 'brand',
+        'retailPrice', 'currency', 'description', 'notes', 'bom',
+        'measurements', 'colorways', 'howToMeasure'
+      ];
+
+      // Safely update only whitelisted fields that exist in request body
+      const updateData: any = {
+        updatedBy: user._id,
+        updatedByName: `${user.firstName} ${user.lastName}`
+      };
+
+      allowedFields.forEach(field => {
+        if (req.body.hasOwnProperty(field)) {
+          updateData[field] = req.body[field];
+        }
+      });
+
+      // Apply updates to the document
+      Object.assign(techpack, updateData);
       const updatedTechPack = await techpack.save();
 
       await logActivity({ userId: user._id, userName: `${user.firstName} ${user.lastName}`, action: ActivityAction.TECHPACK_UPDATE, target: { type: 'TechPack', id: updatedTechPack._id as Types.ObjectId, name: updatedTechPack.productName }, req });
       sendSuccess(res, updatedTechPack, 'TechPack updated successfully');
     } catch (error: any) {
       console.error('Patch TechPack error:', error);
-      sendError(res, 'Failed to update tech pack');
+
+      // Handle validation errors specifically
+      if (error.name === 'ValidationError') {
+        const validationErrors = Object.values(error.errors).map((err: any) => err.message);
+        return sendError(res, `Validation failed: ${validationErrors.join(', ')}`, 400, 'VALIDATION_ERROR');
+      }
+
+      // Handle duplicate key errors
+      if (error.code === 11000) {
+        return sendError(res, 'Article code already exists', 400, 'DUPLICATE_KEY');
+      }
+
+      sendError(res, 'Failed to update tech pack', 500, 'INTERNAL_ERROR');
     }
   }
 

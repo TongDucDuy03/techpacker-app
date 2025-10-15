@@ -15,6 +15,8 @@ import subdocumentRoutes from './routes/subdocument.routes';
 import workflowRoutes from './routes/workflow.routes';
 import pdfRoutes from './routes/pdf.routes';
 import activityRoutes from './routes/activity.routes';
+import userRoutes from './routes/user.routes';
+import adminRoutes from './routes/admin.routes';
 
 // Middleware
 import { setupSwagger } from './utils/swagger';
@@ -30,12 +32,17 @@ app.use(helmet({
 }));
 
 // CORS configuration
-app.use(cors({
+const corsOptions = {
   origin: config.corsOrigin,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
+};
+
+app.use(cors(corsOptions));
+
+// Handle preflight OPTIONS requests
+app.options('*', cors(corsOptions));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -69,6 +76,8 @@ v1Router.use('/techpacks', subdocumentRoutes);
 v1Router.use('/techpacks', workflowRoutes);
 v1Router.use('/techpacks', pdfRoutes);
 v1Router.use('/activities', activityRoutes);
+v1Router.use('/users', userRoutes);
+v1Router.use('/admin', adminRoutes);
 
 app.use('/api/v1', v1Router);
 
@@ -128,7 +137,7 @@ async function startServer() {
     await connectDatabase();
 
     // Start HTTP server
-    app.listen(config.port, () => {
+    app.listen(config.port, '0.0.0.0', () => {
       console.log(`🚀 TechPacker API running on http://localhost:${config.port}`);
       console.log(`📝 Environment: ${config.nodeEnv}`);
       console.log(`🗄️  Database: Connected`);
