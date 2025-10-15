@@ -1,6 +1,7 @@
 import React from 'react';
 import { ApiTechPack } from '../types/techpack';
 import { Eye, Edit, Trash2, Plus } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface TechPackListProps {
   techPacks: ApiTechPack[];
@@ -19,12 +20,20 @@ export const TechPackList: React.FC<TechPackListProps> = ({
   onUpdateTechPack,
   onDeleteTechPack,
 }) => {
+  const { user } = useAuth();
+
+  // Permission checks based on user role
+  const canCreate = user?.role === 'admin' || user?.role === 'designer';
+  const canEdit = user?.role === 'admin' || user?.role === 'designer';
+  const canDelete = user?.role === 'admin' || user?.role === 'designer';
+  const isReadOnly = user?.role === 'merchandiser' || user?.role === 'viewer';
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'approved': return 'bg-green-100 text-green-800';
-      case 'pending_approval': return 'bg-yellow-100 text-yellow-800';
-      case 'draft': return 'bg-blue-100 text-blue-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
+      case 'Approved': return 'bg-green-100 text-green-800';
+      case 'In Review': return 'bg-yellow-100 text-yellow-800';
+      case 'Draft': return 'bg-blue-100 text-blue-800';
+      case 'Rejected': return 'bg-red-100 text-red-800';
+      case 'Archived': return 'bg-gray-200 text-gray-700';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -45,13 +54,15 @@ export const TechPackList: React.FC<TechPackListProps> = ({
           <h2 className="text-2xl font-bold text-gray-900">Tech Packs</h2>
           <p className="text-gray-600">Manage your fashion tech packs</p>
         </div>
-        <button
-          onClick={onCreateTechPack}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Create New
-        </button>
+        {canCreate && (
+          <button
+            onClick={onCreateTechPack}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Create New
+          </button>
+        )}
       </div>
 
       {/* Stats */}
@@ -62,19 +73,19 @@ export const TechPackList: React.FC<TechPackListProps> = ({
         </div>
         <div className="bg-white p-4 rounded-lg border border-gray-200">
           <div className="text-2xl font-bold text-blue-600">
-            {techPacks.filter(tp => tp.status === 'draft').length}
+            {techPacks.filter(tp => tp.status === 'Draft').length}
           </div>
           <div className="text-sm text-gray-600">Draft</div>
         </div>
         <div className="bg-white p-4 rounded-lg border border-gray-200">
           <div className="text-2xl font-bold text-yellow-600">
-            {techPacks.filter(tp => tp.status === 'pending_approval').length}
+            {techPacks.filter(tp => tp.status === 'In Review').length}
           </div>
-          <div className="text-sm text-gray-600">Pending</div>
+          <div className="text-sm text-gray-600">In Review</div>
         </div>
         <div className="bg-white p-4 rounded-lg border border-gray-200">
           <div className="text-2xl font-bold text-green-600">
-            {techPacks.filter(tp => tp.status === 'approved').length}
+            {techPacks.filter(tp => tp.status === 'Approved').length}
           </div>
           <div className="text-sm text-gray-600">Approved</div>
         </div>
@@ -89,13 +100,20 @@ export const TechPackList: React.FC<TechPackListProps> = ({
         {techPacks.length === 0 ? (
           <div className="p-8 text-center">
             <div className="text-gray-500 mb-4">No tech packs found</div>
-            <button
-              onClick={onCreateTechPack}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Create Your First Tech Pack
-            </button>
+            {canCreate && (
+              <button
+                onClick={onCreateTechPack}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Create Your First Tech Pack
+              </button>
+            )}
+            {isReadOnly && (
+              <div className="text-sm text-gray-500 mt-2">
+                You have read-only access to tech packs
+              </div>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -103,7 +121,7 @@ export const TechPackList: React.FC<TechPackListProps> = ({
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tech Pack
+                    Product Name
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Article Code
@@ -125,10 +143,10 @@ export const TechPackList: React.FC<TechPackListProps> = ({
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">
-                          {techPack.name}
+                          {(techPack as any).productName || techPack.name || 'Unnamed'}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {techPack.metadata?.category || 'No category'}
+                          {(techPack as any).category || techPack.metadata?.category || 'No category'}
                         </div>
                       </div>
                     </td>
@@ -148,21 +166,33 @@ export const TechPackList: React.FC<TechPackListProps> = ({
                         <button
                           onClick={() => onViewTechPack?.(techPack)}
                           className="text-blue-600 hover:text-blue-900"
+                          title="View Tech Pack"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button
-                          onClick={() => onEditTechPack?.(techPack)}
-                          className="text-gray-600 hover:text-gray-900"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => onDeleteTechPack?.(techPack._id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {canEdit && (
+                          <button
+                            onClick={() => onEditTechPack?.(techPack)}
+                            className="text-gray-600 hover:text-gray-900"
+                            title="Edit Tech Pack"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button
+                            onClick={() => onDeleteTechPack?.(techPack._id)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Delete Tech Pack"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        {isReadOnly && (
+                          <span className="text-xs text-gray-400 px-2 py-1 bg-gray-100 rounded">
+                            Read Only
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>

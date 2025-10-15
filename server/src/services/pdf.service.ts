@@ -9,7 +9,7 @@ import {
   TemplateData,
   PDFGenerationError,
   PDFErrorCode
-} from '@/types/techpack.types';
+} from '../types/techpack.types';
 
 export class PDFService {
   private browser: Browser | null = null;

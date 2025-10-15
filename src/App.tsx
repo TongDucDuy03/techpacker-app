@@ -8,7 +8,7 @@ import { ApiTechPack } from './types/techpack';
 import { useTechPack } from './contexts/TechPackContext';
 import { useAuth } from './contexts/AuthContext';
 
-import { Plus, List, Settings } from 'lucide-react';
+import { Plus, List, Settings, LogOut, User } from 'lucide-react';
 
 // Admin Navigation Component
 const AdminNavigation: React.FC = () => {
@@ -29,11 +29,59 @@ const AdminNavigation: React.FC = () => {
   );
 };
 
+// User Menu Component with Logout
+const UserMenu: React.FC = () => {
+  const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      // Redirect will be handled by the router when user becomes null
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
+  if (!user) {
+    return null;
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      {/* User Info */}
+      <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-50">
+        <User className="w-4 h-4 text-gray-500" />
+        <span className="text-sm font-medium text-gray-700">
+          {user.firstName} {user.lastName}
+        </span>
+        <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
+          {user.role}
+        </span>
+      </div>
+
+      {/* Logout Button */}
+      <button
+        onClick={handleLogout}
+        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-red-600 hover:bg-red-50 transition-colors"
+        title="Logout"
+      >
+        <LogOut className="w-4 h-4" />
+        Logout
+      </button>
+    </div>
+  );
+};
+
 function AppContent() {
   const [currentTab, setCurrentTab] = useState('list');
   const [selectedTechPack, setSelectedTechPack] = useState<ApiTechPack | null>(null);
   const context = useTechPack();
   const { techPacks = [], updateTechPack, deleteTechPack } = context ?? {};
+  const { user } = useAuth();
+
+  // Permission checks based on user role
+  const canCreate = user?.role === 'admin' || user?.role === 'designer';
+  const canEdit = user?.role === 'admin' || user?.role === 'designer';
 
   const handleViewTechPack = (techPack: ApiTechPack) => {
     setSelectedTechPack(techPack);
@@ -146,19 +194,22 @@ function AppContent() {
                   <List className="w-4 h-4" />
                   Tech Packs
                 </button>
-                <button
-                  onClick={() => setCurrentTab('create')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    currentTab === 'create'
-                      ? 'bg-white text-blue-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <Plus className="w-4 h-4" />
-                  Create New
-                </button>
+                {canCreate && (
+                  <button
+                    onClick={() => setCurrentTab('create')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      currentTab === 'create'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create New
+                  </button>
+                )}
               </div>
               <AdminNavigation />
+              <UserMenu />
             </div>
           </div>
         </div>

@@ -151,6 +151,14 @@ class ApiClient {
   }
 
   private formatError(error: AxiosError<ApiError>): Error {
+    // Handle CORS errors specifically
+    if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+      if (error.config?.url?.includes('localhost:4001')) {
+        return new Error('Server connection failed. Please ensure the backend server is running on port 4001.');
+      }
+      return new Error('Network connection failed. Please check your internet connection and server status.');
+    }
+
     if (error.response?.data) {
       const apiError = error.response.data;
       let message = apiError.message || 'An error occurred';
@@ -163,6 +171,15 @@ class ApiClient {
       }
 
       return new Error(message);
+    }
+
+    // Handle specific HTTP status codes
+    if (error.response?.status === 500) {
+      return new Error('Server error occurred. Please try again later or contact support.');
+    }
+
+    if (error.response?.status === 0) {
+      return new Error('Cannot connect to server. Please check if the server is running.');
     }
 
     return new Error(error.message || 'Network error');

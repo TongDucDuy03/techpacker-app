@@ -24,8 +24,10 @@ export const config = {
   // Redis (for caching)
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
 
-  // CORS
-  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  // CORS - Support multiple origins
+  corsOrigin: process.env.CORS_ORIGIN ?
+    process.env.CORS_ORIGIN.split(',').map(origin => origin.trim()) :
+    ['http://localhost:5173', 'http://localhost:5174'],
 
   // Rate Limiting
   rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15 minutes

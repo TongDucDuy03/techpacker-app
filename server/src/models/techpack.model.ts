@@ -69,7 +69,7 @@ export interface IColorway {
   approved?: boolean;
   isDefault?: boolean;
   season?: string;
-  collection?: string;
+  collectionName?: string;
   notes?: string;
 }
 
@@ -92,13 +92,18 @@ export interface ITechPack extends Document {
   version: string;
   designer: Types.ObjectId;
   designerName: string;
+  technicalDesigner?: string;
   supplier: string;
   season: string;
   fabricDescription: string;
   status: TechPackStatus;
+  lifecycleStage?: 'Concept' | 'Design' | 'Development' | 'Pre-production' | 'Production' | 'Shipped';
   category?: string;
   gender?: 'Men' | 'Women' | 'Unisex' | 'Kids';
   brand?: string;
+  collectionName?: string;
+  targetMarket?: string;
+  pricePoint?: 'Value' | 'Mid-range' | 'Premium' | 'Luxury';
   retailPrice?: number;
   currency?: string;
   description?: string;
@@ -172,7 +177,7 @@ const ColorwaySchema = new Schema<IColorway>({
   approved: { type: Boolean, default: false },
   isDefault: { type: Boolean, default: false },
   season: { type: String },
-  collection: { type: String },
+  collectionName: { type: String },
   notes: { type: String }
 });
 
@@ -215,6 +220,10 @@ const TechPackSchema = new Schema<ITechPack>(
       type: String,
       required: true
     },
+    technicalDesigner: {
+      type: String,
+      trim: true
+    },
     supplier: {
       type: String,
       required: [true, 'Supplier is required'],
@@ -235,9 +244,13 @@ const TechPackSchema = new Schema<ITechPack>(
       enum: Object.values(TechPackStatus),
       default: TechPackStatus.Draft
     },
+    lifecycleStage: { type: String, enum: ['Concept', 'Design', 'Development', 'Pre-production', 'Production', 'Shipped'] },
     category: { type: String, trim: true },
     gender: { type: String, enum: ['Men', 'Women', 'Unisex', 'Kids'] },
     brand: { type: String, trim: true },
+    collectionName: { type: String, trim: true },
+    targetMarket: { type: String, trim: true },
+    pricePoint: { type: String, enum: ['Value', 'Mid-range', 'Premium', 'Luxury'] },
     retailPrice: { type: Number, min: 0 },
     currency: { type: String, default: 'USD' },
     description: { type: String, trim: true },
@@ -279,10 +292,7 @@ TechPackSchema.index({ status: 1, updatedAt: -1 });
 TechPackSchema.index({ season: 1, brand: 1 });
 TechPackSchema.index({ createdAt: -1 });
 
-// Virtual for lifecycle stage (compatibility with PDF service)
-TechPackSchema.virtual('lifecycleStage').get(function (this: ITechPack) {
-  return this.status;
-});
+// Removed virtual 'lifecycleStage' because it's now a real schema path
 
 const TechPack = model<ITechPack>('TechPack', TechPackSchema);
 

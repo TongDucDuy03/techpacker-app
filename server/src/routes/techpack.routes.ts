@@ -205,10 +205,11 @@ const idValidation = [
 /**
  * @route GET /api/techpacks
  * @desc Get all TechPacks with pagination, search, and filters
- * @access Public (for demo)
+ * @access Private (All authenticated users can view)
  */
 router.get(
   '/',
+  requireAuth,
   queryValidation,
   techpackController.getTechPacks
 );
@@ -216,10 +217,12 @@ router.get(
 /**
  * @route POST /api/techpacks
  * @desc Create a new TechPack
- * @access Public (for demo)
+ * @access Private (Admin and Designer only)
  */
 router.post(
   '/',
+  requireAuth,
+  requireRole([UserRole.Admin, UserRole.Designer]),
   techpackValidation,
   techpackController.createTechPack
 );
@@ -239,12 +242,12 @@ router.get(
 /**
  * @route PUT /api/techpacks/:id
  * @desc Update TechPack (creates new revision for significant changes)
- * @access Private (Owner or Merchandiser/Admin)
+ * @access Private (Admin and Designer only)
  */
 router.put(
   '/:id',
   requireAuth,
-  requireRole([UserRole.Admin, UserRole.Merchandiser]),
+  requireRole([UserRole.Admin, UserRole.Designer]),
   idValidation,
   techpackValidation,
   techpackController.updateTechPack
@@ -253,12 +256,12 @@ router.put(
 /**
  * @route PATCH /api/techpacks/:id
  * @desc Partial update TechPack (autosave, no revision)
- * @access Private (Owner or Merchandiser/Admin)
+ * @access Private (Admin and Designer only)
  */
 router.patch(
   '/:id',
   requireAuth,
-  requireRole([UserRole.Admin, UserRole.Merchandiser]),
+  requireRole([UserRole.Admin, UserRole.Designer]),
   idValidation,
   patchValidation,
   techpackController.patchTechPack
@@ -280,12 +283,12 @@ router.delete(
 /**
  * @route POST /api/techpacks/:id/duplicate
  * @desc Duplicate a TechPack
- * @access Private (Owner or Merchandiser/Admin)
+ * @access Private (Admin and Designer only)
  */
 router.post(
   '/:id/duplicate',
   requireAuth,
-  requireRole([UserRole.Admin, UserRole.Merchandiser]),
+  requireRole([UserRole.Admin, UserRole.Designer]),
   idValidation,
   [
     body('keepVersion')
@@ -299,12 +302,12 @@ router.post(
 /**
  * @route PATCH /api/techpacks/bulk
  * @desc Perform bulk operations on TechPacks
- * @access Private (Merchandiser/Admin)
+ * @access Private (Admin only)
  */
 router.patch(
   '/bulk',
   requireAuth,
-  requireRole([UserRole.Admin, UserRole.Merchandiser]),
+  requireRole([UserRole.Admin]),
   [
     body('ids')
       .isArray({ min: 1 })

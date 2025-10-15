@@ -8,6 +8,7 @@ import { logActivity } from '../utils/activity-logger';
 import { ActivityAction } from '../models/activity.model';
 import { sendSuccess, sendError, formatValidationErrors } from '../utils/response.util';
 import { Types } from 'mongoose';
+import PermissionManager from '../utils/permissions.util';
 
 export class TechPackController {
   constructor() {
@@ -42,14 +43,28 @@ export class TechPackController {
         query.status = { $ne: 'Archived' };
       }
       if (season) query.season = season;
-      if (designer) query.designer = designer;
+      if (designer) {
+        // Validate designer parameter is a valid ObjectId before using it
+        const designerStr = designer as string;
+        if (Types.ObjectId.isValid(designerStr)) {
+          query.designer = designerStr;
+        } else {
+          console.warn(`Invalid designer ObjectId provided: ${designerStr}`);
+          // Skip invalid designer filter rather than causing a 500 error
+        }
+      }
       if (brand) query.brand = brand;
 
       // Skip user role filtering for demo
       const sortOptions: any = { [sortBy as string]: sortOrder === 'asc' ? 1 : -1 };
 
+      // Execute queries without populate to avoid CastError from invalid ObjectIds
       const [techpacks, total] = await Promise.all([
-        TechPack.find(query).populate('designer', 'firstName lastName username').sort(sortOptions).skip(skip).limit(limitNum).lean(),
+        TechPack.find(query)
+          .sort(sortOptions)
+          .skip(skip)
+          .limit(limitNum)
+          .lean(),
         TechPack.countDocuments(query)
       ]);
 
@@ -63,7 +78,25 @@ export class TechPackController {
 
   async getTechPack(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const techpack = await TechPack.findById(req.params.id).populate('designer createdBy updatedBy', 'firstName lastName username').lean();
+      const { id } = req.params;
+
+      // Handle both ObjectId and string ID formats
+      let techpack;
+
+      try {
+        // First try as ObjectId
+        techpack = await TechPack.findById(id).populate('designer createdBy updatedBy', 'firstName lastName username').lean();
+      } catch (error) {
+        // If that fails, try with relaxed validation
+        try {
+          // Use findOne with mixed type to handle string IDs
+          techpack = await TechPack.findOne({ _id: id } as any).populate('designer createdBy updatedBy', 'firstName lastName username').lean();
+        } catch (secondError) {
+          // Both attempts failed
+          techpack = null;
+        }
+      }
+
       if (!techpack) {
         return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
       }
@@ -89,7 +122,16 @@ export class TechPackController {
     try {
       const { articleInfo, bom, measurements, colorways, howToMeasures } = req.body;
 
-      const user = req.user!;
+      // Ensure user is authenticated and has permission to create tech packs
+      const user = req.user;
+      if (!user) {
+        return sendError(res, 'Authentication required', 401, 'UNAUTHORIZED');
+      }
+
+      // Check if user has permission to create tech packs
+      if (!PermissionManager.canCreateTechPacks(user.role)) {
+        return sendError(res, 'Insufficient permissions to create tech packs', 403, 'FORBIDDEN');
+      }
 
       // Validate required fields
       const productName = articleInfo?.productName || req.body.productName;
@@ -114,6 +156,24 @@ export class TechPackController {
         return sendError(res, 'Fabric description is required', 400, 'VALIDATION_ERROR');
       }
 
+      // Derive status from lifecycleStage if provided
+      const lifecycleStage = articleInfo?.lifecycleStage || req.body.lifecycleStage;
+      const statusFromLifecycle = (() => {
+        switch (lifecycleStage) {
+          case 'Concept':
+          case 'Design':
+            return TechPackStatus.Draft;
+          case 'Development':
+          case 'Pre-production':
+            return TechPackStatus.InReview;
+          case 'Production':
+          case 'Shipped':
+            return TechPackStatus.Approved;
+          default:
+            return undefined;
+        }
+      })();
+
       // Map frontend data to backend format
       const techpackData = {
         productName,
@@ -125,7 +185,16 @@ export class TechPackController {
         category: articleInfo?.productClass || req.body.category,
         gender: articleInfo?.gender || req.body.gender,
         brand: articleInfo?.brand || req.body.brand,
+        technicalDesigner: articleInfo?.technicalDesigner || req.body.technicalDesigner,
+        lifecycleStage: lifecycleStage,
+        collectionName: articleInfo?.collection || req.body.collectionName || req.body.collection,
+        targetMarket: articleInfo?.targetMarket || req.body.targetMarket,
+        pricePoint: articleInfo?.pricePoint || req.body.pricePoint,
         description: articleInfo?.notes || req.body.description,
+        notes: req.body.notes || articleInfo?.notes,
+        retailPrice: req.body.retailPrice ?? undefined,
+        currency: req.body.currency ?? undefined,
+        status: statusFromLifecycle || req.body.status || TechPackStatus.Draft,
         bom: bom || [],
         measurements: measurements || [],
         colorways: colorways || [],
@@ -177,19 +246,41 @@ export class TechPackController {
       const { id } = req.params;
       const user = req.user!;
 
-      const techpack = await TechPack.findById(id);
+      // Check if user has permission to edit tech packs
+      if (!PermissionManager.canEditTechPacks(user.role)) {
+        return sendError(res, 'Insufficient permissions to edit tech packs', 403, 'FORBIDDEN');
+      }
+
+      // Handle both ObjectId and string ID formats
+      let techpack;
+
+      try {
+        // First try as ObjectId
+        techpack = await TechPack.findById(id);
+      } catch (error) {
+        // If that fails, try with relaxed validation
+        try {
+          // Use findOne with mixed type to handle string IDs
+          techpack = await TechPack.findOne({ _id: id } as any);
+        } catch (secondError) {
+          // Both attempts failed
+          techpack = null;
+        }
+      }
       if (!techpack) {
         return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
       }
 
+      // Designers can only edit their own tech packs, Admins can edit any
       if (user.role === UserRole.Designer && techpack.designer.toString() !== user._id.toString()) {
-        return sendError(res, 'Access denied', 403, 'FORBIDDEN');
+        return sendError(res, 'Access denied. You can only edit tech packs you created.', 403, 'FORBIDDEN');
       }
 
       // Define whitelist of updatable fields to prevent schema validation errors
       const allowedFields = [
         'productName', 'articleCode', 'version', 'supplier', 'season',
         'fabricDescription', 'status', 'category', 'gender', 'brand',
+        'technicalDesigner', 'lifecycleStage', 'collectionName', 'targetMarket', 'pricePoint',
         'retailPrice', 'currency', 'description', 'notes', 'bom',
         'measurements', 'colorways', 'howToMeasure'
       ];
@@ -205,6 +296,25 @@ export class TechPackController {
           updateData[field] = req.body[field];
         }
       });
+
+      // Map lifecycleStage to status if sent
+      const lifecycleStage = (req.body as any).lifecycleStage;
+      if (lifecycleStage) {
+        switch (lifecycleStage) {
+          case 'Concept':
+          case 'Design':
+            updateData.status = TechPackStatus.Draft;
+            break;
+          case 'Development':
+          case 'Pre-production':
+            updateData.status = TechPackStatus.InReview;
+            break;
+          case 'Production':
+          case 'Shipped':
+            updateData.status = TechPackStatus.Approved;
+            break;
+        }
+      }
 
       // Apply updates to the document
       Object.assign(techpack, updateData);
@@ -235,13 +345,34 @@ export class TechPackController {
       const { id } = req.params;
       const user = req.user!;
 
-      const techpack = await TechPack.findById(id);
+      // Check if user has permission to delete tech packs
+      if (!PermissionManager.canDeleteTechPacks(user.role)) {
+        return sendError(res, 'Insufficient permissions to delete tech packs', 403, 'FORBIDDEN');
+      }
+
+      // Handle both ObjectId and string ID formats
+      let techpack;
+
+      try {
+        // First try as ObjectId
+        techpack = await TechPack.findById(id);
+      } catch (error) {
+        // If that fails, try with relaxed validation
+        try {
+          // Use findOne with mixed type to handle string IDs
+          techpack = await TechPack.findOne({ _id: id } as any);
+        } catch (secondError) {
+          // Both attempts failed
+          techpack = null;
+        }
+      }
       if (!techpack) {
         return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
       }
 
+      // Designers can only delete their own tech packs, Admins can delete any
       if (user.role === UserRole.Designer && techpack.designer.toString() !== user._id.toString()) {
-        return sendError(res, 'Access denied', 403, 'FORBIDDEN');
+        return sendError(res, 'Access denied. You can only delete tech packs you created.', 403, 'FORBIDDEN');
       }
 
       techpack.status = TechPackStatus.Archived;

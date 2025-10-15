@@ -206,6 +206,11 @@ export type SafeTechPackContext = {
 // API Response Types
 export interface CreateTechPackInput {
   articleInfo: Partial<ArticleInfo>;
+  bom?: BomItem[];
+  measurements?: MeasurementPoint[];
+  colorways?: Colorway[];
+  howToMeasures?: HowToMeasure[];
+  status?: TechPack['status'];
 }
 
 export interface TechPackListResponse {

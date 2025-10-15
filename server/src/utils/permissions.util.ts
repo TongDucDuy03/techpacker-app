@@ -18,15 +18,16 @@ export const PERMISSIONS: Permission[] = [
 
   // Tech Pack Permissions
   { resource: 'techpacks', action: 'create', roles: [UserRole.Admin, UserRole.Designer] },
-  { resource: 'techpacks', action: 'read', roles: [UserRole.Admin, UserRole.Designer, UserRole.Viewer] },
+  { resource: 'techpacks', action: 'read', roles: [UserRole.Admin, UserRole.Designer, UserRole.Merchandiser, UserRole.Viewer] },
   { resource: 'techpacks', action: 'update', roles: [UserRole.Admin, UserRole.Designer] },
   { resource: 'techpacks', action: 'delete', roles: [UserRole.Admin, UserRole.Designer] },
   { resource: 'techpacks', action: 'duplicate', roles: [UserRole.Admin, UserRole.Designer] },
   { resource: 'techpacks', action: 'bulk_operations', roles: [UserRole.Admin] },
+  { resource: 'techpacks', action: 'export', roles: [UserRole.Admin, UserRole.Designer, UserRole.Merchandiser, UserRole.Viewer] },
 
   // Profile Permissions
-  { resource: 'profile', action: 'read', roles: [UserRole.Admin, UserRole.Designer, UserRole.Viewer] },
-  { resource: 'profile', action: 'update', roles: [UserRole.Admin, UserRole.Designer, UserRole.Viewer] },
+  { resource: 'profile', action: 'read', roles: [UserRole.Admin, UserRole.Designer, UserRole.Merchandiser, UserRole.Viewer] },
+  { resource: 'profile', action: 'update', roles: [UserRole.Admin, UserRole.Designer, UserRole.Merchandiser, UserRole.Viewer] },
 
   // System Permissions
   { resource: 'system', action: 'admin_panel', roles: [UserRole.Admin] },
@@ -71,7 +72,7 @@ export class PermissionManager {
    * Check if a user can view tech packs
    */
   static canViewTechPacks(userRole: UserRole): boolean {
-    return [UserRole.Admin, UserRole.Designer, UserRole.Viewer].includes(userRole);
+    return [UserRole.Admin, UserRole.Designer, UserRole.Merchandiser, UserRole.Viewer].includes(userRole);
   }
 
   /**
@@ -88,10 +89,12 @@ export class PermissionManager {
     switch (role) {
       case UserRole.Viewer:
         return 1;
-      case UserRole.Designer:
+      case UserRole.Merchandiser:
         return 2;
-      case UserRole.Admin:
+      case UserRole.Designer:
         return 3;
+      case UserRole.Admin:
+        return 4;
       default:
         return 0;
     }
@@ -112,9 +115,11 @@ export class PermissionManager {
       case UserRole.Admin:
         return 'Administrator - Full system access including user management';
       case UserRole.Designer:
-        return 'Designer - Can create and manage tech packs';
+        return 'Designer - Can create, edit, and delete tech packs they own';
+      case UserRole.Merchandiser:
+        return 'Merchandiser - Read-only access to all tech packs for review';
       case UserRole.Viewer:
-        return 'Viewer - Read-only access to assigned tech packs';
+        return 'Viewer - Read-only access to tech packs';
       default:
         return 'Unknown role';
     }
@@ -132,7 +137,7 @@ export class PermissionManager {
   /**
    * Validate if a role transition is allowed
    */
-  static canChangeRole(currentUserRole: UserRole, targetRole: UserRole, subjectRole: UserRole): boolean {
+  static canChangeRole(currentUserRole: UserRole, _targetRole: UserRole, _subjectRole: UserRole): boolean {
     // Only admins can change roles
     if (currentUserRole !== UserRole.Admin) {
       return false;
@@ -142,12 +147,48 @@ export class PermissionManager {
     // (to prevent accidentally removing the last admin)
     return true;
   }
+
+  /**
+   * Check if a user can create tech packs
+   */
+  static canCreateTechPacks(userRole: UserRole): boolean {
+    return this.hasPermission(userRole, 'techpacks', 'create');
+  }
+
+  /**
+   * Check if a user can edit tech packs
+   */
+  static canEditTechPacks(userRole: UserRole): boolean {
+    return this.hasPermission(userRole, 'techpacks', 'update');
+  }
+
+  /**
+   * Check if a user can delete tech packs
+   */
+  static canDeleteTechPacks(userRole: UserRole): boolean {
+    return this.hasPermission(userRole, 'techpacks', 'delete');
+  }
+
+  /**
+   * Check if a user has read-only access
+   */
+  static isReadOnlyRole(userRole: UserRole): boolean {
+    return [UserRole.Merchandiser, UserRole.Viewer].includes(userRole);
+  }
+
+  /**
+   * Check if a user can perform write operations on tech packs
+   */
+  static canWriteTechPacks(userRole: UserRole): boolean {
+    return [UserRole.Admin, UserRole.Designer].includes(userRole);
+  }
 }
 
 // Export role constants for easy access
 export const ROLES = {
   ADMIN: UserRole.Admin,
   DESIGNER: UserRole.Designer,
+  MERCHANDISER: UserRole.Merchandiser,
   VIEWER: UserRole.Viewer,
 } as const;
 

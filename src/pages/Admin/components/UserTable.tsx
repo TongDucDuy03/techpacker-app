@@ -56,7 +56,12 @@ const UserTable: React.FC<Props> = ({ users, loading, sortBy, sortOrder, onSort,
                 <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>{user.firstName}</td>
                 <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>{user.lastName}</td>
                 <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>{user.email}</td>
-                <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>{user.role}</td>
+                <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>
+                  {user.role === 'admin' && 'Admin'}
+                  {user.role === 'designer' && 'Designer/Developer'}
+                  {user.role === 'merchandiser' && 'Merchandiser/Brand Owner'}
+                  {user.role === 'viewer' && 'Viewer/Supplier'}
+                </td>
                 <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>{new Date(user.createdAt).toLocaleDateString()}</td>
                 <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>{user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'Never'}</td>
                 <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>

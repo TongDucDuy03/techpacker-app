@@ -214,9 +214,10 @@ const UserModal: React.FC<Props> = ({ user, mode, onClose, onSave }) => {
           <div style={formGroupStyles}>
             <label>Role</label>
             <select name="role" value={formData.role} onChange={handleChange} style={inputStyles}>
-              <option value="designer">Designer</option>
-              <option value="viewer">Viewer</option>
-              <option value="admin">Admin</option>
+              <option value="admin">Admin (Quản trị viên)</option>
+              <option value="designer">Designer/Developer (Nhà thiết kế)</option>
+              <option value="merchandiser">Merchandiser (Chủ thương hiệu)</option>
+              <option value="viewer">Viewer/Supplier (Chỉ xem)</option>
             </select>
           </div>
           {error && <p style={{ color: 'red' }}>{error}</p>}

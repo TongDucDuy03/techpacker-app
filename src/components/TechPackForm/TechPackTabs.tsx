@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTechPack } from '../../contexts/TechPackContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { ApiTechPack } from '../../types/techpack';
 import ArticleInfoTab from './tabs/ArticleInfoTab';
 import BomTab from './tabs/BomTab';
@@ -33,44 +34,60 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
   const context = useTechPack();
   const { state, setCurrentTab, updateFormState, saveTechPack, exportToPDF, resetFormState } = context ?? {};
   const { currentTab = 0, techpack, isSaving = false, lastSaved, hasUnsavedChanges = false } = state ?? {};
+  const { user } = useAuth();
 
   const [showSaveNotification, setShowSaveNotification] = useState(false);
 
+  // Permission checks based on user role
+  const canEdit = user?.role === 'admin' || user?.role === 'designer';
+  const isReadOnly = user?.role === 'merchandiser' || user?.role === 'viewer' || mode === 'view';
+
   useEffect(() => {
     if ((mode === 'edit' || mode === 'view') && initialTechPack) {
-      // Map the ApiTechPack structure to the expected TechPack structure
+      // Map the API TechPack (supports both current backend and legacy shapes) to the expected TechPack structure
       const mappedTechPack = {
         id: initialTechPack._id,
         articleInfo: {
-          articleCode: initialTechPack.articleCode || '',
-          productName: initialTechPack.name || '',
-          version: parseInt(initialTechPack.version) || 1,
-          gender: 'Unisex' as const,
-          productClass: initialTechPack.metadata?.category || '',
+          articleCode: (initialTechPack as any).articleCode || '',
+          productName: (initialTechPack as any).productName || (initialTechPack as any).name || '',
+          version: (() => {
+            const v = (initialTechPack as any).version;
+            if (!v) return 1;
+            const digits = String(v).replace(/[^0-9]/g, '');
+            const parsed = parseInt(digits, 10);
+            return Number.isNaN(parsed) ? 1 : parsed;
+          })(),
+          gender: ((initialTechPack as any).gender || 'Unisex') as any,
+          productClass: (initialTechPack as any).category || (initialTechPack as any).metadata?.category || '',
           fitType: 'Regular' as const,
-          supplier: '',
-          technicalDesigner: '',
-          fabricDescription: '',
-          season: (initialTechPack.metadata?.season || 'SS25') as any,
-          lifecycleStage: 'Concept' as const,
-          createdDate: initialTechPack.createdAt,
-          lastModified: initialTechPack.updatedAt,
+          supplier: (initialTechPack as any).supplier || '',
+          technicalDesigner: (initialTechPack as any).technicalDesigner || '',
+          fabricDescription: (initialTechPack as any).fabricDescription || '',
+          season: (((initialTechPack as any).season || (initialTechPack as any).metadata?.season || 'SS25')) as any,
+          brand: (initialTechPack as any).brand || '',
+          collection: (initialTechPack as any).collectionName || (initialTechPack as any).collection || '',
+          targetMarket: (initialTechPack as any).targetMarket || '',
+          pricePoint: (initialTechPack as any).pricePoint || undefined,
+          notes: (initialTechPack as any).notes || (initialTechPack as any).description || '',
+          lifecycleStage: (initialTechPack as any).lifecycleStage || undefined,
+          createdDate: (initialTechPack as any).createdAt,
+          lastModified: (initialTechPack as any).updatedAt,
         },
-        bom: initialTechPack.materials || [],
-        measurements: initialTechPack.measurements || [],
-        howToMeasures: [],
-        colorways: initialTechPack.colorways || [],
-        revisionHistory: initialTechPack.revisions || [],
-        status: initialTechPack.status,
+        bom: (initialTechPack as any).bom || (initialTechPack as any).materials || [],
+        measurements: (initialTechPack as any).measurements || [],
+        howToMeasures: (initialTechPack as any).howToMeasure || [],
+        colorways: (initialTechPack as any).colorways || [],
+        revisionHistory: (initialTechPack as any).revisions || [],
+        status: (initialTechPack as any).status,
         completeness: {
           isComplete: false,
           missingItems: [],
           completionPercentage: 0,
         },
-        createdBy: initialTechPack.ownerId,
-        updatedBy: initialTechPack.ownerId,
-        createdAt: initialTechPack.createdAt,
-        updatedAt: initialTechPack.updatedAt,
+        createdBy: (initialTechPack as any).createdBy || (initialTechPack as any).ownerId || '',
+        updatedBy: (initialTechPack as any).updatedBy || (initialTechPack as any).ownerId || '',
+        createdAt: (initialTechPack as any).createdAt,
+        updatedAt: (initialTechPack as any).updatedAt,
       };
       updateFormState(mappedTechPack);
     } else if (mode === 'create') {
@@ -252,7 +269,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
               </div>
 
               {/* Action Buttons */}
-              {mode !== 'view' && (
+              {canEdit && mode !== 'view' && (
                 <button
                   onClick={handleSave}
                   disabled={isSaving}
@@ -261,6 +278,13 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
                   <Save className="w-4 h-4 mr-2" />
                   {mode === 'edit' ? 'Update' : 'Save'}
                 </button>
+              )}
+
+              {isReadOnly && (
+                <div className="flex items-center px-3 py-2 text-sm text-gray-500 bg-gray-100 rounded-md">
+                  <Eye className="w-4 h-4 mr-2" />
+                  Read Only Mode
+                </div>
               )}
 
               <button

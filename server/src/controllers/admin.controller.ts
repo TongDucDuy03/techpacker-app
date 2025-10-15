@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { validationResult } from 'express-validator';
-import User from '../models/user.model';
+import User, { UserRole } from '../models/user.model';
 import { sendSuccess, sendError, formatValidationErrors } from '../utils/response.util';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { auditLogService } from '../services/audit-log.service';
@@ -106,12 +106,13 @@ class AdminController {
         return sendError(res, 'User with this email already exists', 409, 'CONFLICT');
       }
 
+      const safeRole = Object.values(UserRole).includes(role) ? role : UserRole.Designer;
       const newUser = new User({
         firstName,
         lastName,
         email,
         password,
-        role: role || 'designer'
+        role: safeRole
       });
 
       await newUser.save();
@@ -121,8 +122,9 @@ class AdminController {
       delete (userResponse as any).refreshTokens;
 
       // Log admin action
+      // Best-effort audit log; do not fail user creation if logging fails
       await auditLogService.log({
-        user: req.user!,
+        user: (req.user as any) ?? { _id: newUser._id, email: 'system@local' },
         action: 'CREATE_USER',
         resource: 'user',
         resourceId: newUser._id.toString(),
@@ -164,7 +166,12 @@ class AdminController {
       if (firstName) user.firstName = firstName;
       if (lastName) user.lastName = lastName;
       if (email) user.email = email;
-      if (role) user.role = role;
+      if (role) {
+        if (!Object.values(UserRole).includes(role)) {
+          return sendError(res, 'Invalid role provided', 400, 'VALIDATION_ERROR');
+        }
+        user.role = role;
+      }
 
       await user.save();
 
@@ -241,6 +248,9 @@ class AdminController {
     try {
       const { id } = req.params;
       const { role } = req.body;
+      if (!Object.values(UserRole).includes(role)) {
+        return sendError(res, 'Invalid role provided', 400, 'VALIDATION_ERROR');
+      }
 
       const user = await User.findById(id);
       if (!user) {

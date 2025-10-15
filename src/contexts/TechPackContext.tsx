@@ -121,7 +121,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
   const updateTechPack = async (id: string, data: Partial<ApiTechPack>) => {
     try {
       const updatedTechPack = await showPromise(
-        api.updateTechPack(id, data),
+        api.patchTechPack(id, data),
         {
           loading: 'Updating tech pack...',
           success: 'Tech pack updated successfully!',
@@ -173,7 +173,14 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
   const updateFormState = useCallback((updates: Partial<ApiTechPack>) => {
     setState(prev => ({
       ...prev,
-      techpack: { ...prev.techpack, ...updates },
+      techpack: {
+        ...prev.techpack,
+        ...(updates as any),
+        articleInfo: {
+          ...(prev.techpack as any).articleInfo,
+          ...(updates as any).articleInfo,
+        }
+      },
       hasUnsavedChanges: true
     }));
   }, []);
@@ -226,8 +233,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
       
       // If techpack has an ID, update existing; otherwise create new
       if (techpackData.id && techpackData.id !== '') {
-        // Map the frontend TechPack to the backend model structure
-        const backendTechPackData = {
+        // For updates, use PATCH with flat fields expected by backend patch handler
+        const updatePayload = {
           productName: techpackData.articleInfo.productName,
           articleCode: techpackData.articleInfo.articleCode,
           version: techpackData.articleInfo.version.toString(),
@@ -237,34 +244,49 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           status: techpackData.status,
           category: techpackData.articleInfo.productClass,
           gender: techpackData.articleInfo.gender,
+          technicalDesigner: techpackData.articleInfo.technicalDesigner,
+          lifecycleStage: techpackData.articleInfo.lifecycleStage as any,
+          collectionName: (techpackData.articleInfo as any).collection,
+          targetMarket: (techpackData.articleInfo as any).targetMarket,
+          pricePoint: (techpackData.articleInfo as any).pricePoint,
           description: techpackData.articleInfo.notes,
+          notes: techpackData.articleInfo.notes,
+          brand: techpackData.articleInfo.brand,
+          retailPrice: (techpackData as any).retailPrice,
+          currency: (techpackData as any).currency,
           bom: techpackData.bom,
           measurements: techpackData.measurements,
           colorways: techpackData.colorways,
           howToMeasure: techpackData.howToMeasures,
         };
-        // Update existing tech pack
-        await updateTechPack(techpackData.id, backendTechPackData);
+        await updateTechPack(techpackData.id, updatePayload);
       } else {
-        // Map the frontend TechPack to the backend model structure
-        const backendTechPackData = {
-          productName: techpackData.articleInfo.productName,
-          articleCode: techpackData.articleInfo.articleCode,
-          version: techpackData.articleInfo.version.toString(),
-          supplier: techpackData.articleInfo.supplier || '',
-          season: techpackData.articleInfo.season,
-          fabricDescription: techpackData.articleInfo.fabricDescription || '',
-          status: techpackData.status,
-          category: techpackData.articleInfo.productClass,
-          gender: techpackData.articleInfo.gender,
-          description: techpackData.articleInfo.notes,
+        // For create, send nested articleInfo to satisfy route validation
+        const createPayload: CreateTechPackInput = {
+          articleInfo: {
+            productName: techpackData.articleInfo.productName,
+            articleCode: techpackData.articleInfo.articleCode,
+            version: techpackData.articleInfo.version,
+            supplier: techpackData.articleInfo.supplier || '',
+            season: techpackData.articleInfo.season,
+            fabricDescription: techpackData.articleInfo.fabricDescription || '',
+            productClass: techpackData.articleInfo.productClass,
+            gender: techpackData.articleInfo.gender,
+            technicalDesigner: techpackData.articleInfo.technicalDesigner,
+            lifecycleStage: techpackData.articleInfo.lifecycleStage as any,
+            collection: (techpackData.articleInfo as any).collection,
+            targetMarket: (techpackData.articleInfo as any).targetMarket,
+            pricePoint: (techpackData.articleInfo as any).pricePoint,
+            notes: techpackData.articleInfo.notes,
+          },
           bom: techpackData.bom,
           measurements: techpackData.measurements,
           colorways: techpackData.colorways,
-          howToMeasure: techpackData.howToMeasures,
-        };
-        // Create new tech pack
-        const newTechPack = await createTechPack(backendTechPackData as any);
+          howToMeasures: techpackData.howToMeasures,
+          status: techpackData.status as any,
+        } as unknown as CreateTechPackInput;
+
+        const newTechPack = await createTechPack(createPayload);
 
         // Update the state with the new ID
         setState(prev => ({
