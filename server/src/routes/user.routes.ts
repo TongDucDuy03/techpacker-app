@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
 import authController from '../controllers/auth.controller';
+import adminController from '../controllers/admin.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -21,6 +22,13 @@ router.put(
     body('lastName').optional().notEmpty().withMessage('Last name cannot be empty').trim(),
   ],
   authController.updateProfile
+);
+
+// GET /api/v1/users - Get users with optional role filter
+router.get(
+  '/',
+  requireAuth,
+  adminController.getAllUsers
 );
 
 export default router;

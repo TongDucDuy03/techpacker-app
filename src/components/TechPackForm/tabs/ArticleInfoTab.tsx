@@ -1,4 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react';
+import { useFormValidation } from '../../../hooks/useFormValidation';
+import { articleInfoValidationSchema } from '../../../utils/validationSchemas';
+import { api } from '../../../lib/api';
 import { TechPack, PRODUCT_CLASSES, ArticleInfo } from '../../../types/techpack';
 import Input from '../shared/Input';
 import Select from '../shared/Select';
@@ -12,8 +15,15 @@ interface ArticleInfoTabProps {
   setCurrentTab?: (tab: number) => void;
 }
 
-const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, mode = 'create', onUpdate, setCurrentTab }) => {
+export interface ArticleInfoTabRef {
+  validateAndSave: () => boolean;
+}
+
+const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>(({ techPack, mode = 'create', onUpdate, setCurrentTab }, ref) => {
+  const validation = useFormValidation(articleInfoValidationSchema);
   const { articleInfo } = techPack ?? {};
+  const [designers, setDesigners] = useState<Array<{ value: string; label: string }>>([]);
+  const [loadingDesigners, setLoadingDesigners] = useState(false);
 
   // Fallback if no techPack is passed
   const safeArticleInfo = articleInfo ?? {
@@ -24,13 +34,34 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, mode = 'creat
     productClass: '',
     fitType: 'Regular',
     supplier: '',
-    technicalDesigner: '',
+    technicalDesignerId: '',
     fabricDescription: '',
     season: 'SS25',
     lifecycleStage: 'Concept',
     createdDate: new Date().toISOString(),
     lastModified: new Date().toISOString(),
   };
+
+  // Fetch designers on component mount
+  useEffect(() => {
+    const fetchDesigners = async () => {
+      setLoadingDesigners(true);
+      try {
+        const response = await api.getAllUsers({ role: 'designer' });
+        const designerOptions = response.users.map(user => ({
+          value: user._id,
+          label: `${user.firstName} ${user.lastName}`
+        }));
+        setDesigners(designerOptions);
+      } catch (error) {
+        console.error('Failed to fetch designers:', error);
+      } finally {
+        setLoadingDesigners(false);
+      }
+    };
+
+    fetchDesigners();
+  }, []);
 
   // Gender options
   const genderOptions = [
@@ -83,7 +114,12 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, mode = 'creat
   ];
 
   const handleInputChange = (field: keyof ArticleInfo) => (value: string | number) => {
-    onUpdate?.({ articleInfo: { ...safeArticleInfo, [field]: value } });
+    // Update the form data
+    const updatedArticleInfo = { ...safeArticleInfo, [field]: value };
+    onUpdate?.({ articleInfo: updatedArticleInfo });
+
+    // Validate the field in real-time
+    validation.validateField(field, value);
   };
 
   const handleReset = () => {
@@ -99,7 +135,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, mode = 'creat
           productClass: '',
           fitType: 'Regular',
           supplier: '',
-          technicalDesigner: '',
+          technicalDesignerId: '',
           fabricDescription: '',
           season: 'Spring',
           lifecycleStage: 'Concept',
@@ -113,18 +149,54 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, mode = 'creat
     }
   };
 
+    const scrollToFirstError = (errors: Record<string, string>) => {
+    const firstErrorField = Object.keys(errors)[0];
+    if (firstErrorField) {
+      const element = document.querySelector(`[id*="${firstErrorField}"]`);
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
   const handleSave = () => {
-    onUpdate?.(techPack ?? {});
+    const { isValid, errors } = validation.validateForm(safeArticleInfo);
+
+    if (!isValid) {
+      Object.keys(articleInfoValidationSchema).forEach(field => {
+        validation.setFieldTouched(field, true);
+      });
+      scrollToFirstError(errors);
+      return;
+    }
+
+    onUpdate?.({
+      ...techPack,
+      articleInfo: safeArticleInfo
+    });
   };
 
   const handleNextTab = () => {
-    setCurrentTab?.(1); // Go to BOM tab
+    const { isValid, errors } = validation.validateForm(safeArticleInfo);
+
+    if (!isValid) {
+      Object.keys(articleInfoValidationSchema).forEach(field => {
+        validation.setFieldTouched(field, true);
+      });
+      scrollToFirstError(errors);
+      return;
+    }
+
+    onUpdate?.({
+      ...techPack,
+      articleInfo: safeArticleInfo
+    });
+
+    setCurrentTab?.(1);
   };
 
   // Calculate form completion percentage
   const completionPercentage = useMemo(() => {
     const requiredFields = ['articleCode', 'productName', 'fabricDescription'];
-    const optionalFields = ['supplier', 'technicalDesigner', 'productClass'];
+    const optionalFields = ['supplier', 'technicalDesignerId', 'productClass'];
     
     const requiredCompleted = requiredFields.filter(field => 
       safeArticleInfo[field as keyof typeof safeArticleInfo]
@@ -179,58 +251,76 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, mode = 'creat
                 label="Article Code"
                 value={safeArticleInfo.articleCode}
                 onChange={handleInputChange('articleCode')}
+                onBlur={() => validation.setFieldTouched('articleCode')}
                 placeholder="e.g., SHRT-001-SS25"
                 required
                 maxLength={50}
                 disabled={mode === 'view'}
+                error={validation.getFieldProps('articleCode').error}
+                helperText={validation.getFieldProps('articleCode').helperText}
               />
 
               <Input
                 label="Product Name"
                 value={safeArticleInfo.productName}
                 onChange={handleInputChange('productName')}
+                onBlur={() => validation.setFieldTouched('productName')}
                 placeholder="e.g., Men's Oxford Button-Down Shirt"
                 required
                 maxLength={255}
                 disabled={mode === 'view'}
+                error={validation.getFieldProps('productName').error}
+                helperText={validation.getFieldProps('productName').helperText}
               />
 
               <Input
                 label="Version"
                 value={safeArticleInfo.version}
                 onChange={handleInputChange('version')}
+                onBlur={() => validation.setFieldTouched('version')}
                 type="number"
                 min={1}
                 max={999}
                 disabled={mode === 'view'}
+                error={validation.getFieldProps('version').error}
+                helperText={validation.getFieldProps('version').helperText}
               />
 
               <Select
                 label="Gender"
                 value={safeArticleInfo.gender}
                 onChange={handleInputChange('gender')}
+                onBlur={() => validation.setFieldTouched('gender')}
                 options={genderOptions}
                 required
                 disabled={mode === 'view'}
+                error={validation.getFieldProps('gender').error}
+                helperText={validation.getFieldProps('gender').helperText}
               />
 
               <Select
                 label="Product Class"
                 value={safeArticleInfo.productClass}
                 onChange={handleInputChange('productClass')}
+                onBlur={() => validation.setFieldTouched('productClass')}
                 options={productClassOptions}
                 placeholder="Select product category..."
                 required
                 disabled={mode === 'view'}
+                error={validation.getFieldProps('productClass').error}
+                helperText={validation.getFieldProps('productClass').helperText}
               />
 
               <Select
                 label="Fit Type"
                 value={safeArticleInfo.fitType}
                 onChange={handleInputChange('fitType')}
+                onBlur={() => validation.setFieldTouched('fitType')}
                 options={fitTypeOptions}
                 required
                 disabled={mode === 'view'}
+                error={validation.getFieldProps('fitType').error}
+                helperText={validation.getFieldProps('fitType').helperText}
               />
 
               {/* Product Details */}
@@ -245,36 +335,49 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, mode = 'creat
                 label="Supplier"
                 value={safeArticleInfo.supplier}
                 onChange={handleInputChange('supplier')}
+                onBlur={() => validation.setFieldTouched('supplier')}
                 placeholder="Supplier name or code"
                 maxLength={255}
                 disabled={mode === 'view'}
+                error={validation.getFieldProps('supplier').error}
+                helperText={validation.getFieldProps('supplier').helperText}
               />
 
-              <Input
+              <Select
                 label="Technical Designer"
-                value={safeArticleInfo.technicalDesigner}
-                onChange={handleInputChange('technicalDesigner')}
-                placeholder="Designer name"
-                maxLength={255}
-                disabled={mode === 'view'}
+                value={safeArticleInfo.technicalDesignerId}
+                onChange={handleInputChange('technicalDesignerId')}
+                onBlur={() => validation.setFieldTouched('technicalDesignerId')}
+                options={designers}
+                placeholder={loadingDesigners ? 'Loading...' : 'Select a designer'}
+                required
+                disabled={mode === 'view' || loadingDesigners}
+                error={validation.getFieldProps('technicalDesignerId').error}
+                helperText={validation.getFieldProps('technicalDesignerId').helperText}
               />
 
               <Select
                 label="Season"
                 value={safeArticleInfo.season}
                 onChange={handleInputChange('season')}
+                onBlur={() => validation.setFieldTouched('season')}
                 options={seasonOptions}
                 required
                 disabled={mode === 'view'}
+                error={validation.getFieldProps('season').error}
+                helperText={validation.getFieldProps('season').helperText}
               />
 
               <Select
                 label="Lifecycle Stage"
                 value={safeArticleInfo.lifecycleStage}
                 onChange={handleInputChange('lifecycleStage')}
+                onBlur={() => validation.setFieldTouched('lifecycleStage')}
                 options={lifecycleOptions}
                 required
                 disabled={mode === 'view'}
+                error={validation.getFieldProps('lifecycleStage').error}
+                helperText={validation.getFieldProps('lifecycleStage').helperText}
               />
 
               {/* Optional Fields */}
@@ -289,36 +392,48 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, mode = 'creat
                 label="Brand"
                 value={safeArticleInfo.brand || ''}
                 onChange={handleInputChange('brand')}
+                onBlur={() => validation.setFieldTouched('brand')}
                 placeholder="Brand name"
                 maxLength={255}
                 disabled={mode === 'view'}
+                error={validation.getFieldProps('brand').error}
+                helperText={validation.getFieldProps('brand').helperText}
               />
 
               <Input
                 label="Collection"
                 value={safeArticleInfo.collection || ''}
                 onChange={handleInputChange('collection')}
+                onBlur={() => validation.setFieldTouched('collection')}
                 placeholder="Collection name"
                 maxLength={255}
                 disabled={mode === 'view'}
+                error={validation.getFieldProps('collection').error}
+                helperText={validation.getFieldProps('collection').helperText}
               />
 
               <Input
                 label="Target Market"
                 value={safeArticleInfo.targetMarket || ''}
                 onChange={handleInputChange('targetMarket')}
+                onBlur={() => validation.setFieldTouched('targetMarket')}
                 placeholder="e.g., US, EU, Asia"
                 maxLength={255}
                 disabled={mode === 'view'}
+                error={validation.getFieldProps('targetMarket').error}
+                helperText={validation.getFieldProps('targetMarket').helperText}
               />
 
               <Select
                 label="Price Point"
                 value={safeArticleInfo.pricePoint || ''}
                 onChange={handleInputChange('pricePoint')}
+                onBlur={() => validation.setFieldTouched('pricePoint')}
                 options={pricePointOptions}
                 placeholder="Select price range..."
                 disabled={mode === 'view'}
+                error={validation.getFieldProps('pricePoint').error}
+                helperText={validation.getFieldProps('pricePoint').helperText}
               />
 
               <div className="md:col-span-2">
@@ -326,11 +441,14 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, mode = 'creat
                   label="Fabric Description"
                   value={safeArticleInfo.fabricDescription}
                   onChange={handleInputChange('fabricDescription')}
+                  onBlur={() => validation.setFieldTouched('fabricDescription')}
                   placeholder="Detailed fabric composition, weight, and specifications..."
                   required
                   rows={4}
                   maxLength={1000}
                   disabled={mode === 'view'}
+                  error={validation.getFieldProps('fabricDescription').error}
+                  helperText={validation.getFieldProps('fabricDescription').helperText}
                 />
               </div>
 
@@ -339,13 +457,18 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, mode = 'creat
                   label="Notes"
                   value={safeArticleInfo.notes || ''}
                   onChange={handleInputChange('notes')}
+                  onBlur={() => validation.setFieldTouched('notes')}
                   placeholder="Additional notes or special instructions..."
                   rows={3}
                   maxLength={500}
                   disabled={mode === 'view'}
+                  error={validation.getFieldProps('notes').error}
+                  helperText={validation.getFieldProps('notes').helperText}
                 />
               </div>
             </div>
+
+
 
             {/* Action Buttons */}
             {mode !== 'view' && (
@@ -361,7 +484,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, mode = 'creat
 
                   <button
                     onClick={handleSave}
-                    className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
                     <Save className="w-4 h-4 mr-2" />
                     Save Draft
@@ -370,7 +493,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, mode = 'creat
 
                 <button
                   onClick={handleNextTab}
-                  className="flex items-center px-6 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  className="flex items-center px-6 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                 >
                   Next: Bill of Materials
                   <ArrowRight className="w-4 h-4 ml-2" />
@@ -437,7 +560,7 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, mode = 'creat
                 </div>
                 <div className="flex items-center">
                   <User className="w-3 h-3 mr-1" />
-                  Designer: {safeArticleInfo.technicalDesigner || 'Not assigned'}
+                  Designer: {designers.find(d => d.value === safeArticleInfo.technicalDesignerId)?.label || 'Not assigned'}
                 </div>
               </div>
             </div>
@@ -447,5 +570,263 @@ const ArticleInfoTab: React.FC<ArticleInfoTabProps> = ({ techPack, mode = 'creat
     </div>
   );
 };
+
+
+  useImperativeHandle(ref, () => ({
+    validateAndSave: () => {
+      const isValid = validation.validateForm(safeArticleInfo);
+      if (!isValid) {
+        Object.keys(articleInfoValidationSchema).forEach(field => {
+          validation.setFieldTouched(field, true);
+        });
+        const firstErrorField = Object.keys(validation.errors).find(key => validation.errors[key]);
+        if (firstErrorField) {
+          const element = document.querySelector(`[id*="${firstErrorField}"]`);
+          element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+      return isValid;
+    }
+  }));
+
+  return (
+    <div className="p-6 bg-white rounded-lg shadow-md">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Article Code */}
+        <Input
+          label="Article Code"
+          value={safeArticleInfo.articleCode}
+          onChange={(value) => handleInputChange('articleCode', value)}
+          required
+          placeholder="e.g., NIKE-SHOE-001"
+          error={validation.errors.articleCode}
+          onBlur={() => validation.setFieldTouched('articleCode')}
+          disabled={mode === 'view'}
+        />
+
+        {/* Product Name */}
+        <Input
+          label="Product Name"
+          value={safeArticleInfo.productName}
+          onChange={(value) => handleInputChange('productName', value)}
+          required
+          placeholder="e.g., Air Max 90"
+          className="lg:col-span-2"
+          error={validation.errors.productName}
+          onBlur={() => validation.setFieldTouched('productName')}
+          disabled={mode === 'view'}
+        />
+
+        {/* Version */}
+        <Input
+          label="Version"
+          type="number"
+          value={safeArticleInfo.version}
+          onChange={(value) => handleInputChange('version', value)}
+          required
+          min={1}
+          error={validation.errors.version}
+          onBlur={() => validation.setFieldTouched('version')}
+          disabled={mode === 'view'}
+        />
+
+        {/* Gender */}
+        <Select
+          label="Gender"
+          value={safeArticleInfo.gender}
+          onChange={(value) => handleInputChange('gender', value)}
+          options={['Men', 'Women', 'Unisex', 'Kids']}
+          required
+          error={validation.errors.gender}
+          onBlur={() => validation.setFieldTouched('gender')}
+          disabled={mode === 'view'}
+        />
+
+        {/* Product Class */}
+        <Select
+          label="Product Class"
+          value={safeArticleInfo.productClass}
+          onChange={(value) => handleInputChange('productClass', value)}
+          options={PRODUCT_CLASSES}
+          required
+          placeholder="Select product class..."
+          error={validation.errors.productClass}
+          onBlur={() => validation.setFieldTouched('productClass')}
+          disabled={mode === 'view'}
+        />
+
+        {/* Fit Type */}
+        <Select
+          label="Fit Type"
+          value={safeArticleInfo.fitType}
+          onChange={(value) => handleInputChange('fitType', value)}
+          options={['Regular', 'Slim', 'Loose', 'Relaxed', 'Oversized']}
+          required
+          error={validation.errors.fitType}
+          onBlur={() => validation.setFieldTouched('fitType')}
+          disabled={mode === 'view'}
+        />
+
+        {/* Supplier */}
+        <Input
+          label="Supplier"
+          value={safeArticleInfo.supplier}
+          onChange={(value) => handleInputChange('supplier', value)}
+          placeholder="e.g., Global Fabrics Inc."
+          error={validation.errors.supplier}
+          onBlur={() => validation.setFieldTouched('supplier')}
+          disabled={mode === 'view'}
+        />
+
+        {/* Technical Designer */}
+        <Select
+          label="Technical Designer"
+          value={safeArticleInfo.technicalDesignerId}
+          onChange={(value) => handleInputChange('technicalDesignerId', value)}
+          options={designers}
+          required
+          placeholder={loadingDesigners ? 'Loading...' : 'Select a designer...'}
+          error={validation.errors.technicalDesignerId}
+          onBlur={() => validation.setFieldTouched('technicalDesignerId')}
+          disabled={mode === 'view' || loadingDesigners}
+        />
+
+        {/* Season */}
+        <Select
+          label="Season"
+          value={safeArticleInfo.season}
+          onChange={(value) => handleInputChange('season', value)}
+          options={['SS25', 'FW25', 'SS26', 'FW26', 'Core']}
+          required
+          error={validation.errors.season}
+          onBlur={() => validation.setFieldTouched('season')}
+          disabled={mode === 'view'}
+        />
+
+        {/* Lifecycle Stage */}
+        <Select
+          label="Lifecycle Stage"
+          value={safeArticleInfo.lifecycleStage}
+          onChange={(value) => handleInputChange('lifecycleStage', value)}
+          options={['Concept', 'Design', 'Development', 'Pre-production', 'Production', 'Shipped']}
+          required
+          error={validation.errors.lifecycleStage}
+          onBlur={() => validation.setFieldTouched('lifecycleStage')}
+          disabled={mode === 'view'}
+        />
+
+        {/* Fabric Description */}
+        <Textarea
+          label="Fabric Description"
+          value={safeArticleInfo.fabricDescription}
+          onChange={(value) => handleInputChange('fabricDescription', value)}
+          required
+          placeholder="Describe the main fabric used..."
+          className="lg:col-span-4"
+          rows={4}
+          error={validation.errors.fabricDescription}
+          onBlur={() => validation.setFieldTouched('fabricDescription')}
+          disabled={mode === 'view'}
+        />
+      </div>
+
+      {/* Optional Fields Section */}
+      <div className="mt-8 pt-6 border-t border-gray-200">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Details</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Input
+            label="Brand"
+            value={safeArticleInfo.brand || ''}
+            onChange={(value) => handleInputChange('brand', value)}
+            placeholder="e.g., Nike Sportswear"
+            error={validation.errors.brand}
+            onBlur={() => validation.setFieldTouched('brand')}
+            disabled={mode === 'view'}
+          />
+          <Input
+            label="Collection"
+            value={safeArticleInfo.collection || ''}
+            onChange={(value) => handleInputChange('collection', value)}
+            placeholder="e.g., Tech Fleece"
+            error={validation.errors.collection}
+            onBlur={() => validation.setFieldTouched('collection')}
+            disabled={mode === 'view'}
+          />
+          <Input
+            label="Target Market"
+            value={safeArticleInfo.targetMarket || ''}
+            onChange={(value) => handleInputChange('targetMarket', value)}
+            placeholder="e.g., Young Adults"
+            error={validation.errors.targetMarket}
+            onBlur={() => validation.setFieldTouched('targetMarket')}
+            disabled={mode === 'view'}
+          />
+          <Select
+            label="Price Point"
+            value={safeArticleInfo.pricePoint || ''}
+            onChange={(value) => handleInputChange('pricePoint', value)}
+            options={['Value', 'Mid-range', 'Premium', 'Luxury']}
+            placeholder="Select a price point"
+            error={validation.errors.pricePoint}
+            onBlur={() => validation.setFieldTouched('pricePoint')}
+            disabled={mode === 'view'}
+          />
+          <Textarea
+            label="Notes"
+            value={safeArticleInfo.notes || ''}
+            onChange={(value) => handleInputChange('notes', value)}
+            placeholder="Any additional notes..."
+            className="lg:col-span-3"
+            rows={3}
+            error={validation.errors.notes}
+            onBlur={() => validation.setFieldTouched('notes')}
+            disabled={mode === 'view'}
+          />
+        </div>
+      </div>
+
+      {/* Dates and Meta */}
+      <div className="mt-6 text-sm text-gray-500 flex items-center justify-between">
+        <div className="flex items-center">
+          <Calendar className="w-4 h-4 mr-2" />
+          <span>Created: {new Date(safeArticleInfo.createdDate).toLocaleDateString()}</span>
+        </div>
+        <div className="flex items-center">
+          <User className="w-4 h-4 mr-2" />
+          <span>Last Modified: {new Date(safeArticleInfo.lastModified).toLocaleDateString()}</span>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      {mode !== 'view' && (
+        <div className="mt-8 pt-6 border-t border-gray-200 flex justify-end space-x-4">
+          <button
+            onClick={handleReset}
+            className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Reset
+          </button>
+
+          <button
+            onClick={handleSave}
+            className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            Save Draft
+          </button>
+
+          <button
+            onClick={handleNextTab}
+            className="flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+          >
+            Next: Bill of Materials
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
 
 export default ArticleInfoTab;

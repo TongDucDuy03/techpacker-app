@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { useTechPack } from '../../../contexts/TechPackContext';
 import { BomItem, UNITS_OF_MEASURE, COMMON_MATERIALS, COMMON_PLACEMENTS } from '../../../types/techpack';
+import { useFormValidation } from '../../../hooks/useFormValidation';
+import { bomItemValidationSchema } from '../../../utils/validationSchemas';
 import DataTable from '../shared/DataTable';
 import Input from '../shared/Input';
 import Select from '../shared/Select';
 import Textarea from '../shared/Textarea';
-import { Plus, Upload, Download, Search, Filter, Package } from 'lucide-react';
+import { Plus, Upload, Download, Search, Filter, Package, AlertCircle } from 'lucide-react';
 
 const BomTab: React.FC = () => {
   const context = useTechPack();
@@ -16,6 +18,9 @@ const BomTab: React.FC = () => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterByPart, setFilterByPart] = useState('');
+
+  // Initialize validation for the form
+  const validation = useFormValidation(bomItemValidationSchema);
   
   const [formData, setFormData] = useState<Partial<BomItem>>({
     part: '',
@@ -60,12 +65,22 @@ const BomTab: React.FC = () => {
   }, [bom]);
 
   const handleInputChange = (field: keyof BomItem) => (value: string | number) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    const updatedFormData = { ...formData, [field]: value };
+    setFormData(updatedFormData);
+
+    // Validate the field in real-time
+    validation.validateField(field, value);
   };
 
   const handleSubmit = () => {
-    if (!formData.part || !formData.materialName || !formData.quantity) {
-      alert('Please fill in all required fields');
+    // Validate the entire form before submission
+    const isValid = validation.validateForm(formData);
+
+    if (!isValid) {
+      // Mark all fields as touched to show validation errors
+      Object.keys(bomItemValidationSchema).forEach(field => {
+        validation.setFieldTouched(field, true);
+      });
       return;
     }
 
@@ -110,6 +125,9 @@ const BomTab: React.FC = () => {
     });
     setShowAddForm(false);
     setEditingIndex(null);
+
+    // Reset validation state
+    validation.reset();
   };
 
   const handleEdit = (item: BomItem, index: number) => {
@@ -322,91 +340,149 @@ const BomTab: React.FC = () => {
               label="Part"
               value={formData.part || ''}
               onChange={handleInputChange('part')}
+              onBlur={() => validation.setFieldTouched('part')}
               options={COMMON_MATERIALS}
               required
+              error={validation.getFieldProps('part').error}
+              helperText={validation.getFieldProps('part').helperText}
             />
-            
+
             <Input
               label="Material Name"
               value={formData.materialName || ''}
               onChange={handleInputChange('materialName')}
+              onBlur={() => validation.setFieldTouched('materialName')}
               placeholder="e.g., Cotton Oxford"
               required
+              error={validation.getFieldProps('materialName').error}
+              helperText={validation.getFieldProps('materialName').helperText}
             />
-            
+
             <Select
               label="Placement"
               value={formData.placement || ''}
               onChange={handleInputChange('placement')}
+              onBlur={() => validation.setFieldTouched('placement')}
               options={COMMON_PLACEMENTS}
+              error={validation.getFieldProps('placement').error}
+              helperText={validation.getFieldProps('placement').helperText}
             />
-            
+
             <Input
               label="Size"
               value={formData.size || ''}
               onChange={handleInputChange('size')}
+              onBlur={() => validation.setFieldTouched('size')}
               placeholder="e.g., 14mm, L, etc."
+              error={validation.getFieldProps('size').error}
+              helperText={validation.getFieldProps('size').helperText}
             />
-            
+
             <Input
               label="Quantity"
               value={formData.quantity || 0}
               onChange={handleInputChange('quantity')}
+              onBlur={() => validation.setFieldTouched('quantity')}
               type="number"
               min={0}
               step={0.01}
               required
+              error={validation.getFieldProps('quantity').error}
+              helperText={validation.getFieldProps('quantity').helperText}
             />
-            
+
             <Select
               label="Unit of Measure"
               value={formData.uom || 'm'}
               onChange={handleInputChange('uom')}
+              onBlur={() => validation.setFieldTouched('uom')}
               options={UNITS_OF_MEASURE}
               required
+              error={validation.getFieldProps('uom').error}
+              helperText={validation.getFieldProps('uom').helperText}
             />
             
             <Input
               label="Supplier"
               value={formData.supplier || ''}
               onChange={handleInputChange('supplier')}
+              onBlur={() => validation.setFieldTouched('supplier')}
               placeholder="Supplier name"
+              error={validation.getFieldProps('supplier').error}
+              helperText={validation.getFieldProps('supplier').helperText}
             />
-            
+
             <Input
               label="Supplier Code"
               value={formData.supplierCode || ''}
               onChange={handleInputChange('supplierCode')}
+              onBlur={() => validation.setFieldTouched('supplierCode')}
               placeholder="Material code"
+              error={validation.getFieldProps('supplierCode').error}
+              helperText={validation.getFieldProps('supplierCode').helperText}
             />
-            
+
             <Input
               label="Color Code"
               value={formData.colorCode || ''}
               onChange={handleInputChange('colorCode')}
+              onBlur={() => validation.setFieldTouched('colorCode')}
               placeholder="e.g., Navy, #001122"
+              error={validation.getFieldProps('colorCode').error}
+              helperText={validation.getFieldProps('colorCode').helperText}
             />
-            
+
             <div className="md:col-span-2">
               <Input
                 label="Material Composition"
                 value={formData.materialComposition || ''}
                 onChange={handleInputChange('materialComposition')}
+                onBlur={() => validation.setFieldTouched('materialComposition')}
                 placeholder="e.g., 100% Cotton, 65% Cotton 35% Polyester"
+                error={validation.getFieldProps('materialComposition').error}
+                helperText={validation.getFieldProps('materialComposition').helperText}
               />
             </div>
-            
+
             <div className="md:col-span-3">
               <Textarea
                 label="Comments"
                 value={formData.comments || ''}
                 onChange={handleInputChange('comments')}
+                onBlur={() => validation.setFieldTouched('comments')}
                 placeholder="Additional notes or specifications..."
                 rows={2}
+                error={validation.getFieldProps('comments').error}
+                helperText={validation.getFieldProps('comments').helperText}
               />
             </div>
           </div>
-          
+
+          {/* Validation Summary */}
+          {!validation.isValid && Object.keys(validation.errors).some(key => validation.touched[key]) && (
+            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-md">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <AlertCircle className="h-5 w-5 text-red-400" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    Please fix the following errors:
+                  </h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <ul className="list-disc pl-5 space-y-1">
+                      {Object.entries(validation.errors).map(([field, error]) =>
+                        validation.touched[field] && error ? (
+                          <li key={field}>{error}</li>
+                        ) : null
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-end space-x-3 mt-6">
             <button
               onClick={resetForm}
@@ -416,7 +492,12 @@ const BomTab: React.FC = () => {
             </button>
             <button
               onClick={handleSubmit}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              disabled={!validation.isValid}
+              className={`px-4 py-2 text-sm font-medium border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                validation.isValid
+                  ? 'text-white bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
+                  : 'text-gray-400 bg-gray-200 cursor-not-allowed'
+              }`}
             >
               {editingIndex !== null ? 'Update' : 'Add'} Material
             </button>

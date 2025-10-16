@@ -114,3 +114,4 @@ curl -X GET http://localhost:4001/api/v1/techpacks \
 - **401 Unauthorized**: Kiểm tra authentication token
 - **400 Bad Request**: Kiểm tra validation rules
 - **500 Internal Server Error**: Kiểm tra database connection và server logs
+

@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTechPack } from '../../contexts/TechPackContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { ApiTechPack } from '../../types/techpack';
-import ArticleInfoTab from './tabs/ArticleInfoTab';
+import ArticleInfoTab, { ArticleInfoTabRef } from './tabs/ArticleInfoTab';
 import BomTab from './tabs/BomTab';
 import MeasurementTab from './tabs/MeasurementTab';
 import HowToMeasureTab from './tabs/HowToMeasureTab';
 import ColorwayTab from './tabs/ColorwayTab';
 import RevisionTab from './tabs/RevisionTab';
+import SharingTab from './tabs/SharingTab';
 import {
   FileText,
   Package,
@@ -15,6 +16,7 @@ import {
   BookOpen,
   Palette,
   Clock,
+  Share2,
   Save,
   Download,
   Eye,
@@ -35,6 +37,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
   const { state, setCurrentTab, updateFormState, saveTechPack, exportToPDF, resetFormState } = context ?? {};
   const { currentTab = 0, techpack, isSaving = false, lastSaved, hasUnsavedChanges = false } = state ?? {};
   const { user } = useAuth();
+  const articleInfoTabRef = useRef<ArticleInfoTabRef>(null);
 
   const [showSaveNotification, setShowSaveNotification] = useState(false);
 
@@ -61,7 +64,9 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
           productClass: (initialTechPack as any).category || (initialTechPack as any).metadata?.category || '',
           fitType: 'Regular' as const,
           supplier: (initialTechPack as any).supplier || '',
-          technicalDesigner: (initialTechPack as any).technicalDesigner || '',
+          technicalDesignerId: typeof (initialTechPack as any).technicalDesignerId === 'object'
+            ? (initialTechPack as any).technicalDesignerId?._id || ''
+            : (initialTechPack as any).technicalDesignerId || '',
           fabricDescription: (initialTechPack as any).fabricDescription || '',
           season: (((initialTechPack as any).season || (initialTechPack as any).metadata?.season || 'SS25')) as any,
           brand: (initialTechPack as any).brand || '',
@@ -140,14 +145,21 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       component: RevisionTab,
       description: 'Change tracking',
     },
+    {
+      id: 6,
+      name: 'Sharing',
+      icon: Share2,
+      component: SharingTab,
+      description: 'Access control and sharing',
+    },
   ];
 
   // Calculate tab completion status
   const getTabCompletionStatus = (tabId: number) => {
     switch (tabId) {
       case 0: // Article Info
-        return !!(techpack.articleInfo.articleCode && 
-                 techpack.articleInfo.productName && 
+        return !!(techpack.articleInfo.articleCode &&
+                 techpack.articleInfo.productName &&
                  techpack.articleInfo.fabricDescription);
       case 1: // BOM
         return techpack.bom.length > 0;
@@ -184,6 +196,14 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
   };
 
   const handleSave = async () => {
+    // If we're on the Article Info tab (tab 0), validate before saving
+    if (currentTab === 0 && articleInfoTabRef.current) {
+      const isValid = articleInfoTabRef.current.validateAndSave();
+      if (!isValid) {
+        return; // Stop saving if validation fails
+      }
+    }
+
     await saveTechPack();
   };
 
@@ -191,7 +211,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
     exportToPDF();
   };
 
-  const CurrentTabComponent = tabs[currentTab]?.component || ArticleInfoTab;
+  const CurrentTabComponent = tabs[currentTab]?.component;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -233,12 +253,12 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
                   </span>
                 </div>
               </div>
-              
+
               {/* Progress Bar */}
               <div className="flex items-center space-x-3">
                 <div className="text-sm text-gray-600">Progress:</div>
                 <div className="w-32 bg-gray-200 rounded-full h-2">
-                  <div 
+                  <div
                     className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${overallProgress}%` }}
                   />
@@ -314,7 +334,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
               const Icon = tab.icon;
               const isActive = currentTab === tab.id;
               const isComplete = getTabCompletionStatus(tab.id);
-              
+
               return (
                 <button
                   key={tab.id}
@@ -343,17 +363,24 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
 
       {/* Tab Content */}
       <div className="flex-1">
-        <CurrentTabComponent
-          techPack={techpack}
-          mode={mode}
-          onUpdate={(updates) => {
-            // Update context state using updateFormState
-            if (mode !== 'view') {
-              updateFormState(updates);
-            }
-          }}
-          setCurrentTab={setCurrentTab}
-        />
+        {
+          currentTab === 0 ? (
+            <ArticleInfoTab
+              ref={articleInfoTabRef}
+              techPack={techpack}
+              mode={mode}
+              onUpdate={updateFormState}
+              setCurrentTab={setCurrentTab}
+            />
+          ) : CurrentTabComponent ? (
+            <CurrentTabComponent
+              techPack={techpack}
+              mode={mode}
+              onUpdate={updateFormState}
+              setCurrentTab={setCurrentTab}
+            />
+          ) : null
+        }
       </div>
 
       {/* Save Notification */}

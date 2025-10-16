@@ -109,7 +109,7 @@ export const validateTechPackData = (
     if (!techpack.name) errors.push('TechPack name is required');
     if (!techpack.articleCode) errors.push('Article code is required');
     if (!techpack.version) errors.push('Version is required');
-    if (!techpack.designer) errors.push('Designer is required');
+    if (!techpack.technicalDesignerId) errors.push('Technical designer is required');
     if (!techpack.supplier) errors.push('Supplier is required');
   }
 

@@ -23,7 +23,7 @@ export class PDFController {
 
       // Get TechPack with all related data
       const techpack = await TechPack.findById(id)
-        .populate('designer', 'firstName lastName username')
+        .populate('technicalDesignerId', 'firstName lastName username')
         .populate('createdBy', 'firstName lastName username')
         .populate('updatedBy', 'firstName lastName username')
         .lean();
@@ -38,7 +38,7 @@ export class PDFController {
 
       // Check access permissions
       if (user.role === UserRole.Designer &&
-          techpack.designer._id.toString() !== user._id.toString()) {
+          techpack.technicalDesignerId._id.toString() !== user._id.toString()) {
         res.status(403).json({
           success: false,
           message: 'Access denied. You can only export your own TechPacks.'
@@ -134,7 +134,7 @@ export class PDFController {
 
       // Check access permissions
       if (user.role === UserRole.Designer &&
-          techpack.designer._id.toString() !== user._id.toString()) {
+          techpack.technicalDesignerId._id.toString() !== user._id.toString()) {
         res.status(403).json({
           success: false,
           message: 'Access denied. You can only preview your own TechPacks.'
@@ -193,7 +193,7 @@ export class PDFController {
 
       // Check access permissions
       if (user.role === UserRole.Designer &&
-          techpack.designer.toString() !== user._id.toString()) {
+          techpack.technicalDesignerId.toString() !== user._id.toString()) {
         res.status(403).json({
           success: false,
           message: 'Access denied. You can only view info for your own TechPacks.'
@@ -243,7 +243,7 @@ export class PDFController {
         name: techpack.productName,
         articleCode: techpack.articleCode,
         version: techpack.version,
-        designer: techpack.designerName,
+        designer: techpack.technicalDesignerId ? `${techpack.technicalDesignerId.firstName} ${techpack.technicalDesignerId.lastName}` : 'Unknown Designer',
         supplier: techpack.supplier,
         season: techpack.season,
         fabricDescription: techpack.fabricDescription,

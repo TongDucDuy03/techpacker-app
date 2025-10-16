@@ -46,7 +46,7 @@ export class TechPackPDFExporter {
       ],
       supplierInfo: [
         { label: 'Supplier', value: articleInfo.supplier },
-        { label: 'Technical Designer', value: articleInfo.technicalDesigner },
+        { label: 'Technical Designer', value: articleInfo.technicalDesignerId },
       ],
       fabricDescription: articleInfo.fabricDescription,
       notes: articleInfo.notes,

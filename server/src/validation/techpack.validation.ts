@@ -118,7 +118,7 @@ export const listTechPacksSchema = z.object({
     limit: z.string().transform(val => parseInt(val, 10)).refine(val => val > 0 && val <= 100, 'Limit must be between 1 and 100').optional(),
     q: z.string().optional(),
     status: z.nativeEnum(TechPackStatus).optional(),
-    designer: objectIdSchema.optional()
+    technicalDesignerId: objectIdSchema.optional()
   })
 });
 

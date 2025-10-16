@@ -51,7 +51,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         productClass: '',
         fitType: 'Regular',
         supplier: '',
-        technicalDesigner: '',
+        technicalDesignerId: '',
         fabricDescription: '',
         season: 'SS25',
         lifecycleStage: 'Concept',
@@ -80,6 +80,24 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     isSaving: false,
     hasUnsavedChanges: false,
   });
+
+  // Exit warning system - prevent accidental data loss
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (state.hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'Bạn có thay đổi chưa được lưu. Bạn có muốn lưu trước khi thoát không?';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [state.hasUnsavedChanges]);
+
 
   const loadTechPacks = useCallback(async (params = {}) => {
     console.log('🔄 Loading tech packs...', params);
@@ -128,7 +146,10 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           error: (err) => err.message || 'Failed to update tech pack',
         }
       );
-      await loadTechPacks();
+      // Optimistically update the local state instead of refetching the whole list
+      setTechPacks(prev =>
+        prev.map(tp => (tp._id === id ? { ...tp, ...updatedTechPack } : tp))
+      );
       return updatedTechPack;
     } catch (error) {
       // Error is already handled by showPromise
@@ -198,7 +219,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           productClass: '',
           fitType: 'Regular',
           supplier: '',
-          technicalDesigner: '',
+          technicalDesignerId: '',
           fabricDescription: '',
           season: 'SS25',
           lifecycleStage: 'Concept',
@@ -230,7 +251,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     setState(prev => ({ ...prev, isSaving: true }));
     try {
       const techpackData = state.techpack;
-      
+
       // If techpack has an ID, update existing; otherwise create new
       if (techpackData.id && techpackData.id !== '') {
         // For updates, use PATCH with flat fields expected by backend patch handler
@@ -244,7 +265,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           status: techpackData.status,
           category: techpackData.articleInfo.productClass,
           gender: techpackData.articleInfo.gender,
-          technicalDesigner: techpackData.articleInfo.technicalDesigner,
+          technicalDesignerId: techpackData.articleInfo.technicalDesignerId,
           lifecycleStage: techpackData.articleInfo.lifecycleStage as any,
           collectionName: (techpackData.articleInfo as any).collection,
           targetMarket: (techpackData.articleInfo as any).targetMarket,
@@ -272,7 +293,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
             fabricDescription: techpackData.articleInfo.fabricDescription || '',
             productClass: techpackData.articleInfo.productClass,
             gender: techpackData.articleInfo.gender,
-            technicalDesigner: techpackData.articleInfo.technicalDesigner,
+            technicalDesignerId: techpackData.articleInfo.technicalDesignerId,
             lifecycleStage: techpackData.articleInfo.lifecycleStage as any,
             collection: (techpackData.articleInfo as any).collection,
             targetMarket: (techpackData.articleInfo as any).targetMarket,
@@ -294,7 +315,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           techpack: { ...prev.techpack, id: newTechPack?._id || newTechPack?.id || '' }
         }));
       }
-      
+
       setState(prev => ({
         ...prev,
         isSaving: false,

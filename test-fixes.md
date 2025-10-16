@@ -103,3 +103,4 @@ db.techpacks.find().pretty()
 - ✅ Back to List button hoạt động đúng
 - ✅ List hiển thị tech pack đã tạo
 - ✅ Toàn bộ flow hoạt động mượt mà
+

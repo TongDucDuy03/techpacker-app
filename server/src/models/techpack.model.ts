@@ -86,13 +86,28 @@ export interface IHowToMeasure {
   relatedMeasurements?: string[];
 }
 
+export interface ISharedAccess {
+  userId: Types.ObjectId;
+  permission: 'view' | 'edit';
+  sharedAt: Date;
+  sharedBy: Types.ObjectId;
+}
+
+export interface IAuditLogEntry {
+  action: 'share_granted' | 'share_revoked' | 'permission_changed';
+  performedBy: Types.ObjectId;
+  targetUser: Types.ObjectId;
+  permission: 'view' | 'edit';
+  timestamp: Date;
+  techpackId: Types.ObjectId;
+}
+
 export interface ITechPack extends Document {
   productName: string;
   articleCode: string;
   version: string;
-  designer: Types.ObjectId;
-  designerName: string;
-  technicalDesigner?: string;
+  technicalDesignerId: Types.ObjectId;
+  customerId?: string;
   supplier: string;
   season: string;
   fabricDescription: string;
@@ -118,6 +133,8 @@ export interface ITechPack extends Document {
   updatedByName: string;
   createdAt: Date;
   updatedAt: Date;
+  sharedWith: ISharedAccess[];
+  auditLogs: IAuditLogEntry[];
 }
 
 const BOMItemSchema = new Schema<IBOMItem>({
@@ -193,6 +210,22 @@ const HowToMeasureSchema = new Schema<IHowToMeasure>({
   relatedMeasurements: [{ type: String }]
 });
 
+const SharedAccessSchema = new Schema<ISharedAccess>({
+  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  permission: { type: String, enum: ['view', 'edit'], required: true },
+  sharedAt: { type: Date, default: Date.now },
+  sharedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true }
+});
+
+const AuditLogEntrySchema = new Schema<IAuditLogEntry>({
+  action: { type: String, enum: ['share_granted', 'share_revoked', 'permission_changed'], required: true },
+  performedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  targetUser: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  permission: { type: String, enum: ['view', 'edit'], required: true },
+  timestamp: { type: Date, default: Date.now },
+  techpackId: { type: Schema.Types.ObjectId, ref: 'TechPack', required: true }
+});
+
 const TechPackSchema = new Schema<ITechPack>(
   {
     productName: {
@@ -211,19 +244,14 @@ const TechPackSchema = new Schema<ITechPack>(
       type: String,
       default: 'V1'
     },
-    designer: {
+    technicalDesignerId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true
     },
-    designerName: {
-      type: String,
-      required: true
-    },
-    technicalDesigner: {
-      type: String,
-      trim: true
-    },
+    customerId: { type: String, trim: true },
+    sharedWith: [SharedAccessSchema],
+    auditLogs: [AuditLogEntrySchema],
     supplier: {
       type: String,
       required: [true, 'Supplier is required'],
@@ -261,21 +289,17 @@ const TechPackSchema = new Schema<ITechPack>(
     howToMeasure: [HowToMeasureSchema],
     createdBy: {
       type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
+      ref: 'User'
     },
     createdByName: {
-      type: String,
-      required: true
+      type: String
     },
     updatedBy: {
       type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
+      ref: 'User'
     },
     updatedByName: {
-      type: String,
-      required: true
+      type: String
     }
   },
   {
@@ -287,7 +311,10 @@ const TechPackSchema = new Schema<ITechPack>(
 
 // Indexes for performance
 TechPackSchema.index({ articleCode: 1 });
-TechPackSchema.index({ designer: 1, createdAt: -1 });
+TechPackSchema.index({ technicalDesignerId: 1, createdAt: -1 });
+TechPackSchema.index({ createdBy: 1, createdAt: -1 });
+TechPackSchema.index({ customerId: 1, createdAt: -1 });
+TechPackSchema.index({ 'sharedWith.userId': 1 });
 TechPackSchema.index({ status: 1, updatedAt: -1 });
 TechPackSchema.index({ season: 1, brand: 1 });
 TechPackSchema.index({ createdAt: -1 });

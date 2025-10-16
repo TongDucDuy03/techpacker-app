@@ -1,21 +1,23 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { Form, Input, Button, Typography, Alert } from 'antd';
+import { MailOutlined, LockOutlined } from '@ant-design/icons';
+import './LoginPage.css';
+
+const { Title, Text } = Typography;
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const { login } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onFinish = async (values: any) => {
     setLoading(true);
     setError(null);
     try {
-      await login(email, password);
+      await login(values.email, values.password);
       navigate('/');
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');
@@ -25,36 +27,38 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: '400px', margin: '40px auto', padding: '20px', border: '1px solid #ccc', borderRadius: '8px' }}>
-      <h2>Login</h2>
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '15px' }}>
-          <label htmlFor="email">Email</label>
-          <input
-            type="email"
-            id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-          />
-        </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label htmlFor="password">Password</label>
-          <input
-            type="password"
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-          />
-        </div>
-        {error && <p style={{ color: 'red' }}>{error}</p>}
-        <button type="submit" disabled={loading} style={{ width: '100%', padding: '10px', cursor: 'pointer' }}>
-          {loading ? 'Logging in...' : 'Login'}
-        </button>
-      </form>
+    <div className="login-page">
+      <div className="login-card">
+        <Title level={2} className="login-title">Welcome Back</Title>
+        <Text className="login-subtitle">Please login to your account</Text>
+        <Form
+          name="login"
+          onFinish={onFinish}
+          autoComplete="off"
+        >
+          <Form.Item
+            name="email"
+            rules={[{ required: true, message: 'Please input your Email!' }, { type: 'email', message: 'The input is not valid E-mail!' }]}
+          >
+            <Input prefix={<MailOutlined />} placeholder="Email" />
+          </Form.Item>
+
+          <Form.Item
+            name="password"
+            rules={[{ required: true, message: 'Please input your Password!' }]}
+          >
+            <Input.Password prefix={<LockOutlined />} placeholder="Password" />
+          </Form.Item>
+
+          {error && <Alert message={error} type="error" showIcon style={{ marginBottom: '24px' }}/>}
+
+          <Form.Item>
+            <Button type="primary" htmlType="submit" className="login-form-button" loading={loading}>
+              Log in
+            </Button>
+          </Form.Item>
+        </Form>
+      </div>
     </div>
   );
 };

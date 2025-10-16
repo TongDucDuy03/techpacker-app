@@ -1,22 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { Button, Table, Input, Select, Tag, Space, Tooltip, Modal, message, Card, Row, Col, Statistic, Typography } from 'antd';
+import { ArrowLeftOutlined, PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, UserOutlined, TeamOutlined, RiseOutlined } from '@ant-design/icons';
 import { api } from '../../lib/api';
-import UserTable from './components/UserTable';
 import UserModal from './components/UserModal';
-import SearchAndFilters from './components/SearchAndFilters';
-import UserStats from './components/UserStats';
-import ConfirmationDialog from '../../components/ConfirmationDialog';
+import './UserListPage.css';
+
+const { Search } = Input;
+const { Option } = Select;
+const { Title, Text } = Typography;
+
 
 interface User {
   _id: string;
   firstName: string;
   lastName: string;
   email: string;
-  role: string;
+  role: 'admin' | 'designer' | 'merchandiser' | 'viewer';
   createdAt: string;
   lastLogin?: string;
 }
 
-interface UserStats {
+interface UserStatsData {
   totalUsers: number;
   roleDistribution: Record<string, number>;
   recentUsers: User[];
@@ -24,49 +29,31 @@ interface UserStats {
 
 const UserListPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
-  const [stats, setStats] = useState<UserStats | null>(null);
+  const [stats, setStats] = useState<UserStatsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit' | 'view'>('create');
-  const [confirmDialog, setConfirmDialog] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void;
-  }>({
-    isOpen: false,
-    title: '',
-    message: '',
-    onConfirm: () => {}
-  });
-  
-  // Pagination and filtering state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
+  const [filters, setFilters] = useState({ search: '', role: '' });
+  const [sorter, setSorter] = useState({ field: 'createdAt', order: 'descend' });
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
       const response = await api.getAllUsers({
-        page: currentPage,
-        limit: 10,
-        search: searchTerm,
-        role: roleFilter,
-        sortBy,
-        sortOrder
+        page: pagination.current,
+        limit: pagination.pageSize,
+        search: filters.search,
+        role: filters.role,
+        sortBy: sorter.field,
+        sortOrder: sorter.order === 'ascend' ? 'asc' : 'desc',
       });
-      
       setUsers(response.users);
-      setTotalPages(response.pagination.totalPages);
-      setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch users');
+      setPagination(prev => ({ ...prev, total: response.pagination.total }));
+    } catch (err) {
+      message.error('Failed to fetch users');
     } finally {
       setLoading(false);
     }
@@ -76,175 +63,133 @@ const UserListPage: React.FC = () => {
     try {
       const statsData = await api.getUserStats();
       setStats(statsData);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Failed to fetch user stats:', err);
     }
   };
 
   useEffect(() => {
     fetchUsers();
-  }, [currentPage, searchTerm, roleFilter, sortBy, sortOrder]);
+  }, [pagination.current, pagination.pageSize, filters, sorter]);
 
   useEffect(() => {
     fetchStats();
   }, []);
 
-  const handleCreateUser = () => {
-    setSelectedUser(null);
-    setModalMode('create');
-    setIsModalOpen(true);
+  const handleTableChange = (pagination: any, filters: any, sorter: any) => {
+    setPagination(prev => ({ ...prev, current: pagination.current, pageSize: pagination.pageSize }));
+    setSorter({ field: sorter.field || 'createdAt', order: sorter.order || 'descend' });
   };
 
-  const handleEditUser = (user: User) => {
-    setSelectedUser(user);
-    setModalMode('edit');
-    setIsModalOpen(true);
+  const handleUserSaved = () => {
+    setIsModalOpen(false);
+    fetchUsers();
+    fetchStats();
   };
 
-  const handleViewUser = (user: User) => {
-    setSelectedUser(user);
-    setModalMode('view');
-    setIsModalOpen(true);
-  };
-
-  const handleDeleteUser = async (userId: string) => {
-    const user = users.find(u => u._id === userId);
-    if (!user) return;
-
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Delete User',
-      message: `Are you sure you want to delete ${user.firstName} ${user.lastName} (${user.email})? This action cannot be undone and will permanently remove all user data.`,
-      onConfirm: async () => {
+  const showDeleteConfirm = (user: User) => {
+    Modal.confirm({
+      title: 'Are you sure you want to delete this user?',
+      content: `${user.firstName} ${user.lastName} will be permanently deleted.`,
+      okText: 'Yes, Delete',
+      okType: 'danger',
+      cancelText: 'No, Cancel',
+      onOk: async () => {
         try {
-          await api.deleteUser(userId);
-          await fetchUsers();
-          await fetchStats();
-          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
-        } catch (err: any) {
-          alert(err.message || 'Failed to delete user');
-          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+          await api.deleteUser(user._id);
+          message.success('User deleted successfully');
+          fetchUsers();
+          fetchStats();
+        } catch (error) {
+          message.error('Failed to delete user');
         }
-      }
+      },
     });
   };
 
-  const handleUserSaved = async () => {
-    setIsModalOpen(false);
-    await fetchUsers();
-    await fetchStats();
+  const roleColors: { [key: string]: string } = {
+    admin: 'red',
+    designer: 'blue',
+    merchandiser: 'green',
+    viewer: 'purple',
   };
 
-  const handleSearch = (term: string) => {
-    setSearchTerm(term);
-    setCurrentPage(1);
-  };
+  const columns = [
+    { title: 'Name', dataIndex: 'firstName', sorter: true, render: (text: string, record: User) => `${record.firstName} ${record.lastName}` },
+    { title: 'Email', dataIndex: 'email', sorter: true },
+    { title: 'Role', dataIndex: 'role', sorter: true, render: (role: string) => <Tag color={roleColors[role]}>{role.toUpperCase()}</Tag> },
+    { title: 'Created At', dataIndex: 'createdAt', sorter: true, render: (date: string) => new Date(date).toLocaleDateString() },
+    { title: 'Last Login', dataIndex: 'lastLogin', sorter: true, render: (date: string) => date ? new Date(date).toLocaleString() : 'N/A' },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, record: User) => (
+        <Space size="middle">
+          <Tooltip title="View"><Button icon={<EyeOutlined />} onClick={() => { setSelectedUser(record); setModalMode('view'); setIsModalOpen(true); }} /></Tooltip>
+          <Tooltip title="Edit"><Button icon={<EditOutlined />} onClick={() => { setSelectedUser(record); setModalMode('edit'); setIsModalOpen(true); }} /></Tooltip>
+          <Tooltip title="Delete"><Button icon={<DeleteOutlined />} danger onClick={() => showDeleteConfirm(record)} /></Tooltip>
+        </Space>
+      ),
+    },
+  ];
 
-  const handleRoleFilter = (role: string) => {
-    setRoleFilter(role);
-    setCurrentPage(1);
-  };
-
-  const handleSort = (field: string) => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortOrder('asc');
-    }
-    setCurrentPage(1);
-  };
-
-  if (loading && users.length === 0) {
-    return <div style={{ padding: '20px' }}>Loading users...</div>;
-  }
+  const userStats = useMemo(() => (
+    <Row gutter={16} className="stats-container">
+      <Col span={8}><Card><Statistic title="Total Users" value={stats?.totalUsers} prefix={<TeamOutlined />} /></Card></Col>
+      <Col span={8}><Card><Statistic title="Most Common Role" value={Object.keys(stats?.roleDistribution || {}).reduce((a, b) => (stats?.roleDistribution[a] || 0) > (stats?.roleDistribution[b] || 0) ? a : b, 'N/A')} prefix={<UserOutlined />} /></Card></Col>
+      <Col span={8}><Card><Statistic title="New Users (Last 7 Days)" value={stats?.recentUsers.length} prefix={<RiseOutlined />} /></Card></Col>
+    </Row>
+  ), [stats]);
 
   return (
-    <div style={{ padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1>User Management</h1>
-        <button 
-          onClick={handleCreateUser}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          Add New User
-        </button>
+    <div className="user-list-page">
+      <div className="page-header">
+        <Row justify="space-between" align="middle">
+          <Col>
+            <Space align="center">
+              <Button icon={<ArrowLeftOutlined />} onClick={() => window.history.back()} />
+              <div>
+                <Title level={3} style={{ marginBottom: 0 }}>User Management</Title>
+                <Text type="secondary">Administer users and roles</Text>
+              </div>
+            </Space>
+          </Col>
+          <Col>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => { setSelectedUser(null); setModalMode('create'); setIsModalOpen(true); }}>
+              Add New User
+            </Button>
+          </Col>
+        </Row>
       </div>
 
-      {stats && <UserStats stats={stats} />}
+      {userStats}
 
-      <SearchAndFilters
-        searchTerm={searchTerm}
-        roleFilter={roleFilter}
-        onSearch={handleSearch}
-        onRoleFilter={handleRoleFilter}
-      />
-
-      {error && (
-        <div style={{ 
-          padding: '10px', 
-          backgroundColor: '#f8d7da', 
-          color: '#721c24', 
-          border: '1px solid #f5c6cb',
-          borderRadius: '4px',
-          marginBottom: '20px'
-        }}>
-          {error}
+      <Card className="table-card">
+        <div className="table-header">
+          <Row justify="space-between" align="middle">
+            <Col><Title level={4}>All Users</Title></Col>
+            <Col>
+              <Space>
+                <Search placeholder="Search by name or email" onSearch={value => setFilters({ ...filters, search: value })} style={{ width: 250 }} allowClear />
+                <Select placeholder="Filter by role" onChange={value => setFilters({ ...filters, role: value })} style={{ width: 150 }} allowClear>
+                  <Option value="admin">Admin</Option>
+                  <Option value="designer">Designer</Option>
+                  <Option value="merchandiser">Merchandiser</Option>
+                  <Option value="viewer">Viewer</Option>
+                </Select>
+              </Space>
+            </Col>
+          </Row>
         </div>
-      )}
-
-      <UserTable
-        users={users}
-        loading={loading}
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        onSort={handleSort}
-        onEdit={handleEditUser}
-        onView={handleViewUser}
-        onDelete={handleDeleteUser}
-      />
-
-      {/* Pagination */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        marginTop: '20px',
-        gap: '10px'
-      }}>
-        <button 
-          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-          disabled={currentPage === 1}
-          style={{
-            padding: '8px 12px',
-            border: '1px solid #ccc',
-            backgroundColor: currentPage === 1 ? '#f8f9fa' : 'white',
-            cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
-          }}
-        >
-          Previous
-        </button>
-        <span>Page {currentPage} of {totalPages}</span>
-        <button 
-          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-          disabled={currentPage === totalPages}
-          style={{
-            padding: '8px 12px',
-            border: '1px solid #ccc',
-            backgroundColor: currentPage === totalPages ? '#f8f9fa' : 'white',
-            cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
-          }}
-        >
-          Next
-        </button>
-      </div>
+        <Table
+          columns={columns}
+          dataSource={users}
+          rowKey="_id"
+          loading={loading}
+          pagination={pagination}
+          onChange={handleTableChange}
+        />
+      </Card>
 
       {isModalOpen && (
         <UserModal
@@ -254,17 +199,6 @@ const UserListPage: React.FC = () => {
           onSave={handleUserSaved}
         />
       )}
-
-      <ConfirmationDialog
-        isOpen={confirmDialog.isOpen}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        confirmText="Delete"
-        cancelText="Cancel"
-        type="danger"
-        onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
-      />
     </div>
   );
 };

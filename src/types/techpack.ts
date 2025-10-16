@@ -11,7 +11,7 @@ export interface ArticleInfo {
   productClass: string;
   fitType: 'Regular' | 'Slim' | 'Loose' | 'Relaxed' | 'Oversized';
   supplier: string;
-  technicalDesigner: string;
+  technicalDesignerId: string;
   fabricDescription: string;
   season: 'Spring' | 'Summer' | 'Autumn' | 'Winter' | 'SS25' | 'FW25' | 'SS26' | 'FW26';
   lifecycleStage: 'Concept' | 'Design' | 'Development' | 'Pre-production' | 'Production' | 'Shipped';
@@ -110,6 +110,23 @@ export interface RevisionEntry {
   rejectionReason?: string;
 }
 
+// Sharing and Access Control Types
+export interface SharedAccess {
+  userId: string;
+  permission: 'view' | 'edit';
+  sharedAt: string;
+  sharedBy: string;
+}
+
+export interface AuditLogEntry {
+  action: 'share_granted' | 'share_revoked' | 'permission_changed';
+  performedBy: string; // userId
+  targetUser: string;  // userId
+  permission: 'view' | 'edit';
+  timestamp: string;
+  techpackId: string;
+}
+
 // Backend API TechPack type (matches database response)
 export interface ApiTechPack {
   _id: string;
@@ -118,6 +135,11 @@ export interface ApiTechPack {
   version: string;
   status: 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'archived';
   ownerId: string;
+  createdBy: string;
+  technicalDesignerId: string;
+  customerId?: string;
+  sharedWith: SharedAccess[];
+  auditLogs: AuditLogEntry[];
   isDeleted: boolean;
   metadata?: {
     description?: string;

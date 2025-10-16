@@ -1,4 +1,5 @@
 import React from 'react';
+import { Eye, Edit, Trash2 } from 'lucide-react';
 
 interface User {
   _id: string;
@@ -65,9 +66,86 @@ const UserTable: React.FC<Props> = ({ users, loading, sortBy, sortOrder, onSort,
                 <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>{new Date(user.createdAt).toLocaleDateString()}</td>
                 <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>{user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'Never'}</td>
                 <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>
-                  <button onClick={() => onView(user)} style={{ marginRight: '5px' }}>View</button>
-                  <button onClick={() => onEdit(user)} style={{ marginRight: '5px' }}>Edit</button>
-                  <button onClick={() => onDelete(user._id)}>Delete</button>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                      onClick={() => onView(user)}
+                      title="View User"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '6px',
+                        border: '1px solid #6c757d',
+                        backgroundColor: 'white',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        color: '#6c757d',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#6c757d';
+                        e.currentTarget.style.color = 'white';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'white';
+                        e.currentTarget.style.color = '#6c757d';
+                      }}
+                    >
+                      <Eye size={16} />
+                    </button>
+                    <button
+                      onClick={() => onEdit(user)}
+                      title="Edit User"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '6px',
+                        border: '1px solid #007bff',
+                        backgroundColor: 'white',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        color: '#007bff',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#007bff';
+                        e.currentTarget.style.color = 'white';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'white';
+                        e.currentTarget.style.color = '#007bff';
+                      }}
+                    >
+                      <Edit size={16} />
+                    </button>
+                    <button
+                      onClick={() => onDelete(user._id)}
+                      title="Delete User"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '6px',
+                        border: '1px solid #dc3545',
+                        backgroundColor: 'white',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        color: '#dc3545',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#dc3545';
+                        e.currentTarget.style.color = 'white';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'white';
+                        e.currentTarget.style.color = '#dc3545';
+                      }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))

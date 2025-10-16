@@ -36,12 +36,16 @@ export class SubdocumentController {
         return;
       }
 
-      // Check ownership for Designer role
-      if (user.role === UserRole.Designer && 
-          techpack.designer.toString() !== user._id.toString()) {
+      // Check access permissions based on role and sharing
+      const isOwner = techpack.createdBy.toString() === user._id.toString();
+      const isTechnicalDesigner = techpack.technicalDesignerId.toString() === user._id.toString();
+      const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
+      const hasEditAccess = sharedAccess?.permission === 'edit';
+
+      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !hasEditAccess) {
         res.status(403).json({
           success: false,
-          message: 'Access denied. You can only modify your own TechPacks.'
+          message: 'Access denied. You do not have permission to modify this Tech Pack.'
         });
         return;
       }
@@ -114,12 +118,16 @@ export class SubdocumentController {
         return;
       }
 
-      // Check ownership for Designer role
-      if (user.role === UserRole.Designer && 
-          techpack.designer.toString() !== user._id.toString()) {
+      // Check access permissions based on role and sharing
+      const isOwner = techpack.createdBy.toString() === user._id.toString();
+      const isTechnicalDesigner = techpack.technicalDesignerId.toString() === user._id.toString();
+      const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
+      const hasEditAccess = sharedAccess?.permission === 'edit';
+
+      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !hasEditAccess) {
         res.status(403).json({
           success: false,
-          message: 'Access denied. You can only modify your own TechPacks.'
+          message: 'Access denied. You do not have permission to modify this Tech Pack.'
         });
         return;
       }
@@ -186,12 +194,16 @@ export class SubdocumentController {
         return;
       }
 
-      // Check ownership for Designer role
-      if (user.role === UserRole.Designer && 
-          techpack.designer.toString() !== user._id.toString()) {
+      // Check access permissions based on role and sharing
+      const isOwner = techpack.createdBy.toString() === user._id.toString();
+      const isTechnicalDesigner = techpack.technicalDesignerId.toString() === user._id.toString();
+      const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
+      const hasEditAccess = sharedAccess?.permission === 'edit';
+
+      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !hasEditAccess) {
         res.status(403).json({
           success: false,
-          message: 'Access denied. You can only modify your own TechPacks.'
+          message: 'Access denied. You do not have permission to modify this Tech Pack.'
         });
         return;
       }
@@ -268,12 +280,16 @@ export class SubdocumentController {
         return;
       }
 
-      // Check ownership for Designer role
-      if (user.role === UserRole.Designer && 
-          techpack.designer.toString() !== user._id.toString()) {
+      // Check access permissions based on role and sharing
+      const isOwner = techpack.createdBy.toString() === user._id.toString();
+      const isTechnicalDesigner = techpack.technicalDesignerId.toString() === user._id.toString();
+      const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
+      const hasEditAccess = sharedAccess?.permission === 'edit';
+
+      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !hasEditAccess) {
         res.status(403).json({
           success: false,
-          message: 'Access denied. You can only modify your own TechPacks.'
+          message: 'Access denied. You do not have permission to modify this Tech Pack.'
         });
         return;
       }
@@ -346,12 +362,16 @@ export class SubdocumentController {
         return;
       }
 
-      // Check ownership for Designer role
-      if (user.role === UserRole.Designer && 
-          techpack.designer.toString() !== user._id.toString()) {
+      // Check access permissions based on role and sharing
+      const isOwner = techpack.createdBy.toString() === user._id.toString();
+      const isTechnicalDesigner = techpack.technicalDesignerId.toString() === user._id.toString();
+      const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
+      const hasEditAccess = sharedAccess?.permission === 'edit';
+
+      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !hasEditAccess) {
         res.status(403).json({
           success: false,
-          message: 'Access denied. You can only modify your own TechPacks.'
+          message: 'Access denied. You do not have permission to modify this Tech Pack.'
         });
         return;
       }
@@ -418,12 +438,16 @@ export class SubdocumentController {
         return;
       }
 
-      // Check ownership for Designer role
-      if (user.role === UserRole.Designer &&
-          techpack.designer.toString() !== user._id.toString()) {
+      // Check access permissions based on role and sharing
+      const isOwner = techpack.createdBy.toString() === user._id.toString();
+      const isTechnicalDesigner = techpack.technicalDesignerId.toString() === user._id.toString();
+      const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
+      const hasEditAccess = sharedAccess?.permission === 'edit';
+
+      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !hasEditAccess) {
         res.status(403).json({
           success: false,
-          message: 'Access denied. You can only modify your own TechPacks.'
+          message: 'Access denied. You do not have permission to modify this Tech Pack.'
         });
         return;
       }
@@ -500,12 +524,16 @@ export class SubdocumentController {
         return;
       }
 
-      // Check ownership for Designer role
-      if (user.role === UserRole.Designer &&
-          techpack.designer.toString() !== user._id.toString()) {
+      // Check access permissions based on role and sharing
+      const isOwner = techpack.createdBy.toString() === user._id.toString();
+      const isTechnicalDesigner = techpack.technicalDesignerId.toString() === user._id.toString();
+      const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
+      const hasEditAccess = sharedAccess?.permission === 'edit';
+
+      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !hasEditAccess) {
         res.status(403).json({
           success: false,
-          message: 'Access denied. You can only modify your own TechPacks.'
+          message: 'Access denied. You do not have permission to modify this Tech Pack.'
         });
         return;
       }
@@ -578,12 +606,16 @@ export class SubdocumentController {
         return;
       }
 
-      // Check ownership for Designer role
-      if (user.role === UserRole.Designer &&
-          techpack.designer.toString() !== user._id.toString()) {
+      // Check access permissions based on role and sharing
+      const isOwner = techpack.createdBy.toString() === user._id.toString();
+      const isTechnicalDesigner = techpack.technicalDesignerId.toString() === user._id.toString();
+      const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
+      const hasEditAccess = sharedAccess?.permission === 'edit';
+
+      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !hasEditAccess) {
         res.status(403).json({
           success: false,
-          message: 'Access denied. You can only modify your own TechPacks.'
+          message: 'Access denied. You do not have permission to modify this Tech Pack.'
         });
         return;
       }
@@ -650,12 +682,16 @@ export class SubdocumentController {
         return;
       }
 
-      // Check ownership for Designer role
-      if (user.role === UserRole.Designer &&
-          techpack.designer.toString() !== user._id.toString()) {
+      // Check access permissions based on role and sharing
+      const isOwner = techpack.createdBy.toString() === user._id.toString();
+      const isTechnicalDesigner = techpack.technicalDesignerId.toString() === user._id.toString();
+      const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
+      const hasEditAccess = sharedAccess?.permission === 'edit';
+
+      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !hasEditAccess) {
         res.status(403).json({
           success: false,
-          message: 'Access denied. You can only modify your own TechPacks.'
+          message: 'Access denied. You do not have permission to modify this Tech Pack.'
         });
         return;
       }

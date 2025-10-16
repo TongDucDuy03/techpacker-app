@@ -202,6 +202,24 @@ const idValidation = [
     .withMessage('Invalid TechPack ID')
 ];
 
+const shareValidation = [
+  body('userId')
+    .isMongoId()
+    .withMessage('Invalid User ID'),
+  body('permission')
+    .isIn(['view', 'edit'])
+    .withMessage('Permission must be either view or edit')
+];
+
+const revokeValidation = [
+  param('id')
+    .isMongoId()
+    .withMessage('Invalid TechPack ID'),
+  param('userId')
+    .isMongoId()
+    .withMessage('Invalid User ID')
+];
+
 /**
  * @route GET /api/techpacks
  * @desc Get all TechPacks with pagination, search, and filters
@@ -324,6 +342,43 @@ router.patch(
       .withMessage('Status must be valid when action is setStatus')
   ],
   techpackController.bulkOperations
+);
+
+/**
+ * @route PUT /api/techpacks/:id/share
+ * @desc Share TechPack with a user
+ * @access Private (Owner or Admin only)
+ */
+router.put(
+  '/:id/share',
+  requireAuth,
+  idValidation,
+  shareValidation,
+  techpackController.shareTechPack
+);
+
+/**
+ * @route DELETE /api/techpacks/:id/share/:userId
+ * @desc Revoke TechPack sharing access
+ * @access Private (Owner or Admin only)
+ */
+router.delete(
+  '/:id/share/:userId',
+  requireAuth,
+  revokeValidation,
+  techpackController.revokeShare
+);
+
+/**
+ * @route GET /api/techpacks/:id/audit-logs
+ * @desc Get TechPack sharing audit logs
+ * @access Private (Owner or Admin only)
+ */
+router.get(
+  '/:id/audit-logs',
+  requireAuth,
+  idValidation,
+  techpackController.getAuditLogs
 );
 
 export default router;

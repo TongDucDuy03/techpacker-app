@@ -1,8 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { useTechPack } from '../../../contexts/TechPackContext';
 import { MeasurementPoint, SIZE_RANGES } from '../../../types/techpack';
+import { useFormValidation } from '../../../hooks/useFormValidation';
+import { measurementValidationSchema } from '../../../utils/validationSchemas';
 import Input from '../shared/Input';
-import { Plus, Upload, Download, Ruler, AlertTriangle, Info } from 'lucide-react';
+import { Plus, Upload, Download, Ruler, AlertTriangle, Info, AlertCircle } from 'lucide-react';
 
 const MeasurementTab: React.FC = () => {
   const context = useTechPack();
@@ -12,6 +14,9 @@ const MeasurementTab: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+
+  // Initialize validation for the form
+  const validation = useFormValidation(measurementValidationSchema);
   
   const [formData, setFormData] = useState<Partial<MeasurementPoint>>({
     pomCode: '',
@@ -37,15 +42,23 @@ const MeasurementTab: React.FC = () => {
   }, [availableSizes, selectedSizes.length]);
 
   const handleInputChange = (field: keyof MeasurementPoint) => (value: string | number | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    const updatedFormData = { ...formData, [field]: value };
+    setFormData(updatedFormData);
+
+    // Validate the field in real-time
+    validation.validateField(field, value);
   };
 
   const handleSizeValueChange = (size: string, value: string) => {
     const numValue = parseFloat(value) || 0;
-    setFormData(prev => ({
-      ...prev,
-      sizes: { ...prev.sizes, [size]: numValue }
-    }));
+    const updatedFormData = {
+      ...formData,
+      sizes: { ...formData.sizes, [size]: numValue }
+    };
+    setFormData(updatedFormData);
+
+    // Validate size measurements
+    validation.validateField('measurement', numValue);
   };
 
   const handleSizeToggle = (size: string) => {
@@ -61,16 +74,39 @@ const MeasurementTab: React.FC = () => {
   };
 
   const handleSubmit = () => {
-    if (!formData.pomCode || !formData.pomName) {
-      alert('Please fill in POM Code and POM Name');
-      return;
-    }
-
-    // Build sizes object with only selected sizes
+    // Build sizes object with only selected sizes for validation
     const sizes: Record<string, number> = {};
     selectedSizes.forEach(size => {
       sizes[size] = formData.sizes?.[size] || 0;
     });
+
+    // Create validation data object
+    const validationData = {
+      pointName: formData.pomName,
+      measurement: Math.min(...Object.values(sizes).filter(v => v > 0)) || 0, // Use smallest non-zero measurement
+      tolerance: parseFloat(formData.minusTolerance?.replace(/[^\d.]/g, '') || '0'),
+      unit: 'cm',
+      category: 'Length', // Default category
+      notes: formData.notes
+    };
+
+    // Validate the entire form before submission
+    const isValid = validation.validateForm(validationData);
+
+    if (!isValid) {
+      // Mark all fields as touched to show validation errors
+      Object.keys(measurementValidationSchema).forEach(field => {
+        validation.setFieldTouched(field, true);
+      });
+      return;
+    }
+
+    // Additional validation for sizes
+    const sizeValues = Object.values(sizes);
+    if (sizeValues.every(v => v <= 0)) {
+      validation.setFieldError('measurement', 'At least one size measurement must be greater than 0');
+      return;
+    }
 
     const measurement: MeasurementPoint = {
       id: editingIndex !== null ? measurements[editingIndex].id : `measurement_${Date.now()}`,
@@ -107,6 +143,9 @@ const MeasurementTab: React.FC = () => {
     });
     setShowAddForm(false);
     setEditingIndex(null);
+
+    // Reset validation state
+    validation.reset();
   };
 
   const handleEdit = (measurement: MeasurementPoint, index: number) => {
@@ -272,30 +311,42 @@ const MeasurementTab: React.FC = () => {
               label="POM Code"
               value={formData.pomCode || ''}
               onChange={handleInputChange('pomCode')}
+              onBlur={() => validation.setFieldTouched('pointName')}
               placeholder="e.g., CHEST, LENGTH"
               required
+              error={validation.getFieldProps('pointName').error}
+              helperText={validation.getFieldProps('pointName').helperText}
             />
-            
+
             <Input
               label="POM Name"
               value={formData.pomName || ''}
               onChange={handleInputChange('pomName')}
+              onBlur={() => validation.setFieldTouched('pointName')}
               placeholder="e.g., Chest 1 inch below armhole"
               required
+              error={validation.getFieldProps('pointName').error}
+              helperText={validation.getFieldProps('pointName').helperText}
             />
-            
+
             <Input
               label="Tolerance"
               value={formData.minusTolerance || ''}
               onChange={handleInputChange('minusTolerance')}
+              onBlur={() => validation.setFieldTouched('tolerance')}
               placeholder="e.g., +/- 1.0cm"
+              error={validation.getFieldProps('tolerance').error}
+              helperText={validation.getFieldProps('tolerance').helperText}
             />
-            
+
             <Input
               label="Measurement Method"
               value={formData.measurementMethod || ''}
               onChange={handleInputChange('measurementMethod')}
+              onBlur={() => validation.setFieldTouched('notes')}
               placeholder="Brief description of how to measure"
+              error={validation.getFieldProps('notes').error}
+              helperText={validation.getFieldProps('notes').helperText}
             />
           </div>
 
@@ -312,12 +363,16 @@ const MeasurementTab: React.FC = () => {
                     min="0"
                     value={formData.sizes?.[size] || ''}
                     onChange={(e) => handleSizeValueChange(size, e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    onBlur={() => validation.setFieldTouched('measurement')}
+                    className={`px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${validation.getFieldProps('measurement').error ? 'border-red-500' : 'border-gray-300'}`}
                     placeholder="0.0"
                   />
                 </div>
               ))}
             </div>
+            {validation.getFieldProps('measurement').error && (
+              <p className="mt-2 text-sm text-red-600">{validation.getFieldProps('measurement').helperText}</p>
+            )}
           </div>
 
           <div className="mb-4">
@@ -325,13 +380,42 @@ const MeasurementTab: React.FC = () => {
             <textarea
               value={formData.notes || ''}
               onChange={(e) => handleInputChange('notes')(e.target.value)}
+              onBlur={() => validation.setFieldTouched('notes')}
               placeholder="Additional notes or special instructions..."
               rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${validation.getFieldProps('notes').error ? 'border-red-500' : 'border-gray-300'}`}
             />
+            {validation.getFieldProps('notes').error && (
+              <p className="mt-1 text-sm text-red-600">{validation.getFieldProps('notes').helperText}</p>
+            )}
           </div>
           
-          <div className="flex items-center justify-end space-x-3">
+          {/* Validation Summary */}
+          {!validation.isValid && Object.keys(validation.errors).some(key => validation.touched[key]) && (
+            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-md">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <AlertCircle className="h-5 w-5 text-red-400" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    Please fix the following errors:
+                  </h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <ul className="list-disc pl-5 space-y-1">
+                      {Object.entries(validation.errors).map(([field, error]) =>
+                        validation.touched[field] && error ? (
+                          <li key={field}>{error}</li>
+                        ) : null
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end space-x-3 mt-6">
             <button
               onClick={resetForm}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
@@ -340,7 +424,12 @@ const MeasurementTab: React.FC = () => {
             </button>
             <button
               onClick={handleSubmit}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+              disabled={!validation.isValid}
+              className={`px-4 py-2 text-sm font-medium border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                validation.isValid
+                  ? 'text-white bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
+                  : 'text-gray-400 bg-gray-200 cursor-not-allowed'
+              }`}
             >
               {editingIndex !== null ? 'Update' : 'Add'} Measurement
             </button>

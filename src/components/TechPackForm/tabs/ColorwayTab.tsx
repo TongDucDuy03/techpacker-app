@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { useTechPack } from '../../../contexts/TechPackContext';
 import { Colorway, ColorwayPart } from '../../../types/techpack';
+import { useFormValidation } from '../../../hooks/useFormValidation';
+import { colorwayValidationSchema } from '../../../utils/validationSchemas';
 import Input from '../shared/Input';
 import Select from '../shared/Select';
 import DataTable from '../shared/DataTable';
-import { Plus, Palette, Copy, Eye, Star, Upload, Download } from 'lucide-react';
+import { Plus, Palette, Copy, Eye, Star, Upload, Download, AlertCircle } from 'lucide-react';
 
 const ColorwayTab: React.FC = () => {
   const context = useTechPack();
@@ -15,6 +17,10 @@ const ColorwayTab: React.FC = () => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [selectedColorway, setSelectedColorway] = useState<string>('');
   const [showPreview, setShowPreview] = useState(false);
+
+  // Initialize validation for the form
+  const validation = useFormValidation(colorwayValidationSchema);
+  const partValidation = useFormValidation(colorwayValidationSchema);
   
   const [formData, setFormData] = useState<Partial<Colorway>>({
     colorwayName: '',
@@ -65,12 +71,20 @@ const ColorwayTab: React.FC = () => {
   ];
 
   const handleInputChange = (field: keyof Colorway) => (value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    const updatedFormData = { ...formData, [field]: value };
+    setFormData(updatedFormData);
+
+    // Validate the field in real-time
+    validation.validateField(field, value);
   };
 
   const handlePartInputChange = (field: keyof ColorwayPart) => (value: string) => {
-    setPartFormData(prev => ({ ...prev, [field]: value }));
-    
+    const updatedPartFormData = { ...partFormData, [field]: value };
+    setPartFormData(updatedPartFormData);
+
+    // Validate the part field in real-time
+    partValidation.validateField(field, value);
+
     // Auto-generate RGB from hex
     if (field === 'hexCode' && value.match(/^#[0-9A-Fa-f]{6}$/)) {
       const r = parseInt(value.slice(1, 3), 16);
@@ -81,8 +95,11 @@ const ColorwayTab: React.FC = () => {
   };
 
   const handleAddPart = () => {
-    if (!partFormData.partName || !partFormData.colorName) {
-      alert('Please fill in part name and color name');
+    const isValid = partValidation.validateForm(partFormData);
+    if (!isValid) {
+      Object.keys(colorwayValidationSchema).forEach(field => {
+        partValidation.setFieldTouched(field, true);
+      });
       return;
     }
 
@@ -125,8 +142,11 @@ const ColorwayTab: React.FC = () => {
   };
 
   const handleSubmit = () => {
-    if (!formData.colorwayName || !formData.colorwayCode) {
-      alert('Please fill in colorway name and code');
+    const isValid = validation.validateForm(formData);
+    if (!isValid) {
+      Object.keys(colorwayValidationSchema).forEach(field => {
+        validation.setFieldTouched(field, true);
+      });
       return;
     }
 
@@ -171,6 +191,8 @@ const ColorwayTab: React.FC = () => {
     });
     setShowAddForm(false);
     setEditingIndex(null);
+    validation.reset();
+    partValidation.reset();
   };
 
   const handleEdit = (colorway: Colorway, index: number) => {
@@ -345,37 +367,52 @@ const ColorwayTab: React.FC = () => {
               label="Colorway Name"
               value={formData.colorwayName || ''}
               onChange={handleInputChange('colorwayName')}
+              onBlur={() => validation.setFieldTouched('colorwayName')}
               placeholder="e.g., Navy Blazer"
               required
+              error={validation.getFieldProps('colorwayName').error}
+              helperText={validation.getFieldProps('colorwayName').helperText}
             />
-            
+
             <Input
               label="Colorway Code"
               value={formData.colorwayCode || ''}
               onChange={handleInputChange('colorwayCode')}
+              onBlur={() => validation.setFieldTouched('colorwayCode')}
               placeholder="e.g., NVY001"
               required
+              error={validation.getFieldProps('colorwayCode').error}
+              helperText={validation.getFieldProps('colorwayCode').helperText}
             />
-            
+
             <Input
               label="Season"
               value={formData.season || ''}
               onChange={handleInputChange('season')}
+              onBlur={() => validation.setFieldTouched('season')}
               placeholder="e.g., SS25"
+              error={validation.getFieldProps('season').error}
+              helperText={validation.getFieldProps('season').helperText}
             />
             
             <Select
               label="Approval Status"
               value={formData.approvalStatus || 'Pending'}
               onChange={handleInputChange('approvalStatus')}
+              onBlur={() => validation.setFieldTouched('approvalStatus')}
               options={approvalStatusOptions}
+              error={validation.getFieldProps('approvalStatus').error}
+              helperText={validation.getFieldProps('approvalStatus').helperText}
             />
-            
+
             <Select
               label="Production Status"
               value={formData.productionStatus || 'Lab Dip'}
               onChange={handleInputChange('productionStatus')}
+              onBlur={() => validation.setFieldTouched('productionStatus')}
               options={productionStatusOptions}
+              error={validation.getFieldProps('productionStatus').error}
+              helperText={validation.getFieldProps('productionStatus').helperText}
             />
             
             <div className="flex items-center space-x-2 mt-6">
@@ -403,23 +440,31 @@ const ColorwayTab: React.FC = () => {
                   label="Part"
                   value={partFormData.partName || ''}
                   onChange={handlePartInputChange('partName')}
+                  onBlur={() => partValidation.setFieldTouched('colorName')}
                   options={availableParts}
                   placeholder="Select part..."
+                  error={partValidation.getFieldProps('colorName').error}
+                  helperText={partValidation.getFieldProps('colorName').helperText}
                 />
-                
+
                 <Input
                   label="Color Name"
                   value={partFormData.colorName || ''}
                   onChange={handlePartInputChange('colorName')}
+                  onBlur={() => partValidation.setFieldTouched('colorName')}
                   placeholder="e.g., Navy Blue"
+                  error={partValidation.getFieldProps('colorName').error}
+                  helperText={partValidation.getFieldProps('colorName').helperText}
                 />
-                
+
                 <Input
                   label="Pantone Code"
                   value={partFormData.pantoneCode || ''}
                   onChange={handlePartInputChange('pantoneCode')}
+                  onBlur={() => partValidation.setFieldTouched('pantoneCode')}
                   placeholder="19-4052 TPX"
-                  error={partFormData.pantoneCode && !validatePantoneCode(partFormData.pantoneCode) ? 'Invalid Pantone format' : undefined}
+                  error={partValidation.getFieldProps('pantoneCode').error}
+                  helperText={partValidation.getFieldProps('pantoneCode').helperText}
                 />
                 
                 <div className="flex flex-col space-y-1">
@@ -429,28 +474,37 @@ const ColorwayTab: React.FC = () => {
                       type="color"
                       value={partFormData.hexCode || '#000000'}
                       onChange={(e) => handlePartInputChange('hexCode')(e.target.value)}
-                      className="w-10 h-10 border border-gray-300 rounded cursor-pointer"
+                      onBlur={() => partValidation.setFieldTouched('hexCode')}
+                      className={`w-10 h-10 border rounded cursor-pointer ${partValidation.getFieldProps('hexCode').error ? 'border-red-500' : 'border-gray-300'}`}
                     />
                     <input
                       type="text"
                       value={partFormData.hexCode || '#000000'}
                       onChange={(e) => handlePartInputChange('hexCode')(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
+                      onBlur={() => partValidation.setFieldTouched('hexCode')}
+                      className={`flex-1 px-3 py-2 border rounded-md text-sm font-mono ${partValidation.getFieldProps('hexCode').error ? 'border-red-500' : 'border-gray-300'}`}
                       placeholder="#000000"
                     />
                   </div>
+                  {partValidation.getFieldProps('hexCode').error && (
+                    <p className="mt-1 text-xs text-red-600">{partValidation.getFieldProps('hexCode').helperText}</p>
+                  )}
                 </div>
-                
+
                 <Select
                   label="Type"
                   value={partFormData.colorType || 'Solid'}
                   onChange={handlePartInputChange('colorType')}
+                  onBlur={() => partValidation.setFieldTouched('colorType')}
                   options={colorTypeOptions}
+                  error={partValidation.getFieldProps('colorType').error}
+                  helperText={partValidation.getFieldProps('colorType').helperText}
                 />
-                
+
                 <button
                   onClick={handleAddPart}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 h-10"
+                  disabled={!partValidation.isValid}
+                  className={`px-4 py-2 text-sm font-medium text-white rounded-md h-10 ${!partValidation.isValid ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
                 >
                   Add Part
                 </button>
@@ -472,6 +526,31 @@ const ColorwayTab: React.FC = () => {
             )}
           </div>
           
+          {/* Validation Summary */}
+          {!validation.isValid && Object.keys(validation.errors).some(key => validation.touched[key]) && (
+            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-md">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <AlertCircle className="h-5 w-5 text-red-400" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    Please fix the following errors:
+                  </h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <ul className="list-disc pl-5 space-y-1">
+                      {Object.entries(validation.errors).map(([field, error]) =>
+                        validation.touched[field] && error ? (
+                          <li key={field}>{error}</li>
+                        ) : null
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-end space-x-3 mt-6">
             <button
               onClick={resetForm}
@@ -481,7 +560,8 @@ const ColorwayTab: React.FC = () => {
             </button>
             <button
               onClick={handleSubmit}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+              disabled={!validation.isValid}
+              className={`px-4 py-2 text-sm font-medium text-white border border-transparent rounded-md ${!validation.isValid ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
             >
               {editingIndex !== null ? 'Update' : 'Add'} Colorway
             </button>
