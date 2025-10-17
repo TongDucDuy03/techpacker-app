@@ -68,6 +68,8 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
             ? (initialTechPack as any).technicalDesignerId?._id || ''
             : (initialTechPack as any).technicalDesignerId || '',
           fabricDescription: (initialTechPack as any).fabricDescription || '',
+          productDescription: (initialTechPack as any).productDescription || '',
+          designSketchUrl: (initialTechPack as any).designSketchUrl || '',
           season: (((initialTechPack as any).season || (initialTechPack as any).metadata?.season || 'SS25')) as any,
           brand: (initialTechPack as any).brand || '',
           collection: (initialTechPack as any).collectionName || (initialTechPack as any).collection || '',
@@ -126,7 +128,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
     },
     {
       id: 3,
-      name: 'How to Measure',
+      name: 'Construction',
       icon: BookOpen,
       component: HowToMeasureTab,
       description: 'Measurement instructions',

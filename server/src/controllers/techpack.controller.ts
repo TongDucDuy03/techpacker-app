@@ -1,6 +1,8 @@
 import { Response } from 'express';
 import { validationResult } from 'express-validator';
-import TechPack, { TechPackStatus } from '../models/techpack.model';
+import TechPack, { ITechPack, TechPackStatus } from '../models/techpack.model';
+import Revision from '../models/revision.model';
+import RevisionService from '../services/revision.service';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { UserRole } from '../models/user.model';
 import User from '../models/user.model';
@@ -188,7 +190,7 @@ export class TechPackController {
         }
       })();
 
-      const { technicalDesignerId } = req.body;
+      const technicalDesignerId = articleInfo?.technicalDesignerId || req.body.technicalDesignerId;
       if (!technicalDesignerId || !Types.ObjectId.isValid(technicalDesignerId)) {
         return sendError(res, 'A valid Technical Designer is required', 400, 'VALIDATION_ERROR');
       }
@@ -201,6 +203,8 @@ export class TechPackController {
         supplier,
         season,
         fabricDescription,
+        productDescription: articleInfo?.productDescription,
+        designSketchUrl: articleInfo?.designSketchUrl,
         category: articleInfo?.productClass || req.body.category,
         gender: articleInfo?.gender || req.body.gender,
         brand: articleInfo?.brand || req.body.brand,
@@ -322,7 +326,7 @@ export class TechPackController {
       // Define whitelist of updatable fields to prevent schema validation errors
       const allowedFields = [
         'productName', 'articleCode', 'version', 'supplier', 'season',
-        'fabricDescription', 'status', 'category', 'gender', 'brand',
+        'fabricDescription', 'productDescription', 'designSketchUrl', 'status', 'category', 'gender', 'brand',
         'technicalDesignerId', 'lifecycleStage', 'collectionName', 'targetMarket', 'pricePoint',
         'retailPrice', 'currency', 'description', 'notes', 'bom',
         'measurements', 'colorways', 'howToMeasure'
@@ -359,8 +363,30 @@ export class TechPackController {
         }
       }
 
+      // Keep a snapshot of the old techpack for revision comparison
+      const oldTechPack = techpack.toObject({ virtuals: true }) as ITechPack;
+
       // Apply updates to the document
       Object.assign(techpack, updateData);
+
+      // Compare and create a revision if there are changes
+      const changes = RevisionService.compareTechPacks(oldTechPack, techpack);
+
+      if (changes.summary !== 'No changes detected.') {
+        const newRevision = new Revision({
+          techPackId: techpack._id,
+          version: techpack.version, // Assuming version is managed on the techpack itself
+          changes,
+          createdBy: user._id,
+          createdByName: `${user.firstName} ${user.lastName}`,
+          description: req.body.changeDescription || 'Automatic update',
+          changeType: 'auto',
+          statusAtChange: oldTechPack.status,
+          snapshot: techpack.toObject(),
+        });
+        await newRevision.save();
+      }
+
       const updatedTechPack = await techpack.save();
 
       await logActivity({ userId: user._id, userName: `${user.firstName} ${user.lastName}`, action: ActivityAction.TECHPACK_UPDATE, target: { type: 'TechPack', id: updatedTechPack._id as Types.ObjectId, name: updatedTechPack.productName }, req });

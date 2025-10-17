@@ -1,4 +1,5 @@
 import express from 'express';
+import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -17,6 +18,7 @@ import pdfRoutes from './routes/pdf.routes';
 import activityRoutes from './routes/activity.routes';
 import userRoutes from './routes/user.routes';
 import adminRoutes from './routes/admin.routes';
+import revisionRoutes from './routes/revision.routes';
 
 // Middleware
 import { setupSwagger } from './utils/swagger';
@@ -74,11 +76,16 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(compression());
 app.use(morgan(config.nodeEnv === 'production' ? 'combined' : 'dev'));
 
+
+
 // Setup Swagger documentation
 setupSwagger(app);
 
 // API Versioning
 const v1Router = express.Router();
+
+// Static file serving for uploads
+v1Router.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // API Routes
 v1Router.use('/auth', authRoutes);
@@ -89,6 +96,7 @@ v1Router.use('/techpacks', pdfRoutes);
 v1Router.use('/activities', activityRoutes);
 v1Router.use('/users', userRoutes);
 v1Router.use('/admin', adminRoutes);
+v1Router.use('/', revisionRoutes); // Revision routes
 
 app.use('/api/v1', v1Router);
 

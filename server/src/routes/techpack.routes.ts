@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import techpackController from '../controllers/techpack.controller';
 import { requireAuth, requireRole } from '../middleware/auth.middleware';
+import upload from '../middleware/upload.middleware';
 import { UserRole } from '../models/user.model';
 
 const router = Router();
@@ -379,6 +380,26 @@ router.get(
   requireAuth,
   idValidation,
   techpackController.getAuditLogs
+);
+
+/**
+ * @route POST /api/techpacks/upload-sketch
+ * @desc Upload a design sketch image
+ * @access Private (Admin and Designer only)
+ */
+router.post(
+  '/upload-sketch',
+  requireAuth,
+  requireRole([UserRole.Admin, UserRole.Designer]),
+  upload.single('designSketch'),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded.' });
+    }
+    // The backend serves static files from /uploads, so the URL is relative to that.
+    const fileUrl = `/uploads/${req.file.filename}`;
+    return res.status(200).json({ success: true, message: 'File uploaded successfully', data: { url: fileUrl } });
+  }
 );
 
 export default router;

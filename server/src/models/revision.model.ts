@@ -1,18 +1,21 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
+export type ChangeType = 'auto' | 'manual' | 'approval' | 'rollback';
+
 export interface IRevisionChange {
-  field: string;
-  oldValue: any;
-  newValue: any;
+  summary: string; // e.g., "BOM: 1 added, 2 modified. Measurements: 1 modified."
+  details: Record<string, { added?: number; modified?: number; removed?: number }>;
 }
 
 export interface IRevision extends Document {
   techPackId: Types.ObjectId;
   version: string;
-  changes: IRevisionChange[];
+  changes: IRevisionChange;
   createdBy: Types.ObjectId;
   createdByName: string;
-  reason?: string;
+  description?: string; // User-provided reason for the change
+  changeType: ChangeType;
+  statusAtChange: string; // The status of the TechPack when this revision was created
   approvedBy?: Types.ObjectId;
   approvedByName?: string;
   approvedAt?: Date;
@@ -22,18 +25,8 @@ export interface IRevision extends Document {
 
 const RevisionChangeSchema = new Schema<IRevisionChange>(
   {
-    field: {
-      type: String,
-      required: true
-    },
-    oldValue: {
-      type: Schema.Types.Mixed,
-      default: null
-    },
-    newValue: {
-      type: Schema.Types.Mixed,
-      default: null
-    }
+    summary: { type: String, required: true },
+    details: { type: Schema.Types.Mixed, required: true },
   },
   { _id: false }
 );
@@ -49,7 +42,7 @@ const RevisionSchema = new Schema<IRevision>(
       type: String,
       required: true
     },
-    changes: [RevisionChangeSchema],
+    changes: { type: RevisionChangeSchema, required: true },
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: 'User',
@@ -59,10 +52,9 @@ const RevisionSchema = new Schema<IRevision>(
       type: String,
       required: true
     },
-    reason: {
-      type: String,
-      trim: true
-    },
+    description: { type: String, trim: true },
+    changeType: { type: String, enum: ['auto', 'manual', 'approval', 'rollback'], required: true },
+    statusAtChange: { type: String, required: true },
     approvedBy: {
       type: Schema.Types.ObjectId,
       ref: 'User'

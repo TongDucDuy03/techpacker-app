@@ -13,6 +13,8 @@ export interface ArticleInfo {
   supplier: string;
   technicalDesignerId: string;
   fabricDescription: string;
+  productDescription: string;
+  designSketchUrl?: string;
   season: 'Spring' | 'Summer' | 'Autumn' | 'Winter' | 'SS25' | 'FW25' | 'SS26' | 'FW26';
   lifecycleStage: 'Concept' | 'Design' | 'Development' | 'Pre-production' | 'Production' | 'Shipped';
   createdDate: string;
@@ -247,6 +249,8 @@ export interface InputProps {
   label: string;
   value: string | number;
   onChange: (value: string | number) => void;
+  onBlur?: () => void;
+  helperText?: string;
   type?: 'text' | 'number' | 'email' | 'tel' | 'url';
   placeholder?: string;
   required?: boolean;
@@ -262,6 +266,8 @@ export interface SelectProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
+  helperText?: string;
   options: Array<{ value: string; label: string }> | string[];
   placeholder?: string;
   required?: boolean;
@@ -274,6 +280,8 @@ export interface TextareaProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
+  helperText?: string;
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;

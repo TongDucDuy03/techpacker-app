@@ -111,6 +111,8 @@ export interface ITechPack extends Document {
   supplier: string;
   season: string;
   fabricDescription: string;
+  productDescription: string;
+  designSketchUrl?: string;
   status: TechPackStatus;
   lifecycleStage?: 'Concept' | 'Design' | 'Development' | 'Pre-production' | 'Production' | 'Shipped';
   category?: string;
@@ -266,6 +268,19 @@ const TechPackSchema = new Schema<ITechPack>(
       type: String,
       required: [true, 'Fabric description is required'],
       trim: true
+    },
+    productDescription: {
+      type: String,
+      required: [true, 'Product description is required'],
+      trim: true
+    },
+    designSketchUrl: {
+      type: String,
+      trim: true,
+      // Conditionally required based on lifecycle stage
+      required: function(this: ITechPack) {
+        return ['Concept', 'Design'].includes(this.lifecycleStage || '');
+      }
     },
     status: {
       type: String,

@@ -2,11 +2,13 @@ import React, { useState, useEffect, useMemo, useImperativeHandle, forwardRef } 
 import { useFormValidation } from '../../../hooks/useFormValidation';
 import { articleInfoValidationSchema } from '../../../utils/validationSchemas';
 import { api } from '../../../lib/api';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001/api/v1';
 import { TechPack, PRODUCT_CLASSES, ArticleInfo } from '../../../types/techpack';
 import Input from '../shared/Input';
 import Select from '../shared/Select';
 import Textarea from '../shared/Textarea';
-import { Save, RotateCcw, ArrowRight, Calendar, User } from 'lucide-react';
+import { Save, RotateCcw, ArrowRight, Calendar, User, UploadCloud, Image as ImageIcon, XCircle } from 'lucide-react';
 
 interface ArticleInfoTabProps {
   techPack?: TechPack;
@@ -19,11 +21,14 @@ export interface ArticleInfoTabRef {
   validateAndSave: () => boolean;
 }
 
-const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>(({ techPack, mode = 'create', onUpdate, setCurrentTab }, ref) => {
+const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props, ref) => {
+  const { techPack, mode = 'create', onUpdate, setCurrentTab } = props;
   const validation = useFormValidation(articleInfoValidationSchema);
   const { articleInfo } = techPack ?? {};
   const [designers, setDesigners] = useState<Array<{ value: string; label: string }>>([]);
   const [loadingDesigners, setLoadingDesigners] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Fallback if no techPack is passed
   const safeArticleInfo = articleInfo ?? {
@@ -36,6 +41,8 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>(({ tec
     supplier: '',
     technicalDesignerId: '',
     fabricDescription: '',
+    productDescription: '',
+    designSketchUrl: '',
     season: 'SS25',
     lifecycleStage: 'Concept',
     createdDate: new Date().toISOString(),
@@ -122,6 +129,35 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>(({ tec
     validation.validateField(field, value);
   };
 
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    setUploadError(null);
+
+    const formData = new FormData();
+    formData.append('designSketch', file);
+
+    try {
+      const response = await api.post('/techpacks/upload-sketch', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (response.data.success) {
+        handleInputChange('designSketchUrl')(response.data.data.url);
+      } else {
+        setUploadError(response.data.message || 'Failed to upload image.');
+      }
+    } catch (error: any) {
+      setUploadError(error.response?.data?.message || error.message || 'An unexpected error occurred.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleReset = () => {
     const confirmed = window.confirm('Are you sure you want to reset all fields? This action cannot be undone.');
     if (confirmed) {
@@ -137,6 +173,8 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>(({ tec
           supplier: '',
           technicalDesignerId: '',
           fabricDescription: '',
+          productDescription: '',
+          designSketchUrl: '',
           season: 'Spring',
           lifecycleStage: 'Concept',
           brand: '',
@@ -195,18 +233,39 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>(({ tec
 
   // Calculate form completion percentage
   const completionPercentage = useMemo(() => {
-    const requiredFields = ['articleCode', 'productName', 'fabricDescription'];
+    const requiredFields = ['articleCode', 'productName', 'fabricDescription', 'productDescription'];
     const optionalFields = ['supplier', 'technicalDesignerId', 'productClass'];
-    
-    const requiredCompleted = requiredFields.filter(field => 
+
+    let totalRequired = requiredFields.length;
+    let totalCompleted = 0;
+
+    // Count completed required fields
+    requiredFields.forEach(field => {
+      if (safeArticleInfo[field as keyof typeof safeArticleInfo]) {
+        totalCompleted++;
+      }
+    });
+
+    // Handle conditionally required designSketchUrl
+    const isDesignSketchRequired = ['Concept', 'Design'].includes(safeArticleInfo.lifecycleStage);
+    if (isDesignSketchRequired) {
+      totalRequired++;
+      if (safeArticleInfo.designSketchUrl) {
+        totalCompleted++;
+      }
+    }
+
+    // Count completed optional fields
+    const optionalCompleted = optionalFields.filter(field =>
       safeArticleInfo[field as keyof typeof safeArticleInfo]
     ).length;
-    
-    const optionalCompleted = optionalFields.filter(field => 
-      safeArticleInfo[field as keyof typeof safeArticleInfo]
-    ).length;
-    
-    return Math.round(((requiredCompleted * 2 + optionalCompleted) / (requiredFields.length * 2 + optionalFields.length)) * 100);
+
+    const totalFieldsWeight = (totalRequired * 2) + optionalFields.length;
+    if (totalFieldsWeight === 0) return 0; // Avoid division by zero
+
+    const completedWeight = (totalCompleted * 2) + optionalCompleted;
+
+    return Math.round((completedWeight / totalFieldsWeight) * 100);
   }, [safeArticleInfo]);
 
   return (
@@ -454,6 +513,85 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>(({ tec
 
               <div className="md:col-span-2">
                 <Textarea
+                  label="Product Description"
+                  value={safeArticleInfo.productDescription}
+                  onChange={handleInputChange('productDescription')}
+                  onBlur={() => validation.setFieldTouched('productDescription')}
+                  placeholder="Detailed product description including design, functionality, materials, and style..."
+                  required
+                  rows={4}
+                  maxLength={1000}
+                  disabled={mode === 'view'}
+                  error={validation.getFieldProps('productDescription').error}
+                  helperText={validation.getFieldProps('productDescription').helperText}
+                />
+              </div>
+
+              {/* Design Sketch Upload */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Design Sketch
+                  {(['Concept', 'Design'].includes(safeArticleInfo.lifecycleStage)) && (
+                    <span className="text-red-500 ml-1">*</span>
+                  )}
+                </label>
+
+                {mode !== 'view' && (
+                  <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-gray-400 transition-colors">
+                    <div className="space-y-1 text-center">
+                      <UploadCloud className="mx-auto h-12 w-12 text-gray-400" />
+                      <div className="flex text-sm text-gray-600">
+                        <label
+                          htmlFor="design-sketch-upload"
+                          className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
+                        >
+                          <span>Upload a design sketch</span>
+                          <input
+                            id="design-sketch-upload"
+                            name="design-sketch-upload"
+                            type="file"
+                            className="sr-only"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            disabled={uploading}
+                          />
+                        </label>
+                        <p className="pl-1">or drag and drop</p>
+                      </div>
+                      <p className="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</p>
+                      {uploading && (
+                        <p className="text-xs text-blue-600">Uploading...</p>
+                      )}
+                      {uploadError && (
+                        <p className="text-xs text-red-600">{uploadError}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Image Preview */}
+                {safeArticleInfo.designSketchUrl && (
+                  <div className="mt-4 relative">
+                    <img
+                      src={`${API_BASE_URL}${safeArticleInfo.designSketchUrl}`}
+                      alt="Design Sketch"
+                      className="max-w-full h-auto max-h-64 rounded-lg shadow-sm border border-gray-200"
+                    />
+                    {mode !== 'view' && (
+                      <button
+                        onClick={() => handleInputChange('designSketchUrl')('')}
+                        className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        title="Remove image"
+                      >
+                        <XCircle className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="md:col-span-2">
+                <Textarea
                   label="Notes"
                   value={safeArticleInfo.notes || ''}
                   onChange={handleInputChange('notes')}
@@ -553,6 +691,26 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>(({ tec
                 </div>
               )}
 
+              {safeArticleInfo.productDescription && (
+                <div className="pt-4 border-t border-gray-200">
+                  <h5 className="text-sm font-medium text-gray-700 mb-2">Description</h5>
+                  <p className="text-xs text-gray-600 line-clamp-3">
+                    {safeArticleInfo.productDescription}
+                  </p>
+                </div>
+              )}
+
+              {safeArticleInfo.designSketchUrl && (
+                <div className="pt-4 border-t border-gray-200">
+                  <h5 className="text-sm font-medium text-gray-700 mb-2">Design Sketch</h5>
+                  <img
+                    src={`${API_BASE_URL}${safeArticleInfo.designSketchUrl}`}
+                    alt="Design Sketch Preview"
+                    className="w-full h-auto max-h-32 rounded border border-gray-200 object-cover"
+                  />
+                </div>
+              )}
+
               <div className="pt-4 border-t border-gray-200 space-y-2 text-xs text-gray-500">
                 <div className="flex items-center">
                   <Calendar className="w-3 h-3 mr-1" />
@@ -567,264 +725,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>(({ tec
           </div>
         </div>
       </div>
-    </div>
-  );
-};
-
-
-  useImperativeHandle(ref, () => ({
-    validateAndSave: () => {
-      const isValid = validation.validateForm(safeArticleInfo);
-      if (!isValid) {
-        Object.keys(articleInfoValidationSchema).forEach(field => {
-          validation.setFieldTouched(field, true);
-        });
-        const firstErrorField = Object.keys(validation.errors).find(key => validation.errors[key]);
-        if (firstErrorField) {
-          const element = document.querySelector(`[id*="${firstErrorField}"]`);
-          element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }
-      return isValid;
-    }
-  }));
-
-  return (
-    <div className="p-6 bg-white rounded-lg shadow-md">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Article Code */}
-        <Input
-          label="Article Code"
-          value={safeArticleInfo.articleCode}
-          onChange={(value) => handleInputChange('articleCode', value)}
-          required
-          placeholder="e.g., NIKE-SHOE-001"
-          error={validation.errors.articleCode}
-          onBlur={() => validation.setFieldTouched('articleCode')}
-          disabled={mode === 'view'}
-        />
-
-        {/* Product Name */}
-        <Input
-          label="Product Name"
-          value={safeArticleInfo.productName}
-          onChange={(value) => handleInputChange('productName', value)}
-          required
-          placeholder="e.g., Air Max 90"
-          className="lg:col-span-2"
-          error={validation.errors.productName}
-          onBlur={() => validation.setFieldTouched('productName')}
-          disabled={mode === 'view'}
-        />
-
-        {/* Version */}
-        <Input
-          label="Version"
-          type="number"
-          value={safeArticleInfo.version}
-          onChange={(value) => handleInputChange('version', value)}
-          required
-          min={1}
-          error={validation.errors.version}
-          onBlur={() => validation.setFieldTouched('version')}
-          disabled={mode === 'view'}
-        />
-
-        {/* Gender */}
-        <Select
-          label="Gender"
-          value={safeArticleInfo.gender}
-          onChange={(value) => handleInputChange('gender', value)}
-          options={['Men', 'Women', 'Unisex', 'Kids']}
-          required
-          error={validation.errors.gender}
-          onBlur={() => validation.setFieldTouched('gender')}
-          disabled={mode === 'view'}
-        />
-
-        {/* Product Class */}
-        <Select
-          label="Product Class"
-          value={safeArticleInfo.productClass}
-          onChange={(value) => handleInputChange('productClass', value)}
-          options={PRODUCT_CLASSES}
-          required
-          placeholder="Select product class..."
-          error={validation.errors.productClass}
-          onBlur={() => validation.setFieldTouched('productClass')}
-          disabled={mode === 'view'}
-        />
-
-        {/* Fit Type */}
-        <Select
-          label="Fit Type"
-          value={safeArticleInfo.fitType}
-          onChange={(value) => handleInputChange('fitType', value)}
-          options={['Regular', 'Slim', 'Loose', 'Relaxed', 'Oversized']}
-          required
-          error={validation.errors.fitType}
-          onBlur={() => validation.setFieldTouched('fitType')}
-          disabled={mode === 'view'}
-        />
-
-        {/* Supplier */}
-        <Input
-          label="Supplier"
-          value={safeArticleInfo.supplier}
-          onChange={(value) => handleInputChange('supplier', value)}
-          placeholder="e.g., Global Fabrics Inc."
-          error={validation.errors.supplier}
-          onBlur={() => validation.setFieldTouched('supplier')}
-          disabled={mode === 'view'}
-        />
-
-        {/* Technical Designer */}
-        <Select
-          label="Technical Designer"
-          value={safeArticleInfo.technicalDesignerId}
-          onChange={(value) => handleInputChange('technicalDesignerId', value)}
-          options={designers}
-          required
-          placeholder={loadingDesigners ? 'Loading...' : 'Select a designer...'}
-          error={validation.errors.technicalDesignerId}
-          onBlur={() => validation.setFieldTouched('technicalDesignerId')}
-          disabled={mode === 'view' || loadingDesigners}
-        />
-
-        {/* Season */}
-        <Select
-          label="Season"
-          value={safeArticleInfo.season}
-          onChange={(value) => handleInputChange('season', value)}
-          options={['SS25', 'FW25', 'SS26', 'FW26', 'Core']}
-          required
-          error={validation.errors.season}
-          onBlur={() => validation.setFieldTouched('season')}
-          disabled={mode === 'view'}
-        />
-
-        {/* Lifecycle Stage */}
-        <Select
-          label="Lifecycle Stage"
-          value={safeArticleInfo.lifecycleStage}
-          onChange={(value) => handleInputChange('lifecycleStage', value)}
-          options={['Concept', 'Design', 'Development', 'Pre-production', 'Production', 'Shipped']}
-          required
-          error={validation.errors.lifecycleStage}
-          onBlur={() => validation.setFieldTouched('lifecycleStage')}
-          disabled={mode === 'view'}
-        />
-
-        {/* Fabric Description */}
-        <Textarea
-          label="Fabric Description"
-          value={safeArticleInfo.fabricDescription}
-          onChange={(value) => handleInputChange('fabricDescription', value)}
-          required
-          placeholder="Describe the main fabric used..."
-          className="lg:col-span-4"
-          rows={4}
-          error={validation.errors.fabricDescription}
-          onBlur={() => validation.setFieldTouched('fabricDescription')}
-          disabled={mode === 'view'}
-        />
-      </div>
-
-      {/* Optional Fields Section */}
-      <div className="mt-8 pt-6 border-t border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Details</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Input
-            label="Brand"
-            value={safeArticleInfo.brand || ''}
-            onChange={(value) => handleInputChange('brand', value)}
-            placeholder="e.g., Nike Sportswear"
-            error={validation.errors.brand}
-            onBlur={() => validation.setFieldTouched('brand')}
-            disabled={mode === 'view'}
-          />
-          <Input
-            label="Collection"
-            value={safeArticleInfo.collection || ''}
-            onChange={(value) => handleInputChange('collection', value)}
-            placeholder="e.g., Tech Fleece"
-            error={validation.errors.collection}
-            onBlur={() => validation.setFieldTouched('collection')}
-            disabled={mode === 'view'}
-          />
-          <Input
-            label="Target Market"
-            value={safeArticleInfo.targetMarket || ''}
-            onChange={(value) => handleInputChange('targetMarket', value)}
-            placeholder="e.g., Young Adults"
-            error={validation.errors.targetMarket}
-            onBlur={() => validation.setFieldTouched('targetMarket')}
-            disabled={mode === 'view'}
-          />
-          <Select
-            label="Price Point"
-            value={safeArticleInfo.pricePoint || ''}
-            onChange={(value) => handleInputChange('pricePoint', value)}
-            options={['Value', 'Mid-range', 'Premium', 'Luxury']}
-            placeholder="Select a price point"
-            error={validation.errors.pricePoint}
-            onBlur={() => validation.setFieldTouched('pricePoint')}
-            disabled={mode === 'view'}
-          />
-          <Textarea
-            label="Notes"
-            value={safeArticleInfo.notes || ''}
-            onChange={(value) => handleInputChange('notes', value)}
-            placeholder="Any additional notes..."
-            className="lg:col-span-3"
-            rows={3}
-            error={validation.errors.notes}
-            onBlur={() => validation.setFieldTouched('notes')}
-            disabled={mode === 'view'}
-          />
-        </div>
-      </div>
-
-      {/* Dates and Meta */}
-      <div className="mt-6 text-sm text-gray-500 flex items-center justify-between">
-        <div className="flex items-center">
-          <Calendar className="w-4 h-4 mr-2" />
-          <span>Created: {new Date(safeArticleInfo.createdDate).toLocaleDateString()}</span>
-        </div>
-        <div className="flex items-center">
-          <User className="w-4 h-4 mr-2" />
-          <span>Last Modified: {new Date(safeArticleInfo.lastModified).toLocaleDateString()}</span>
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      {mode !== 'view' && (
-        <div className="mt-8 pt-6 border-t border-gray-200 flex justify-end space-x-4">
-          <button
-            onClick={handleReset}
-            className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            <RotateCcw className="w-4 h-4 mr-2" />
-            Reset
-          </button>
-
-          <button
-            onClick={handleSave}
-            className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            Save Draft
-          </button>
-
-          <button
-            onClick={handleNextTab}
-            className="flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-          >
-            Next: Bill of Materials
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </button>
-        </div>
-      )}
     </div>
   );
 });

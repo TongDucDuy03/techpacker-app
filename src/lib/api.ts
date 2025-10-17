@@ -185,6 +185,27 @@ class ApiClient {
     return new Error(error.message || 'Network error');
   }
 
+  // Generic HTTP methods
+  async post<T = any>(url: string, data?: any, config?: any): Promise<AxiosResponse<T>> {
+    return this.axiosInstance.post<T>(url, data, config);
+  }
+
+  async get<T = any>(url: string, config?: any): Promise<AxiosResponse<T>> {
+    return this.axiosInstance.get<T>(url, config);
+  }
+
+  async put<T = any>(url: string, data?: any, config?: any): Promise<AxiosResponse<T>> {
+    return this.axiosInstance.put<T>(url, data, config);
+  }
+
+  async patch<T = any>(url: string, data?: any, config?: any): Promise<AxiosResponse<T>> {
+    return this.axiosInstance.patch<T>(url, data, config);
+  }
+
+  async delete<T = any>(url: string, config?: any): Promise<AxiosResponse<T>> {
+    return this.axiosInstance.delete<T>(url, config);
+  }
+
   // Authentication methods
   async login(email: string, password: string): Promise<{ user: any; tokens: any }> {
     const response = await this.axiosInstance.post<ApiResponse<{ user: any; tokens: any }>>('/auth/login', {
@@ -432,8 +453,12 @@ class ApiClient {
       recentUsers: responseData.recentUsers || []
     };
   }
+
+  // Revision APIs
+  getRevisions = (techPackId: string, params?: any): Promise<any> => this.get(`/techpacks/${techPackId}/revisions`, { params });
+  getRevision = (revisionId: string): Promise<any> => this.get(`/revisions/${revisionId}`);
+  compareRevisions = (techPackId: string, from: string, to: string): Promise<any> => this.get(`/techpacks/${techPackId}/revisions/compare`, { params: { from, to } });
+  restoreRevision = (techPackId: string, revisionId: string): Promise<any> => this.post(`/techpacks/${techPackId}/revisions/${revisionId}/restore`);
 }
 
 export const api = new ApiClient();
-
-

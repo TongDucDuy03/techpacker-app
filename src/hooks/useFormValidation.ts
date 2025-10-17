@@ -14,7 +14,7 @@ export interface FormValidationState {
 
 export interface FormValidationActions {
   validateField: (fieldName: string, value: any) => void;
-  validateForm: (data: Record<string, any>) => boolean;
+  validateForm: (data: Record<string, any>) => { isValid: boolean; errors: Record<string, string> };
   setFieldTouched: (fieldName: string, touched?: boolean) => void;
   setFieldError: (fieldName: string, error: string | null) => void;
   clearErrors: () => void;
@@ -75,9 +75,9 @@ export function useFormValidation(
   }, [validateSingleField]);
 
   // Validate entire form
-  const handleValidateForm = useCallback((data: Record<string, any>): boolean => {
+  const handleValidateForm = useCallback((data: Record<string, any>): { isValid: boolean; errors: Record<string, string> } => {
     const result = validateFields(data, validationConfig);
-    
+
     const newErrors: Record<string, string> = {};
     result.errors.forEach(error => {
       newErrors[error.field] = error.message;
@@ -89,7 +89,7 @@ export function useFormValidation(
       isValid: result.isValid,
     }));
 
-    return result.isValid;
+    return { isValid: result.isValid, errors: newErrors };
   }, [validationConfig]);
 
   // Set field as touched

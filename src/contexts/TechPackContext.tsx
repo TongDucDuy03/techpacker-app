@@ -8,11 +8,16 @@ interface TechPackContextType {
   loading: boolean;
   pagination: Omit<TechPackListResponse, 'data'>;
   state: TechPackFormState;
+  revisions: any[];
+  revisionsLoading: boolean;
+  revisionPagination: any;
   loadTechPacks: (params?: { page?: number; limit?: number; q?: string; status?: string }) => Promise<void>;
   createTechPack: (data: CreateTechPackInput) => Promise<ApiTechPack | undefined>;
   updateTechPack: (id: string, data: Partial<ApiTechPack>) => Promise<ApiTechPack | undefined>;
   deleteTechPack: (id: string) => Promise<void>;
   getTechPack: (id: string) => Promise<ApiTechPack | undefined>;
+  loadRevisions: (techPackId: string, params?: any) => Promise<void>;
+  restoreTechPackToRevision: (techPackId: string, revisionId: string) => Promise<void>;
   setCurrentTab: (tab: number) => void;
   updateFormState: (updates: Partial<ApiTechPack>) => void;
   resetFormState: () => void;
@@ -38,6 +43,9 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
   const [techPacks, setTechPacks] = useState<ApiTechPack[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [pagination, setPagination] = useState<Omit<TechPackListResponse, 'data'>>({ total: 0, page: 1, totalPages: 1 });
+  const [revisions, setRevisions] = useState<any[]>([]);
+  const [revisionsLoading, setRevisionsLoading] = useState<boolean>(false);
+  const [revisionPagination, setRevisionPagination] = useState<any>({ total: 0, page: 1, totalPages: 1 });
 
   // Initialize default TechPack state
   const [state, setState] = useState<TechPackFormState>({
@@ -53,6 +61,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         supplier: '',
         technicalDesignerId: '',
         fabricDescription: '',
+        productDescription: '',
+        designSketchUrl: '',
         season: 'SS25',
         lifecycleStage: 'Concept',
         createdDate: new Date().toISOString(),
@@ -221,6 +231,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           supplier: '',
           technicalDesignerId: '',
           fabricDescription: '',
+          productDescription: '',
+          designSketchUrl: '',
           season: 'SS25',
           lifecycleStage: 'Concept',
           createdDate: new Date().toISOString(),
@@ -262,6 +274,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           supplier: techpackData.articleInfo.supplier || '',
           season: techpackData.articleInfo.season,
           fabricDescription: techpackData.articleInfo.fabricDescription || '',
+          productDescription: (techpackData.articleInfo as any).productDescription || '',
+          designSketchUrl: (techpackData.articleInfo as any).designSketchUrl || '',
           status: techpackData.status,
           category: techpackData.articleInfo.productClass,
           gender: techpackData.articleInfo.gender,
@@ -291,6 +305,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
             supplier: techpackData.articleInfo.supplier || '',
             season: techpackData.articleInfo.season,
             fabricDescription: techpackData.articleInfo.fabricDescription || '',
+            productDescription: (techpackData.articleInfo as any).productDescription || '',
+            designSketchUrl: (techpackData.articleInfo as any).designSketchUrl || '',
             productClass: techpackData.articleInfo.productClass,
             gender: techpackData.articleInfo.gender,
             technicalDesignerId: techpackData.articleInfo.technicalDesignerId,
@@ -465,16 +481,57 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
+  // Revision management functions
+  const loadRevisions = useCallback(async (techPackId: string, params = {}) => {
+    setRevisionsLoading(true);
+    try {
+      const response = await api.getRevisions(techPackId, params);
+      setRevisions(response.revisions);
+      setRevisionPagination(response.pagination);
+    } catch (error: any) {
+      showError(error.message || 'Failed to load revisions');
+    } finally {
+      setRevisionsLoading(false);
+    }
+  }, []);
+
+  const restoreTechPackToRevision = async (techPackId: string, revisionId: string) => {
+    try {
+      await showPromise(
+        api.restoreRevision(techPackId, revisionId),
+        {
+          loading: 'Restoring TechPack...',
+          success: 'TechPack restored successfully!',
+          error: (err) => err.message || 'Failed to restore TechPack',
+        }
+      );
+      // Reload the current techpack data after restoration
+      const updatedTechPack = await getTechPack(techPackId);
+      if (updatedTechPack) {
+        updateFormState(updatedTechPack);
+      }
+      // Reload revisions to show the new rollback revision
+      await loadRevisions(techPackId);
+    } catch (error) {
+      // Error is already handled by showPromise
+    }
+  };
+
   const value = {
     techPacks,
     loading,
     pagination,
     state,
+    revisions,
+    revisionsLoading,
+    revisionPagination,
     loadTechPacks,
     createTechPack,
     updateTechPack,
     deleteTechPack,
     getTechPack,
+    loadRevisions,
+    restoreTechPackToRevision,
     setCurrentTab,
     updateFormState,
     resetFormState,

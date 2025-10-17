@@ -104,6 +104,30 @@ export const articleInfoValidationSchema: FormValidationConfig = {
       return null;
     }
   },
+  productDescription: {
+    required: true,
+    minLength: 10,
+    maxLength: 1000,
+    custom: (value: string) => {
+      if (!value || value.trim().length < 10) {
+        return 'Product description must be at least 10 characters long';
+      }
+      return null;
+    }
+  },
+  designSketchUrl: {
+    required: (formData?: any) => {
+      const lifecycleStage = formData?.lifecycleStage;
+      return ['Concept', 'Design'].includes(lifecycleStage);
+    },
+    custom: (value: string, formData?: any) => {
+      const lifecycleStage = formData?.lifecycleStage;
+      if (['Concept', 'Design'].includes(lifecycleStage) && (!value || value.trim().length === 0)) {
+        return 'Design sketch is required for Concept and Design stages';
+      }
+      return null;
+    }
+  },
   supplier: {
     required: true,
     minLength: 2,

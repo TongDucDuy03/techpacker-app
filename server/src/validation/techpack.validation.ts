@@ -71,17 +71,41 @@ const colorwaySpecSchema = z.object({
 // Create tech pack schema
 export const createTechPackSchema = z.object({
   body: z.object({
+    productName: z.string().min(1, 'Product name is required'),
     articleCode: z.string().min(1, 'Article code is required').transform(val => val.toUpperCase()),
-    name: z.string().min(1, 'Name is required'),
-    ownerId: objectIdSchema,
-    metadata: z.object({
-      description: z.string().optional(),
-      category: z.string().optional(),
-      season: z.string().optional()
-    }).optional(),
-    materials: z.array(materialSpecSchema).optional(),
+    version: z.string().optional().default('V1'),
+    technicalDesignerId: objectIdSchema,
+    customerId: z.string().optional(),
+    supplier: z.string().min(1, 'Supplier is required'),
+    season: z.string().min(1, 'Season is required'),
+    fabricDescription: z.string().min(1, 'Fabric description is required'),
+    productDescription: z.string().min(1, 'Product description is required'),
+    designSketchUrl: z.string().optional(),
+    status: z.nativeEnum(TechPackStatus).optional(),
+    lifecycleStage: z.enum(['Concept', 'Design', 'Development', 'Pre-production', 'Production', 'Shipped']).optional(),
+    category: z.string().optional(),
+    gender: z.enum(['Men', 'Women', 'Unisex', 'Kids']).optional(),
+    brand: z.string().optional(),
+    collectionName: z.string().optional(),
+    targetMarket: z.string().optional(),
+    pricePoint: z.enum(['Value', 'Mid-range', 'Premium', 'Luxury']).optional(),
+    retailPrice: z.number().min(0).optional(),
+    currency: z.string().optional(),
+    description: z.string().optional(),
+    notes: z.string().optional(),
+    bom: z.array(z.any()).optional(),
     measurements: z.array(measurementSpecSchema).optional(),
-    colorways: z.array(colorwaySpecSchema).optional()
+    colorways: z.array(colorwaySpecSchema).optional(),
+    howToMeasure: z.array(z.any()).optional()
+  }).refine((data) => {
+    // If lifecycleStage is 'Concept' or 'Design', designSketchUrl is required
+    if (['Concept', 'Design'].includes(data.lifecycleStage || '')) {
+      return data.designSketchUrl && data.designSketchUrl.length > 0;
+    }
+    return true;
+  }, {
+    message: 'Design sketch is required for Concept and Design stages',
+    path: ['designSketchUrl']
   })
 });
 
@@ -91,16 +115,32 @@ export const updateTechPackSchema = z.object({
     id: objectIdSchema
   }),
   body: z.object({
-    name: z.string().min(1).optional(),
+    productName: z.string().min(1, 'Product name is required').optional(),
+    articleCode: z.string().min(1, 'Article code is required').transform(val => val.toUpperCase()).optional(),
+    version: z.string().optional(),
+    technicalDesignerId: objectIdSchema.optional(),
+    customerId: z.string().optional(),
+    supplier: z.string().min(1, 'Supplier is required').optional(),
+    season: z.string().min(1, 'Season is required').optional(),
+    fabricDescription: z.string().min(1, 'Fabric description is required').optional(),
+    productDescription: z.string().min(1, 'Product description is required').optional(),
+    designSketchUrl: z.string().optional(),
     status: z.nativeEnum(TechPackStatus).optional(),
-    metadata: z.object({
-      description: z.string().optional(),
-      category: z.string().optional(),
-      season: z.string().optional()
-    }).optional(),
-    materials: z.array(materialSpecSchema).optional(),
+    lifecycleStage: z.enum(['Concept', 'Design', 'Development', 'Pre-production', 'Production', 'Shipped']).optional(),
+    category: z.string().optional(),
+    gender: z.enum(['Men', 'Women', 'Unisex', 'Kids']).optional(),
+    brand: z.string().optional(),
+    collectionName: z.string().optional(),
+    targetMarket: z.string().optional(),
+    pricePoint: z.enum(['Value', 'Mid-range', 'Premium', 'Luxury']).optional(),
+    retailPrice: z.number().min(0).optional(),
+    currency: z.string().optional(),
+    description: z.string().optional(),
+    notes: z.string().optional(),
+    bom: z.array(z.any()).optional(),
     measurements: z.array(measurementSpecSchema).optional(),
-    colorways: z.array(colorwaySpecSchema).optional()
+    colorways: z.array(colorwaySpecSchema).optional(),
+    howToMeasure: z.array(z.any()).optional()
   })
 });
 
