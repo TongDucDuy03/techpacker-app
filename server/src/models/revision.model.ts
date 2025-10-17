@@ -5,6 +5,7 @@ export type ChangeType = 'auto' | 'manual' | 'approval' | 'rollback';
 export interface IRevisionChange {
   summary: string; // e.g., "BOM: 1 added, 2 modified. Measurements: 1 modified."
   details: Record<string, { added?: number; modified?: number; removed?: number }>;
+  diff?: Record<string, { old: any; new: any }>; // Detailed field-level changes
 }
 
 export interface IRevision extends Document {
@@ -27,6 +28,7 @@ const RevisionChangeSchema = new Schema<IRevisionChange>(
   {
     summary: { type: String, required: true },
     details: { type: Schema.Types.Mixed, required: true },
+    diff: { type: Schema.Types.Mixed }, // Optional field for detailed diff
   },
   { _id: false }
 );

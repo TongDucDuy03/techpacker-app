@@ -269,6 +269,13 @@ export class TechPackController {
     try {
       const { id } = req.params;
       const user = req.user!;
+      
+      console.log('🔧 PATCH TechPack request received:', {
+        techPackId: id,
+        userId: user._id,
+        userName: `${user.firstName} ${user.lastName}`,
+        requestBody: req.body
+      });
 
       // Check if user has permission to edit tech packs
       if (!PermissionManager.canEditTechPacks(user.role)) {
@@ -299,6 +306,12 @@ export class TechPackController {
       }
       if (!techpack) {
         return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
+      }
+
+      // Data integrity patch: If createdBy is missing, assign it from technical designer or current user
+      if (!techpack.createdBy) {
+        console.warn(`TechPack ${techpack._id} is missing 'createdBy' field. Patching data...`);
+        techpack.createdBy = techpack.technicalDesignerId || user._id;
       }
 
       // Debug logging
@@ -366,31 +379,82 @@ export class TechPackController {
       // Keep a snapshot of the old techpack for revision comparison
       const oldTechPack = techpack.toObject({ virtuals: true }) as ITechPack;
 
-      // Apply updates to the document
+      // Apply user's updates to the in-memory document
       Object.assign(techpack, updateData);
 
-      // Compare and create a revision if there are changes
-      const changes = RevisionService.compareTechPacks(oldTechPack, techpack);
+      // Compare the old version with the updated in-memory version
+      const changes = RevisionService.compareTechPacks(oldTechPack, techpack as ITechPack);
+      let revisionVersion = techpack.version; // Default to current version if no changes
 
-      if (changes.summary !== 'No changes detected.') {
-        const newRevision = new Revision({
-          techPackId: techpack._id,
-          version: techpack.version, // Assuming version is managed on the techpack itself
-          changes,
-          createdBy: user._id,
-          createdByName: `${user.firstName} ${user.lastName}`,
-          description: req.body.changeDescription || 'Automatic update',
-          changeType: 'auto',
-          statusAtChange: oldTechPack.status,
-          snapshot: techpack.toObject(),
-        });
-        await newRevision.save();
+      // If there are meaningful changes, increment the version
+      if (changes.summary !== 'No changes detected.' && changes.summary !== 'Error detecting changes.') {
+        const { revisionVersion: newRevisionVersion } = await RevisionService.autoIncrementVersion(techpack._id as Types.ObjectId);
+        revisionVersion = newRevisionVersion; // Get version for the revision log (e.g., "v1.2")
       }
 
+      // Save the TechPack document once, with both user updates and the new version
       const updatedTechPack = await techpack.save();
 
-      await logActivity({ userId: user._id, userName: `${user.firstName} ${user.lastName}`, action: ActivityAction.TECHPACK_UPDATE, target: { type: 'TechPack', id: updatedTechPack._id as Types.ObjectId, name: updatedTechPack.productName }, req });
-      sendSuccess(res, updatedTechPack, 'TechPack updated successfully');
+      // Try to create the revision log separately
+      let revisionCreated = null;
+      try {
+        // Use the pre-calculated 'changes' object. Only create a revision if there were changes.
+        if (changes.summary !== 'No changes detected.' && changes.summary !== 'Error detecting changes.') {
+          console.log('🔍 Creating revision with version:', revisionVersion);
+
+          const newRevision = new Revision({
+            techPackId: updatedTechPack._id,
+            version: revisionVersion, // Use the auto-incremented version
+            changes: {
+              summary: changes.summary,
+              details: changes.details,
+              diff: changes.diffData, // Pass the detailed diff data
+            },
+            createdBy: user._id,
+            createdByName: `${user.firstName} ${user.lastName}`,
+            description: req.body.changeDescription || changes.summary,
+            changeType: 'auto' as const,
+            statusAtChange: oldTechPack.status || 'draft',
+            snapshot: updatedTechPack.toObject()
+          });
+
+          revisionCreated = await newRevision.save();
+          console.log('✅ Revision created successfully:', revisionCreated._id);
+          console.log('📊 Revision details:', {
+            version: revisionCreated.version,
+            summary: revisionCreated.changes.summary,
+            createdBy: revisionCreated.createdByName
+          });
+        } else {
+          console.log('❌ No revision created - no significant changes detected');
+          console.log('🔍 Changes summary was:', changes.summary);
+        }
+      } catch (revError: any) {
+        // Log revision creation error but don't fail the entire operation
+        console.error('Failed to create revision log (TechPack save still successful):', {
+          error: revError.message,
+          stack: revError.stack,
+          techPackId: updatedTechPack._id,
+          userId: user._id
+        });
+      }
+
+      // Build response payload per spec
+      const responsePayload: any = {
+        updatedTechPack: updatedTechPack,
+      };
+      if (revisionCreated) {
+        responsePayload.newRevision = {
+          _id: revisionCreated._id,
+          version: revisionCreated.version,
+          changedBy: revisionCreated.createdByName,
+          changedDate: revisionCreated.createdAt,
+          changeSummary: revisionCreated.changes.summary,
+        };
+      }
+
+      // Send success response matching the desired API behavior
+      return sendSuccess(res, responsePayload, 'Tech Pack updated successfully');
     } catch (error: any) {
       console.error('Patch TechPack error:', error);
 

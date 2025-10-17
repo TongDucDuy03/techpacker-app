@@ -314,21 +314,32 @@ class ApiClient {
   }
 
   async updateTechPack(id: string, data: Partial<ApiTechPack>): Promise<ApiTechPack> {
-    const response = await this.axiosInstance.put<ApiResponse<ApiTechPack>>(`/techpacks/${id}`, data);
-    const techPack = response.data?.data;
-    if (!techPack) {
+    const response = await this.axiosInstance.put<ApiResponse<any>>(`/techpacks/${id}`, data);
+    // Backend may return one of:
+    // - { success, message, data: TechPack }
+    // - { success, message, data: { techpack, revisionCreated } }
+    // - { success, message, updatedTechPack, revisionCreated }
+    const root = response.data ?? {};
+    const payload = root.data ?? root;
+    const techPack = payload.techpack ?? payload.updatedTechPack ?? payload;
+    if (!techPack || (techPack && techPack.success !== undefined)) {
+      // If we accidentally captured the wrapper, log and throw
+      console.error('Invalid update tech pack response received:', response.data);
       throw new Error('Invalid update tech pack response');
     }
-    return techPack;
+    return techPack as ApiTechPack;
   }
 
   async patchTechPack(id: string, data: Partial<ApiTechPack>): Promise<ApiTechPack> {
-    const response = await this.axiosInstance.patch<ApiResponse<ApiTechPack>>(`/techpacks/${id}`, data);
-    const techPack = response.data?.data;
-    if (!techPack) {
+    const response = await this.axiosInstance.patch<ApiResponse<any>>(`/techpacks/${id}`, data);
+    // Support both legacy and new response shapes
+    const payload = response.data ?? {};
+    const updatedTechPack = payload.updatedTechPack ?? payload.data?.techpack ?? payload.data;
+    if (!updatedTechPack) {
+      console.error('Invalid patch tech pack response received:', response.data);
       throw new Error('Invalid patch tech pack response');
     }
-    return techPack;
+    return updatedTechPack as ApiTechPack;
   }
 
   async deleteTechPack(id: string): Promise<{ message: string }> {

@@ -149,7 +149,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
   const updateTechPack = async (id: string, data: Partial<ApiTechPack>) => {
     try {
       const updatedTechPack = await showPromise(
-        api.patchTechPack(id, data),
+        api.updateTechPack(id, data), // Sử dụng PUT thay vì PATCH để đảm bảo tạo revision
         {
           loading: 'Updating tech pack...',
           success: 'Tech pack updated successfully!',
@@ -294,7 +294,13 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           colorways: techpackData.colorways,
           howToMeasure: techpackData.howToMeasures,
         };
-        await updateTechPack(techpackData.id, updatePayload);
+        const updatedTP = await updateTechPack(techpackData.id, updatePayload);
+
+        // After a successful save, reload the revisions to show the new one
+        if (updatedTP) {
+          console.log('🔄 Reloading revisions after update for TechPack ID:', techpackData.id);
+          await loadRevisions(techpackData.id);
+        }
       } else {
         // For create, send nested articleInfo to satisfy route validation
         const createPayload: CreateTechPackInput = {
@@ -330,6 +336,15 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           ...prev,
           techpack: { ...prev.techpack, id: newTechPack?._id || newTechPack?.id || '' }
         }));
+
+        // After creating a new TechPack, load revisions to show the initial revision
+        if (newTechPack) {
+          const techPackId = newTechPack._id || newTechPack.id;
+          if (techPackId) {
+            console.log('🔄 Loading revisions after create for TechPack ID:', techPackId);
+            await loadRevisions(techPackId);
+          }
+        }
       }
 
       setState(prev => ({
@@ -483,12 +498,36 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
 
   // Revision management functions
   const loadRevisions = useCallback(async (techPackId: string, params = {}) => {
+    console.log('🔄 Attempting to load revisions for TechPack ID:', techPackId);
     setRevisionsLoading(true);
     try {
       const response = await api.getRevisions(techPackId, params);
-      setRevisions(response.revisions);
-      setRevisionPagination(response.pagination);
+      console.log('✅ API response for revisions:', response);
+      
+      // Handle possible shapes:
+      // 1) AxiosResponse<{ success, data: { revisions, pagination } }>
+      // 2) { revisions, pagination }
+      // 3) { data: { revisions, pagination } }
+      // 4) AxiosResponse<{ success, data }> where data is already the payload
+      const root = (response as any)?.data ?? response;
+      const payload = root?.data ?? root;
+      const revisions = payload?.revisions ?? [];
+      const pagination = payload?.pagination ?? { total: 0, page: 1, totalPages: 1 };
+
+      console.log('📊 Revisions parsing debug:', {
+        hasAxiosData: !!(response as any)?.data,
+        hasRootData: !!root,
+        keysAtRoot: root ? Object.keys(root) : [],
+        keysAtPayload: payload ? Object.keys(payload) : [],
+        parsedCount: revisions.length
+      });
+      
+      console.log('📊 Revisions count:', revisions.length);
+      setRevisions(Array.isArray(revisions) ? revisions : []);
+      setRevisionPagination(pagination);
+      console.log('✅ Revisions state updated with', Array.isArray(revisions) ? revisions.length : 0, 'revisions');
     } catch (error: any) {
+      console.error('❌ Failed to load revisions:', error);
       showError(error.message || 'Failed to load revisions');
     } finally {
       setRevisionsLoading(false);
