@@ -56,12 +56,20 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
     return shared?.role;
   }, [techPack, currentUser, accessList]);
 
-  const canManage = currentUserTechPackRole === TechPackRole.Owner || currentUserTechPackRole === TechPackRole.Admin;
+  const canManage = useMemo(() => {
+    return currentUserTechPackRole === TechPackRole.Owner || currentUserTechPackRole === TechPackRole.Admin;
+  }, [currentUserTechPackRole]);
 
   const fetchData = async () => {
-    if (!techPack?._id) return;
+    if (!techPack?._id) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
+
     try {
+      console.log('Fetching access list for techpack:', techPack._id);
       const accessRes = await api.getAccessList(techPack._id);
       const fetchedAccessList = accessRes.data || [];
       setAccessList(fetchedAccessList);
@@ -72,22 +80,50 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
         : fetchedAccessList.find((item: AccessListItem) => item.userId === currentUser?._id)?.role;
 
       if (userRole === TechPackRole.Owner || userRole === TechPackRole.Admin) {
+        console.log('Fetching shareable users for techpack:', techPack._id);
         const usersRes = await api.getShareableUsers(techPack._id);
         setShareableUsers(usersRes.data || []);
       }
+
+      console.log('Successfully loaded sharing data');
     } catch (error) {
       console.error('Failed to fetch sharing data:', error);
       showError('Failed to load sharing information.');
+      // Reset states on error
+      setAccessList([]);
+      setShareableUsers([]);
     } finally {
+      console.log('Setting loading to false');
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (techPack?._id) {
-      fetchData();
-    }
-  }, [techPack?._id]);
+    let isMounted = true;
+
+    const loadData = async () => {
+      if (techPack?._id) {
+        await fetchData();
+      } else {
+        // Ensure loading is false when no techpack ID
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadData().catch((error) => {
+      console.error('Error in sharing tab useEffect:', error);
+      if (isMounted) {
+        setLoading(false);
+        showError('Failed to load sharing information.');
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [techPack?._id, currentUser?._id]);
 
   const handleShare = async () => {
     if (!selectedUserId || !techPack?._id) return;
@@ -256,7 +292,7 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
                         value={item.role}
                         onChange={(e) => handleUpdateRole(item.userId, e.target.value as TechPackRole)}
                         className="ml-2 capitalize border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                        disabled={item.role === TechPackRole.Owner || currentUserRole !== TechPackRole.Owner}
+                        disabled={item.role === TechPackRole.Owner || currentUserTechPackRole !== TechPackRole.Owner}
                       >
                         {Object.values(TechPackRole).map(role => (
                           <option key={role} value={role} disabled={role === TechPackRole.Owner}>{role}</option>

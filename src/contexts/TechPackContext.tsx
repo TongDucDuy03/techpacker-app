@@ -17,7 +17,7 @@ interface TechPackContextType {
   deleteTechPack: (id: string) => Promise<void>;
   getTechPack: (id: string) => Promise<ApiTechPack | undefined>;
   loadRevisions: (techPackId: string, params?: any) => Promise<void>;
-  restoreTechPackToRevision: (techPackId: string, revisionId: string) => Promise<void>;
+  revertToRevision: (techPackId: string, revisionId: string) => Promise<string | undefined>;
   setCurrentTab: (tab: number) => void;
   updateFormState: (updates: Partial<ApiTechPack>) => void;
   resetFormState: () => void;
@@ -534,25 +534,31 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const restoreTechPackToRevision = async (techPackId: string, revisionId: string) => {
+  const revertToRevision = async (techPackId: string, revisionId: string): Promise<string | undefined> => {
     try {
-      await showPromise(
-        api.restoreRevision(techPackId, revisionId),
+      const response = await showPromise(
+        api.revertToRevision(techPackId, revisionId),
         {
-          loading: 'Restoring TechPack...',
-          success: 'TechPack restored successfully!',
-          error: (err) => err.message || 'Failed to restore TechPack',
+          loading: 'Reverting TechPack...',
+          success: 'TechPack reverted successfully!',
+          error: (err) => err.message || 'Failed to revert TechPack',
         }
       );
-      // Reload the current techpack data after restoration
+
+      // Reload the current techpack data after revert
       const updatedTechPack = await getTechPack(techPackId);
       if (updatedTechPack) {
         updateFormState(updatedTechPack);
       }
+
       // Reload revisions to show the new rollback revision
       await loadRevisions(techPackId);
+
+      // Return the new revision ID for highlighting
+      return response?.data?.newRevision?._id || response?.data?.newRevision?.id;
     } catch (error) {
       // Error is already handled by showPromise
+      return undefined;
     }
   };
 
@@ -570,7 +576,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     deleteTechPack,
     getTechPack,
     loadRevisions,
-    restoreTechPackToRevision,
+    revertToRevision,
     setCurrentTab,
     updateFormState,
     resetFormState,

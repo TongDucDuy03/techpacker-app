@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react';
-import { api } from '../../../lib/api';
+
 import { TechPack } from '../../../types/techpack';
 import { useTechPack } from '../../../contexts/TechPackContext';
+import { api } from '../../../lib/api';
 import { Clock, User, FileText, Undo2, AlertCircle, ImageIcon, ExternalLink } from 'lucide-react';
 
 interface ImagePreviewProps {
@@ -107,9 +108,10 @@ export interface RevisionTabRef {
 
 const RevisionTab = forwardRef<RevisionTabRef, RevisionTabProps>((props, ref) => {
   const { techPack, mode = 'create', onUpdate, setCurrentTab } = props;
-  const { revisions, revisionsLoading, loadRevisions } = useTechPack();
+  const { revisions, revisionsLoading, loadRevisions, revertToRevision } = useTechPack();
   const [selectedRevision, setSelectedRevision] = useState<string>('');
   const [selectedRevisionDetails, setSelectedRevisionDetails] = useState<any | null>(null);
+  const [highlightedRevision, setHighlightedRevision] = useState<string | null>(null);
 
   // Revert functionality state
   const [showRevertModal, setShowRevertModal] = useState(false);
@@ -184,24 +186,24 @@ const RevisionTab = forwardRef<RevisionTabRef, RevisionTabProps>((props, ref) =>
     setRevertError(null);
 
     try {
-      const response = await api.post(`/revisions/revert/${techPack.id}/${revertingRevision._id || revertingRevision.id}`);
-      
-      if (response.data.success) {
-        // Reload revisions
-        await loadRevisions(techPack.id);
-        
-        // Close modal
-        setShowRevertModal(false);
-        setRevertingRevision(null);
-        
-        // Show success message
-        console.log('Successfully reverted to revision', revertingRevision.version);
-      } else {
-        setRevertError(response.data.message || 'Failed to revert to revision');
+      // Use context function which now returns the new revision ID
+      const newRevisionId = await revertToRevision(techPack.id, revertingRevision._id || revertingRevision.id);
+
+      // Close modal on success
+      setShowRevertModal(false);
+      setRevertingRevision(null);
+
+      if (newRevisionId) {
+        // Select and highlight the new revision
+        setSelectedRevision(newRevisionId);
+        setHighlightedRevision(newRevisionId);
+        // Remove highlight after a delay
+        setTimeout(() => setHighlightedRevision(null), 2500);
       }
+
     } catch (error: any) {
       console.error('Error reverting to revision:', error);
-      setRevertError(error.response?.data?.message || 'Failed to revert to revision');
+      setRevertError(error.message || 'Failed to revert to revision');
     } finally {
       setIsReverting(false);
     }
@@ -357,8 +359,11 @@ const RevisionTab = forwardRef<RevisionTabRef, RevisionTabProps>((props, ref) =>
                     <div
                       key={revision._id || revision.id}
                       onClick={() => setSelectedRevision(revision._id || revision.id || '')}
-                      className={`w-full text-left p-3 rounded-md transition-colors cursor-pointer border-l-4 ${selectedRevision === (revision._id || revision.id)
+                      className={`w-full text-left p-3 rounded-md transition-all duration-300 cursor-pointer border-l-4 ${
+                        selectedRevision === (revision._id || revision.id)
                           ? 'bg-blue-50 border-blue-500'
+                          : highlightedRevision === (revision._id || revision.id)
+                          ? 'bg-green-50 border-green-500 shadow-md'
                           : 'bg-white border-transparent hover:bg-gray-50'
                         }`}
                     >

@@ -9,8 +9,17 @@ interface RevisionDetailModalProps {
 const RevisionDetailModal: React.FC<RevisionDetailModalProps> = ({ open, onClose, revision }) => {
   if (!open || !revision) return null;
 
+  // Debug logging to understand data structure
+  console.log('🔍 Revision data structure:', revision);
+  console.log('🔍 Changes object:', revision?.changes);
+  console.log[object Object]iff data:', revision?.changes?.diff);
+
   const changes = revision?.changes || {};
-  const diffData: Record<string, { old: any; new: any }> = changes.diff || {};
+  const diffData = extractDiffData(revision);
+
+  console.log('🔍 Processed diffData:', diffData);
+  console.log('🔍 DiffData keys count:', Object.keys(diffData).length);
+
   const sectionChanges: string[] = (changes.details as any)?.sectionChanges || [];
 
   // Group changes by section
@@ -47,10 +56,20 @@ const RevisionDetailModal: React.FC<RevisionDetailModalProps> = ({ open, onClose
           {/* Changed Fields */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Changed Fields</h3>
+            <div className="mb-2 text-xs text-gray-500">
+              Debug: Found {Object.keys(diffData).length} changes
+            </div>
             {Object.keys(diffData).length === 0 ? (
               <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
                 <div className="text-lg mb-2">⚠️</div>
                 <p>No field-level changes detected in this revision.</p>
+                <div className="mt-4 text-xs text-left">
+                  <p><strong>Debug Info:</strong></p>
+                  <p>Revision ID: {revision._id || revision.id}</p>
+                  <p>Has changes object: {revision.changes ? 'Yes' : 'No'}</p>
+                  <p>Has diff: {revision.changes?.diff ? 'Yes' : 'No'}</p>
+                  <p>Raw changes: {JSON.stringify(revision.changes, null, 2)}</p>
+                </div>
               </div>
             ) : (
               <div className="space-y-6">
@@ -117,6 +136,82 @@ function formatValue(val: any): string {
   return String(val);
 }
 
+// Helper function to extract diff data from various API response formats
+const extractDiffData = (revision: any): Record<string, { old: any; new: any }> => {
+  console.log('🔧 Extracting diff data from revision:', revision);
+
+  // Try different possible locations for diff data
+  const possibleSources = [
+    revision?.changes?.diff,
+    revision?.diff,
+    revision?.data?.changes?.diff,
+    revision?.data?.diff,
+    revision?.changeData?.diff
+  ];
+
+  for (const source of possibleSources) {
+    if (source && typeof source === 'object' && Object.keys(source).length > 0) {
+      console.log('✅ Found diff data in source:', source);
+      return source;
+    }
+  }
+
+  // If no diff object found, try to construct from changes array
+  if (revision?.changes && Array.isArray(revision.changes)) {
+    const diffData: Record<string, { old: any; new: any }> = {};
+    revision.changes.forEach((change: any) => {
+      if (change.field) {
+        diffData[change.field] = {
+          old: change.oldValue ?? change.old ?? change.before ?? '',
+          new: change.newValue ?? change.new ?? change.after ?? ''
+        };
+      }
+    });
+    console.log('✅ Constructed diff from changes array:', diffData);
+    return diffData;
+  }
+
+  // Try to extract from changeDetails if available
+  if (revision?.changeDetails && typeof revision.changeDetails === 'object') {
+    const diffData: Record<string, { old: any; new: any }> = {};
+    Object.entries(revision.changeDetails).forEach(([key, value]: [string, any]) => {
+      if (value && typeof value === 'object' && ('old' in value || 'new' in value)) {
+        diffData[key] = {
+          old: value.old ?? '',
+          new: value.new ?? ''
+        };
+      }
+    });
+    console.log('✅ Extracted from changeDetails:', diffData);
+    return diffData;
+  }
+
+  // Try to construct from direct field comparisons if available
+  if (revision?.fieldChanges && typeof revision.fieldChanges === 'object') {
+    console.log('✅ Found fieldChanges:', revision.fieldChanges);
+    return revision.fieldChanges;
+  }
+
+  // Last resort: try to find any object that looks like diff data
+  const allKeys = Object.keys(revision || {});
+  for (const key of allKeys) {
+    const value = revision[key];
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      // Check if this object has the structure of diff data
+      const hasValidDiffStructure = Object.values(value).some((item: any) =>
+        item && typeof item === 'object' && ('old' in item || 'new' in item)
+      );
+      if (hasValidDiffStructure) {
+        console.log(`✅ Found diff-like structure in ${key}:`, value);
+        return value;
+      }
+    }
+  }
+
+  console.log('❌ No diff data found in revision');
+  return {};
+};
+
 // Helper functions for grouping and formatting
 const groupChangesBySection = (diffData: Record<string, any>) => {
   const groups: Record<string, any> = {};
@@ -168,4 +263,5 @@ const formatFieldName = (field: string) => {
 };
 
 export default RevisionDetailModal;
+
 

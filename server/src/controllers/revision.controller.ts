@@ -174,83 +174,7 @@ export class RevisionController {
     }
   }
 
-  /**
-   * Restore TechPack to a specific revision
-   * POST /api/v1/techpacks/:id/revisions/:revisionId/restore
-   */
-  async restoreRevision(req: AuthRequest, res: Response): Promise<void> {
-    try {
-      const { id, revisionId } = req.params;
-      const user = req.user!;
 
-      // Check TechPack access and edit permissions
-      const techpack = await TechPack.findById(id);
-      if (!techpack) {
-        return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
-      }
-
-      const isOwner = techpack.createdBy?.toString() === user._id.toString();
-      const isTechnicalDesigner = techpack.technicalDesignerId?.toString() === user._id.toString();
-      const sharedAccess = techpack.sharedWith?.find(s => s.userId.toString() === user._id.toString());
-      const hasEditAccess = sharedAccess?.permission === 'edit';
-      const canEdit = user.role === UserRole.Admin || isOwner || isTechnicalDesigner || hasEditAccess;
-
-      if (!canEdit) {
-        return sendError(res, 'Access denied. You do not have permission to edit this tech pack.', 403, 'FORBIDDEN');
-      }
-
-      // Prevent restoration if TechPack is approved (unless admin)
-      if (techpack.status === 'Approved' && user.role !== UserRole.Admin) {
-        return sendError(res, 'Cannot restore approved TechPack', 400, 'VALIDATION_ERROR');
-      }
-
-      // Get the revision to restore
-      const revision = await Revision.findById(revisionId);
-      if (!revision) {
-        return sendError(res, 'Revision not found', 404, 'NOT_FOUND');
-      }
-
-      if (revision.techPackId.toString() !== id) {
-        return sendError(res, 'Revision does not belong to this TechPack', 400, 'VALIDATION_ERROR');
-      }
-
-      // Restore the TechPack to the revision snapshot
-      const restoredData = { ...revision.snapshot };
-      delete restoredData._id; // Don't overwrite the ID
-      delete restoredData.createdAt; // Keep original creation date
-      delete restoredData.updatedAt; // Will be updated automatically
-
-      Object.assign(techpack, restoredData, {
-        updatedBy: user._id,
-        updatedByName: `${user.firstName} ${user.lastName}`
-      });
-
-      await techpack.save();
-
-      // Create a rollback revision
-      const rollbackRevision = new Revision({
-        techPackId: techpack._id,
-        version: techpack.version,
-        changes: {
-          summary: `Restored from revision ${revision.version}`,
-          details: { restoration: { restored: 1 } }
-        },
-        createdBy: user._id,
-        createdByName: `${user.firstName} ${user.lastName}`,
-        description: `Restored from revision created on ${revision.createdAt}`,
-        changeType: 'rollback',
-        statusAtChange: techpack.status,
-        snapshot: techpack.toObject()
-      });
-
-      await rollbackRevision.save();
-
-      sendSuccess(res, techpack, 'TechPack restored successfully');
-    } catch (error) {
-      console.error('Restore revision error:', error);
-      sendError(res, 'Failed to restore revision');
-    }
-  }
 
   /**
    * Revert TechPack to a previous revision (creates new revision entry)
@@ -320,8 +244,9 @@ export class RevisionController {
 
       const newVersion = `v${Math.floor(newVersionNumber / 100)}.${newVersionNumber % 100}`;
 
-      // Apply the reverted data to techpack
-      Object.assign(techpack, revertedData, {
+      // Apply the reverted data to techpack using .set() to ensure deep paths are marked as modified
+      techpack.set({
+        ...revertedData,
         version: newVersion,
         updatedBy: user._id,
         updatedByName: `${user.firstName} ${user.lastName}`,

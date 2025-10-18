@@ -469,7 +469,7 @@ class ApiClient {
   getRevisions = (techPackId: string, params?: any): Promise<any> => this.get(`/techpacks/${techPackId}/revisions`, { params });
   getRevision = (revisionId: string): Promise<any> => this.get(`/revisions/${revisionId}`);
   compareRevisions = (techPackId: string, from: string, to: string): Promise<any> => this.get(`/techpacks/${techPackId}/revisions/compare`, { params: { from, to } });
-  restoreRevision = (techPackId: string, revisionId: string): Promise<any> => this.post(`/techpacks/${techPackId}/revisions/${revisionId}/restore`);
+
 
   // New revert API method
   revertToRevision = async (techPackId: string, revisionId: string): Promise<ApiResponse<any>> => {

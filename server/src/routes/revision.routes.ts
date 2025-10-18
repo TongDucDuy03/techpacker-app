@@ -13,9 +13,6 @@ router.get('/revisions/:id', requireAuth, RevisionController.getRevision);
 // Compare two revisions
 router.get('/techpacks/:id/revisions/compare', requireAuth, RevisionController.compareRevisions);
 
-// Restore a TechPack to a specific revision
-router.post('/techpacks/:id/revisions/:revisionId/restore', requireAuth, RevisionController.restoreRevision);
-
 // Revert TechPack to a previous revision (creates new revision entry)
 router.post('/revisions/revert/:techPackId/:revisionId', requireAuth, RevisionController.revertToRevision);
 
