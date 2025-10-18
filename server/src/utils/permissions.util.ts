@@ -1,4 +1,5 @@
 import { UserRole } from '../models/user.model';
+import { TechPackRole } from '../models/techpack.model';
 
 export interface Permission {
   resource: string;
@@ -182,6 +183,41 @@ export class PermissionManager {
   static canWriteTechPacks(userRole: UserRole): boolean {
     return [UserRole.Admin, UserRole.Designer].includes(userRole);
   }
+
+  /**
+   * Checks if a TechPackRole allows viewing the tech pack.
+   */
+  static canViewTechPack(role: TechPackRole): boolean {
+    return [TechPackRole.Owner, TechPackRole.Admin, TechPackRole.Editor, TechPackRole.Viewer, TechPackRole.Factory].includes(role);
+  }
+
+  /**
+   * Checks if a TechPackRole allows editing the tech pack.
+   */
+  static canEditTechPackContent(role: TechPackRole): boolean {
+    return [TechPackRole.Owner, TechPackRole.Admin, TechPackRole.Editor].includes(role);
+  }
+
+  /**
+   * Checks if a TechPackRole allows sharing and managing access.
+   */
+  static canManageSharing(role: TechPackRole): boolean {
+    return [TechPackRole.Owner, TechPackRole.Admin].includes(role);
+  }
+
+  /**
+   * Checks if a TechPackRole allows deleting the tech pack.
+   */
+  static canDeleteTechPack(role: TechPackRole): boolean {
+    return role === TechPackRole.Owner;
+  }
+
+  /**
+   * Checks if a TechPackRole can view sensitive tabs (e.g., Costing, Revisions).
+   */
+  static canViewSensitiveTabs(role: TechPackRole): boolean {
+    return role !== TechPackRole.Factory;
+  }
 }
 
 // Export role constants for easy access
@@ -190,6 +226,14 @@ export const ROLES = {
   DESIGNER: UserRole.Designer,
   MERCHANDISER: UserRole.Merchandiser,
   VIEWER: UserRole.Viewer,
+} as const;
+
+export const TECHPACK_ROLES = {
+  OWNER: TechPackRole.Owner,
+  ADMIN: TechPackRole.Admin,
+  EDITOR: TechPackRole.Editor,
+  VIEWER: TechPackRole.Viewer,
+  FACTORY: TechPackRole.Factory,
 } as const;
 
 // Export permission checking functions for middleware

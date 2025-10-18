@@ -16,5 +16,8 @@ router.get('/techpacks/:id/revisions/compare', requireAuth, RevisionController.c
 // Restore a TechPack to a specific revision
 router.post('/techpacks/:id/revisions/:revisionId/restore', requireAuth, RevisionController.restoreRevision);
 
+// Revert TechPack to a previous revision (creates new revision entry)
+router.post('/revisions/revert/:techPackId/:revisionId', requireAuth, RevisionController.revertToRevision);
+
 export default router;
 

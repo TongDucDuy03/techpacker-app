@@ -470,6 +470,43 @@ class ApiClient {
   getRevision = (revisionId: string): Promise<any> => this.get(`/revisions/${revisionId}`);
   compareRevisions = (techPackId: string, from: string, to: string): Promise<any> => this.get(`/techpacks/${techPackId}/revisions/compare`, { params: { from, to } });
   restoreRevision = (techPackId: string, revisionId: string): Promise<any> => this.post(`/techpacks/${techPackId}/revisions/${revisionId}/restore`);
+
+  // New revert API method
+  revertToRevision = async (techPackId: string, revisionId: string): Promise<ApiResponse<any>> => {
+    const response = await this.axiosInstance.post<ApiResponse<any>>(`/revisions/revert/${techPackId}/${revisionId}`);
+    return response.data;
+  };
+
+  // Sharing & Access Control APIs
+  async getAccessList(techPackId: string): Promise<any> {
+    const response = await this.axiosInstance.get(`/techpacks/${techPackId}/access`);
+    return response.data;
+  }
+
+  async getShareableUsers(techPackId: string): Promise<any> {
+    const response = await this.axiosInstance.get(`/techpacks/${techPackId}/shareable-users`);
+    return response.data;
+  }
+
+  async shareTechPack(techPackId: string, data: { userId: string; role: string }): Promise<any> {
+    const response = await this.axiosInstance.put(`/techpacks/${techPackId}/share`, data);
+    return response.data;
+  }
+
+  async updateShareRole(techPackId: string, userId: string, data: { role: string }): Promise<any> {
+    const response = await this.axiosInstance.patch(`/techpacks/${techPackId}/share/${userId}`, data);
+    return response.data;
+  }
+
+  async revokeShare(techPackId: string, userId: string): Promise<any> {
+    const response = await this.axiosInstance.delete(`/techpacks/${techPackId}/share/${userId}`);
+    return response.data;
+  }
+
+  async getAuditLogs(techPackId: string): Promise<any> {
+    const response = await this.axiosInstance.get(`/techpacks/${techPackId}/audit-logs`);
+    return response.data;
+  }
 }
 
 export const api = new ApiClient();

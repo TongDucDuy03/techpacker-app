@@ -86,20 +86,32 @@ export interface IHowToMeasure {
   relatedMeasurements?: string[];
 }
 
+export enum TechPackRole {
+  Owner = 'owner',
+  Admin = 'admin',
+  Editor = 'editor',
+  Viewer = 'viewer',
+  Factory = 'factory'
+}
+
 export interface ISharedAccess {
   userId: Types.ObjectId;
-  permission: 'view' | 'edit';
+  role: TechPackRole;
   sharedAt: Date;
   sharedBy: Types.ObjectId;
+  // Keep backward compatibility
+  permission?: 'view' | 'edit';
 }
 
 export interface IAuditLogEntry {
-  action: 'share_granted' | 'share_revoked' | 'permission_changed';
+  action: 'share_granted' | 'share_revoked' | 'role_changed';
   performedBy: Types.ObjectId;
   targetUser: Types.ObjectId;
-  permission: 'view' | 'edit';
+  role: TechPackRole;
   timestamp: Date;
   techpackId: Types.ObjectId;
+  // Keep backward compatibility
+  permission: 'view' | 'edit';
 }
 
 export interface ITechPack extends Document {
@@ -214,18 +226,22 @@ const HowToMeasureSchema = new Schema<IHowToMeasure>({
 
 const SharedAccessSchema = new Schema<ISharedAccess>({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  permission: { type: String, enum: ['view', 'edit'], required: true },
+  role: { type: String, enum: Object.values(TechPackRole), required: true },
   sharedAt: { type: Date, default: Date.now },
-  sharedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true }
+  sharedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  // Keep backward compatibility
+  permission: { type: String, enum: ['view', 'edit'] }
 });
 
 const AuditLogEntrySchema = new Schema<IAuditLogEntry>({
-  action: { type: String, enum: ['share_granted', 'share_revoked', 'permission_changed'], required: true },
+  action: { type: String, enum: ['share_granted', 'share_revoked', 'role_changed'], required: true },
   performedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   targetUser: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  permission: { type: String, enum: ['view', 'edit'], required: true },
+  role: { type: String, enum: Object.values(TechPackRole), required: true },
   timestamp: { type: Date, default: Date.now },
-  techpackId: { type: Schema.Types.ObjectId, ref: 'TechPack', required: true }
+  techpackId: { type: Schema.Types.ObjectId, ref: 'TechPack', required: true },
+  // Keep backward compatibility
+  permission: { type: String, enum: ['view', 'edit'] }
 });
 
 const TechPackSchema = new Schema<ITechPack>(

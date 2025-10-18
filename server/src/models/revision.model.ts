@@ -22,6 +22,7 @@ export interface IRevision extends Document {
   approvedAt?: Date;
   createdAt: Date;
   snapshot: any; // Full TechPack data at this revision
+  revertedFrom?: string; // Version that was reverted from (e.g., "v1.3")
 }
 
 const RevisionChangeSchema = new Schema<IRevisionChange>(
@@ -70,6 +71,10 @@ const RevisionSchema = new Schema<IRevision>(
     snapshot: {
       type: Schema.Types.Mixed,
       required: true
+    },
+    revertedFrom: {
+      type: String,
+      trim: true
     }
   },
   {

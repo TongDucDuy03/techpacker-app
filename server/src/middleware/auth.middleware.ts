@@ -118,3 +118,78 @@ export const requireOwnershipOrAdmin = () => {
     next();
   };
 };
+
+// TechPack access control middleware
+export const requireTechPackAccess = (requiredActions: string[] = ['view']) => {
+  return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    if (!req.user) {
+      return sendError(res, 'Authentication required. Please log in.', 401, 'UNAUTHORIZED');
+    }
+
+    // System admins have universal access
+    if (req.user.role === UserRole.Admin) {
+      return next();
+    }
+
+    const techPackId = req.params.id;
+    if (!techPackId) {
+      return sendError(res, 'TechPack ID is required.', 400, 'BAD_REQUEST');
+    }
+
+    try {
+      // Import here to avoid circular dependency
+      const TechPack = (await import('../models/techpack.model')).default;
+
+      const techPack = await TechPack.findById(techPackId);
+      if (!techPack) {
+        return sendError(res, 'TechPack not found.', 404, 'NOT_FOUND');
+      }
+
+      // Check if user is the owner
+      const isOwner = techPack.createdBy?.toString() === req.user!._id.toString();
+      if (isOwner) {
+        return next(); // Owner has all permissions
+      }
+
+      // Check if user has shared access
+      const sharedAccess = techPack.sharedWith?.find(
+        (share: any) => share.userId.toString() === req.user!._id.toString()
+      );
+
+      if (!sharedAccess) {
+        return sendError(res, 'Access denied. You do not have permission to access this TechPack.', 403, 'FORBIDDEN');
+      }
+
+      // Check if user's role allows the required actions
+      const userRole = sharedAccess.role;
+      const hasPermission = requiredActions.every(action => {
+        switch (action) {
+          case 'view':
+            return true; // All shared users can view
+          case 'edit':
+            return ['admin', 'editor'].includes(userRole);
+          case 'share':
+            return ['admin'].includes(userRole);
+          case 'delete':
+            return false; // Only owner can delete (handled above)
+          default:
+            return false;
+        }
+      });
+
+      if (!hasPermission) {
+        return sendError(
+          res,
+          `Access denied. Your role (${userRole}) does not allow the required actions: ${requiredActions.join(', ')}.`,
+          403,
+          'FORBIDDEN'
+        );
+      }
+
+      next();
+    } catch (error) {
+      console.error('TechPack access check error:', error);
+      return sendError(res, 'Failed to verify TechPack access.', 500, 'INTERNAL_ERROR');
+    }
+  };
+};

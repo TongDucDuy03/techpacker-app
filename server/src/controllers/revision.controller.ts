@@ -251,6 +251,119 @@ export class RevisionController {
       sendError(res, 'Failed to restore revision');
     }
   }
+
+  /**
+   * Revert TechPack to a previous revision (creates new revision entry)
+   * POST /api/v1/revisions/revert/:techPackId/:revisionId
+   */
+  async revertToRevision(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { techPackId, revisionId } = req.params;
+      const user = req.user!;
+
+      // Check if user has permission to revert (admin or designer only)
+      if (user.role !== UserRole.Admin && user.role !== UserRole.Designer) {
+        return sendError(res, "You don't have permission to revert.", 403, 'FORBIDDEN');
+      }
+
+      // Check TechPack access and edit permissions
+      const techpack = await TechPack.findById(techPackId);
+      if (!techpack) {
+        return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
+      }
+
+      const isOwner = techpack.createdBy?.toString() === user._id.toString();
+      const isTechnicalDesigner = techpack.technicalDesignerId?.toString() === user._id.toString();
+      const sharedAccess = techpack.sharedWith?.find(s => s.userId.toString() === user._id.toString());
+      const hasEditAccess = sharedAccess?.permission === 'edit';
+      const canEdit = user.role === UserRole.Admin || isOwner || isTechnicalDesigner || hasEditAccess;
+
+      if (!canEdit) {
+        return sendError(res, 'Access denied. You do not have permission to edit this tech pack.', 403, 'FORBIDDEN');
+      }
+
+      // Get the revision to revert to
+      const targetRevision = await Revision.findById(revisionId);
+      if (!targetRevision) {
+        return sendError(res, 'Revision not found', 404, 'NOT_FOUND');
+      }
+
+      if (targetRevision.techPackId.toString() !== techPackId) {
+        return sendError(res, 'Revision does not belong to this TechPack', 400, 'VALIDATION_ERROR');
+      }
+
+      // Don't allow reverting to rollback revisions
+      if (targetRevision.changeType === 'rollback') {
+        return sendError(res, 'Cannot revert to a rollback revision', 400, 'VALIDATION_ERROR');
+      }
+
+      // Revert the TechPack to the target revision snapshot
+      const revertedData = { ...targetRevision.snapshot };
+      delete revertedData._id; // Don't overwrite the ID
+      delete revertedData.createdAt; // Keep original creation date
+      delete revertedData.updatedAt; // Will be updated automatically
+
+      // Generate new version number
+      const latestRevision = await Revision.findOne({ techPackId })
+        .sort({ createdAt: -1 })
+        .select('version');
+
+      let newVersionNumber = 1;
+      if (latestRevision && latestRevision.version) {
+        const match = latestRevision.version.match(/v?(\d+)\.(\d+)/);
+        if (match) {
+          const major = parseInt(match[1]);
+          const minor = parseInt(match[2]);
+          newVersionNumber = major * 100 + minor + 1;
+        }
+      }
+
+      const newVersion = `v${Math.floor(newVersionNumber / 100)}.${newVersionNumber % 100}`;
+
+      // Apply the reverted data to techpack
+      Object.assign(techpack, revertedData, {
+        version: newVersion,
+        updatedBy: user._id,
+        updatedByName: `${user.firstName} ${user.lastName}`,
+        updatedAt: new Date()
+      });
+
+      await techpack.save();
+
+      // Create a new revision entry for the revert action
+      const revertRevision = new Revision({
+        techPackId: techpack._id,
+        version: newVersion,
+        changeType: 'rollback',
+        changes: {
+          summary: `Reverted to Revision ${targetRevision.version}`,
+          details: {
+            revertedFrom: targetRevision.version,
+            revertedFromId: targetRevision._id,
+            revertAction: true
+          }
+        },
+        createdBy: user._id,
+        createdByName: `${user.firstName} ${user.lastName}`,
+        description: `Reverted to revision ${targetRevision.version} created on ${targetRevision.createdAt}`,
+        statusAtChange: techpack.status,
+        snapshot: techpack.toObject(),
+        revertedFrom: targetRevision.version
+      });
+
+      await revertRevision.save();
+
+      sendSuccess(res, {
+        techpack,
+        newRevision: revertRevision,
+        revertedFrom: targetRevision.version
+      }, `Successfully reverted to Revision ${targetRevision.version}`);
+
+    } catch (error) {
+      console.error('Revert to revision error:', error);
+      sendError(res, 'Failed to revert to revision');
+    }
+  }
 }
 
 export default new RevisionController();

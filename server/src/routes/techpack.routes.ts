@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import techpackController from '../controllers/techpack.controller';
-import { requireAuth, requireRole } from '../middleware/auth.middleware';
+import { requireAuth, requireRole, requireTechPackAccess } from '../middleware/auth.middleware';
 import upload from '../middleware/upload.middleware';
 import { UserRole } from '../models/user.model';
 
@@ -207,7 +207,12 @@ const shareValidation = [
   body('userId')
     .isMongoId()
     .withMessage('Invalid User ID'),
+  body('role')
+    .isIn(['admin', 'editor', 'viewer', 'factory'])
+    .withMessage('Role must be one of: admin, editor, viewer, factory'),
+  // Keep backward compatibility
   body('permission')
+    .optional()
     .isIn(['view', 'edit'])
     .withMessage('Permission must be either view or edit')
 ];
@@ -249,25 +254,26 @@ router.post(
 /**
  * @route GET /api/techpacks/:id
  * @desc Get single TechPack by ID
- * @access Private
+ * @access Private (with TechPack access control)
  */
 router.get(
   '/:id',
   requireAuth,
   idValidation,
+  requireTechPackAccess(['view']),
   techpackController.getTechPack
 );
 
 /**
  * @route PUT /api/techpacks/:id
  * @desc Update TechPack (creates new revision for significant changes)
- * @access Private (Admin and Designer only)
+ * @access Private (with edit access)
  */
 router.put(
   '/:id',
   requireAuth,
-  requireRole([UserRole.Admin, UserRole.Designer]),
   idValidation,
+  requireTechPackAccess(['edit']),
   techpackValidation,
   techpackController.updateTechPack
 );
@@ -275,13 +281,13 @@ router.put(
 /**
  * @route PATCH /api/techpacks/:id
  * @desc Partial update TechPack (autosave, no revision)
- * @access Private (Admin and Designer only)
+ * @access Private (with edit access)
  */
 router.patch(
   '/:id',
   requireAuth,
-  requireRole([UserRole.Admin, UserRole.Designer]),
   idValidation,
+  requireTechPackAccess(['edit']),
   patchValidation,
   techpackController.patchTechPack
 );
@@ -289,13 +295,13 @@ router.patch(
 /**
  * @route DELETE /api/techpacks/:id
  * @desc Delete TechPack (soft delete)
- * @access Private (Owner or Admin)
+ * @access Private (Owner only)
  */
 router.delete(
   '/:id',
   requireAuth,
-  requireRole([UserRole.Admin, UserRole.Designer]),
   idValidation,
+  requireTechPackAccess(['delete']),
   techpackController.deleteTechPack
 );
 
@@ -348,24 +354,43 @@ router.patch(
 /**
  * @route PUT /api/techpacks/:id/share
  * @desc Share TechPack with a user
- * @access Private (Owner or Admin only)
+ * @access Private (with share access)
  */
 router.put(
   '/:id/share',
   requireAuth,
   idValidation,
+  requireTechPackAccess(['share']),
   shareValidation,
   techpackController.shareTechPack
 );
 
 /**
+ * @route PATCH /api/techpacks/:id/share/:userId
+ * @desc Update role for shared user
+ * @access Private (with share access)
+ */
+router.patch(
+  '/:id/share/:userId',
+  requireAuth,
+  requireTechPackAccess(['share']),
+  [
+    param('id').isMongoId().withMessage('Invalid TechPack ID'),
+    param('userId').isMongoId().withMessage('Invalid User ID'),
+    body('role').isIn(['admin', 'editor', 'viewer', 'factory']).withMessage('Role must be one of: admin, editor, viewer, factory')
+  ],
+  techpackController.updateShareRole
+);
+
+/**
  * @route DELETE /api/techpacks/:id/share/:userId
  * @desc Revoke TechPack sharing access
- * @access Private (Owner or Admin only)
+ * @access Private (with share access)
  */
 router.delete(
   '/:id/share/:userId',
   requireAuth,
+  requireTechPackAccess(['share']),
   revokeValidation,
   techpackController.revokeShare
 );
@@ -373,13 +398,40 @@ router.delete(
 /**
  * @route GET /api/techpacks/:id/audit-logs
  * @desc Get TechPack sharing audit logs
- * @access Private (Owner or Admin only)
+ * @access Private (with share access)
  */
 router.get(
   '/:id/audit-logs',
   requireAuth,
   idValidation,
+  requireTechPackAccess(['share']),
   techpackController.getAuditLogs
+);
+
+/**
+ * @route GET /api/techpacks/:id/shareable-users
+ * @desc Get list of users that can be shared with
+ * @access Private (with share access)
+ */
+router.get(
+  '/:id/shareable-users',
+  requireAuth,
+  idValidation,
+  requireTechPackAccess(['share']),
+  techpackController.getShareableUsers
+);
+
+/**
+ * @route GET /api/techpacks/:id/access
+ * @desc Get access list for TechPack
+ * @access Private (with share access)
+ */
+router.get(
+  '/:id/access',
+  requireAuth,
+  idValidation,
+  requireTechPackAccess(['share']),
+  techpackController.getAccessList
 );
 
 /**

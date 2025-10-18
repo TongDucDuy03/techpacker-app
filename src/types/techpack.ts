@@ -112,21 +112,76 @@ export interface RevisionEntry {
   rejectionReason?: string;
 }
 
+// New Revision interface for the Revision Tab
+export interface Revision {
+  id?: string;
+  _id?: string;
+  techPackId: string;
+  version: string;
+  changeType: 'auto' | 'manual' | 'approval' | 'rollback';
+  changeSummary: string;
+  changes?: string;
+  description?: string;
+  status: 'Draft' | 'In Review' | 'Approved' | 'Rejected' | 'Archived';
+  createdBy: string;
+  createdByName?: string;
+  changedBy?: string;
+  changedByName?: string;
+  createdDate: string;
+  changedDate?: string;
+  approvedBy?: string;
+  approvedDate?: string;
+  rejectionReason?: string;
+  revertedFrom?: string; // Version that was reverted from (e.g., "v1.3")
+  snapshotUrl?: string;
+  diffData?: any;
+}
+
 // Sharing and Access Control Types
+export enum TechPackRole {
+  Owner = 'owner',
+  Admin = 'admin',
+  Editor = 'editor',
+  Viewer = 'viewer',
+  Factory = 'factory'
+}
+
 export interface SharedAccess {
   userId: string;
-  permission: 'view' | 'edit';
+  role: TechPackRole;
   sharedAt: string;
   sharedBy: string;
+  // Keep backward compatibility
+  permission?: 'view' | 'edit';
 }
 
 export interface AuditLogEntry {
-  action: 'share_granted' | 'share_revoked' | 'permission_changed';
+  action: 'share_granted' | 'share_revoked' | 'role_changed';
   performedBy: string; // userId
   targetUser: string;  // userId
-  permission: 'view' | 'edit';
+  role: TechPackRole;
   timestamp: string;
   techpackId: string;
+  // Keep backward compatibility
+  permission?: 'view' | 'edit';
+}
+
+export interface ShareableUser {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+}
+
+export interface AccessListItem {
+  userId: string;
+  role: TechPackRole;
+  sharedAt: string;
+  sharedBy: string;
+  user: ShareableUser;
+  // Keep backward compatibility
+  permission?: 'view' | 'edit';
 }
 
 // Backend API TechPack type (matches database response)
@@ -166,6 +221,7 @@ export interface TechPack {
   howToMeasures: HowToMeasure[];
   colorways: Colorway[];
   revisionHistory: RevisionEntry[];
+  revisions?: Revision[]; // New revisions array for the Revision Tab
   status: 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'archived';
   completeness: {
     isComplete: boolean;

@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { validationResult } from 'express-validator';
-import TechPack, { ITechPack, TechPackStatus } from '../models/techpack.model';
+import TechPack, { ITechPack, TechPackStatus, TechPackRole } from '../models/techpack.model';
 import Revision from '../models/revision.model';
 import RevisionService from '../services/revision.service';
 import { AuthRequest } from '../middleware/auth.middleware';
@@ -26,6 +26,9 @@ export class TechPackController {
     this.shareTechPack = this.shareTechPack.bind(this);
     this.revokeShare = this.revokeShare.bind(this);
     this.getAuditLogs = this.getAuditLogs.bind(this);
+    this.getShareableUsers = this.getShareableUsers.bind(this);
+    this.getAccessList = this.getAccessList.bind(this);
+    this.updateShareRole = this.updateShareRole.bind(this);
   }
 
 
@@ -621,11 +624,17 @@ export class TechPackController {
   async shareTechPack(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const { userId, permission } = req.body;
+      const { userId, role } = req.body;
       const sharer = req.user!;
 
-      if (!userId || !permission || !['view', 'edit'].includes(permission)) {
-        return sendError(res, 'Valid userId and permission (view/edit) are required', 400, 'VALIDATION_ERROR');
+      // Validate input
+      if (!userId || !role || !Object.values(TechPackRole).includes(role)) {
+        return sendError(res, 'Valid userId and role are required', 400, 'VALIDATION_ERROR');
+      }
+
+      // Prevent sharing Owner role
+      if (role === TechPackRole.Owner) {
+        return sendError(res, 'Cannot share Owner role. Use transfer ownership instead.', 400, 'VALIDATION_ERROR');
       }
 
       const techpack = await TechPack.findById(id);
@@ -633,9 +642,14 @@ export class TechPackController {
         return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
       }
 
+      // Check if sharer has permission to share
       const isOwner = techpack.createdBy?.toString() === sharer._id.toString();
-      if (sharer.role !== UserRole.Admin && !isOwner) {
-        return sendError(res, 'Access denied. Only the creator or an admin can share this tech pack.', 403, 'FORBIDDEN');
+      const sharerAccess = techpack.sharedWith?.find(s => s.userId.toString() === sharer._id.toString());
+      const canShare = sharer.role === UserRole.Admin || isOwner ||
+                      (sharerAccess && ['admin'].includes(sharerAccess.role));
+
+      if (!canShare) {
+        return sendError(res, 'Access denied. Only Owner or Admin can share this tech pack.', 403, 'FORBIDDEN');
       }
 
       const targetUser = await User.findById(userId);
@@ -643,21 +657,36 @@ export class TechPackController {
         return sendError(res, 'Target user not found', 404, 'NOT_FOUND');
       }
 
+      // Prevent sharing with self
+      if (targetUser._id.toString() === sharer._id.toString()) {
+        return sendError(res, 'Cannot share with yourself.', 400, 'BAD_REQUEST');
+      }
+
+      // Prevent sharing with system admin or technical designer
       if (targetUser.role === UserRole.Admin || techpack.technicalDesignerId?.toString() === userId) {
-        return sendError(res, 'Cannot share with an admin or the assigned technical designer.', 400, 'BAD_REQUEST');
+        return sendError(res, 'Cannot share with system admin or the assigned technical designer.', 400, 'BAD_REQUEST');
       }
 
       const existingShareIndex = techpack.sharedWith?.findIndex(s => s.userId.toString() === userId) || -1;
-      let action: 'share_granted' | 'permission_changed' = 'share_granted';
+      let action: 'share_granted' | 'role_changed' = 'share_granted';
 
       if (existingShareIndex > -1) {
-        action = 'permission_changed';
-        techpack.sharedWith![existingShareIndex].permission = permission;
+        action = 'role_changed';
+        techpack.sharedWith![existingShareIndex].role = role;
+        // Update backward compatibility field
+        techpack.sharedWith![existingShareIndex].permission = role === TechPackRole.Viewer || role === TechPackRole.Factory ? 'view' : 'edit';
       } else {
         if (!techpack.sharedWith) {
           techpack.sharedWith = [];
         }
-        techpack.sharedWith.push({ userId, permission, sharedAt: new Date(), sharedBy: sharer._id });
+        techpack.sharedWith.push({
+          userId,
+          role,
+          sharedAt: new Date(),
+          sharedBy: sharer._id,
+          // Backward compatibility
+          permission: role === TechPackRole.Viewer || role === TechPackRole.Factory ? 'view' : 'edit'
+        });
       }
 
       if (!techpack.auditLogs) {
@@ -667,13 +696,30 @@ export class TechPackController {
         action,
         performedBy: sharer._id,
         targetUser: userId,
-        permission,
+        role,
         timestamp: new Date(),
-        techpackId: techpack._id as Types.ObjectId
+        techpackId: techpack._id as Types.ObjectId,
+        // Backward compatibility
+        permission: role === TechPackRole.Viewer || role === TechPackRole.Factory ? 'view' : 'edit'
       });
 
       await techpack.save();
-      sendSuccess(res, techpack.sharedWith, 'TechPack shared successfully');
+
+      // Log activity
+      await logActivity({
+        userId: sharer._id,
+        userName: `${sharer.firstName} ${sharer.lastName}`,
+        action: ActivityAction.TECHPACK_UPDATE,
+        target: {
+          type: 'TechPack',
+          id: techpack._id as Types.ObjectId,
+          name: techpack.productName
+        },
+        req,
+        details: `Shared with ${targetUser.firstName} ${targetUser.lastName} as ${role}`
+      });
+
+      sendSuccess(res, techpack.sharedWith, `TechPack shared successfully with ${targetUser.firstName} ${targetUser.lastName}`);
     } catch (error: any) {
       console.error('Share TechPack error:', error);
       sendError(res, 'Failed to share tech pack');
@@ -690,9 +736,14 @@ export class TechPackController {
         return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
       }
 
+      // Check if revoker has permission to revoke access
       const isOwner = techpack.createdBy?.toString() === revoker._id.toString();
-      if (revoker.role !== UserRole.Admin && !isOwner) {
-        return sendError(res, 'Access denied. Only the creator or an admin can revoke access.', 403, 'FORBIDDEN');
+      const revokerAccess = techpack.sharedWith?.find(s => s.userId.toString() === revoker._id.toString());
+      const canRevoke = revoker.role === UserRole.Admin || isOwner ||
+                       (revokerAccess && ['admin'].includes(revokerAccess.role));
+
+      if (!canRevoke) {
+        return sendError(res, 'Access denied. Only Owner or Admin can revoke access.', 403, 'FORBIDDEN');
       }
 
       const shareIndex = techpack.sharedWith?.findIndex(s => s.userId.toString() === userId) || -1;
@@ -701,6 +752,7 @@ export class TechPackController {
       }
 
       const removedShare = techpack.sharedWith!.splice(shareIndex, 1)[0];
+      const targetUser = await User.findById(userId);
 
       if (!techpack.auditLogs) {
         techpack.auditLogs = [];
@@ -709,13 +761,30 @@ export class TechPackController {
         action: 'share_revoked',
         performedBy: revoker._id,
         targetUser: removedShare.userId,
-        permission: removedShare.permission,
+        role: removedShare.role,
         timestamp: new Date(),
-        techpackId: techpack._id as Types.ObjectId
+        techpackId: techpack._id as Types.ObjectId,
+        // Backward compatibility
+        permission: removedShare.permission || 'view'
       });
 
       await techpack.save();
-      sendSuccess(res, {}, 'Access revoked successfully');
+
+      // Log activity
+      await logActivity({
+        userId: revoker._id,
+        userName: `${revoker.firstName} ${revoker.lastName}`,
+        action: ActivityAction.TECHPACK_UPDATE,
+        target: {
+          type: 'TechPack',
+          id: techpack._id as Types.ObjectId,
+          name: techpack.productName
+        },
+        req,
+        details: `Revoked access from ${targetUser?.firstName || 'Unknown'} ${targetUser?.lastName || 'User'}`
+      });
+
+      sendSuccess(res, {}, `Access revoked successfully from ${targetUser?.firstName || 'Unknown'} ${targetUser?.lastName || 'User'}`);
     } catch (error: any) {
       console.error('Revoke share error:', error);
       sendError(res, 'Failed to revoke access');
@@ -743,6 +812,181 @@ export class TechPackController {
       sendError(res, 'Failed to retrieve audit logs');
     }
   }
+
+  async getShareableUsers(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const user = req.user!;
+
+      const techpack = await TechPack.findById(id);
+      if (!techpack) {
+        return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
+      }
+
+      // Check if user has permission to share
+      const isOwner = techpack.createdBy?.toString() === user._id.toString();
+      const userAccess = techpack.sharedWith?.find(s => s.userId.toString() === user._id.toString());
+      const canShare = user.role === UserRole.Admin || isOwner ||
+                      (userAccess && ['admin'].includes(userAccess.role));
+
+      if (!canShare) {
+        return sendError(res, 'Access denied. Only Owner or Admin can view shareable users.', 403, 'FORBIDDEN');
+      }
+
+      // Get all users except:
+      // - System admins
+      // - The technical designer
+      // - Users already shared with
+      // - The current user
+      const excludedUserIds = [
+        user._id.toString(),
+        techpack.technicalDesignerId?.toString(),
+        ...(techpack.sharedWith?.map(s => s.userId.toString()) || [])
+      ].filter(Boolean);
+
+      const shareableUsers = await User.find({
+        _id: { $nin: excludedUserIds },
+        role: { $ne: UserRole.Admin },
+        isActive: true
+      }).select('firstName lastName email role').lean();
+
+      sendSuccess(res, shareableUsers, 'Shareable users retrieved successfully');
+    } catch (error: any) {
+      console.error('Get shareable users error:', error);
+      sendError(res, 'Failed to get shareable users');
+    }
+  }
+
+  async getAccessList(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const user = req.user!;
+
+      const techpack = await TechPack.findById(id);
+      if (!techpack) {
+        return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
+      }
+
+      // Check if user has permission to view access list
+      const isOwner = techpack.createdBy?.toString() === user._id.toString();
+      const userAccess = techpack.sharedWith?.find(s => s.userId.toString() === user._id.toString());
+      const canView = user.role === UserRole.Admin || isOwner ||
+                     (userAccess && ['admin'].includes(userAccess.role));
+
+      if (!canView) {
+        return sendError(res, 'Access denied. Only Owner or Admin can view access list.', 403, 'FORBIDDEN');
+      }
+
+      // Get shared users information manually
+      const accessList = await Promise.all(
+        (techpack.sharedWith || []).map(async (share) => {
+          const sharedUser = await User.findById(share.userId).select('firstName lastName email role');
+          const sharedByUser = share.sharedBy ? await User.findById(share.sharedBy).select('firstName lastName email') : null;
+
+          return {
+            userId: share.userId.toString(),
+            role: share.role,
+            permission: share.permission || 'view', // Backward compatibility
+            sharedAt: share.sharedAt,
+            sharedBy: sharedByUser,
+            user: sharedUser
+          };
+        })
+      );
+
+      sendSuccess(res, accessList, 'Access list retrieved successfully');
+    } catch (error: any) {
+      console.error('Get access list error:', error);
+      sendError(res, 'Failed to get access list');
+    }
+  }
+
+  async updateShareRole(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { id, userId } = req.params;
+      const { role } = req.body;
+      const updater = req.user!;
+
+      // Validate input
+      if (!role || !Object.values(TechPackRole).includes(role)) {
+        return sendError(res, 'Valid role is required', 400, 'VALIDATION_ERROR');
+      }
+
+      // Prevent updating to Owner role
+      if (role === TechPackRole.Owner) {
+        return sendError(res, 'Cannot update to Owner role. Use transfer ownership instead.', 400, 'VALIDATION_ERROR');
+      }
+
+      const techpack = await TechPack.findById(id);
+      if (!techpack) {
+        return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
+      }
+
+      // Check if updater has permission to update roles
+      const isOwner = techpack.createdBy?.toString() === updater._id.toString();
+      const updaterAccess = techpack.sharedWith?.find(s => s.userId.toString() === updater._id.toString());
+      const canUpdate = updater.role === UserRole.Admin || isOwner ||
+                       (updaterAccess && ['admin'].includes(updaterAccess.role));
+
+      if (!canUpdate) {
+        return sendError(res, 'Access denied. Only Owner or Admin can update roles.', 403, 'FORBIDDEN');
+      }
+
+      const shareIndex = techpack.sharedWith?.findIndex(s => s.userId.toString() === userId) || -1;
+      if (shareIndex === -1) {
+        return sendError(res, 'User does not have access to this TechPack.', 404, 'NOT_FOUND');
+      }
+
+      const targetUser = await User.findById(userId);
+      if (!targetUser) {
+        return sendError(res, 'Target user not found', 404, 'NOT_FOUND');
+      }
+
+      // Update the role
+      const oldRole = techpack.sharedWith![shareIndex].role;
+      techpack.sharedWith![shareIndex].role = role;
+      // Update backward compatibility field
+      techpack.sharedWith![shareIndex].permission = role === TechPackRole.Viewer || role === TechPackRole.Factory ? 'view' : 'edit';
+
+      // Add audit log
+      if (!techpack.auditLogs) {
+        techpack.auditLogs = [];
+      }
+      techpack.auditLogs.push({
+        action: 'role_changed',
+        performedBy: updater._id,
+        targetUser: new Types.ObjectId(userId),
+        role,
+        timestamp: new Date(),
+        techpackId: techpack._id as Types.ObjectId,
+        // Backward compatibility
+        permission: role === TechPackRole.Viewer || role === TechPackRole.Factory ? 'view' : 'edit'
+      });
+
+      await techpack.save();
+
+      // Log activity
+      await logActivity({
+        userId: updater._id,
+        userName: `${updater.firstName} ${updater.lastName}`,
+        action: ActivityAction.TECHPACK_UPDATE,
+        target: {
+          type: 'TechPack',
+          id: techpack._id as Types.ObjectId,
+          name: techpack.productName
+        },
+        req,
+        details: `Updated ${targetUser.firstName} ${targetUser.lastName} role from ${oldRole} to ${role}`
+      });
+
+      sendSuccess(res, techpack.sharedWith, `Role updated successfully for ${targetUser.firstName} ${targetUser.lastName}`);
+    } catch (error: any) {
+      console.error('Update share role error:', error);
+      sendError(res, 'Failed to update role');
+    }
+  }
+
+
 }
 
 export default new TechPackController();
