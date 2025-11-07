@@ -69,16 +69,95 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
     });
   };
 
-  const formatValue = (val: any): React.ReactNode => {
-    if (val === null || val === undefined || val === '') return '—';
-    if (typeof val === 'object') {
-      try {
-        return <pre className="text-xs">{JSON.stringify(val, null, 2)}</pre>;
-      } catch {
-        return String(val);
+  const formatFieldName = (fieldPath: string): string => {
+    // Extract section and field name from path like "bom[id:xxx].supplierCode"
+    const match = fieldPath.match(/^(\w+)(\[.*?\])?\.?(.+)?$/);
+    if (!match) return fieldPath;
+    
+    const [, section, idPart, field] = match;
+    let result = '';
+    
+    // Format section name
+    const sectionNames: Record<string, string> = {
+      bom: 'BOM',
+      measurements: 'Measurement',
+      colorways: 'Colorway',
+      howToMeasure: 'How to Measure',
+      articleInfo: 'Article Info'
+    };
+    result = sectionNames[section] || section;
+    
+    // Add item identifier if present
+    if (idPart) {
+      const idMatch = idPart.match(/\[([+-]?id:.*?)\]/);
+      if (idMatch) {
+        const idStr = idMatch[1];
+        if (idStr.startsWith('+id:')) {
+          result += ' (New Item)';
+        } else if (idStr.startsWith('-id:')) {
+          result += ' (Removed Item)';
+        } else {
+          result += ' Item';
+        }
       }
     }
-    return String(val);
+    
+    // Add field name
+    if (field) {
+      const fieldNames: Record<string, string> = {
+        supplierCode: 'Supplier Code',
+        materialName: 'Material Name',
+        part: 'Part',
+        quantity: 'Quantity',
+        uom: 'Unit of Measure',
+        pomCode: 'POM Code',
+        pomName: 'POM Name',
+        name: 'Name',
+        code: 'Code',
+        placement: 'Placement',
+        materialType: 'Material Type',
+        hexColor: 'Hex Color',
+        pantoneCode: 'Pantone Code',
+        stepNumber: 'Step Number',
+        description: 'Description'
+      };
+      result += ` > ${fieldNames[field] || field.replace(/([A-Z])/g, ' $1').trim()}`;
+    }
+    
+    return result;
+  };
+
+  const formatValue = (val: any, isObject = false): React.ReactNode => {
+    if (val === null || val === undefined || val === '') return <span className="text-gray-400">—</span>;
+    
+    if (typeof val === 'object' && !Array.isArray(val)) {
+      // For objects, show as formatted key-value pairs
+      const entries = Object.entries(val);
+      if (entries.length === 0) return <span className="text-gray-400">(empty)</span>;
+      
+      return (
+        <div className="space-y-1">
+          {entries.map(([key, value]) => {
+            const displayKey = key.replace(/([A-Z])/g, ' $1').trim();
+            return (
+              <div key={key} className="text-xs">
+                <span className="font-medium text-gray-600">{displayKey}:</span>{' '}
+                <span className="text-gray-800">
+                  {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+    
+    if (Array.isArray(val)) {
+      if (val.length === 0) return <span className="text-gray-400">(empty)</span>;
+      return <span className="text-sm">{val.join(', ')}</span>;
+    }
+    
+    return <span className="text-sm">{String(val)}</span>;
   };
 
   const diffColumns = [
@@ -86,36 +165,76 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
       title: 'Field',
       dataIndex: 'field',
       key: 'field',
+      width: '35%',
       render: (text: string) => (
-        <span className="font-medium">{text.replace(/\./g, ' > ')}</span>
+        <span className="font-medium text-gray-900">{formatFieldName(text)}</span>
       )
     },
     {
       title: 'Old Value',
       dataIndex: 'old',
       key: 'old',
-      render: (val: any) => (
-        <div className="bg-gray-100 px-2 py-1 rounded text-sm">{formatValue(val)}</div>
+      width: '32.5%',
+      render: (val: any, record: any) => (
+        <div className="bg-red-50 border border-red-200 px-3 py-2 rounded text-sm min-h-[40px]">
+          {formatValue(val, record._isObject)}
+        </div>
       )
     },
     {
       title: 'New Value',
       dataIndex: 'new',
       key: 'new',
-      render: (val: any) => (
-        <div className="bg-yellow-100 px-2 py-1 rounded text-sm font-medium">{formatValue(val)}</div>
+      width: '32.5%',
+      render: (val: any, record: any) => (
+        <div className="bg-green-50 border border-green-200 px-3 py-2 rounded text-sm min-h-[40px]">
+          {formatValue(val, record._isObject)}
+        </div>
       )
     }
   ];
 
-  const diffData = revision.changes?.diff
-    ? Object.entries(revision.changes.diff).map(([field, change]: [string, any]) => ({
+  // Process and group diff data by section
+  const processDiffData = () => {
+    if (!revision.changes?.diff) return [];
+    
+    const entries = Object.entries(revision.changes.diff);
+    const grouped: Record<string, any[]> = {};
+    
+    entries.forEach(([field, change]: [string, any]) => {
+      // Extract section from field path
+      const sectionMatch = field.match(/^(\w+)(\[.*?\])?/);
+      const section = sectionMatch ? sectionMatch[1] : 'other';
+      
+      if (!grouped[section]) {
+        grouped[section] = [];
+      }
+      
+      grouped[section].push({
         key: field,
         field,
         old: change.old,
-        new: change.new
-      }))
-    : [];
+        new: change.new,
+        _isAdded: change._isAdded,
+        _isRemoved: change._isRemoved,
+        _isObject: typeof change.old === 'object' || typeof change.new === 'object'
+      });
+    });
+    
+    // Flatten with section headers
+    const result: any[] = [];
+    Object.entries(grouped).forEach(([section, items]) => {
+      if (result.length > 0) {
+        result.push({ key: `divider-${section}`, _isDivider: true });
+      }
+      result.push({ key: `header-${section}`, _isHeader: true, section });
+      result.push(...items);
+    });
+    
+    return result;
+  };
+
+  const diffData = processDiffData();
 
   return (
     <>
@@ -168,16 +287,72 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
           <h4 className="text-sm font-semibold text-gray-900 mb-3">Field Changes</h4>
           {diffData.length === 0 ? (
             <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed">
-              <p className="text-sm">No field-level changes detected in this revision.</p>
+              {revision.changes?.details && Object.keys(revision.changes.details).length > 0 ? (
+                <div>
+                  <p className="text-sm mb-2">No detailed field-level diff available, but changes were detected:</p>
+                  <div className="text-left max-w-md mx-auto">
+                    {Object.entries(revision.changes.details).map(([section, details]: [string, any]) => {
+                      const changes: string[] = [];
+                      if (details.added) changes.push(`${details.added} added`);
+                      if (details.modified) changes.push(`${details.modified} modified`);
+                      if (details.removed) changes.push(`${details.removed} removed`);
+                      if (changes.length > 0) {
+                        return (
+                          <div key={section} className="text-sm py-1">
+                            <span className="font-medium capitalize">{section}:</span> {changes.join(', ')}
+                          </div>
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm">No field-level changes detected in this revision.</p>
+              )}
             </div>
           ) : (
-            <Table
-              columns={diffColumns}
-              dataSource={diffData}
-              pagination={false}
-              size="small"
-              scroll={{ x: 'max-content' }}
-            />
+            <div className="space-y-4">
+              {(() => {
+                // Group by section for better display
+                const grouped: Record<string, any[]> = {};
+                diffData.forEach((item: any) => {
+                  if (item._isHeader || item._isDivider) return;
+                  const sectionMatch = item.field.match(/^(\w+)(\[.*?\])?/);
+                  const section = sectionMatch ? sectionMatch[1] : 'other';
+                  if (!grouped[section]) grouped[section] = [];
+                  grouped[section].push(item);
+                });
+
+                return Object.entries(grouped).map(([section, items]) => {
+                  const sectionNames: Record<string, string> = {
+                    bom: 'BOM Items',
+                    measurements: 'Measurements',
+                    colorways: 'Colorways',
+                    howToMeasure: 'How to Measure',
+                    articleInfo: 'Article Information'
+                  };
+
+                  return (
+                    <div key={section} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="bg-gray-100 px-4 py-2 border-b border-gray-200">
+                        <h5 className="font-semibold text-gray-900 text-sm uppercase">
+                          {sectionNames[section] || section}
+                        </h5>
+                      </div>
+                      <Table
+                        columns={diffColumns}
+                        dataSource={items}
+                        pagination={false}
+                        size="small"
+                        scroll={{ x: 'max-content' }}
+                        rowClassName="hover:bg-gray-50"
+                      />
+                    </div>
+                  );
+                });
+              })()}
+            </div>
           )}
         </div>
 

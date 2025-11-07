@@ -597,12 +597,15 @@ export class SubdocumentController {
         return;
       }
 
-      const deletedMeasurement = measurement.toObject();
-      (techpack.measurements as any).pull(measurementId);
-      techpack.updatedBy = user._id;
-      techpack.updatedByName = `${user.firstName} ${user.lastName}`;
-      const oldTechPack = techpack.toObject({ virtuals: true });
-      await techpack.save();
+  const deletedMeasurement = measurement.toObject();
+
+  // Keep a snapshot of the old techpack for revision comparison BEFORE mutation
+  const oldTechPack = techpack.toObject({ virtuals: true });
+
+  (techpack.measurements as any).pull(measurementId);
+  techpack.updatedBy = user._id;
+  techpack.updatedByName = `${user.firstName} ${user.lastName}`;
+  await techpack.save();
 
       try {
         const changes = RevisionService.compareTechPacks(oldTechPack as any, techpack as any);
@@ -702,10 +705,12 @@ export class SubdocumentController {
         ...req.body
       };
 
+      // Keep a snapshot of the old techpack for revision comparison BEFORE mutation
+      const oldTechPack = techpack.toObject({ virtuals: true });
+
       techpack.colorways.push(newColorway);
       techpack.updatedBy = user._id;
       techpack.updatedByName = `${user.firstName} ${user.lastName}`;
-      const oldTechPack = techpack.toObject({ virtuals: true });
       await techpack.save();
 
       try {
@@ -812,10 +817,12 @@ export class SubdocumentController {
         return;
       }
 
+      // Keep a snapshot of the old techpack for revision comparison BEFORE mutation
+      const oldTechPack = techpack.toObject({ virtuals: true });
+
       Object.assign(colorway, req.body);
       techpack.updatedBy = user._id;
       techpack.updatedByName = `${user.firstName} ${user.lastName}`;
-      const oldTechPack = techpack.toObject({ virtuals: true });
       await techpack.save();
 
       try {
@@ -912,12 +919,15 @@ export class SubdocumentController {
         return;
       }
 
-      const deletedColorway = colorway.toObject();
-      (techpack.colorways as any).pull(colorwayId);
-      techpack.updatedBy = user._id;
-      techpack.updatedByName = `${user.firstName} ${user.lastName}`;
-      const oldTechPack = techpack.toObject({ virtuals: true });
-      await techpack.save();
+  const deletedColorway = colorway.toObject();
+
+  // Keep a snapshot of the old techpack for revision comparison BEFORE mutation
+  const oldTechPack = techpack.toObject({ virtuals: true });
+
+  (techpack.colorways as any).pull(colorwayId);
+  techpack.updatedBy = user._id;
+  techpack.updatedByName = `${user.firstName} ${user.lastName}`;
+  await techpack.save();
 
       try {
         const changes = RevisionService.compareTechPacks(oldTechPack as any, techpack as any);

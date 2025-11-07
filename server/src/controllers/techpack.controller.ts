@@ -13,6 +13,7 @@ import { sendSuccess, sendError, formatValidationErrors } from '../utils/respons
 import { Types } from 'mongoose';
 import PermissionManager from '../utils/permissions.util';
 import { cacheService, CacheKeys, CacheTTL } from '../services/cache.service';
+import _ from 'lodash';
 
 /**
  * Helper function to merge arrays of subdocuments
@@ -570,7 +571,73 @@ export class TechPackController {
             const oldArray = (techpack as any)[field] || [];
             const newArray = req.body[field];
             if (Array.isArray(newArray)) {
-              updateData[field] = mergeSubdocumentArray(oldArray, newArray);
+              // Normalize arrays for comparison: remove _id/id differences and compare content
+              const normalizeForComparison = (arr: any[]): any[] => {
+                return arr
+                  .filter(item => item != null) // Remove null/undefined
+                  .map(item => {
+                    // Deep clone to avoid mutating original
+                    const normalized = _.cloneDeep(item);
+                    // Remove ID fields for comparison (we only care about content)
+                    delete normalized._id;
+                    delete normalized.id;
+                    delete normalized.__v;
+                    return normalized;
+                  })
+                  .sort((a, b) => {
+                    // Sort by a stable key for comparison (use key identifying fields)
+                    const getSortKey = (item: any): string => {
+                      if (field === 'bom') {
+                        const part = String(item.part || '').trim().toLowerCase();
+                        const material = String(item.materialName || '').trim().toLowerCase();
+                        return `${part}_${material}`;
+                      }
+                      if (field === 'measurements') {
+                        return String(item.pomCode || '').trim().toLowerCase();
+                      }
+                      if (field === 'colorways') {
+                        const name = String(item.name || '').trim().toLowerCase();
+                        const code = String(item.code || '').trim().toLowerCase();
+                        return `${name}_${code}`;
+                      }
+                      if (field === 'howToMeasure') {
+                        const pomCode = String(item.pomCode || '').trim().toLowerCase();
+                        const step = String(item.stepNumber || 0);
+                        return `${pomCode}_${step}`;
+                      }
+                      // Fallback: use sorted keys for stable comparison
+                      try {
+                        const keys = Object.keys(item).sort();
+                        return keys.map(k => `${k}:${JSON.stringify(item[k])}`).join('|');
+                      } catch {
+                        return String(item);
+                      }
+                    };
+                    return getSortKey(a).localeCompare(getSortKey(b));
+                  });
+              };
+              
+              const oldNormalized = normalizeForComparison(oldArray);
+              const newNormalized = normalizeForComparison(newArray);
+              
+              // Deep comparison using lodash isEqual (handles nested objects/arrays correctly)
+              const arraysEqual = oldNormalized.length === newNormalized.length &&
+                oldNormalized.every((oldItem, idx) => {
+                  const newItem = newNormalized[idx];
+                  if (!oldItem || !newItem) return false;
+                  // Use lodash isEqual for deep comparison (handles nested objects, arrays, etc.)
+                  return _.isEqual(oldItem, newItem);
+                });
+              
+              // Only merge and update if arrays are actually different
+              if (!arraysEqual) {
+                console.log(`📊 Array ${field} has changes - old: ${oldArray.length}, new: ${newArray.length}`);
+                const merged = mergeSubdocumentArray(oldArray, newArray);
+                updateData[field] = merged;
+              } else {
+                console.log(`✅ Array ${field} unchanged - skipping update to prevent false revision`);
+                // Don't include in updateData - this prevents false revision detection
+              }
             } else {
               updateData[field] = req.body[field];
             }
