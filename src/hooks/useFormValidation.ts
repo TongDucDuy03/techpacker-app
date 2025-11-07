@@ -13,7 +13,7 @@ export interface FormValidationState {
 }
 
 export interface FormValidationActions {
-  validateField: (fieldName: string, value: any) => void;
+  validateField: (fieldName: string, value: any) => boolean;
   validateForm: (data: Record<string, any>) => { isValid: boolean; errors: Record<string, string> };
   setFieldTouched: (fieldName: string, touched?: boolean) => void;
   setFieldError: (fieldName: string, error: string | null) => void;
@@ -72,6 +72,7 @@ export function useFormValidation(
         [fieldName]: error || '',
       },
     }));
+    return !error;
   }, [validateSingleField]);
 
   // Validate entire form

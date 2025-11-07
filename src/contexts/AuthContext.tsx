@@ -1,12 +1,13 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { api } from '../lib/api';
 
 interface User {
-  id: string;
+  _id: string;
   email: string;
   firstName: string;
   lastName: string;
   role: string;
+  username?: string;
 }
 
 interface AuthContextType {
@@ -14,79 +15,103 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  register: (userData: any) => Promise<void>;
+  logout: () => Promise<void>;
+  register: (userData: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    username: string;
+    role?: string;
+  }) => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // Check if user is authenticated on mount
   useEffect(() => {
-    const initializeAuth = async () => {
+    const checkAuth = async () => {
       const token = localStorage.getItem('accessToken');
       if (token) {
         try {
-          // TODO: Verify token with a backend endpoint if available
-          // For now, we'll fetch the profile
-          const profile = await api.getProfile();
-          setUser(profile);
+          const userData = await api.getProfile();
+          setUser(userData);
         } catch (error) {
-          console.error('Failed to initialize auth:', error);
+          // Token is invalid, clear it
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
+          setUser(null);
         }
       }
       setIsLoading(false);
     };
-    initializeAuth();
+
+    checkAuth();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const { user, tokens } = await api.login(email, password);
-    localStorage.setItem('accessToken', tokens.accessToken);
-    localStorage.setItem('refreshToken', tokens.refreshToken);
-    setUser(user);
-  };
-
-  const logout = async () => {
-    const refreshToken = localStorage.getItem('refreshToken');
-    if (refreshToken) {
-      try {
-        await api.logout();
-      } catch (error) {
-        console.error('Failed to logout from server:', error);
-      }
+  const login = useCallback(async (email: string, password: string) => {
+    try {
+      const { user: userData } = await api.login(email, password);
+      setUser(userData);
+    } catch (error: any) {
+      throw new Error(error.message || 'Login failed');
     }
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    setUser(null);
-  };
+  }, []);
 
-  const register = async (userData: any) => {
-    await api.register(userData);
-    // Optional: automatically log in the user after registration
-  };
+  const logout = useCallback(async () => {
+    try {
+      await api.logout();
+    } catch (error) {
+      // Ignore logout errors
+    } finally {
+      setUser(null);
+    }
+  }, []);
 
-  const value = {
+  const register = useCallback(async (userData: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    username: string;
+    role?: string;
+  }) => {
+    // Registration is disabled. Only admins may create accounts via the Admin panel.
+    throw new Error('Registration is disabled. Please contact an administrator to create an account.');
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const userData = await api.getProfile();
+      setUser(userData);
+    } catch (error) {
+      // If refresh fails, user might be logged out
+      setUser(null);
+    }
+  }, []);
+
+  const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
     isLoading,
     login,
     logout,
     register,
+    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export const useAuth = () => {
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
-

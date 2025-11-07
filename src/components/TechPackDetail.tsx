@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import { ApiTechPack } from '../types/techpack';
 import { ArrowLeft, Edit, Trash2, Download } from 'lucide-react';
 
@@ -9,13 +9,13 @@ interface TechPackDetailProps {
   onDelete: (id: string) => void;
 }
 
-export const TechPackDetail: React.FC<TechPackDetailProps> = ({
+const TechPackDetailComponent: React.FC<TechPackDetailProps> = ({
   techPack,
   onBack,
   onUpdate,
   onDelete,
 }) => {
-  const getStatusColor = (status: string) => {
+  const getStatusColor = useCallback((status: string) => {
     switch (status) {
       case 'approved': return 'bg-green-100 text-green-800';
       case 'pending_approval': return 'bg-yellow-100 text-yellow-800';
@@ -23,15 +23,19 @@ export const TechPackDetail: React.FC<TechPackDetailProps> = ({
       case 'rejected': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
-  };
+  }, []);
 
-  const formatDate = (dateString: string) => {
+  const formatDate = useCallback((dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
-  };
+  }, []);
+
+  const statusColor = useMemo(() => getStatusColor(techPack.status), [techPack.status, getStatusColor]);
+  const formattedCreatedAt = useMemo(() => formatDate(techPack.createdAt), [techPack.createdAt, formatDate]);
+  const formattedUpdatedAt = useMemo(() => formatDate(techPack.updatedAt), [techPack.updatedAt, formatDate]);
 
   return (
     <div className="space-y-6">
@@ -97,7 +101,7 @@ export const TechPackDetail: React.FC<TechPackDetailProps> = ({
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Status</label>
-                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(techPack.status)}`}>
+                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${statusColor}`}>
                   {techPack.status}
                 </span>
               </div>
@@ -140,11 +144,11 @@ export const TechPackDetail: React.FC<TechPackDetailProps> = ({
             <div className="space-y-3">
               <div>
                 <div className="text-sm font-medium text-gray-900">Created</div>
-                <div className="text-sm text-gray-600">{formatDate(techPack.createdAt)}</div>
+                <div className="text-sm text-gray-600">{formattedCreatedAt}</div>
               </div>
               <div>
                 <div className="text-sm font-medium text-gray-900">Last Updated</div>
-                <div className="text-sm text-gray-600">{formatDate(techPack.updatedAt)}</div>
+                <div className="text-sm text-gray-600">{formattedUpdatedAt}</div>
               </div>
             </div>
           </div>
@@ -178,3 +182,5 @@ export const TechPackDetail: React.FC<TechPackDetailProps> = ({
     </div>
   );
 };
+
+export const TechPackDetail = memo(TechPackDetailComponent);

@@ -149,7 +149,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   return sendError(res, message, statusCode, code);
 });
 
-// Start server
+// Start server (exported for tests). When run directly, startServer will execute.
 async function startServer() {
   try {
     // Connect to database
@@ -180,5 +180,10 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-startServer();
+// If this file is executed directly, start the server. Tests can import { app } without starting it.
+if (require.main === module) {
+  startServer();
+}
+
+export { app, startServer };
 

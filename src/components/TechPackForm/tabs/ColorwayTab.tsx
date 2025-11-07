@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useTechPack } from '../../../contexts/TechPackContext';
 import { Colorway, ColorwayPart } from '../../../types/techpack';
 import { useFormValidation } from '../../../hooks/useFormValidation';
-import { colorwayValidationSchema } from '../../../utils/validationSchemas';
+import { colorwayFormValidationSchema, colorwayPartValidationSchema } from '../../../utils/validationSchemas';
 import Input from '../shared/Input';
 import Select from '../shared/Select';
 import DataTable from '../shared/DataTable';
@@ -19,17 +19,23 @@ const ColorwayTab: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false);
 
   // Initialize validation for the form
-  const validation = useFormValidation(colorwayValidationSchema);
-  const partValidation = useFormValidation(colorwayValidationSchema);
+  const validation = useFormValidation(colorwayFormValidationSchema);
+  const partValidation = useFormValidation(colorwayPartValidationSchema);
   
   const [formData, setFormData] = useState<Partial<Colorway>>({
-    colorwayName: '',
-    colorwayCode: '',
+    name: '',
+    code: '',
+    placement: '',
+    materialType: '',
     season: '',
     isDefault: false,
     parts: [],
     approvalStatus: 'Pending',
     productionStatus: 'Lab Dip',
+    hexColor: '#000000',
+    pantoneCode: '',
+    supplier: '',
+    notes: '',
   });
 
   const [partFormData, setPartFormData] = useState<Partial<ColorwayPart>>({
@@ -71,11 +77,24 @@ const ColorwayTab: React.FC = () => {
   ];
 
   const handleInputChange = (field: keyof Colorway) => (value: string | boolean) => {
-    const updatedFormData = { ...formData, [field]: value };
+    let nextValue: string | boolean = value;
+
+    if (field === 'hexColor' && typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        nextValue = '';
+      } else if (!trimmed.startsWith('#')) {
+        nextValue = `#${trimmed.replace(/^#+/, '')}`.toUpperCase();
+      } else {
+        nextValue = trimmed.toUpperCase();
+      }
+    }
+
+    const updatedFormData = { ...formData, [field]: nextValue };
     setFormData(updatedFormData);
 
     // Validate the field in real-time
-    validation.validateField(field, value);
+    validation.validateField(field, nextValue);
   };
 
   const handlePartInputChange = (field: keyof ColorwayPart) => (value: string) => {
@@ -95,9 +114,9 @@ const ColorwayTab: React.FC = () => {
   };
 
   const handleAddPart = () => {
-    const isValid = partValidation.validateForm(partFormData);
+    const { isValid } = partValidation.validateForm(partFormData as Record<string, any>);
     if (!isValid) {
-      Object.keys(colorwayValidationSchema).forEach(field => {
+      Object.keys(colorwayPartValidationSchema).forEach(field => {
         partValidation.setFieldTouched(field, true);
       });
       return;
@@ -142,9 +161,9 @@ const ColorwayTab: React.FC = () => {
   };
 
   const handleSubmit = () => {
-    const isValid = validation.validateForm(formData);
+    const { isValid } = validation.validateForm(formData as Record<string, any>);
     if (!isValid) {
-      Object.keys(colorwayValidationSchema).forEach(field => {
+      Object.keys(colorwayFormValidationSchema).forEach(field => {
         validation.setFieldTouched(field, true);
       });
       return;
@@ -152,13 +171,21 @@ const ColorwayTab: React.FC = () => {
 
     const colorway: Colorway = {
       id: editingIndex !== null ? colorways[editingIndex].id : `colorway_${Date.now()}`,
-      colorwayName: formData.colorwayName!,
-      colorwayCode: formData.colorwayCode!,
+      _id: editingIndex !== null ? colorways[editingIndex]._id : undefined,
+      name: (formData.name || '').trim(),
+      code: (formData.code || '').trim(),
+      placement: (formData.placement || '').trim(),
+      materialType: (formData.materialType || '').trim(),
       season: formData.season || '',
-      isDefault: formData.isDefault || false,
-      parts: formData.parts || [],
+      isDefault: !!formData.isDefault,
       approvalStatus: formData.approvalStatus || 'Pending',
       productionStatus: formData.productionStatus || 'Lab Dip',
+      pantoneCode: formData.pantoneCode || '',
+      hexColor: formData.hexColor || '#000000',
+      supplier: formData.supplier || '',
+      notes: formData.notes || '',
+      collectionName: formData.collectionName,
+      parts: (formData.parts || []).map(part => ({ ...part })),
     };
 
     if (editingIndex !== null) {
@@ -173,13 +200,19 @@ const ColorwayTab: React.FC = () => {
 
   const resetForm = () => {
     setFormData({
-      colorwayName: '',
-      colorwayCode: '',
+      name: '',
+      code: '',
+      placement: '',
+      materialType: '',
       season: '',
       isDefault: false,
       parts: [],
       approvalStatus: 'Pending',
       productionStatus: 'Lab Dip',
+      hexColor: '#000000',
+      pantoneCode: '',
+      supplier: '',
+      notes: '',
     });
     setPartFormData({
       partName: '',
@@ -196,13 +229,20 @@ const ColorwayTab: React.FC = () => {
   };
 
   const handleEdit = (colorway: Colorway, index: number) => {
-    setFormData(colorway);
+    setFormData({
+      ...colorway,
+      hexColor: colorway.hexColor || '#000000',
+      pantoneCode: colorway.pantoneCode || '',
+      supplier: colorway.supplier || '',
+      notes: colorway.notes || '',
+      parts: (colorway.parts || []).map(part => ({ ...part })),
+    });
     setEditingIndex(index);
     setShowAddForm(true);
   };
 
   const handleDelete = (colorway: Colorway, index: number) => {
-    if (window.confirm(`Are you sure you want to delete colorway "${colorway.colorwayName}"?`)) {
+    if (window.confirm(`Are you sure you want to delete colorway "${colorway.name}"?`)) {
       deleteColorway(index);
     }
   };
@@ -211,8 +251,9 @@ const ColorwayTab: React.FC = () => {
     const duplicated: Colorway = {
       ...colorway,
       id: `colorway_${Date.now()}`,
-      colorwayName: `${colorway.colorwayName} Copy`,
-      colorwayCode: `${colorway.colorwayCode}_COPY`,
+      _id: undefined,
+      name: `${colorway.name} Copy`,
+      code: `${colorway.code}_COPY`,
       isDefault: false,
       parts: colorway.parts.map(part => ({
         ...part,
@@ -224,12 +265,9 @@ const ColorwayTab: React.FC = () => {
   };
 
   const handleSetDefault = (index: number) => {
-    // First, set all colorways to non-default
-    colorways.forEach((_, i) => {
-      updateColorway(i, { isDefault: false });
+    colorways.forEach((colorway, i) => {
+      updateColorway(i, { ...colorway, isDefault: i === index });
     });
-    // Then set the selected one as default
-    updateColorway(index, { isDefault: true });
   };
 
   const validatePantoneCode = (code: string): boolean => {
@@ -327,7 +365,7 @@ const ColorwayTab: React.FC = () => {
                 label=""
                 value={selectedColorway}
                 onChange={setSelectedColorway}
-                options={colorways.map(c => ({ value: c.id, label: c.colorwayName }))}
+                options={colorways.map(c => ({ value: c.id, label: c.name }))}
                 placeholder="Select colorway to preview..."
                 className="min-w-48"
               />
@@ -365,36 +403,119 @@ const ColorwayTab: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <Input
               label="Colorway Name"
-              value={formData.colorwayName || ''}
-              onChange={handleInputChange('colorwayName')}
-              onBlur={() => validation.setFieldTouched('colorwayName')}
+              value={formData.name || ''}
+              onChange={handleInputChange('name')}
+              onBlur={validation.getFieldProps('name').onBlur}
               placeholder="e.g., Navy Blazer"
               required
-              error={validation.getFieldProps('colorwayName').error}
-              helperText={validation.getFieldProps('colorwayName').helperText}
+              error={validation.getFieldProps('name').error}
+              helperText={validation.getFieldProps('name').helperText}
             />
 
             <Input
               label="Colorway Code"
-              value={formData.colorwayCode || ''}
-              onChange={handleInputChange('colorwayCode')}
-              onBlur={() => validation.setFieldTouched('colorwayCode')}
+              value={formData.code || ''}
+              onChange={handleInputChange('code')}
+              onBlur={validation.getFieldProps('code').onBlur}
               placeholder="e.g., NVY001"
               required
-              error={validation.getFieldProps('colorwayCode').error}
-              helperText={validation.getFieldProps('colorwayCode').helperText}
+              error={validation.getFieldProps('code').error}
+              helperText={validation.getFieldProps('code').helperText}
             />
 
             <Input
               label="Season"
               value={formData.season || ''}
               onChange={handleInputChange('season')}
-              onBlur={() => validation.setFieldTouched('season')}
+              onBlur={validation.getFieldProps('season').onBlur}
               placeholder="e.g., SS25"
               error={validation.getFieldProps('season').error}
               helperText={validation.getFieldProps('season').helperText}
             />
-            
+
+            <Input
+              label="Placement"
+              value={formData.placement || ''}
+              onChange={handleInputChange('placement')}
+              onBlur={validation.getFieldProps('placement').onBlur}
+              placeholder="e.g., Body"
+              required
+              error={validation.getFieldProps('placement').error}
+              helperText={validation.getFieldProps('placement').helperText}
+            />
+
+            <Input
+              label="Material Type"
+              value={formData.materialType || ''}
+              onChange={handleInputChange('materialType')}
+              onBlur={validation.getFieldProps('materialType').onBlur}
+              placeholder="e.g., Cotton"
+              required
+              error={validation.getFieldProps('materialType').error}
+              helperText={validation.getFieldProps('materialType').helperText}
+            />
+
+            <Input
+              label="Supplier"
+              value={formData.supplier || ''}
+              onChange={handleInputChange('supplier')}
+              onBlur={validation.getFieldProps('supplier').onBlur}
+              placeholder="Optional supplier name"
+              error={validation.getFieldProps('supplier').error}
+              helperText={validation.getFieldProps('supplier').helperText}
+            />
+
+            <Input
+              label="Pantone Code"
+              value={formData.pantoneCode || ''}
+              onChange={handleInputChange('pantoneCode')}
+              onBlur={validation.getFieldProps('pantoneCode').onBlur}
+              placeholder="19-4052 TPX"
+              error={validation.getFieldProps('pantoneCode').error}
+              helperText={validation.getFieldProps('pantoneCode').helperText}
+            />
+
+            <div className="flex flex-col space-y-1">
+              <label className="text-sm font-medium text-gray-700">Primary Hex Color</label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="color"
+                  value={formData.hexColor || '#000000'}
+                  onChange={(e) => handleInputChange('hexColor')(e.target.value)}
+                  onBlur={validation.getFieldProps('hexColor').onBlur}
+                  className={`w-10 h-10 border rounded cursor-pointer ${validation.getFieldProps('hexColor').error ? 'border-red-500' : 'border-gray-300'}`}
+                />
+                <input
+                  type="text"
+                  value={formData.hexColor || '#000000'}
+                  onChange={(e) => handleInputChange('hexColor')(e.target.value)}
+                  onBlur={validation.getFieldProps('hexColor').onBlur}
+                  className={`flex-1 px-3 py-2 border rounded-md text-sm font-mono ${validation.getFieldProps('hexColor').error ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="#000000"
+                />
+              </div>
+              {validation.getFieldProps('hexColor').error && (
+                <p className="mt-1 text-xs text-red-600">{validation.getFieldProps('hexColor').helperText}</p>
+              )}
+            </div>
+
+            <div className="md:col-span-3">
+              <label className="text-sm font-medium text-gray-700" htmlFor="colorway-notes">
+                Notes
+              </label>
+              <textarea
+                id="colorway-notes"
+                value={formData.notes || ''}
+                onChange={(e) => handleInputChange('notes')(e.target.value)}
+                onBlur={validation.getFieldProps('notes').onBlur}
+                placeholder="Optional notes about this colorway"
+                className={`mt-1 w-full px-3 py-2 border rounded-md text-sm min-h-[72px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${validation.getFieldProps('notes').error ? 'border-red-500' : 'border-gray-300'}`}
+              />
+              {validation.getFieldProps('notes').error && (
+                <p className="mt-1 text-xs text-red-600">{validation.getFieldProps('notes').helperText}</p>
+              )}
+            </div>
+
             <Select
               label="Approval Status"
               value={formData.approvalStatus || 'Pending'}
@@ -414,7 +535,7 @@ const ColorwayTab: React.FC = () => {
               error={validation.getFieldProps('productionStatus').error}
               helperText={validation.getFieldProps('productionStatus').helperText}
             />
-            
+
             <div className="flex items-center space-x-2 mt-6">
               <input
                 type="checkbox"
@@ -440,11 +561,11 @@ const ColorwayTab: React.FC = () => {
                   label="Part"
                   value={partFormData.partName || ''}
                   onChange={handlePartInputChange('partName')}
-                  onBlur={() => partValidation.setFieldTouched('colorName')}
+                  onBlur={() => partValidation.setFieldTouched('partName')}
                   options={availableParts}
                   placeholder="Select part..."
-                  error={partValidation.getFieldProps('colorName').error}
-                  helperText={partValidation.getFieldProps('colorName').helperText}
+                  error={partValidation.getFieldProps('partName').error}
+                  helperText={partValidation.getFieldProps('partName').helperText}
                 />
 
                 <Input
@@ -583,7 +704,7 @@ const ColorwayTab: React.FC = () => {
               <div className="p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-2">
-                    <h3 className="text-lg font-semibold text-gray-900">{colorway.colorwayName}</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">{colorway.name}</h3>
                     {colorway.isDefault && (
                       <Star className="w-4 h-4 text-yellow-500 fill-current" />
                     )}
@@ -607,7 +728,27 @@ const ColorwayTab: React.FC = () => {
                 </div>
 
                 <div className="text-sm text-gray-600 mb-3">
-                  <div>Code: <span className="font-mono">{colorway.colorwayCode}</span></div>
+                  <div>Code: <span className="font-mono">{colorway.code}</span></div>
+                  <div>Placement: <span className="font-medium text-gray-700">{colorway.placement}</span></div>
+                  <div>Material: <span className="font-medium text-gray-700">{colorway.materialType}</span></div>
+                  {colorway.supplier && (
+                    <div>Supplier: <span className="text-gray-700">{colorway.supplier}</span></div>
+                  )}
+                  {colorway.pantoneCode && (
+                    <div>Pantone: <span className="font-mono">{colorway.pantoneCode}</span></div>
+                  )}
+                  {colorway.hexColor && (
+                    <div className="flex items-center space-x-2">
+                      <span>Hex:</span>
+                      <span className="inline-flex items-center space-x-2">
+                        <span
+                          className="w-4 h-4 rounded border border-gray-300"
+                          style={{ backgroundColor: colorway.hexColor }}
+                        />
+                        <span className="font-mono">{colorway.hexColor}</span>
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between mt-1">
                     <span>Status: <span className={`font-medium ${
                       colorway.approvalStatus === 'Approved' ? 'text-green-600' :

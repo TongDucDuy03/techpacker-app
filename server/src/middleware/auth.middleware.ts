@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import User, { IUser, UserRole } from '../models/user.model';
 import { authService, ITokenPayload } from '../services/auth.service';
 import { sendError } from '../utils/response.util';
+import { cacheService, CacheKeys, CacheTTL } from '../services/cache.service';
 
 export interface AuthRequest extends Request {
   user?: IUser;
@@ -12,24 +13,57 @@ export const requireAuth = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+  // Step 1: verify access token; if invalid/expired -> return 401
+  const token = req.header('Authorization')?.replace('Bearer ', '');
 
-    if (!token) {
-      return sendError(res, 'Access denied. No token provided.', 401, 'UNAUTHORIZED');
+  if (!token) {
+    return sendError(res, 'Access denied. No token provided.', 401, 'UNAUTHORIZED');
+  }
+
+  let decoded: ITokenPayload;
+  try {
+    decoded = authService.verifyAccessToken(token) as ITokenPayload;
+  } catch (err) {
+    return sendError(res, 'Access denied. Invalid or expired token.', 401, 'INVALID_TOKEN');
+  }
+
+  // Step 2: attempt to get user from cache, but gracefully fallback to DB on any cache error
+  const userCacheKey = CacheKeys.user(decoded.userId.toString());
+  let user: IUser | null = null;
+
+  try {
+    try {
+      user = await cacheService.get<IUser>(userCacheKey);
+    } catch (cacheErr) {
+      // Log cache errors but do not treat them as auth failures
+      console.warn('Cache service error when fetching user; falling back to DB. Error:', (cacheErr as Error).message);
+      user = null;
     }
 
-    const decoded = authService.verifyAccessToken(token) as ITokenPayload;
+    if (!user) {
+      const dbUser = await User.findById(decoded.userId);
+      user = dbUser;
 
-    const user = await User.findById(decoded.userId);
+      // Best-effort: try to set cache but ignore errors
+      try {
+        if (user) {
+          await cacheService.set(userCacheKey, user, CacheTTL.SHORT);
+        }
+      } catch (e) {
+        // ignore cache set errors
+      }
+    }
+
     if (!user || !user.isActive) {
       return sendError(res, 'Access denied. User not found or is inactive.', 401, 'UNAUTHORIZED');
     }
 
-    req.user = user;
+    req.user = user as IUser;
     next();
   } catch (error) {
-    return sendError(res, 'Access denied. Invalid or expired token.', 401, 'INVALID_TOKEN');
+    // Any unexpected error - do not leak stack, return generic 500
+    console.error('Auth middleware unexpected error:', error);
+    return sendError(res, 'Authentication failed', 500, 'INTERNAL_ERROR');
   }
 };
 

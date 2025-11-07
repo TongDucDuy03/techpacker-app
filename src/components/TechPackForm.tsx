@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Upload, Save } from 'lucide-react';
+import { X, Plus, Save } from 'lucide-react';
 import { TechPack, Material, Measurement, Colorway } from '../types';
 import { api, isApiConfigured } from '../lib/api';
 import { useI18n } from '../lib/i18n';
@@ -12,19 +12,27 @@ interface TechPackFormProps {
 
 export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, onCancel }) => {
   const { t } = useI18n();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
+    // Article information (structured payload expected by backend)
     name: techPack?.name || '',
+    articleCode: techPack?.articleCode || '',
     category: techPack?.category || 'Shirts',
-    status: techPack?.status || 'draft' as const,
+    status: techPack?.status || 'Draft' as const,
     season: techPack?.season || '',
     brand: techPack?.brand || '',
-    designer: techPack?.designer || '',
+    // technicalDesignerId should store user id; designerDisplay is human friendly
+    technicalDesignerId: (techPack as any)?.technicalDesignerId || '',
+    designerDisplay: (techPack as any)?.technicalDesignerName || techPack?.designer || '',
+    supplier: (techPack as any)?.supplier || '',
+    fabricDescription: (techPack as any)?.fabricDescription || '',
+    productDescription: (techPack as any)?.productDescription || '',
     images: techPack?.images || ['https://images.pexels.com/photos/996329/pexels-photo-996329.jpeg'],
     materials: techPack?.materials || [],
     measurements: techPack?.measurements || [],
     constructionDetails: techPack?.constructionDetails || [''],
     colorways: techPack?.colorways || []
-  });
+  }));
+  const [errors, setErrors] = useState<Record<string,string>>({});
 
   const [activeTab, setActiveTab] = useState('basic');
 
@@ -37,6 +45,8 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
   const [materialsLibrary, setMaterialsLibrary] = useState<any[]>([]);
   const [measurementTemplates, setMeasurementTemplates] = useState<any[]>([]);
   const [colorwaysLibrary, setColorwaysLibrary] = useState<any[]>([]);
+  // Designers list for technicalDesignerId select
+  const [designers, setDesigners] = useState<any[]>([]);
 
   // Selected library items (for quick add)
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
@@ -47,14 +57,28 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
     if (!isApiConfigured()) return;
     (async () => {
       try {
-        const [mats, temps, cols] = await Promise.all([
-          api.listMaterials(),
-          api.listMeasurementTemplates(),
-          api.listColorways(),
-        ]);
-        setMaterialsLibrary(mats || []);
-        setMeasurementTemplates(temps || []);
-        setColorwaysLibrary(cols || []);
+            const matsPromise = (api as any).listMaterials ? (api as any).listMaterials() : Promise.resolve([]);
+            const tempsPromise = (api as any).listMeasurementTemplates ? (api as any).listMeasurementTemplates() : Promise.resolve([]);
+            const colsPromise = (api as any).listColorways ? (api as any).listColorways() : Promise.resolve([]);
+            const [mats, temps, cols] = await Promise.all([matsPromise, tempsPromise, colsPromise]);
+            setMaterialsLibrary(mats || []);
+            setMeasurementTemplates(temps || []);
+            setColorwaysLibrary(cols || []);
+
+        // Fetch designers for technicalDesigner selection. Try admin users endpoint filtering by role.
+        try {
+          const usersResp = await api.getAllUsers({ role: 'Designer', limit: 200 });
+          const users = usersResp.users || [];
+          setDesigners(users);
+        } catch (e) {
+          // Fallback: call shareable users endpoint if available
+          try {
+            const shareable = await api.getShareableUsers((techPack as any)?._id || '');
+            setDesigners(Array.isArray(shareable) ? shareable : []);
+          } catch {
+            setDesigners([]);
+          }
+        }
       } catch {
         // ignore fetch errors in UI layer
       }
@@ -64,7 +88,30 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Fire-and-forget library saves (fastest path)
+    // Client-side validation for required Article Information fields that backend expects
+    const newErrors: Record<string,string> = {};
+    const required = [
+      { key: 'name', label: t('form.productName') },
+      { key: 'articleCode', label: 'Article Code' },
+      { key: 'technicalDesignerId', label: t('form.designer') },
+      { key: 'supplier', label: 'Supplier' },
+      { key: 'fabricDescription', label: 'Fabric Description' },
+      { key: 'productDescription', label: 'Product Description' },
+      { key: 'season', label: t('form.season') }
+    ];
+    required.forEach(r => {
+      // @ts-ignore
+      if (!formData[r.key] || String((formData as any)[r.key]).trim() === '') {
+        newErrors[r.key] = `${r.label} is required`;
+      }
+    });
+
+    if (Object.keys(newErrors).length) {
+      setErrors(newErrors);
+      return;
+    }
+
+    // Fire-and-forget library saves (fastest path) — use any() wrapper for optional API methods
     if (isApiConfigured()) {
       const tasks: Array<Promise<any>> = [];
       if (saveMaterialsToLibrary) {
@@ -72,7 +119,8 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
           if ((m.name && m.name.trim()) || (m.specifications && m.specifications.trim())) {
             const payload: any = { ...m };
             payload.id = payload.id || Date.now().toString() + Math.random().toString(16).slice(2);
-            tasks.push(api.createMaterial(payload).catch(() => undefined));
+            const fn = (api as any).createMaterial;
+            if (fn) tasks.push(fn(payload).catch(() => undefined));
           }
         }
       }
@@ -83,7 +131,8 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
             name: `${formData.name || 'Untitled'} - measurements`,
             points: formData.measurements.map(me => ({ point: me.point, tolerance: me.tolerance }))
           };
-          tasks.push(api.createMeasurementTemplate(templatePayload).catch(() => undefined));
+          const fn = (api as any).createMeasurementTemplate;
+          if (fn) tasks.push(fn(templatePayload).catch(() => undefined));
         }
       }
       if (saveColorwaysToLibrary) {
@@ -91,7 +140,8 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
           if (c.name || (c.colors && c.colors.length > 0)) {
             const payload: any = { ...c };
             payload.id = payload.id || Date.now().toString() + Math.random().toString(16).slice(2);
-            tasks.push(api.createColorway(payload).catch(() => undefined));
+            const fn = (api as any).createColorway;
+            if (fn) tasks.push(fn(payload).catch(() => undefined));
           }
         }
       }
@@ -99,7 +149,8 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
       try { await Promise.all(tasks); } catch { /* ignored */ }
     }
 
-    onSave(formData);
+    // Map formData into the expected payload shape if parent expects it; cast to any to avoid strict typing mismatch
+    onSave(formData as unknown as any);
   };
 
   const addMaterial = () => {
@@ -359,15 +410,38 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {t('form.designer')} *
+                      {t('form.articleCode')} *
                     </label>
                     <input
                       type="text"
                       required
-                      value={formData.designer}
-                      onChange={(e) => setFormData(prev => ({ ...prev, designer: e.target.value }))}
+                      value={formData.articleCode}
+                      readOnly={!!techPack}
+                      onChange={(e) => setFormData(prev => ({ ...prev, articleCode: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                     />
+                    {errors.articleCode && <div className="text-red-600 text-sm mt-1">{errors.articleCode}</div>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {t('form.designer')} *
+                    </label>
+                    <select
+                      required
+                      value={formData.technicalDesignerId}
+                      onChange={(e) => {
+                        const selected = e.target.value;
+                        const selUser = designers.find((d: any) => (d._id || d.id) === selected) as any;
+                        setFormData(prev => ({ ...prev, technicalDesignerId: selected, designerDisplay: selUser ? (selUser.firstName ? `${selUser.firstName} ${selUser.lastName}` : selUser.name || selUser.email) : '' }));
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    >
+                      <option value="">-- Select Designer --</option>
+                      {designers.map(d => (
+                        <option key={(d._id || d.id)} value={(d._id || d.id)}>{d.firstName ? `${d.firstName} ${d.lastName}` : d.name || d.email}</option>
+                      ))}
+                    </select>
+                    {errors.technicalDesignerId && <div className="text-red-600 text-sm mt-1">{errors.technicalDesignerId}</div>}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -381,6 +455,7 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
                       placeholder={t('form.season.placeholder')}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                     />
+                    {errors.season && <div className="text-red-600 text-sm mt-1">{errors.season}</div>}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -391,11 +466,44 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
                       onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                     >
-                      <option value="draft">Draft</option>
-                      <option value="review">Under Review</option>
-                      <option value="approved">Approved</option>
-                      <option value="production">Production</option>
+                      <option value="Draft">Draft</option>
+                      <option value="In Review">In Review</option>
+                      <option value="Approved">Approved</option>
+                      <option value="Rejected">Rejected</option>
+                      <option value="Archived">Archived</option>
                     </select>
+                  </div>
+                  {/* Full width fields for supplier and descriptions */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Supplier *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.supplier}
+                      onChange={(e) => setFormData(prev => ({ ...prev, supplier: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    />
+                    {errors.supplier && <div className="text-red-600 text-sm mt-1">{errors.supplier}</div>}
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Fabric Description *</label>
+                    <textarea
+                      required
+                      value={formData.fabricDescription}
+                      onChange={(e) => setFormData(prev => ({ ...prev, fabricDescription: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent min-h-[80px]"
+                    />
+                    {errors.fabricDescription && <div className="text-red-600 text-sm mt-1">{errors.fabricDescription}</div>}
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Product Description *</label>
+                    <textarea
+                      required
+                      value={formData.productDescription}
+                      onChange={(e) => setFormData(prev => ({ ...prev, productDescription: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent min-h-[80px]"
+                    />
+                    {errors.productDescription && <div className="text-red-600 text-sm mt-1">{errors.productDescription}</div>}
                   </div>
                 </div>
               </div>

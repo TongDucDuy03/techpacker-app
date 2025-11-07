@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, memo } from 'react';
 import { ApiTechPack } from '../types/techpack';
 import { useAuth } from '../contexts/AuthContext';
+import CreateTechPackWorkflow from './CreateTechPackWorkflow';
 import {
   Table,
   Button,
@@ -44,7 +45,7 @@ interface TechPackListProps {
   onDeleteTechPack?: (id: string) => void;
 }
 
-export const TechPackList: React.FC<TechPackListProps> = ({
+const TechPackListComponent: React.FC<TechPackListProps> = ({
   techPacks,
   onViewTechPack,
   onEditTechPack,
@@ -57,6 +58,7 @@ export const TechPackList: React.FC<TechPackListProps> = ({
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [seasonFilter, setSeasonFilter] = useState('');
+  const [showCreateWorkflow, setShowCreateWorkflow] = useState(false);
 
   // Permission checks based on user role
   const canCreate = user?.role === 'admin' || user?.role === 'designer';
@@ -78,7 +80,7 @@ export const TechPackList: React.FC<TechPackListProps> = ({
   const filteredTechPacks = useMemo(() => {
     return techPacks.filter(tp => {
       const name = (tp as any).productName || tp.name || '';
-      const category = (tp as any).category || tp.metadata?.category || '';
+      const category = (tp as any).productClass || (tp as any).category || tp.metadata?.category || '';
       const season = (tp as any).season || tp.metadata?.season || '';
 
       return (
@@ -114,7 +116,7 @@ export const TechPackList: React.FC<TechPackListProps> = ({
         <Tooltip title={record.description || 'No description'}>
           <Text strong>{record.productName || record.name}</Text>
           <br />
-          <Text type="secondary">{record.category || record.metadata?.category}</Text>
+          <Text type="secondary">{record.productClass || record.category || record.metadata?.category}</Text>
         </Tooltip>
       )
     },
@@ -165,7 +167,7 @@ export const TechPackList: React.FC<TechPackListProps> = ({
                   {[...new Set(techPacks.map(tp => tp.status))].map(s => <Option key={s} value={s}>{s}</Option>)}
                 </Select>
                 <Select placeholder="Filter by category" onChange={setCategoryFilter} style={{ width: 150 }} allowClear>
-                  {[...new Set(techPacks.map(tp => (tp as any).category || tp.metadata?.category))].filter(Boolean).map(c => <Option key={c} value={c}>{c}</Option>)}
+                  {[...new Set(techPacks.map(tp => (tp as any).productClass || (tp as any).category || tp.metadata?.category))].filter(Boolean).map(c => <Option key={c} value={c}>{c}</Option>)}
                 </Select>
                 <Select placeholder="Filter by season" onChange={setSeasonFilter} style={{ width: 150 }} allowClear>
                   {[...new Set(techPacks.map(tp => (tp as any).season || tp.metadata?.season))].filter(Boolean).map(s => <Option key={s} value={s}>{s}</Option>)}
@@ -174,7 +176,7 @@ export const TechPackList: React.FC<TechPackListProps> = ({
             </Col>
             <Col>
               {canCreate && (
-                <Button type="primary" icon={<PlusOutlined />} onClick={onCreateTechPack}>
+                <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowCreateWorkflow(true)}>
                   Create New Tech Pack
                 </Button>
               )}
@@ -192,6 +194,28 @@ export const TechPackList: React.FC<TechPackListProps> = ({
           rowClassName="techpack-row"
         />
       </Card>
+
+      {/* Create TechPack Workflow */}
+      <CreateTechPackWorkflow
+        visible={showCreateWorkflow}
+        onCancel={() => setShowCreateWorkflow(false)}
+        onCreateTechPack={() => {
+          setShowCreateWorkflow(false);
+          // Call callback to switch to create tab
+          if (onCreateTechPack) {
+            onCreateTechPack();
+          }
+        }}
+        onSuccess={(newTechPack) => {
+          setShowCreateWorkflow(false);
+          // Optionally refresh the list or call onCreateTechPack callback
+          if (onCreateTechPack) {
+            onCreateTechPack();
+          }
+        }}
+      />
     </div>
   );
 };
+
+export const TechPackList = memo(TechPackListComponent);

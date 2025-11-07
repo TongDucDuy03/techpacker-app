@@ -3,64 +3,66 @@ import express from 'express';
 import pdfRoutes from '../routes/pdf.routes';
 import { TechPackData } from '../types/techpack.types';
 
+// Shared mock data used across multiple test suites in this file
+const mockTechPackData: TechPackData = {
+  techpack: {
+    _id: 'test-techpack-1',
+    name: 'Test Shirt',
+    articleCode: 'TS001',
+    version: 'V1',
+    designer: 'Test Designer',
+    supplier: 'Test Supplier',
+    season: 'Spring 2024',
+    fabricDescription: 'Cotton blend test fabric',
+    lifecycleStage: 'Development',
+    createdAt: '2024-01-01',
+    lastModified: '2024-01-15'
+  },
+  materials: [
+    {
+      part: 'Main Body',
+      materialName: 'Cotton Fabric',
+      placement: 'Body',
+      size: '150cm',
+      quantity: 2,
+      uom: 'meters',
+      supplier: 'Fabric Co'
+    }
+  ],
+  measurements: [
+    {
+      pomCode: 'A',
+      pomName: 'Chest Width',
+      toleranceMinus: 1,
+      tolerancePlus: 1,
+      sizes: { S: 50, M: 53, L: 56 }
+    }
+  ],
+  howToMeasure: [
+    {
+      pomCode: 'A',
+      pomName: 'Chest Width',
+      description: 'Measure across chest',
+      imageUrl: 'https://example.com/image.jpg',
+      stepNumber: 1,
+      instructions: ['Step 1', 'Step 2']
+    }
+  ],
+  colorways: [
+    {
+      name: 'Navy Blue',
+      code: 'NV001',
+      placement: 'Main',
+      materialType: 'Fabric'
+    }
+  ]
+};
+
 const app = express();
 app.use(express.json());
 app.use('/api/techpacks', pdfRoutes);
 
 describe('PDF Generator API', () => {
-  const mockTechPackData: TechPackData = {
-    techpack: {
-      _id: 'test-techpack-1',
-      name: 'Test Shirt',
-      articleCode: 'TS001',
-      version: 'V1',
-      designer: 'Test Designer',
-      supplier: 'Test Supplier',
-      season: 'Spring 2024',
-      fabricDescription: 'Cotton blend test fabric',
-      lifecycleStage: 'Development',
-      createdAt: '2024-01-01',
-      lastModified: '2024-01-15'
-    },
-    materials: [
-      {
-        part: 'Main Body',
-        materialName: 'Cotton Fabric',
-        placement: 'Body',
-        size: '150cm',
-        quantity: 2,
-        uom: 'meters',
-        supplier: 'Fabric Co'
-      }
-    ],
-    measurements: [
-      {
-        pomCode: 'A',
-        pomName: 'Chest Width',
-        toleranceMinus: 1,
-        tolerancePlus: 1,
-        sizes: { S: 50, M: 53, L: 56 }
-      }
-    ],
-    howToMeasure: [
-      {
-        pomCode: 'A',
-        pomName: 'Chest Width',
-        description: 'Measure across chest',
-        imageUrl: 'https://example.com/image.jpg',
-        stepNumber: 1,
-        instructions: ['Step 1', 'Step 2']
-      }
-    ],
-    colorways: [
-      {
-        name: 'Navy Blue',
-        code: 'NV001',
-        placement: 'Main',
-        materialType: 'Fabric'
-      }
-    ]
-  };
 
   describe('GET /health', () => {
     it('should return health status', async () => {

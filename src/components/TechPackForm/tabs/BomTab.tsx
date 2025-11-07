@@ -1,23 +1,149 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, memo, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useTechPack } from '../../../contexts/TechPackContext';
 import { BomItem, UNITS_OF_MEASURE, COMMON_MATERIALS, COMMON_PLACEMENTS } from '../../../types/techpack';
 import { useFormValidation } from '../../../hooks/useFormValidation';
 import { bomItemValidationSchema } from '../../../utils/validationSchemas';
+import { useDebounce } from '../../../hooks/useDebounce';
 import DataTable from '../shared/DataTable';
 import Input from '../shared/Input';
 import Select from '../shared/Select';
 import Textarea from '../shared/Textarea';
-import { Plus, Upload, Download, Search, Filter, Package, AlertCircle } from 'lucide-react';
+import Modal from '../shared/Modal';
+import { Plus, Upload, Download, Search, Filter, Package, AlertCircle, X, Copy, RotateCcw, Edit, ChevronLeft, ChevronRight } from 'lucide-react';
+import { showSuccess, showError, showWarning, showUndoToast } from '../../../lib/toast';
 
-const BomTab: React.FC = () => {
+// Generate UUID v4
+const generateUUID = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
+// CSV Import/Export utilities
+const CSV_HEADERS = ['Part', 'MaterialCode', 'MaterialName', 'Placement', 'Size', 'Quantity', 'UOM', 'Supplier', 'ColorCode', 'MaterialComposition', 'Comments'];
+
+const exportToCSV = (items: BomItem[]): string => {
+  const rows = items.map(item => [
+    item.part || '',
+    item.supplierCode || '',
+    item.materialName || '',
+    item.placement || '',
+    item.size || '',
+    item.quantity?.toString() || '0',
+    item.uom || '',
+    item.supplier || '',
+    item.colorCode || '',
+    item.materialComposition || '',
+    item.comments || ''
+  ]);
+  
+  const csvContent = [
+    CSV_HEADERS.join(','),
+    ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+  ].join('\n');
+  
+  return csvContent;
+};
+
+const downloadCSV = (content: string, filename: string) => {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+const parseCSV = (csvText: string): any[] => {
+  const lines = csvText.split('\n').filter(line => line.trim());
+  if (lines.length < 2) return [];
+  
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  const rows: any[] = [];
+  
+  for (let i = 1; i < lines.length; i++) {
+    const values = lines[i].match(/(".*?"|[^,]+)(?=\s*,|\s*$)/g) || [];
+    const row: any = {};
+    headers.forEach((header, idx) => {
+      let value = values[idx] || '';
+      value = value.trim().replace(/^"|"$/g, '').replace(/""/g, '"');
+      row[header] = value;
+    });
+    rows.push(row);
+  }
+  
+  return rows;
+};
+
+// Validate BOM item
+const validateBomItem = (item: Partial<BomItem>, index?: number): { isValid: boolean; errors: Record<string, string> } => {
+  const errors: Record<string, string> = {};
+  
+  // Validate using schema
+  Object.keys(bomItemValidationSchema).forEach(field => {
+    const rule = bomItemValidationSchema[field as keyof typeof bomItemValidationSchema];
+    const value = item[field as keyof BomItem];
+    
+    if (rule.required && (!value || (typeof value === 'string' && value.trim().length === 0))) {
+      errors[field] = rule.custom ? rule.custom(value as any, item) || `${field} is required` : `${field} is required`;
+    } else if (rule.custom) {
+      const error = rule.custom(value as any, item);
+      if (error) errors[field] = error;
+    } else if (rule.minLength && typeof value === 'string' && value.length < rule.minLength) {
+      errors[field] = `${field} must be at least ${rule.minLength} characters`;
+    } else if (rule.maxLength && typeof value === 'string' && value.length > rule.maxLength) {
+      errors[field] = `${field} must not exceed ${rule.maxLength} characters`;
+    } else if (rule.min !== undefined && typeof value === 'number' && value < rule.min) {
+      errors[field] = `${field} must be at least ${rule.min}`;
+    } else if (rule.max !== undefined && typeof value === 'number' && value > rule.max) {
+      errors[field] = `${field} must not exceed ${rule.max}`;
+    }
+  });
+  
+  return { isValid: Object.keys(errors).length === 0, errors };
+};
+
+export interface BomTabRef {
+  validateAll: () => { isValid: boolean; errors: Array<{ id: string; item: BomItem; errors: Record<string, string> }> };
+}
+
+interface ColumnMapping {
+  csvColumn: string;
+  bomField: keyof BomItem | '';
+}
+
+const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   const context = useTechPack();
-  const { state, addBomItem, updateBomItem, deleteBomItem } = context ?? {};
+  const { state, addBomItem, updateBomItem, updateBomItemById, deleteBomItem, deleteBomItemById, insertBomItemAt, updateFormState } = context ?? {};
   const { bom = [] } = state?.techpack ?? {};
 
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterByPart, setFilterByPart] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showMappingModal, setShowMappingModal] = useState(false);
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [importErrors, setImportErrors] = useState<Array<{ row: number; column?: string; errors: Record<string, string> }>>([]);
+  const [rawCsvData, setRawCsvData] = useState<any[]>([]);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [columnMapping, setColumnMapping] = useState<Record<string, keyof BomItem | ''>>({});
+  const [deletedItem, setDeletedItem] = useState<{ item: BomItem; index: number; timeoutId?: NodeJS.Timeout } | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, Record<string, string>>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
+  
+  const firstErrorFieldRef = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  // Debounce search term
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   // Initialize validation for the form
   const validation = useFormValidation(bomItemValidationSchema);
@@ -39,53 +165,109 @@ const BomTab: React.FC = () => {
   // Filter and search BOM items
   const filteredBom = useMemo(() => {
     return bom.filter(item => {
-      const matchesSearch = searchTerm === '' || 
-        item.part.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.materialName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.supplier.toLowerCase().includes(searchTerm.toLowerCase());
-      
+      const matchesSearch = debouncedSearchTerm === '' ||
+        item.part.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        item.materialName.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        item.supplier.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        (item.supplierCode && item.supplierCode.toLowerCase().includes(debouncedSearchTerm.toLowerCase()));
+
       const matchesFilter = filterByPart === '' || item.part === filterByPart;
-      
+
       return matchesSearch && matchesFilter;
     });
-  }, [bom, searchTerm, filterByPart]);
+  }, [bom, debouncedSearchTerm, filterByPart]);
 
   // Get unique parts for filter
   const uniqueParts = useMemo(() => {
     return Array.from(new Set(bom.map(item => item.part))).sort();
   }, [bom]);
 
-  // Calculate totals
+  // Calculate totals with per-unit breakdown
   const totals = useMemo(() => {
     const totalItems = bom.length;
-    const totalQuantity = bom.reduce((sum, item) => sum + item.quantity, 0);
     const uniqueSuppliers = new Set(bom.map(item => item.supplier)).size;
     
-    return { totalItems, totalQuantity, uniqueSuppliers };
+    // Group by unit
+    const totalsByUnit: Record<string, number> = {};
+    bom.forEach(item => {
+      const unit = item.uom || 'unknown';
+      totalsByUnit[unit] = (totalsByUnit[unit] || 0) + (item.quantity || 0);
+    });
+    
+    return { totalItems, uniqueSuppliers, totalsByUnit };
   }, [bom]);
 
-  const handleInputChange = (field: keyof BomItem) => (value: string | number) => {
+  // Check for duplicates
+  const checkDuplicates = useCallback((item: Partial<BomItem>, excludeIndex?: number): BomItem[] => {
+    return bom.filter((existing, idx) => 
+      idx !== excludeIndex &&
+      existing.part === item.part &&
+      existing.materialName === item.materialName
+    );
+  }, [bom]);
+
+  const handleInputChange = useCallback((field: keyof BomItem) => (value: string | number) => {
     const updatedFormData = { ...formData, [field]: value };
     setFormData(updatedFormData);
 
     // Validate the field in real-time
     validation.validateField(field, value);
-  };
+  }, [formData, validation]);
 
   const handleSubmit = () => {
     // Validate the entire form before submission
-    const isValid = validation.validateForm(formData);
+    const validationResult = validation.validateForm(formData);
+    const isValid = validationResult.isValid;
 
     if (!isValid) {
       // Mark all fields as touched to show validation errors
       Object.keys(bomItemValidationSchema).forEach(field => {
         validation.setFieldTouched(field, true);
       });
+      
+      // Show error message
+      showError('Vui lòng điền đầy đủ các trường bắt buộc và sửa các lỗi validation.');
+      
+      // Focus on first error field
+      setTimeout(() => {
+        const firstErrorField = formRef.current?.querySelector('[data-error="true"]') as HTMLElement;
+        if (firstErrorField) {
+          firstErrorField.focus();
+          firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+      
       return;
     }
 
+    // Check for duplicates
+    const duplicates = checkDuplicates(formData, editingIndex ?? undefined);
+    if (duplicates.length > 0) {
+      const shouldMerge = window.confirm(
+        `Found ${duplicates.length} duplicate item(s) with same Part and Material Name. Do you want to merge quantities instead?`
+      );
+      
+      if (shouldMerge) {
+        // Merge with first duplicate
+        const duplicateIndex = bom.findIndex(item => 
+          item.part === formData.part && item.materialName === formData.materialName
+        );
+        if (duplicateIndex !== -1) {
+          const existing = bom[duplicateIndex];
+          const mergedItem: BomItem = {
+            ...existing,
+            quantity: existing.quantity + (Number(formData.quantity) || 0),
+          };
+          updateBomItem(duplicateIndex, mergedItem);
+          showSuccess('Quantities merged successfully');
+          resetForm();
+          return;
+        }
+      }
+    }
+
     const bomItem: BomItem = {
-      id: editingIndex !== null ? bom[editingIndex].id : `bom_${Date.now()}`,
+      id: editingIndex !== null ? bom[editingIndex].id : generateUUID(),
       part: formData.part!,
       materialName: formData.materialName!,
       placement: formData.placement || '',
@@ -99,11 +281,17 @@ const BomTab: React.FC = () => {
       supplierCode: formData.supplierCode || '',
     };
 
-    if (editingIndex !== null) {
+    if (editingId) {
+      // Use ID-based update for better reliability
+      updateBomItemById(editingId, bomItem);
+      showSuccess('Material updated successfully');
+    } else if (editingIndex !== null) {
+      // Fallback to index-based for backward compatibility
       updateBomItem(editingIndex, bomItem);
-      setEditingIndex(null);
+      showSuccess('Material updated successfully');
     } else {
       addBomItem(bomItem);
+      showSuccess('Material added successfully');
     }
 
     resetForm();
@@ -123,58 +311,290 @@ const BomTab: React.FC = () => {
       colorCode: '',
       supplierCode: '',
     });
-    setShowAddForm(false);
+    setShowModal(false);
     setEditingIndex(null);
-
-    // Reset validation state
+    setEditingId(null);
     validation.reset();
+    setValidationErrors({});
   };
 
   const handleEdit = (item: BomItem, index: number) => {
     setFormData(item);
     setEditingIndex(index);
-    setShowAddForm(true);
+    setEditingId(item.id);
+    setShowModal(true);
   };
 
   const handleDelete = (item: BomItem, index: number) => {
     if (window.confirm(`Are you sure you want to delete "${item.part} - ${item.materialName}"?`)) {
-      deleteBomItem(index);
+      // Clear previous undo timeout if exists
+      if (deletedItem?.timeoutId) {
+        clearTimeout(deletedItem.timeoutId);
+      }
+
+      // Use ID-based delete for better reliability
+      if (item.id) {
+        deleteBomItemById(item.id);
+      } else {
+        // Fallback to index-based for backward compatibility
+        deleteBomItem(index);
+      }
+      
+      // Set up undo with timeout
+      const timeoutId = setTimeout(() => {
+        setDeletedItem(null);
+      }, 5000);
+
+      const deletedItemData = { item, index, timeoutId };
+      setDeletedItem(deletedItemData);
+      
+      // Show undo toast
+      showUndoToast(
+        `Material "${item.part} - ${item.materialName}" deleted`,
+        () => {
+          // Restore item at original index using context method
+          if (deletedItemData && insertBomItemAt) {
+            insertBomItemAt(deletedItemData.index, deletedItemData.item);
+            if (deletedItemData.timeoutId) {
+              clearTimeout(deletedItemData.timeoutId);
+            }
+            setDeletedItem(null);
+            showSuccess('Material restored');
+          }
+        },
+        5000
+      );
     }
   };
 
   const handleAddTemplate = (templateType: string) => {
     const templates = {
       shirt: [
-        { part: 'Main Fabric', materialName: 'Cotton Oxford', placement: 'Body, Sleeves', quantity: 1.5, uom: 'm' },
-        { part: 'Button', materialName: 'Plastic Button', placement: 'Center Front', quantity: 8, uom: 'pcs' },
-        { part: 'Thread', materialName: 'Polyester Thread', placement: 'All Over', quantity: 200, uom: 'g' },
-        { part: 'Label - Main', materialName: 'Woven Label', placement: 'Center Back Neck', quantity: 1, uom: 'pcs' },
-        { part: 'Label - Care', materialName: 'Printed Label', placement: 'Left Side Seam', quantity: 1, uom: 'pcs' },
+        { part: 'Main Fabric', materialName: 'Cotton Oxford', placement: 'Body, Sleeves', quantity: 1.5, uom: 'm' as const, supplier: '', supplierCode: '' },
+        { part: 'Button', materialName: 'Plastic Button', placement: 'Center Front', quantity: 8, uom: 'pcs' as const, supplier: '', supplierCode: '' },
+        { part: 'Thread', materialName: 'Polyester Thread', placement: 'All Over', quantity: 200, uom: 'g' as const, supplier: '', supplierCode: '' },
+        { part: 'Label - Main', materialName: 'Woven Label', placement: 'Center Back Neck', quantity: 1, uom: 'pcs' as const, supplier: '', supplierCode: '' },
+        { part: 'Label - Care', materialName: 'Printed Label', placement: 'Left Side Seam', quantity: 1, uom: 'pcs' as const, supplier: '', supplierCode: '' },
       ],
       pants: [
-        { part: 'Main Fabric', materialName: 'Cotton Twill', placement: 'Body', quantity: 1.2, uom: 'm' },
-        { part: 'Zipper', materialName: 'Metal Zipper', placement: 'Center Front', quantity: 1, uom: 'pcs' },
-        { part: 'Button', materialName: 'Metal Button', placement: 'Waistband', quantity: 1, uom: 'pcs' },
-        { part: 'Thread', materialName: 'Polyester Thread', placement: 'All Over', quantity: 150, uom: 'g' },
+        { part: 'Main Fabric', materialName: 'Cotton Twill', placement: 'Body', quantity: 1.2, uom: 'm' as const, supplier: '', supplierCode: '' },
+        { part: 'Zipper', materialName: 'Metal Zipper', placement: 'Center Front', quantity: 1, uom: 'pcs' as const, supplier: '', supplierCode: '' },
+        { part: 'Button', materialName: 'Metal Button', placement: 'Waistband', quantity: 1, uom: 'pcs' as const, supplier: '', supplierCode: '' },
+        { part: 'Thread', materialName: 'Polyester Thread', placement: 'All Over', quantity: 150, uom: 'g' as const, supplier: '', supplierCode: '' },
       ]
     };
 
     const template = templates[templateType as keyof typeof templates];
     if (template) {
+      const newItems: BomItem[] = [];
       template.forEach(item => {
         const bomItem: BomItem = {
-          id: `bom_${Date.now()}_${Math.random()}`,
+          id: generateUUID(),
           ...item,
-          supplier: '',
           comments: '',
+          colorCode: '',
+          materialComposition: '',
         };
         addBomItem(bomItem);
+        newItems.push(bomItem);
       });
+      showSuccess(`Template "${templateType}" added. Please fill supplier and codes.`);
+      
+      // Auto-open first item for editing
+      if (newItems.length > 0) {
+        // Find the newly added item's index after state updates
+        setTimeout(() => {
+          const idx = bom.findIndex(b => b.id === newItems[0].id);
+          const editIndex = idx !== -1 ? idx : bom.length; // fallback
+          handleEdit(newItems[0], editIndex);
+        }, 100);
+      }
     }
   };
 
-  // Table columns configuration
-  const columns = [
+  const handleExport = () => {
+    if (bom.length === 0) {
+      showWarning('No materials to export');
+      return;
+    }
+    
+    const csvContent = exportToCSV(bom);
+    downloadCSV(csvContent, `bom_export_${new Date().toISOString().split('T')[0]}.csv`);
+    showSuccess('BOM exported successfully');
+  };
+
+  const handleExportSample = () => {
+    const sampleData: BomItem[] = [
+      {
+        id: 'sample1',
+        part: 'Main Fabric',
+        materialName: 'Cotton Oxford',
+        placement: 'Body, Sleeves',
+        size: '',
+        quantity: 1.5,
+        uom: 'm',
+        supplier: 'Supplier Name',
+        supplierCode: 'MAT-001',
+        colorCode: '#000000',
+        materialComposition: '100% Cotton',
+        comments: 'Sample comment'
+      }
+    ];
+    const csvContent = exportToCSV(sampleData);
+    downloadCSV(csvContent, 'bom_sample.csv');
+    showSuccess('Sample CSV downloaded');
+  };
+
+  const handleImport = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const rows = parseCSV(text);
+      
+      if (rows.length === 0) {
+        showError('No data found in CSV file');
+        return;
+      }
+      
+      // Extract headers from first row
+      const headers = Object.keys(rows[0] || {});
+      setCsvHeaders(headers);
+      setRawCsvData(rows);
+      
+      // Auto-detect column mapping
+      const autoMapping: Record<string, keyof BomItem | ''> = {};
+      const bomFields: (keyof BomItem)[] = ['part', 'materialName', 'placement', 'size', 'quantity', 'uom', 'supplier', 'supplierCode', 'colorCode', 'materialComposition', 'comments'];
+      
+      headers.forEach(header => {
+        const lowerHeader = header.toLowerCase().trim();
+        // Try to match common patterns
+        if (lowerHeader.includes('part')) autoMapping[header] = 'part';
+        else if (lowerHeader.includes('material') && lowerHeader.includes('name')) autoMapping[header] = 'materialName';
+        else if (lowerHeader.includes('material') && (lowerHeader.includes('code') || lowerHeader.includes('code'))) autoMapping[header] = 'supplierCode';
+        else if (lowerHeader.includes('placement')) autoMapping[header] = 'placement';
+        else if (lowerHeader.includes('size')) autoMapping[header] = 'size';
+        else if (lowerHeader.includes('quantity') || lowerHeader.includes('qty')) autoMapping[header] = 'quantity';
+        else if (lowerHeader.includes('uom') || lowerHeader.includes('unit')) autoMapping[header] = 'uom';
+        else if (lowerHeader.includes('supplier') && !lowerHeader.includes('code')) autoMapping[header] = 'supplier';
+        else if (lowerHeader.includes('color')) autoMapping[header] = 'colorCode';
+        else if (lowerHeader.includes('composition')) autoMapping[header] = 'materialComposition';
+        else if (lowerHeader.includes('comment') || lowerHeader.includes('note')) autoMapping[header] = 'comments';
+        else autoMapping[header] = '';
+      });
+      
+      setColumnMapping(autoMapping);
+      
+      // Show mapping modal first
+      setShowMappingModal(true);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleConfirmMapping = () => {
+    // Map CSV columns to BOM fields using user mapping
+    const mappedRows = rawCsvData.map((row, idx) => {
+      const item: Partial<BomItem> = {};
+      
+      Object.entries(columnMapping).forEach(([csvColumn, bomField]) => {
+        if (bomField && bomField !== '') {
+          const value = row[csvColumn];
+          if (bomField === 'quantity') {
+            item[bomField] = parseFloat(value || '0') || 0;
+          } else if (bomField === 'uom') {
+            item[bomField] = (value || 'm') as any;
+          } else {
+            item[bomField] = value || '';
+          }
+        }
+      });
+      
+      return { item, rowIndex: idx + 2 }; // +2 because CSV has header and 1-based index
+    });
+    
+    // Validate each row
+    const errors: Array<{ row: number; column?: string; errors: Record<string, string> }> = [];
+    mappedRows.forEach(({ item, rowIndex }) => {
+      const validation = validateBomItem(item);
+      if (!validation.isValid) {
+        errors.push({ row: rowIndex, errors: validation.errors });
+      }
+    });
+    
+    setImportErrors(errors);
+    setImportPreview(mappedRows.map(m => m.item));
+    setShowMappingModal(false);
+    setShowImportModal(true);
+  };
+
+  const handleConfirmImport = () => {
+    if (importPreview.length === 0) return;
+    
+    let successCount = 0;
+    let errorCount = 0;
+    
+    importPreview.forEach((item, idx) => {
+      const validation = validateBomItem(item);
+      if (validation.isValid) {
+        const bomItem: BomItem = {
+          id: generateUUID(),
+          part: item.part!,
+          materialName: item.materialName!,
+          placement: item.placement || '',
+          size: item.size || '',
+          quantity: Number(item.quantity) || 0,
+          uom: (item.uom || 'm') as any,
+          supplier: item.supplier || '',
+          supplierCode: item.supplierCode || '',
+          colorCode: item.colorCode || '',
+          materialComposition: item.materialComposition || '',
+          comments: item.comments || '',
+        };
+        addBomItem(bomItem);
+        successCount++;
+      } else {
+        errorCount++;
+      }
+    });
+    
+    if (errorCount > 0) {
+      showWarning(`${successCount} items imported, ${errorCount} items skipped due to errors`);
+    } else {
+      showSuccess(`${successCount} items imported successfully`);
+    }
+    
+    setShowImportModal(false);
+    setImportPreview([]);
+    setImportErrors([]);
+  };
+
+  // Validate all BOM items (for save TechPack) - ID-based
+  const validateAllBomItems = useCallback((): { isValid: boolean; errors: Array<{ id: string; item: BomItem; errors: Record<string, string> }> } => {
+    const errors: Array<{ id: string; item: BomItem; errors: Record<string, string> }> = [];
+    
+    bom.forEach((item) => {
+      const validation = validateBomItem(item);
+      if (!validation.isValid) {
+        errors.push({ id: item.id, item, errors: validation.errors });
+      }
+    });
+    
+    // Update validation errors state for highlighting - ID-based
+    const errorMap: Record<string, Record<string, string>> = {};
+    errors.forEach(({ id, errors: itemErrors }) => {
+      errorMap[id] = itemErrors;
+    });
+    setValidationErrors(errorMap);
+    
+    return { isValid: errors.length === 0, errors };
+  }, [bom]);
+
+  // Expose validate function via ref (for parent component)
+  useImperativeHandle(ref, () => ({
+    validateAll: validateAllBomItems
+  }), [validateAllBomItems]);
+
+  // Table columns configuration with error highlighting
+  const columns = useMemo(() => [
     {
       key: 'part' as keyof BomItem,
       header: 'Part',
@@ -201,7 +621,7 @@ const BomTab: React.FC = () => {
       key: 'quantity' as keyof BomItem,
       header: 'Qty',
       width: '8%',
-      render: (value: number) => value.toFixed(2),
+      render: (value: number) => value ? value.toFixed(2) : '-',
     },
     {
       key: 'uom' as keyof BomItem,
@@ -219,11 +639,32 @@ const BomTab: React.FC = () => {
       width: '11%',
       render: (value: string) => (
         <span className="text-xs text-gray-600 truncate" title={value}>
-          {value}
+          {value || '-'}
         </span>
       ),
     },
-  ];
+  ], []);
+
+  // Pagination
+  const paginatedBom = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return filteredBom.slice(start, end);
+  }, [filteredBom, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredBom.length / itemsPerPage);
+
+  // Enhanced table data with error highlighting - ID-based
+  const tableDataWithErrors = useMemo(() => {
+    return paginatedBom.map((item) => {
+      const hasErrors = validationErrors[item.id] && Object.keys(validationErrors[item.id]).length > 0;
+      return {
+        ...item,
+        _hasErrors: hasErrors,
+        _errors: validationErrors[item.id] || {}
+      };
+    });
+  }, [paginatedBom, validationErrors]);
 
   return (
     <div className="max-w-7xl mx-auto p-6">
@@ -248,7 +689,11 @@ const BomTab: React.FC = () => {
               <div className="text-gray-500">Suppliers</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">{totals.totalQuantity.toFixed(1)}</div>
+              <div className="text-2xl font-bold text-purple-600">
+                {Object.entries(totals.totalsByUnit).map(([unit, qty]) => (
+                  <div key={unit}>{qty.toFixed(1)} {unit}</div>
+                ))}
+              </div>
               <div className="text-gray-500">Total Qty</div>
             </div>
           </div>
@@ -307,18 +752,48 @@ const BomTab: React.FC = () => {
             </div>
 
             {/* Import/Export */}
-            <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-              <Upload className="w-4 h-4 mr-2" />
-              Import
-            </button>
-            <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            <div className="relative">
+              <input
+                type="file"
+                accept=".csv"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleImport(file);
+                  e.target.value = ''; // Reset input
+                }}
+                className="hidden"
+                id="bom-import-input"
+              />
+              <label
+                htmlFor="bom-import-input"
+                className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Import
+              </label>
+            </div>
+            <button
+              onClick={handleExport}
+              className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
               <Download className="w-4 h-4 mr-2" />
               Export
+            </button>
+            <button
+              onClick={handleExportSample}
+              className="flex items-center px-2 py-2 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              title="Download sample CSV template"
+            >
+              <Download className="w-3 h-3 mr-1" />
+              Sample
             </button>
 
             {/* Add Button */}
             <button
-              onClick={() => setShowAddForm(true)}
+              onClick={() => {
+                resetForm();
+                setShowModal(true);
+              }}
               className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -328,13 +803,34 @@ const BomTab: React.FC = () => {
         </div>
       </div>
 
-      {/* Add/Edit Form */}
-      {showAddForm && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">
-            {editingIndex !== null ? 'Edit Material' : 'Add New Material'}
-          </h3>
-          
+      {/* Add/Edit Modal */}
+      <Modal
+        isOpen={showModal}
+        onClose={resetForm}
+        title={editingIndex !== null ? 'Edit Material' : 'Add New Material'}
+        size="lg"
+        footer={
+          <>
+            <button
+              onClick={resetForm}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              className={`px-4 py-2 text-sm font-medium border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                validation.isValid
+                  ? 'text-white bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
+                  : 'text-gray-700 bg-gray-100'
+              }`}
+            >
+              {editingIndex !== null ? 'Update' : 'Add'} Material
+            </button>
+          </>
+        }
+      >
+        <div ref={formRef} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Select
               label="Part"
@@ -345,6 +841,7 @@ const BomTab: React.FC = () => {
               required
               error={validation.getFieldProps('part').error}
               helperText={validation.getFieldProps('part').helperText}
+              data-error={validation.getFieldProps('part').error ? 'true' : 'false'}
             />
 
             <Input
@@ -356,6 +853,7 @@ const BomTab: React.FC = () => {
               required
               error={validation.getFieldProps('materialName').error}
               helperText={validation.getFieldProps('materialName').helperText}
+              data-error={validation.getFieldProps('materialName').error ? 'true' : 'false'}
             />
 
             <Select
@@ -386,9 +884,11 @@ const BomTab: React.FC = () => {
               type="number"
               min={0}
               step={0.01}
+              placeholder="e.g., 1.50"
               required
               error={validation.getFieldProps('quantity').error}
               helperText={validation.getFieldProps('quantity').helperText}
+              data-error={validation.getFieldProps('quantity').error ? 'true' : 'false'}
             />
 
             <Select
@@ -400,6 +900,7 @@ const BomTab: React.FC = () => {
               required
               error={validation.getFieldProps('uom').error}
               helperText={validation.getFieldProps('uom').helperText}
+              data-error={validation.getFieldProps('uom').error ? 'true' : 'false'}
             />
             
             <Input
@@ -408,8 +909,10 @@ const BomTab: React.FC = () => {
               onChange={handleInputChange('supplier')}
               onBlur={() => validation.setFieldTouched('supplier')}
               placeholder="Supplier name"
+              required
               error={validation.getFieldProps('supplier').error}
               helperText={validation.getFieldProps('supplier').helperText}
+              data-error={validation.getFieldProps('supplier').error ? 'true' : 'false'}
             />
 
             <Input
@@ -417,9 +920,11 @@ const BomTab: React.FC = () => {
               value={formData.supplierCode || ''}
               onChange={handleInputChange('supplierCode')}
               onBlur={() => validation.setFieldTouched('supplierCode')}
-              placeholder="Material code"
+              placeholder="Material code (e.g., MAT-001)"
+              required
               error={validation.getFieldProps('supplierCode').error}
               helperText={validation.getFieldProps('supplierCode').helperText}
+              data-error={validation.getFieldProps('supplierCode').error ? 'true' : 'false'}
             />
 
             <Input
@@ -427,7 +932,7 @@ const BomTab: React.FC = () => {
               value={formData.colorCode || ''}
               onChange={handleInputChange('colorCode')}
               onBlur={() => validation.setFieldTouched('colorCode')}
-              placeholder="e.g., Navy, #001122"
+              placeholder="e.g., #FF0000 or PANTONE 19-4052 TCX"
               error={validation.getFieldProps('colorCode').error}
               helperText={validation.getFieldProps('colorCode').helperText}
             />
@@ -460,20 +965,22 @@ const BomTab: React.FC = () => {
 
           {/* Validation Summary */}
           {!validation.isValid && Object.keys(validation.errors).some(key => validation.touched[key]) && (
-            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-md">
+            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
               <div className="flex">
                 <div className="flex-shrink-0">
                   <AlertCircle className="h-5 w-5 text-red-400" />
                 </div>
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-red-800">
-                    Please fix the following errors:
+                    Vui lòng sửa các lỗi sau:
                   </h3>
                   <div className="mt-2 text-sm text-red-700">
                     <ul className="list-disc pl-5 space-y-1">
                       {Object.entries(validation.errors).map(([field, error]) =>
                         validation.touched[field] && error ? (
-                          <li key={field}>{error}</li>
+                          <li key={field}>
+                            <strong>{field}:</strong> {error}
+                          </li>
                         ) : null
                       )}
                     </ul>
@@ -482,41 +989,448 @@ const BomTab: React.FC = () => {
               </div>
             </div>
           )}
+        </div>
+      </Modal>
 
-          <div className="flex items-center justify-end space-x-3 mt-6">
+      {/* Import Preview Modal */}
+      <Modal
+        isOpen={showImportModal}
+        onClose={() => {
+          setShowImportModal(false);
+          setImportPreview([]);
+          setImportErrors([]);
+        }}
+        title="Import Preview"
+        size="xl"
+        footer={
+          <>
             <button
-              onClick={resetForm}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              onClick={() => {
+                setShowImportModal(false);
+                setImportPreview([]);
+                setImportErrors([]);
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
-              onClick={handleSubmit}
-              disabled={!validation.isValid}
-              className={`px-4 py-2 text-sm font-medium border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                validation.isValid
-                  ? 'text-white bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
-                  : 'text-gray-400 bg-gray-200 cursor-not-allowed'
-              }`}
+              onClick={handleConfirmImport}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
             >
-              {editingIndex !== null ? 'Update' : 'Add'} Material
+              Import {importPreview.length - importErrors.length} Valid Items
             </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {importErrors.length > 0 && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-md">
+              <h4 className="text-sm font-medium text-red-800 mb-2">
+                {importErrors.length} row(s) have errors:
+              </h4>
+              <ul className="text-sm text-red-700 space-y-1">
+                {importErrors.map(({ row, errors }) => (
+                  <li key={row}>
+                    Row {row}: {Object.values(errors).join(', ')}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
+          <div className="max-h-96 overflow-y-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Row</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Part</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Material Name</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Quantity</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">UOM</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Supplier</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Status</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {importPreview.map((item, idx) => {
+                  const rowErrors = importErrors.find(e => e.row === idx + 2);
+                  const isValid = !rowErrors;
+                  return (
+                    <tr key={idx} className={isValid ? '' : 'bg-red-50'}>
+                      <td className="px-4 py-2 text-sm">{idx + 2}</td>
+                      <td className="px-4 py-2 text-sm">{item.part || '-'}</td>
+                      <td className="px-4 py-2 text-sm">{item.materialName || '-'}</td>
+                      <td className="px-4 py-2 text-sm">{item.quantity || '-'}</td>
+                      <td className="px-4 py-2 text-sm">{item.uom || '-'}</td>
+                      <td className="px-4 py-2 text-sm">{item.supplier || '-'}</td>
+                      <td className="px-4 py-2 text-sm">
+                        {isValid ? (
+                          <span className="text-green-600">✓ Valid</span>
+                        ) : (
+                          <span className="text-red-600">✗ Error</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
-      )}
+      </Modal>
 
-      {/* Data Table */}
-      <DataTable
-        data={filteredBom}
-        columns={columns}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        addButtonText="Add Material"
-        emptyMessage="No materials added yet. Click 'Add Material' to get started or use a template."
-        className="mb-6"
-      />
+      {/* Data Table with Error Highlighting */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+        <div className="p-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-800">Materials List</h3>
+          {Object.keys(validationErrors).length > 0 && (
+            <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-md">
+              <div className="flex items-center">
+                <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
+                <span className="text-sm text-red-800">
+                  {Object.keys(validationErrors).length} item(s) have validation errors. Please fix them before saving.
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                {columns.map((column) => (
+                  <th
+                    key={column.key as string}
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    style={{ width: column.width }}
+                  >
+                    {column.header}
+                  </th>
+                ))}
+                <th scope="col" className="relative px-6 py-3">
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredBom.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length + 1} className="px-6 py-12 text-center text-sm text-gray-500">
+                    No materials added yet. Click 'Add Material' to get started or use a template.
+                  </td>
+                </tr>
+              ) : (
+                tableDataWithErrors.map((item, index) => {
+                  const originalIndex = bom.findIndex(b => b.id === item.id);
+                  const hasErrors = item._hasErrors;
+                  const errors = item._errors;
+                  
+                  return (
+                    <tr
+                      key={item.id}
+                      className={`hover:bg-gray-50 ${hasErrors ? 'bg-red-50 border-l-4 border-red-500' : ''}`}
+                    >
+                      {columns.map((column) => {
+                        const value = item[column.key];
+                        return (
+                          <td
+                            key={column.key as string}
+                            className={`px-6 py-4 whitespace-nowrap text-sm ${
+                              hasErrors && errors[column.key as string] ? 'text-red-600' : 'text-gray-700'
+                            }`}
+                            title={hasErrors && errors[column.key as string] ? errors[column.key as string] : undefined}
+                          >
+                            {column.render ? column.render(value as any, item, index) : (value || '-')}
+                            {hasErrors && errors[column.key as string] && (
+                              <div className="mt-1">
+                                <AlertCircle className="w-4 h-4 text-red-400 inline" />
+                                <span className="ml-1 text-xs text-red-600">{errors[column.key as string]}</span>
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center justify-end space-x-3">
+                          <button
+                            onClick={() => handleEdit(item, originalIndex)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="Edit"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(item, originalIndex)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Delete"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-700">
+                Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredBom.length)} of {filteredBom.length} items
+              </span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="ml-4 px-2 py-1 border border-gray-300 rounded text-sm"
+              >
+                <option value={25}>25 per page</option>
+                <option value={50}>50 per page</option>
+                <option value={100}>100 per page</option>
+                <option value={200}>200 per page</option>
+              </select>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-sm text-gray-700">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Column Mapping Modal */}
+      <Modal
+        isOpen={showMappingModal}
+        onClose={() => {
+          setShowMappingModal(false);
+          setRawCsvData([]);
+          setCsvHeaders([]);
+          setColumnMapping({});
+        }}
+        title="Map CSV Columns to BOM Fields"
+        size="lg"
+        footer={
+          <>
+            <button
+              onClick={() => {
+                setShowMappingModal(false);
+                setRawCsvData([]);
+                setCsvHeaders([]);
+                setColumnMapping({});
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirmMapping}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+            >
+              Continue to Preview
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Map each CSV column to a BOM field. Leave unmapped if not needed.
+          </p>
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {csvHeaders.map(header => (
+              <div key={header} className="flex items-center space-x-4 p-2 hover:bg-gray-50 rounded">
+                <div className="w-1/3 text-sm font-medium text-gray-700">{header}</div>
+                <div className="w-2/3">
+                  <select
+                    value={columnMapping[header] || ''}
+                    onChange={(e) => {
+                      setColumnMapping(prev => ({
+                        ...prev,
+                        [header]: e.target.value as keyof BomItem | ''
+                      }));
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  >
+                    <option value="">-- Not mapped --</option>
+                    <option value="part">Part</option>
+                    <option value="materialName">Material Name</option>
+                    <option value="supplierCode">Supplier Code</option>
+                    <option value="placement">Placement</option>
+                    <option value="size">Size</option>
+                    <option value="quantity">Quantity</option>
+                    <option value="uom">Unit of Measure</option>
+                    <option value="supplier">Supplier</option>
+                    <option value="colorCode">Color Code</option>
+                    <option value="materialComposition">Material Composition</option>
+                    <option value="comments">Comments</option>
+                  </select>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
+
+      {/* Import Preview Modal - Enhanced with error download */}
+      <Modal
+        isOpen={showImportModal}
+        onClose={() => {
+          setShowImportModal(false);
+          setImportPreview([]);
+          setImportErrors([]);
+        }}
+        title="Import Preview"
+        size="xl"
+        footer={
+          <>
+            {importErrors.length > 0 && (
+              <button
+                onClick={() => {
+                  // Export errors to CSV
+                  const errorRows = importErrors.map(({ row, errors }) => ({
+                    Row: row,
+                    Errors: Object.entries(errors).map(([field, msg]) => `${field}: ${msg}`).join('; ')
+                  }));
+                  const errorCsv = [
+                    'Row,Errors',
+                    ...errorRows.map(r => `"${r.Row}","${r.Errors.replace(/"/g, '""')}"`)
+                  ].join('\n');
+                  downloadCSV(errorCsv, `import_errors_${new Date().toISOString().split('T')[0]}.csv`);
+                  showSuccess('Error report downloaded');
+                }}
+                className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-300 rounded-md hover:bg-red-100"
+              >
+                <Download className="w-4 h-4 mr-2 inline" />
+                Download Errors
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setShowImportModal(false);
+                setImportPreview([]);
+                setImportErrors([]);
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirmImport}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+            >
+              Import {importPreview.length - importErrors.length} Valid Items
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {importErrors.length > 0 && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-md">
+              <h4 className="text-sm font-medium text-red-800 mb-2">
+                {importErrors.length} row(s) have errors:
+              </h4>
+              <div className="max-h-40 overflow-y-auto">
+                <ul className="text-sm text-red-700 space-y-1">
+                  {importErrors.map(({ row, errors }) => (
+                    <li key={row} className="flex items-start">
+                      <span className="font-medium mr-2">Row {row}:</span>
+                      <div className="flex-1">
+                        {Object.entries(errors).map(([field, msg]) => (
+                          <div key={field} className="text-xs">
+                            <strong>{field}:</strong> {msg}
+                          </div>
+                        ))}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+          
+          <div className="max-h-96 overflow-y-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Row</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Part</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Material Name</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Quantity</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">UOM</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Supplier</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Status</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {importPreview.map((item, idx) => {
+                  const rowErrors = importErrors.find(e => e.row === idx + 2);
+                  const isValid = !rowErrors;
+                  return (
+                    <tr key={idx} className={isValid ? '' : 'bg-red-50'}>
+                      <td className="px-4 py-2 text-sm">{idx + 2}</td>
+                      <td className="px-4 py-2 text-sm">{item.part || '-'}</td>
+                      <td className="px-4 py-2 text-sm">{item.materialName || '-'}</td>
+                      <td className="px-4 py-2 text-sm">{item.quantity || '-'}</td>
+                      <td className="px-4 py-2 text-sm">{item.uom || '-'}</td>
+                      <td className="px-4 py-2 text-sm">{item.supplier || '-'}</td>
+                      <td className="px-4 py-2 text-sm">
+                        {isValid ? (
+                          <span className="text-green-600">✓ Valid</span>
+                        ) : (
+                          <span className="text-red-600" title={Object.values(rowErrors.errors).join(', ')}>✗ Error</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
+});
+
+// Export validate function for use in parent component - ID-based
+export const validateBomForSave = (bom: BomItem[]): { isValid: boolean; errors: Array<{ id: string; item: BomItem; errors: Record<string, string> }> } => {
+  const errors: Array<{ id: string; item: BomItem; errors: Record<string, string> }> = [];
+  
+  bom.forEach((item) => {
+    const validation = validateBomItem(item);
+    if (!validation.isValid) {
+      errors.push({ id: item.id, item, errors: validation.errors });
+    }
+  });
+  
+  return { isValid: errors.length === 0, errors };
 };
 
+BomTabComponent.displayName = 'BomTab';
+
+export const BomTab = memo(BomTabComponent);
 export default BomTab;

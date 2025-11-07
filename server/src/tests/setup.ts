@@ -4,6 +4,9 @@ import dotenv from 'dotenv';
 // Load test environment variables
 dotenv.config({ path: '.env.test' });
 
+// Ensure Redis is disabled for tests unless explicitly enabled in env
+process.env.REDIS_ENABLED = process.env.REDIS_ENABLED || 'false';
+
 // Mock console methods to reduce noise in tests
 global.console = {
   ...console,

@@ -10,6 +10,7 @@ class AuthController {
     this.register = this.register.bind(this);
     this.login = this.login.bind(this);
     this.logout = this.logout.bind(this);
+    this.logoutByRefresh = this.logoutByRefresh.bind(this);
     this.refreshToken = this.refreshToken.bind(this);
     this.getProfile = this.getProfile.bind(this);
     this.updateProfile = this.updateProfile.bind(this);
@@ -114,6 +115,37 @@ class AuthController {
     } catch (error: any) {
       console.error('Logout error:', error);
       sendError(res, 'Failed to log out');
+    }
+  }
+
+  // Logout using only refresh token (works even if access token expired)
+  async logoutByRefresh(req: Request, res: Response): Promise<void> {
+    try {
+      const { refreshToken } = req.body;
+      if (!refreshToken) {
+        return sendError(res, 'Refresh token is required', 400, 'BAD_REQUEST');
+      }
+
+      let decoded: any;
+      try {
+        decoded = authService.verifyRefreshToken(refreshToken);
+      } catch (err) {
+        return sendError(res, 'Invalid or expired refresh token', 401, 'UNAUTHORIZED');
+      }
+
+      const user = await User.findById(decoded.userId).select('+refreshTokens');
+      if (!user) {
+        return sendError(res, 'Invalid refresh token', 401, 'UNAUTHORIZED');
+      }
+
+      // Remove this refresh token from user records if present
+      user.refreshTokens = user.refreshTokens.filter((t: string) => t !== refreshToken);
+      await user.save();
+
+      sendSuccess(res, {}, 'Logged out successfully');
+    } catch (error: any) {
+      console.error('Logout by refresh error:', error);
+      sendError(res, 'Failed to log out', 500, 'INTERNAL_ERROR');
     }
   }
 

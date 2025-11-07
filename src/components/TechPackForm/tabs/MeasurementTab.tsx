@@ -1,10 +1,33 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useTechPack } from '../../../contexts/TechPackContext';
 import { MeasurementPoint, SIZE_RANGES } from '../../../types/techpack';
 import { useFormValidation } from '../../../hooks/useFormValidation';
 import { measurementValidationSchema } from '../../../utils/validationSchemas';
 import Input from '../shared/Input';
-import { Plus, Upload, Download, Ruler, AlertTriangle, Info, AlertCircle } from 'lucide-react';
+import { Plus, Upload, Download, Ruler, AlertTriangle, Info, AlertCircle, X } from 'lucide-react';
+import { showSuccess, showWarning, showError } from '../../../lib/toast';
+
+// Helper to parse tolerance from string format (for backward compatibility)
+const parseTolerance = (value: string | number | undefined): number => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const match = value.match(/[\d.]+/);
+    return match ? parseFloat(match[0]) : 1.0;
+  }
+  return 1.0; // Default tolerance
+};
+
+// Helper to format tolerance for display
+const formatTolerance = (value: number): string => {
+  return `±${value.toFixed(1)}cm`;
+};
+
+// Progression validation result
+interface ProgressionValidation {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
 
 const MeasurementTab: React.FC = () => {
   const context = useTechPack();
@@ -14,6 +37,7 @@ const MeasurementTab: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [progressionMode, setProgressionMode] = useState<'strict' | 'warn'>('strict'); // strict = block, warn = allow with warning
 
   // Initialize validation for the form
   const validation = useFormValidation(measurementValidationSchema);
@@ -21,8 +45,8 @@ const MeasurementTab: React.FC = () => {
   const [formData, setFormData] = useState<Partial<MeasurementPoint>>({
     pomCode: '',
     pomName: '',
-    minusTolerance: '+/- 1.0cm',
-    plusTolerance: '+/- 1.0cm',
+    minusTolerance: 1.0, // Changed to number
+    plusTolerance: 1.0, // Changed to number
     sizes: {},
     notes: '',
     measurementMethod: '',
@@ -31,12 +55,12 @@ const MeasurementTab: React.FC = () => {
 
   // Get size range based on gender
   const availableSizes = useMemo(() => {
-    return SIZE_RANGES[articleInfo.gender] || SIZE_RANGES['Unisex'];
-  }, [articleInfo.gender]);
+    return SIZE_RANGES[articleInfo?.gender] || SIZE_RANGES['Unisex'];
+  }, [articleInfo?.gender]);
 
   // Initialize selected sizes if empty
   React.useEffect(() => {
-    if (selectedSizes.length === 0) {
+    if (selectedSizes.length === 0 && availableSizes.length > 0) {
       setSelectedSizes(availableSizes.slice(0, 6)); // Default to first 6 sizes
     }
   }, [availableSizes, selectedSizes.length]);
@@ -49,22 +73,43 @@ const MeasurementTab: React.FC = () => {
     validation.validateField(field, value);
   };
 
+  // Fixed: Properly handle 0 vs empty for size values
   const handleSizeValueChange = (size: string, value: string) => {
-    const numValue = parseFloat(value) || 0;
+    // Use null/undefined to represent empty, preserve 0 as valid value
+    const numValue = value === '' || value === null || value === undefined 
+      ? undefined 
+      : (isNaN(parseFloat(value)) ? undefined : parseFloat(value));
+    
+    const updatedSizes = { ...formData.sizes };
+    if (numValue === undefined) {
+      delete updatedSizes[size]; // Remove key if empty
+    } else {
+      updatedSizes[size] = numValue;
+    }
+    
     const updatedFormData = {
       ...formData,
-      sizes: { ...formData.sizes, [size]: numValue }
+      sizes: updatedSizes
     };
     setFormData(updatedFormData);
 
-    // Validate size measurements
-    validation.validateField('measurement', numValue);
+    // Validate if at least one size has a value
+    const hasAnyValue = Object.values(updatedSizes).some(v => v !== undefined && v !== null && v > 0);
+    if (hasAnyValue) {
+      const minValue = Math.min(...Object.values(updatedSizes).filter(v => v !== undefined && v !== null && v > 0) as number[]);
+      validation.validateField('measurement', minValue);
+    }
   };
 
   const handleSizeToggle = (size: string) => {
     setSelectedSizes(prev => {
       if (prev.includes(size)) {
-        return prev.filter(s => s !== size);
+        const newSizes = prev.filter(s => s !== size);
+        // Remove size from formData.sizes when unselected
+        const updatedSizes = { ...formData.sizes };
+        delete updatedSizes[size];
+        setFormData({ ...formData, sizes: updatedSizes });
+        return newSizes;
       } else {
         return [...prev, size].sort((a, b) => 
           availableSizes.indexOf(a) - availableSizes.indexOf(b)
@@ -73,47 +118,124 @@ const MeasurementTab: React.FC = () => {
     });
   };
 
-  const handleSubmit = () => {
-    // Build sizes object with only selected sizes for validation
-    const sizes: Record<string, number> = {};
-    selectedSizes.forEach(size => {
-      sizes[size] = formData.sizes?.[size] || 0;
-    });
+  // Enhanced progression validation
+  const validateProgression = useCallback((sizes: Record<string, number>, sizeOrder: string[]): ProgressionValidation => {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    
+    // Filter sizes that have values
+    const sizeEntries = sizeOrder
+      .map(size => ({ size, value: sizes[size] }))
+      .filter(entry => entry.value !== undefined && entry.value !== null);
+    
+    if (sizeEntries.length < 2) {
+      return { isValid: true, errors: [], warnings: [] }; // Need at least 2 sizes to check progression
+    }
 
-    // Create validation data object
-    const validationData = {
-      pointName: formData.pomName,
-      measurement: Math.min(...Object.values(sizes).filter(v => v > 0)) || 0, // Use smallest non-zero measurement
-      tolerance: parseFloat(formData.minusTolerance?.replace(/[^\d.]/g, '') || '0'),
-      unit: 'cm',
-      category: 'Length', // Default category
-      notes: formData.notes
+    // Check for zero or negative values
+    const hasInvalidValues = sizeEntries.some(entry => entry.value! <= 0);
+    if (hasInvalidValues) {
+      errors.push('All measurements must be greater than 0');
+    }
+
+    // Check progression: each size should be >= previous size (for most measurements)
+    // Allow some flexibility: if difference is less than 5%, treat as warning
+    const progressionIssues: Array<{ from: string; to: string; diff: number }> = [];
+    
+    for (let i = 1; i < sizeEntries.length; i++) {
+      const prevValue = sizeEntries[i - 1].value!;
+      const currValue = sizeEntries[i].value!;
+      const diff = currValue - prevValue;
+      const percentDiff = (diff / prevValue) * 100;
+      
+      if (diff < 0) {
+        // Decreasing progression - always an issue
+        progressionIssues.push({
+          from: sizeEntries[i - 1].size,
+          to: sizeEntries[i].size,
+          diff: Math.abs(diff)
+        });
+      } else if (diff === 0) {
+        // Same value - warning (might be intentional for some measurements)
+        warnings.push(`${sizeEntries[i - 1].size} and ${sizeEntries[i].size} have the same value`);
+      } else if (percentDiff < 1) {
+        // Very small increase (< 1%) - warning
+        warnings.push(`Very small progression between ${sizeEntries[i - 1].size} and ${sizeEntries[i].size} (${diff.toFixed(2)}cm)`);
+      }
+    }
+
+    if (progressionIssues.length > 0) {
+      const issueDetails = progressionIssues
+        .map(issue => `${issue.from} → ${issue.to}: decreased by ${issue.diff.toFixed(2)}cm`)
+        .join('; ');
+      
+      if (progressionMode === 'strict') {
+        errors.push(`Size progression error: ${issueDetails}`);
+      } else {
+        warnings.push(`Size progression warning: ${issueDetails}`);
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings
     };
+  }, [progressionMode]);
 
-    // Validate the entire form before submission
-    const isValid = validation.validateForm(validationData);
+  const handleSubmit = () => {
+    // Validate pomCode and pomName separately
+    const pomCodeValid = validation.validateField('pomCode', formData.pomCode);
+    const pomNameValid = validation.validateField('pomName', formData.pomName);
+    const minusToleranceValid = validation.validateField('minusTolerance', formData.minusTolerance);
+    const plusToleranceValid = validation.validateField('plusTolerance', formData.plusTolerance);
 
-    if (!isValid) {
-      // Mark all fields as touched to show validation errors
+    if (!pomCodeValid || !pomNameValid || !minusToleranceValid || !plusToleranceValid) {
       Object.keys(measurementValidationSchema).forEach(field => {
         validation.setFieldTouched(field, true);
       });
       return;
     }
 
-    // Additional validation for sizes
+    // Build sizes object with only selected sizes, preserving 0 values
+    const sizes: Record<string, number> = {};
+    selectedSizes.forEach(size => {
+      const value = formData.sizes?.[size];
+      // Only include if value is defined (including 0)
+      if (value !== undefined && value !== null) {
+        sizes[size] = value;
+      }
+    });
+
+    // Validate that at least one size has a value > 0
     const sizeValues = Object.values(sizes);
-    if (sizeValues.every(v => v <= 0)) {
+    const hasValidMeasurements = sizeValues.some(v => v > 0);
+    
+    if (!hasValidMeasurements) {
       validation.setFieldError('measurement', 'At least one size measurement must be greater than 0');
       return;
+    }
+
+    // Validate progression
+    const progressionValidation = validateProgression(sizes, selectedSizes);
+    
+    if (!progressionValidation.isValid && progressionMode === 'strict') {
+      // Block submission if strict mode and has errors
+      showError(`Cannot save: ${progressionValidation.errors.join('; ')}`);
+      return;
+    }
+
+    // Show warnings if any
+    if (progressionValidation.warnings.length > 0) {
+      showWarning(`Warning: ${progressionValidation.warnings.join('; ')}`);
     }
 
     const measurement: MeasurementPoint = {
       id: editingIndex !== null ? measurements[editingIndex].id : `measurement_${Date.now()}`,
       pomCode: formData.pomCode!,
       pomName: formData.pomName!,
-      minusTolerance: formData.minusTolerance || '+/- 1.0cm',
-      plusTolerance: formData.plusTolerance || '+/- 1.0cm',
+      minusTolerance: formData.minusTolerance ?? 1.0,
+      plusTolerance: formData.plusTolerance ?? 1.0,
       sizes,
       notes: formData.notes || '',
       measurementMethod: formData.measurementMethod || '',
@@ -122,9 +244,10 @@ const MeasurementTab: React.FC = () => {
 
     if (editingIndex !== null) {
       updateMeasurement(editingIndex, measurement);
-      setEditingIndex(null);
+      showSuccess('Measurement updated successfully');
     } else {
       addMeasurement(measurement);
+      showSuccess('Measurement added successfully');
     }
 
     resetForm();
@@ -134,8 +257,8 @@ const MeasurementTab: React.FC = () => {
     setFormData({
       pomCode: '',
       pomName: '',
-      minusTolerance: '+/- 1.0cm',
-      plusTolerance: '+/- 1.0cm',
+      minusTolerance: 1.0,
+      plusTolerance: 1.0,
       sizes: {},
       notes: '',
       measurementMethod: '',
@@ -143,46 +266,43 @@ const MeasurementTab: React.FC = () => {
     });
     setShowAddForm(false);
     setEditingIndex(null);
-
-    // Reset validation state
     validation.reset();
   };
 
   const handleEdit = (measurement: MeasurementPoint, index: number) => {
-    setFormData(measurement);
+    // Convert tolerance from string to number if needed (backward compatibility)
+    const minusTol = typeof measurement.minusTolerance === 'string' 
+      ? parseTolerance(measurement.minusTolerance) 
+      : (measurement.minusTolerance ?? 1.0);
+    const plusTol = typeof measurement.plusTolerance === 'string'
+      ? parseTolerance(measurement.plusTolerance)
+      : (measurement.plusTolerance ?? 1.0);
+
+    setFormData({
+      ...measurement,
+      minusTolerance: minusTol,
+      plusTolerance: plusTol,
+    });
     setEditingIndex(index);
     setShowAddForm(true);
     
     // Set selected sizes based on measurement data
     const measurementSizes = Object.keys(measurement.sizes);
-    setSelectedSizes(measurementSizes);
+    if (measurementSizes.length > 0) {
+      setSelectedSizes(measurementSizes);
+    }
   };
 
   const handleDelete = (measurement: MeasurementPoint, index: number) => {
     if (window.confirm(`Are you sure you want to delete "${measurement.pomCode} - ${measurement.pomName}"?`)) {
       deleteMeasurement(index);
+      showSuccess('Measurement deleted');
     }
   };
 
-  const validateMeasurement = (measurement: MeasurementPoint) => {
-    const issues: string[] = [];
-    const sizeValues = Object.values(measurement.sizes);
-    
-    // Check for zero or negative values
-    if (sizeValues.some(val => val <= 0)) {
-      issues.push('Contains zero or negative measurements');
-    }
-    
-    // Check for logical size progression
-    const sortedSizes = selectedSizes.map(size => ({ size, value: measurement.sizes[size] || 0 }));
-    for (let i = 1; i < sortedSizes.length; i++) {
-      if (sortedSizes[i].value < sortedSizes[i-1].value) {
-        issues.push('Size progression may be incorrect');
-        break;
-      }
-    }
-    
-    return issues;
+  // Enhanced validation for display in table
+  const validateMeasurement = (measurement: MeasurementPoint): ProgressionValidation => {
+    return validateProgression(measurement.sizes, selectedSizes);
   };
 
   const addCommonMeasurements = () => {
@@ -205,8 +325,8 @@ const MeasurementTab: React.FC = () => {
         id: `measurement_${Date.now()}_${index}`,
         pomCode: measurement.pomCode,
         pomName: measurement.pomName,
-        minusTolerance: '+/- 1.0cm',
-        plusTolerance: '+/- 1.0cm',
+        minusTolerance: 1.0,
+        plusTolerance: 1.0,
         sizes,
         measurementMethod: measurement.method,
         notes: '',
@@ -215,6 +335,7 @@ const MeasurementTab: React.FC = () => {
 
       addMeasurement(measurementPoint);
     });
+    showSuccess('Common measurements added');
   };
 
   return (
@@ -246,7 +367,7 @@ const MeasurementTab: React.FC = () => {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-800">Size Range Configuration</h3>
-          <span className="text-sm text-gray-500">Gender: {articleInfo.gender}</span>
+          <span className="text-sm text-gray-500">Gender: {articleInfo?.gender || 'Unisex'}</span>
         </div>
         
         <div className="flex flex-wrap gap-2">
@@ -277,6 +398,19 @@ const MeasurementTab: React.FC = () => {
               <Ruler className="w-4 h-4 mr-2" />
               Add Common Points
             </button>
+            
+            {/* Progression Mode Toggle */}
+            <div className="flex items-center space-x-2">
+              <label className="text-sm text-gray-700">Progression:</label>
+              <select
+                value={progressionMode}
+                onChange={(e) => setProgressionMode(e.target.value as 'strict' | 'warn')}
+                className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="strict">Strict (Block errors)</option>
+                <option value="warn">Warn only</option>
+              </select>
+            </div>
           </div>
 
           <div className="flex items-center space-x-3">
@@ -308,70 +442,139 @@ const MeasurementTab: React.FC = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <Input
-              label="POM Code"
+              label="POM Code *"
               value={formData.pomCode || ''}
               onChange={handleInputChange('pomCode')}
-              onBlur={() => validation.setFieldTouched('pointName')}
+              onBlur={() => validation.setFieldTouched('pomCode')}
               placeholder="e.g., CHEST, LENGTH"
               required
-              error={validation.getFieldProps('pointName').error}
-              helperText={validation.getFieldProps('pointName').helperText}
+              error={validation.getFieldProps('pomCode').error}
+              helperText={validation.getFieldProps('pomCode').helperText || 'Uppercase letters, numbers, hyphens, underscores'}
             />
 
             <Input
-              label="POM Name"
+              label="POM Name *"
               value={formData.pomName || ''}
               onChange={handleInputChange('pomName')}
-              onBlur={() => validation.setFieldTouched('pointName')}
+              onBlur={() => validation.setFieldTouched('pomName')}
               placeholder="e.g., Chest 1 inch below armhole"
               required
-              error={validation.getFieldProps('pointName').error}
-              helperText={validation.getFieldProps('pointName').helperText}
+              error={validation.getFieldProps('pomName').error}
+              helperText={validation.getFieldProps('pomName').helperText}
             />
 
             <Input
-              label="Tolerance"
-              value={formData.minusTolerance || ''}
-              onChange={handleInputChange('minusTolerance')}
-              onBlur={() => validation.setFieldTouched('tolerance')}
-              placeholder="e.g., +/- 1.0cm"
-              error={validation.getFieldProps('tolerance').error}
-              helperText={validation.getFieldProps('tolerance').helperText}
+              label="Minus Tolerance (cm) *"
+              value={formData.minusTolerance ?? ''}
+              onChange={(value) => handleInputChange('minusTolerance')(typeof value === 'string' ? parseFloat(value) || 0 : value)}
+              onBlur={() => validation.setFieldTouched('minusTolerance')}
+              type="number"
+              step="0.1"
+              min="0"
+              max="50"
+              placeholder="e.g., 1.0"
+              required
+              error={validation.getFieldProps('minusTolerance').error}
+              helperText={validation.getFieldProps('minusTolerance').helperText || 'Tolerance in centimeters'}
             />
 
             <Input
-              label="Measurement Method"
-              value={formData.measurementMethod || ''}
-              onChange={handleInputChange('measurementMethod')}
-              onBlur={() => validation.setFieldTouched('notes')}
-              placeholder="Brief description of how to measure"
-              error={validation.getFieldProps('notes').error}
-              helperText={validation.getFieldProps('notes').helperText}
+              label="Plus Tolerance (cm) *"
+              value={formData.plusTolerance ?? ''}
+              onChange={(value) => handleInputChange('plusTolerance')(typeof value === 'string' ? parseFloat(value) || 0 : value)}
+              onBlur={() => validation.setFieldTouched('plusTolerance')}
+              type="number"
+              step="0.1"
+              min="0"
+              max="50"
+              placeholder="e.g., 1.0"
+              required
+              error={validation.getFieldProps('plusTolerance').error}
+              helperText={validation.getFieldProps('plusTolerance').helperText || 'Tolerance in centimeters'}
             />
+
+            <div className="md:col-span-2">
+              <Input
+                label="Measurement Method"
+                value={formData.measurementMethod || ''}
+                onChange={handleInputChange('measurementMethod')}
+                placeholder="Brief description of how to measure"
+                error={validation.getFieldProps('notes').error}
+                helperText={validation.getFieldProps('notes').helperText}
+              />
+            </div>
           </div>
 
           {/* Size Measurements Grid */}
           <div className="mb-6">
             <h4 className="text-md font-medium text-gray-800 mb-3">Size Measurements (cm)</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {selectedSizes.map(size => (
-                <div key={size} className="flex flex-col">
-                  <label className="text-sm font-medium text-gray-700 mb-1">{size}</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    value={formData.sizes?.[size] || ''}
-                    onChange={(e) => handleSizeValueChange(size, e.target.value)}
-                    onBlur={() => validation.setFieldTouched('measurement')}
-                    className={`px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${validation.getFieldProps('measurement').error ? 'border-red-500' : 'border-gray-300'}`}
-                    placeholder="0.0"
-                  />
-                </div>
-              ))}
+              {selectedSizes.map(size => {
+                // Fixed: Properly handle 0 vs empty - use undefined for empty, preserve 0
+                const value = formData.sizes?.[size];
+                const displayValue = value === undefined || value === null ? '' : value.toString();
+                
+                return (
+                  <div key={size} className="flex flex-col">
+                    <label className="text-sm font-medium text-gray-700 mb-1">{size}</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={displayValue}
+                      onChange={(e) => handleSizeValueChange(size, e.target.value)}
+                      onBlur={() => {
+                        const hasAnyValue = Object.values(formData.sizes || {}).some(v => v !== undefined && v !== null && v > 0);
+                        if (hasAnyValue) {
+                          validation.setFieldTouched('measurement');
+                        }
+                      }}
+                      className={`px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        validation.getFieldProps('measurement').error ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="0.0"
+                    />
+                  </div>
+                );
+              })}
             </div>
             {validation.getFieldProps('measurement').error && (
-              <p className="mt-2 text-sm text-red-600">{validation.getFieldProps('measurement').helperText}</p>
+              <p className="mt-2 text-sm text-red-600">{validation.getFieldProps('measurement').error}</p>
+            )}
+            
+            {/* Progression validation preview */}
+            {Object.keys(formData.sizes || {}).length >= 2 && (
+              (() => {
+                const progValidation = validateProgression(formData.sizes || {}, selectedSizes);
+                if (progValidation.errors.length > 0 || progValidation.warnings.length > 0) {
+                  return (
+                    <div className={`mt-3 p-3 rounded-md ${
+                      progValidation.errors.length > 0 ? 'bg-red-50 border border-red-200' : 'bg-yellow-50 border border-yellow-200'
+                    }`}>
+                      <div className="flex items-start">
+                        <AlertTriangle className={`w-5 h-5 mt-0.5 mr-2 ${
+                          progValidation.errors.length > 0 ? 'text-red-400' : 'text-yellow-400'
+                        }`} />
+                        <div className="text-sm">
+                          {progValidation.errors.length > 0 && (
+                            <div className="text-red-800 font-medium mb-1">Errors:</div>
+                          )}
+                          {progValidation.errors.map((err, idx) => (
+                            <div key={idx} className="text-red-700">{err}</div>
+                          ))}
+                          {progValidation.warnings.length > 0 && (
+                            <div className="text-yellow-800 font-medium mt-2 mb-1">Warnings:</div>
+                          )}
+                          {progValidation.warnings.map((warn, idx) => (
+                            <div key={idx} className="text-yellow-700">{warn}</div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()
             )}
           </div>
 
@@ -383,7 +586,9 @@ const MeasurementTab: React.FC = () => {
               onBlur={() => validation.setFieldTouched('notes')}
               placeholder="Additional notes or special instructions..."
               rows={2}
-              className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${validation.getFieldProps('notes').error ? 'border-red-500' : 'border-gray-300'}`}
+              className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                validation.getFieldProps('notes').error ? 'border-red-500' : 'border-gray-300'
+              }`}
             />
             {validation.getFieldProps('notes').error && (
               <p className="mt-1 text-sm text-red-600">{validation.getFieldProps('notes').helperText}</p>
@@ -471,14 +676,38 @@ const MeasurementTab: React.FC = () => {
                 </tr>
               ) : (
                 measurements.map((measurement, index) => {
-                  const issues = validateMeasurement(measurement);
+                  const validationResult = validateMeasurement(measurement);
+                  const hasIssues = validationResult.errors.length > 0 || validationResult.warnings.length > 0;
+                  
+                  // Format tolerance for display
+                  const minusTol = typeof measurement.minusTolerance === 'string' 
+                    ? parseTolerance(measurement.minusTolerance) 
+                    : (measurement.minusTolerance ?? 1.0);
+                  const plusTol = typeof measurement.plusTolerance === 'string'
+                    ? parseTolerance(measurement.plusTolerance)
+                    : (measurement.plusTolerance ?? 1.0);
+                  const toleranceDisplay = minusTol === plusTol 
+                    ? formatTolerance(minusTol)
+                    : `-${minusTol.toFixed(1)}cm / +${plusTol.toFixed(1)}cm`;
+                  
                   return (
-                    <tr key={measurement.id} className="hover:bg-gray-50">
+                    <tr 
+                      key={measurement.id} 
+                      className={`hover:bg-gray-50 ${
+                        validationResult.errors.length > 0 ? 'bg-red-50' : 
+                        validationResult.warnings.length > 0 ? 'bg-yellow-50' : ''
+                      }`}
+                    >
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white">
                         <div className="flex items-center">
                           {measurement.pomCode}
-                          {issues.length > 0 && (
-                            <AlertTriangle className="w-4 h-4 text-yellow-500 ml-2" title={issues.join(', ')} />
+                          {hasIssues && (
+                            <AlertTriangle 
+                              className={`w-4 h-4 ml-2 ${
+                                validationResult.errors.length > 0 ? 'text-red-500' : 'text-yellow-500'
+                              }`} 
+                              title={[...validationResult.errors, ...validationResult.warnings].join('; ')} 
+                            />
                           )}
                         </div>
                       </td>
@@ -491,13 +720,25 @@ const MeasurementTab: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {measurement.minusTolerance}
+                        {toleranceDisplay}
                       </td>
-                      {selectedSizes.map(size => (
-                        <td key={size} className="px-4 py-4 whitespace-nowrap text-sm text-center text-gray-700">
-                          {measurement.sizes[size]?.toFixed(1) || '-'}
-                        </td>
-                      ))}
+                      {selectedSizes.map(size => {
+                        const value = measurement.sizes[size];
+                        return (
+                          <td 
+                            key={size} 
+                            className={`px-4 py-4 whitespace-nowrap text-sm text-center ${
+                              value === undefined || value === null 
+                                ? 'text-gray-400' 
+                                : value <= 0 
+                                  ? 'text-red-600 font-medium' 
+                                  : 'text-gray-700'
+                            }`}
+                          >
+                            {value === undefined || value === null ? '-' : value.toFixed(1)}
+                          </td>
+                        );
+                      })}
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center space-x-3">
                           <button
@@ -531,9 +772,10 @@ const MeasurementTab: React.FC = () => {
             <p className="font-medium mb-1">Measurement Guidelines:</p>
             <ul className="list-disc list-inside space-y-1 text-blue-700">
               <li>All measurements should be in centimeters</li>
-              <li>Ensure size progression is logical (each size should be larger than the previous)</li>
+              <li>Ensure size progression is logical (each size should be larger than or equal to the previous)</li>
+              <li>Tolerance values are in centimeters (e.g., 1.0 means ±1.0cm)</li>
               <li>Use consistent tolerance values across similar measurement points</li>
-              <li>Add detailed measurement methods for complex points</li>
+              <li>Zero values are preserved - use empty field to indicate "not measured"</li>
             </ul>
           </div>
         </div>

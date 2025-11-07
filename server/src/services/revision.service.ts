@@ -55,38 +55,106 @@ class RevisionService {
       const trackedArraySections: (keyof ITechPack)[] = ['bom', 'measurements', 'colorways', 'howToMeasure'];
 
       // Array sections: mark added/removed/modified counts
+      // Use ID-based comparison for better accuracy
       trackedArraySections.forEach(section => {
         try {
           const oldSection = ((oldTechPack as any)[section] as any[]) || [];
           const newSection = ((newTechPack as any)[section] as any[]) || [];
 
-          if (!_.isEqual(oldSection, newSection)) {
-            const added = Math.max(0, newSection.length - oldSection.length);
-            const removed = Math.max(0, oldSection.length - newSection.length);
-
-            // Rough modified estimation: items present in both positions but not deeply equal
-            let modified = 0;
-            const minLen = Math.min(oldSection.length, newSection.length);
-            for (let i = 0; i < minLen; i++) {
-              if (!_.isEqual(oldSection[i], newSection[i])) {
-                modified += 1;
-                // capture shallow field changes for index i
-                const oldItem = oldSection[i] || {};
-                const newItem = newSection[i] || {};
-                const keys = _.uniq([...Object.keys(oldItem), ...Object.keys(newItem)]);
-                keys.forEach(k => {
-                  if (!_.isEqual((oldItem as any)[k], (newItem as any)[k])) {
-                    const path = `${String(section)}[${i}].${k}`;
-                    (changes.diffData as any)[path] = {
-                      old: (oldItem as any)[k],
-                      new: (newItem as any)[k]
-                    };
-                  }
-                });
-              }
+          // Normalize arrays: convert to objects keyed by ID for comparison
+          const getItemId = (item: any, index: number): string => {
+            // Normalize ID: MongoDB uses _id, frontend may use id
+            // Convert both to string for consistent comparison
+            if (item?._id) {
+              return item._id.toString();
             }
+            if (item?.id) {
+              return String(item.id);
+            }
+            // Fallback to index if no ID (shouldn't happen in production)
+            return `__index_${index}`;
+          };
 
-            (changes.details as any)[section] = { added, removed, modified };
+          // Normalize items: ensure consistent ID field format
+          const normalizeItem = (item: any): any => {
+            if (!item) return item;
+            const normalized = { ...item };
+            // Ensure id field exists (prefer id over _id for consistency)
+            if (normalized._id && !normalized.id) {
+              normalized.id = normalized._id.toString();
+            }
+            // Remove MongoDB internal fields for cleaner comparison
+            delete normalized.__v;
+            return normalized;
+          };
+
+          // Create maps by ID for efficient lookup
+          const oldMap = new Map<string, { item: any; index: number }>();
+          const newMap = new Map<string, { item: any; index: number }>();
+
+          oldSection.forEach((item, idx) => {
+            const normalized = normalizeItem(item);
+            const id = getItemId(normalized, idx);
+            oldMap.set(id, { item: normalized, index: idx });
+          });
+
+          newSection.forEach((item, idx) => {
+            const normalized = normalizeItem(item);
+            const id = getItemId(normalized, idx);
+            newMap.set(id, { item: normalized, index: idx });
+          });
+
+          // Find added, removed, and modified items
+          const added: string[] = [];
+          const removed: string[] = [];
+          const modified: string[] = [];
+
+          // Find added items (in new but not in old)
+          for (const id of newMap.keys()) {
+            if (!oldMap.has(id)) {
+              added.push(id);
+            }
+          }
+
+          // Find removed items (in old but not in new)
+          for (const id of oldMap.keys()) {
+            if (!newMap.has(id)) {
+              removed.push(id);
+            }
+          }
+
+          // Find modified items (in both but different)
+          oldMap.forEach((oldData, id) => {
+            const newData = newMap.get(id);
+            if (newData && !_.isEqual(oldData.item, newData.item)) {
+              modified.push(id);
+              
+              // Capture detailed field changes
+              const oldItem = oldData.item || {};
+              const newItem = newData.item || {};
+              const keys = _.uniq([...Object.keys(oldItem), ...Object.keys(newItem)]);
+              keys.forEach(k => {
+                // Skip internal MongoDB fields
+                if (k === '_id' || k === '__v') return;
+                
+                if (!_.isEqual((oldItem as any)[k], (newItem as any)[k])) {
+                  const path = `${String(section)}[id:${id}].${k}`;
+                  (changes.diffData as any)[path] = {
+                    old: (oldItem as any)[k],
+                    new: (newItem as any)[k]
+                  };
+                }
+              });
+            }
+          });
+
+          // Only mark as changed if there are actual changes
+          if (added.length > 0 || removed.length > 0 || modified.length > 0) {
+            (changes.details as any)[section] = { 
+              added: added.length, 
+              removed: removed.length, 
+              modified: modified.length 
+            };
             changes.sectionChanges!.push(String(section));
           }
         } catch (sectionError) {

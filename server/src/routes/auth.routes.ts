@@ -2,22 +2,12 @@ import { Router } from 'express';
 import { body } from 'express-validator';
 import authController from '../controllers/auth.controller';
 import { requireAuth } from '../middleware/auth.middleware';
-import { UserRole } from '../models/user.model';
 
 const router = Router();
 
-// POST /api/v1/auth/register
-router.post(
-  '/register',
-  [
-    body('firstName').notEmpty().withMessage('First name is required').trim(),
-    body('lastName').notEmpty().withMessage('Last name is required').trim(),
-    body('email').isEmail().withMessage('Please provide a valid email address').normalizeEmail(),
-    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters long'),
-    body('role').optional().isIn(Object.values(UserRole)).withMessage('Invalid role provided'),
-  ],
-  authController.register
-);
+// Registration via public endpoint has been disabled. Users must be created via Admin panel.
+// If you want to re-enable public registration in the future, restore the route above
+// and ensure proper validation/email verification and rate limiting are in place.
 
 // POST /api/v1/auth/login
 router.post(
@@ -35,6 +25,15 @@ router.post(
   requireAuth,
   body('refreshToken').notEmpty().withMessage('Refresh token is required'),
   authController.logout
+);
+
+// POST /api/v1/auth/logout/refresh - revoke refresh token without access token
+router.post(
+  '/logout/refresh',
+  [
+    body('refreshToken').notEmpty().withMessage('Refresh token is required')
+  ],
+  authController.logoutByRefresh
 );
 
 // POST /api/v1/auth/refresh

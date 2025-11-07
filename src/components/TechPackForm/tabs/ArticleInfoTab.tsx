@@ -1,14 +1,16 @@
-import React, { useState, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { useFormValidation } from '../../../hooks/useFormValidation';
 import { articleInfoValidationSchema } from '../../../utils/validationSchemas';
 import { api } from '../../../lib/api';
+import { useDebounce } from '../../../hooks/useDebounce';
+import { showError, showWarning } from '../../../lib/toast';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001/api/v1';
-import { TechPack, PRODUCT_CLASSES, ArticleInfo } from '../../../types/techpack';
+import { TechPack, PRODUCT_CLASSES, ArticleInfo, TechPackStatus } from '../../../types/techpack';
 import Input from '../shared/Input';
 import Select from '../shared/Select';
 import Textarea from '../shared/Textarea';
-import { Save, RotateCcw, ArrowRight, Calendar, User, UploadCloud, Image as ImageIcon, XCircle } from 'lucide-react';
+import { Save, RotateCcw, ArrowRight, Calendar, User, UploadCloud, XCircle, CheckCircle, AlertCircle, Lock } from 'lucide-react';
 
 interface ArticleInfoTabProps {
   techPack?: TechPack;
@@ -29,6 +31,8 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
   const [loadingDesigners, setLoadingDesigners] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
+  const [isDuplicate, setIsDuplicate] = useState(false);
 
   // Fallback if no techPack is passed
   const safeArticleInfo = articleInfo ?? {
@@ -61,7 +65,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
         }));
         setDesigners(designerOptions);
       } catch (error) {
-        console.error('Failed to fetch designers:', error);
+        // Failed to fetch designers - handle silently
       } finally {
         setLoadingDesigners(false);
       }
@@ -69,6 +73,51 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
 
     fetchDesigners();
   }, []);
+
+  // Debounce articleCode for duplicate check
+  const debouncedArticleCode = useDebounce(safeArticleInfo.articleCode, 500);
+
+  // Check for duplicate articleCode (only in create mode)
+  useEffect(() => {
+    const checkDuplicate = async () => {
+      if (mode !== 'create' || !debouncedArticleCode || debouncedArticleCode.length < 3) {
+        setIsDuplicate(false);
+        return;
+      }
+
+      // Validate format first - must match validation schema exactly
+      if (!/^[A-Z0-9-]+$/.test(debouncedArticleCode)) {
+        setIsDuplicate(false);
+        return;
+      }
+
+      setCheckingDuplicate(true);
+      setIsDuplicate(false);
+
+      try {
+        // Check if articleCode exists
+        const response = await api.get(`/techpacks/check-article-code/${encodeURIComponent(debouncedArticleCode.toUpperCase())}`);
+        const exists = response.data?.exists || response.data?.data?.exists || false;
+        setIsDuplicate(exists);
+        
+        if (exists) {
+          showWarning('This article code already exists. Please use a different code.');
+        }
+      } catch (error: any) {
+        // If 404, articleCode doesn't exist (good)
+        if (error.response?.status === 404) {
+          setIsDuplicate(false);
+        } else {
+          // Other errors - don't block user, just log
+          console.error('Error checking article code:', error);
+        }
+      } finally {
+        setCheckingDuplicate(false);
+      }
+    };
+
+    checkDuplicate();
+  }, [debouncedArticleCode, mode]);
 
   // Gender options
   const genderOptions = [
@@ -120,6 +169,25 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
     { value: 'Luxury', label: 'Luxury' }
   ];
 
+  // Status options (matching backend enum)
+  const statusOptions: Array<{ value: TechPackStatus; label: string }> = [
+    { value: 'Draft', label: 'Draft' },
+    { value: 'In Review', label: 'In Review' },
+    { value: 'Approved', label: 'Approved' },
+    { value: 'Rejected', label: 'Rejected' },
+    { value: 'Archived', label: 'Archived' }
+  ];
+
+  // Currency options
+  const currencyOptions = [
+    { value: 'USD', label: 'USD - US Dollar' },
+    { value: 'EUR', label: 'EUR - Euro' },
+    { value: 'GBP', label: 'GBP - British Pound' },
+    { value: 'JPY', label: 'JPY - Japanese Yen' },
+    { value: 'CNY', label: 'CNY - Chinese Yuan' },
+    { value: 'VND', label: 'VND - Vietnamese Dong' }
+  ];
+
   const handleInputChange = (field: keyof ArticleInfo) => (value: string | number) => {
     // Update the form data
     const updatedArticleInfo = { ...safeArticleInfo, [field]: value };
@@ -132,6 +200,20 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/svg+xml'];
+    if (!allowedTypes.includes(file.type)) {
+      setUploadError('Invalid file type. Please upload JPEG, PNG, GIF, or SVG image.');
+      return;
+    }
+
+    // Validate file size (5MB limit)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      setUploadError('File size exceeds 5MB limit. Please upload a smaller image.');
+      return;
+    }
 
     setUploading(true);
     setUploadError(null);
@@ -147,15 +229,99 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
       });
 
       if (response.data.success) {
-        handleInputChange('designSketchUrl')(response.data.data.url);
+        const imageUrl = response.data.data.url;
+        handleInputChange('designSketchUrl')(imageUrl);
+        validation.validateField('designSketchUrl', imageUrl);
+        setUploadError(null);
       } else {
         setUploadError(response.data.message || 'Failed to upload image.');
       }
     } catch (error: any) {
-      setUploadError(error.response?.data?.message || error.message || 'An unexpected error occurred.');
+      const errorMessage = error.response?.data?.message || error.message || 'An unexpected error occurred.';
+      setUploadError(errorMessage);
+      showError(errorMessage);
     } finally {
       setUploading(false);
     }
+  };
+
+  // Handle drag and drop for design sketch
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/svg+xml'];
+    if (!allowedTypes.includes(file.type)) {
+      setUploadError('Invalid file type. Please upload JPEG, PNG, GIF, or SVG image.');
+      return;
+    }
+
+    // Validate file size (5MB limit)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      setUploadError('File size exceeds 5MB limit. Please upload a smaller image.');
+      return;
+    }
+
+    setUploading(true);
+    setUploadError(null);
+
+    const formData = new FormData();
+    formData.append('designSketch', file);
+
+    try {
+      const response = await api.post('/techpacks/upload-sketch', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (response.data.success) {
+        const imageUrl = response.data.data.url;
+        handleInputChange('designSketchUrl')(imageUrl);
+        validation.validateField('designSketchUrl', imageUrl);
+        setUploadError(null);
+      } else {
+        setUploadError(response.data.message || 'Failed to upload image.');
+      }
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || 'An unexpected error occurred.';
+      setUploadError(errorMessage);
+      showError(errorMessage);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Helper to get image URL - handles both relative and absolute URLs
+  const getImageUrl = (url: string | undefined): string => {
+    if (!url) return '';
+    // If URL is already absolute (starts with http:// or https://), return as-is
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    // If URL starts with /, it's already a path, just prepend API base
+    if (url.startsWith('/')) {
+      return `${API_BASE_URL}${url}`;
+    }
+    // Otherwise, assume it's a relative path
+    return `${API_BASE_URL}/${url}`;
   };
 
   const handleReset = () => {
@@ -190,12 +356,53 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
     const scrollToFirstError = (errors: Record<string, string>) => {
     const firstErrorField = Object.keys(errors)[0];
     if (firstErrorField) {
-      const element = document.querySelector(`[id*="${firstErrorField}"]`);
-      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Try multiple selector strategies for better compatibility
+      let element: Element | null = null;
+      
+      // Strategy 1: Try by field name in id attribute
+      element = document.querySelector(`[id*="${firstErrorField}"]`);
+      
+      // Strategy 2: Try by name attribute
+      if (!element) {
+        element = document.querySelector(`[name="${firstErrorField}"]`);
+      }
+      
+      // Strategy 3: Try by data-field attribute (if components use it)
+      if (!element) {
+        element = document.querySelector(`[data-field="${firstErrorField}"]`);
+      }
+      
+      // Strategy 4: Try by label text (fallback)
+      if (!element) {
+        const labels = Array.from(document.querySelectorAll('label'));
+        const matchingLabel = labels.find(label => 
+          label.textContent?.toLowerCase().includes(firstErrorField.toLowerCase())
+        );
+        if (matchingLabel) {
+          const labelFor = matchingLabel.getAttribute('for');
+          if (labelFor) {
+            element = document.getElementById(labelFor);
+          }
+        }
+      }
+      
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Focus the element if it's focusable
+        if (element instanceof HTMLElement && 'focus' in element) {
+          (element as HTMLElement).focus();
+        }
+      }
     }
   };
 
   const handleSave = () => {
+    // Check for duplicate articleCode before saving
+    if (mode === 'create' && isDuplicate) {
+      showError('Cannot save: Article code already exists. Please use a different code.');
+      return;
+    }
+
     const { isValid, errors } = validation.validateForm(safeArticleInfo);
 
     if (!isValid) {
@@ -207,10 +414,38 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
     }
 
     onUpdate?.({
-      ...techPack,
-      articleInfo: safeArticleInfo
+      ...(techPack || {}),
+      articleInfo: safeArticleInfo,
+      status: safeArticleInfo.status || techPack?.status || 'Draft'
     });
   };
+
+  // Expose validateAndSave for parent via ref
+  useImperativeHandle(ref, () => ({
+    validateAndSave: () => {
+      // Check for duplicate articleCode before saving
+      if (mode === 'create' && isDuplicate) {
+        showError('Cannot save: Article code already exists. Please use a different code.');
+        return false;
+      }
+
+      const { isValid, errors } = validation.validateForm(safeArticleInfo);
+      if (!isValid) {
+        Object.keys(articleInfoValidationSchema).forEach(field => {
+          validation.setFieldTouched(field, true);
+        });
+        scrollToFirstError(errors);
+        return false;
+      }
+
+      onUpdate?.({
+        ...(techPack || {}),
+        articleInfo: safeArticleInfo,
+        status: safeArticleInfo.status || techPack?.status || 'Draft'
+      });
+      return true;
+    }
+  }));
 
   const handleNextTab = () => {
     const { isValid, errors } = validation.validateForm(safeArticleInfo);
@@ -224,7 +459,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
     }
 
     onUpdate?.({
-      ...techPack,
+      ...(techPack || {}),
       articleInfo: safeArticleInfo
     });
 
@@ -233,8 +468,8 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
 
   // Calculate form completion percentage
   const completionPercentage = useMemo(() => {
-    const requiredFields = ['articleCode', 'productName', 'fabricDescription', 'productDescription'];
-    const optionalFields = ['supplier', 'technicalDesignerId', 'productClass'];
+    const requiredFields = ['articleCode', 'productName', 'fabricDescription', 'productDescription', 'supplier', 'season', 'technicalDesignerId', 'gender', 'productClass', 'fitType'];
+    const optionalFields = ['brand', 'collection', 'targetMarket', 'pricePoint', 'notes'];
 
     let totalRequired = requiredFields.length;
     let totalCompleted = 0;
@@ -246,8 +481,8 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
       }
     });
 
-    // Handle conditionally required designSketchUrl
-    const isDesignSketchRequired = ['Concept', 'Design'].includes(safeArticleInfo.lifecycleStage);
+    // Handle conditionally required designSketchUrl (only for Concept/Design stages)
+    const isDesignSketchRequired = ['Concept', 'Design'].includes(safeArticleInfo.lifecycleStage || '');
     if (isDesignSketchRequired) {
       totalRequired++;
       if (safeArticleInfo.designSketchUrl) {
@@ -306,18 +541,48 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
                 </h3>
               </div>
 
-              <Input
-                label="Article Code"
-                value={safeArticleInfo.articleCode}
-                onChange={handleInputChange('articleCode')}
-                onBlur={() => validation.setFieldTouched('articleCode')}
-                placeholder="e.g., SHRT-001-SS25"
-                required
-                maxLength={50}
-                disabled={mode === 'view'}
-                error={validation.getFieldProps('articleCode').error}
-                helperText={validation.getFieldProps('articleCode').helperText}
-              />
+              <div>
+                <Input
+                  label="Article Code"
+                  value={safeArticleInfo.articleCode}
+                  onChange={(value) => {
+                    // Auto-uppercase articleCode
+                    const upperValue = String(value).toUpperCase();
+                    handleInputChange('articleCode')(upperValue);
+                  }}
+                  onBlur={() => validation.setFieldTouched('articleCode')}
+                  placeholder="e.g., SHRT-001-SS25"
+                  required
+                  maxLength={50}
+                  disabled={mode !== 'create'}
+                  error={validation.getFieldProps('articleCode').error || (isDuplicate ? 'This article code already exists' : undefined)}
+                  helperText={
+                    checkingDuplicate 
+                      ? 'Checking availability...' 
+                      : isDuplicate 
+                        ? 'This article code is already in use' 
+                        : validation.getFieldProps('articleCode').helperText || 'Article code must be unique'
+                  }
+                />
+                {checkingDuplicate && (
+                  <div className="flex items-center text-xs text-blue-600 mt-1">
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1"></div>
+                    Checking availability...
+                  </div>
+                )}
+                {!checkingDuplicate && isDuplicate && (
+                  <div className="flex items-center text-xs text-red-600 mt-1">
+                    <AlertCircle className="w-3 h-3 mr-1" />
+                    This article code already exists
+                  </div>
+                )}
+                {!checkingDuplicate && !isDuplicate && debouncedArticleCode && debouncedArticleCode.length >= 3 && (
+                  <div className="flex items-center text-xs text-green-600 mt-1">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Article code is available
+                  </div>
+                )}
+              </div>
 
               <Input
                 label="Product Name"
@@ -332,18 +597,30 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
                 helperText={validation.getFieldProps('productName').helperText}
               />
 
-              <Input
-                label="Version"
-                value={safeArticleInfo.version}
-                onChange={handleInputChange('version')}
-                onBlur={() => validation.setFieldTouched('version')}
-                type="number"
-                min={1}
-                max={999}
-                disabled={mode === 'view'}
-                error={validation.getFieldProps('version').error}
-                helperText={validation.getFieldProps('version').helperText}
-              />
+              {/* Version - Readonly when editing/viewing */}
+              <div className="relative">
+                <Input
+                  label="Version"
+                  value={safeArticleInfo.version}
+                  onChange={handleInputChange('version')}
+                  onBlur={() => validation.setFieldTouched('version')}
+                  type="number"
+                  min={1}
+                  max={999}
+                  disabled={mode === 'view' || mode === 'edit'}
+                  error={validation.getFieldProps('version').error}
+                  helperText={
+                    (mode === 'edit' || mode === 'view') 
+                      ? 'Version is automatically managed by the system' 
+                      : validation.getFieldProps('version').helperText
+                  }
+                />
+                {(mode === 'edit' || mode === 'view') && (
+                  <div className="absolute right-3 top-8 text-gray-400">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                )}
+              </div>
 
               <Select
                 label="Gender"
@@ -396,6 +673,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
                 onChange={handleInputChange('supplier')}
                 onBlur={() => validation.setFieldTouched('supplier')}
                 placeholder="Supplier name or code"
+                required
                 maxLength={255}
                 disabled={mode === 'view'}
                 error={validation.getFieldProps('supplier').error}
@@ -437,6 +715,22 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
                 disabled={mode === 'view'}
                 error={validation.getFieldProps('lifecycleStage').error}
                 helperText={validation.getFieldProps('lifecycleStage').helperText}
+              />
+
+              {/* Status field - only editable by Admin/Merchandiser */}
+              <Select
+                label="Status"
+                value={safeArticleInfo.status || techPack?.status || 'Draft'}
+                onChange={(value) => {
+                  const updatedArticleInfo = { ...safeArticleInfo, status: value as TechPackStatus };
+                  onUpdate?.({ articleInfo: updatedArticleInfo, status: value as TechPackStatus });
+                  validation.validateField('status', value);
+                }}
+                onBlur={() => validation.setFieldTouched('status')}
+                options={statusOptions}
+                disabled={mode === 'view'}
+                error={validation.getFieldProps('status').error}
+                helperText={validation.getFieldProps('status').helperText || 'Current status of this TechPack'}
               />
 
               {/* Optional Fields */}
@@ -495,6 +789,33 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
                 helperText={validation.getFieldProps('pricePoint').helperText}
               />
 
+              {/* Currency and Retail Price */}
+              <div className="grid grid-cols-2 gap-4">
+                <Select
+                  label="Currency"
+                  value={safeArticleInfo.currency || 'USD'}
+                  onChange={handleInputChange('currency')}
+                  onBlur={() => validation.setFieldTouched('currency')}
+                  options={currencyOptions}
+                  disabled={mode === 'view'}
+                  error={validation.getFieldProps('currency').error}
+                  helperText={validation.getFieldProps('currency').helperText}
+                />
+                <Input
+                  label="Retail Price"
+                  value={safeArticleInfo.retailPrice || ''}
+                  onChange={handleInputChange('retailPrice')}
+                  onBlur={() => validation.setFieldTouched('retailPrice')}
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  placeholder="0.00"
+                  disabled={mode === 'view'}
+                  error={validation.getFieldProps('retailPrice').error}
+                  helperText={validation.getFieldProps('retailPrice').helperText}
+                />
+              </div>
+
               <div className="md:col-span-2">
                 <Textarea
                   label="Fabric Description"
@@ -531,62 +852,123 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Design Sketch
-                  {(['Concept', 'Design'].includes(safeArticleInfo.lifecycleStage)) && (
-                    <span className="text-red-500 ml-1">*</span>
-                  )}
+                  <span className="text-red-500 ml-1">*</span>
                 </label>
 
                 {mode !== 'view' && (
-                  <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-gray-400 transition-colors">
-                    <div className="space-y-1 text-center">
-                      <UploadCloud className="mx-auto h-12 w-12 text-gray-400" />
-                      <div className="flex text-sm text-gray-600">
-                        <label
-                          htmlFor="design-sketch-upload"
-                          className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
-                        >
-                          <span>Upload a design sketch</span>
-                          <input
-                            id="design-sketch-upload"
-                            name="design-sketch-upload"
-                            type="file"
-                            className="sr-only"
-                            accept="image/*"
-                            onChange={handleImageUpload}
-                            disabled={uploading}
-                          />
-                        </label>
-                        <p className="pl-1">or drag and drop</p>
-                      </div>
-                      <p className="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</p>
+                  <div
+                    className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md transition-colors ${
+                      isDragging
+                        ? 'border-blue-500 bg-blue-50'
+                        : safeArticleInfo.designSketchUrl
+                        ? 'border-green-300 bg-green-50'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                  >
+                    <div className="space-y-2 text-center w-full">
+                      {safeArticleInfo.designSketchUrl ? (
+                        <>
+                          <div className="relative inline-block">
+                            <img
+                              src={getImageUrl(safeArticleInfo.designSketchUrl)}
+                              alt="Design Sketch Preview"
+                              className="max-w-full h-auto max-h-48 rounded-lg shadow-sm border border-gray-200"
+                              onError={(e) => {
+                                // Fallback if image fails to load
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                            <button
+                              onClick={() => {
+                                handleInputChange('designSketchUrl')('');
+                                validation.validateField('designSketchUrl', '');
+                              }}
+                              className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                              title="Remove image"
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <p className="text-xs text-green-600 flex items-center justify-center">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Design sketch uploaded successfully
+                          </p>
+                          <label
+                            htmlFor="design-sketch-upload"
+                            className="text-sm text-blue-600 hover:text-blue-500 cursor-pointer underline"
+                          >
+                            Replace image
+                          </label>
+                        </>
+                      ) : (
+                        <>
+                          <UploadCloud className={`mx-auto h-12 w-12 ${isDragging ? 'text-blue-500' : 'text-gray-400'}`} />
+                          <div className="flex text-sm text-gray-600 justify-center">
+                            <label
+                              htmlFor="design-sketch-upload"
+                              className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
+                            >
+                              <span>Upload a design sketch</span>
+                              <input
+                                id="design-sketch-upload"
+                                name="design-sketch-upload"
+                                type="file"
+                                className="sr-only"
+                                accept="image/jpeg,image/jpg,image/png,image/gif,image/svg+xml"
+                                onChange={handleImageUpload}
+                                disabled={uploading}
+                              />
+                            </label>
+                            <p className="pl-1">or drag and drop</p>
+                          </div>
+                          <p className="text-xs text-gray-500">PNG, JPG, GIF, SVG up to 5MB</p>
+                        </>
+                      )}
                       {uploading && (
-                        <p className="text-xs text-blue-600">Uploading...</p>
+                        <div className="flex items-center justify-center text-xs text-blue-600">
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-2"></div>
+                          Uploading...
+                        </div>
                       )}
                       {uploadError && (
-                        <p className="text-xs text-red-600">{uploadError}</p>
+                        <p className="text-xs text-red-600 flex items-center justify-center">
+                          <AlertCircle className="w-3 h-3 mr-1" />
+                          {uploadError}
+                        </p>
                       )}
                     </div>
                   </div>
                 )}
 
-                {/* Image Preview */}
-                {safeArticleInfo.designSketchUrl && (
+                {/* Image Preview for view mode */}
+                {mode === 'view' && safeArticleInfo.designSketchUrl && (
                   <div className="mt-4 relative">
                     <img
-                      src={`${API_BASE_URL}${safeArticleInfo.designSketchUrl}`}
+                      src={getImageUrl(safeArticleInfo.designSketchUrl)}
                       alt="Design Sketch"
                       className="max-w-full h-auto max-h-64 rounded-lg shadow-sm border border-gray-200"
+                      onError={(e) => {
+                        // Fallback if image fails to load
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
                     />
-                    {mode !== 'view' && (
-                      <button
-                        onClick={() => handleInputChange('designSketchUrl')('')}
-                        className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                        title="Remove image"
-                      >
-                        <XCircle className="w-4 h-4" />
-                      </button>
-                    )}
                   </div>
+                )}
+
+                {/* Validation error display */}
+                {validation.getFieldProps('designSketchUrl').error && (
+                  <p className="mt-1 text-xs text-red-600 flex items-center">
+                    <AlertCircle className="w-3 h-3 mr-1" />
+                    {validation.getFieldProps('designSketchUrl').error}
+                  </p>
+                )}
+                {!validation.getFieldProps('designSketchUrl').error && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    {validation.getFieldProps('designSketchUrl').helperText || 'Upload a design sketch image (required)'}
+                  </p>
                 )}
               </div>
 
@@ -604,6 +986,59 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
                   helperText={validation.getFieldProps('notes').helperText}
                 />
               </div>
+
+              {/* Readonly Information Section */}
+              {(mode === 'edit' || mode === 'view') && (
+                <>
+                  <div className="md:col-span-2 mt-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                      <Lock className="w-4 h-4 mr-2 text-gray-500" />
+                      System Information (Read-only)
+                    </h3>
+                  </div>
+
+                  <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Created</label>
+                        <div className="mt-1 flex items-center text-sm text-gray-900">
+                          <Calendar className="w-4 h-4 mr-2 text-gray-400" />
+                          {safeArticleInfo.createdAt 
+                            ? new Date(safeArticleInfo.createdAt).toLocaleString()
+                            : safeArticleInfo.createdDate 
+                            ? new Date(safeArticleInfo.createdDate).toLocaleString()
+                            : 'N/A'}
+                        </div>
+                        {safeArticleInfo.createdByName && (
+                          <div className="mt-1 flex items-center text-xs text-gray-600">
+                            <User className="w-3 h-3 mr-1 text-gray-400" />
+                            by {safeArticleInfo.createdByName}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Last Modified</label>
+                        <div className="mt-1 flex items-center text-sm text-gray-900">
+                          <Calendar className="w-4 h-4 mr-2 text-gray-400" />
+                          {safeArticleInfo.updatedAt 
+                            ? new Date(safeArticleInfo.updatedAt).toLocaleString()
+                            : safeArticleInfo.lastModified 
+                            ? new Date(safeArticleInfo.lastModified).toLocaleString()
+                            : 'N/A'}
+                        </div>
+                        {safeArticleInfo.updatedByName && (
+                          <div className="mt-1 flex items-center text-xs text-gray-600">
+                            <User className="w-3 h-3 mr-1 text-gray-400" />
+                            by {safeArticleInfo.updatedByName}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
 
@@ -704,9 +1139,13 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
                 <div className="pt-4 border-t border-gray-200">
                   <h5 className="text-sm font-medium text-gray-700 mb-2">Design Sketch</h5>
                   <img
-                    src={`${API_BASE_URL}${safeArticleInfo.designSketchUrl}`}
+                    src={getImageUrl(safeArticleInfo.designSketchUrl)}
                     alt="Design Sketch Preview"
                     className="w-full h-auto max-h-32 rounded border border-gray-200 object-cover"
+                    onError={(e) => {
+                      // Fallback if image fails to load
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
                   />
                 </div>
               )}

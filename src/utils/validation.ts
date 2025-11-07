@@ -17,6 +17,83 @@ export interface ValidationError {
   message: string;
 }
 
+const FIELD_METADATA: Record<string, { label: string; tab: string }> = {
+  // Article Info Tab
+  articleCode: { label: 'Article Code', tab: 'Article Info' },
+  productName: { label: 'Product Name', tab: 'Article Info' },
+  version: { label: 'Version', tab: 'Article Info' },
+  gender: { label: 'Gender', tab: 'Article Info' },
+  productClass: { label: 'Product Class', tab: 'Article Info' },
+  fitType: { label: 'Fit Type', tab: 'Article Info' },
+  supplier: { label: 'Supplier', tab: 'Article Info' },
+  technicalDesignerId: { label: 'Technical Designer', tab: 'Article Info' },
+  fabricDescription: { label: 'Fabric Description', tab: 'Article Info' },
+  productDescription: { label: 'Product Description', tab: 'Article Info' },
+  designSketchUrl: { label: 'Design Sketch', tab: 'Article Info' },
+  season: { label: 'Season', tab: 'Article Info' },
+  lifecycleStage: { label: 'Lifecycle Stage', tab: 'Article Info' },
+  status: { label: 'Status', tab: 'Article Info' },
+  brand: { label: 'Brand', tab: 'Article Info' },
+  collection: { label: 'Collection', tab: 'Article Info' },
+  collectionName: { label: 'Collection', tab: 'Article Info' },
+  targetMarket: { label: 'Target Market', tab: 'Article Info' },
+  pricePoint: { label: 'Price Point', tab: 'Article Info' },
+  currency: { label: 'Currency', tab: 'Article Info' },
+  retailPrice: { label: 'Retail Price', tab: 'Article Info' },
+
+  // BOM Tab
+  part: { label: 'Part', tab: 'Bill of Materials' },
+  materialName: { label: 'Material Name', tab: 'Bill of Materials' },
+  materialCode: { label: 'Material Code', tab: 'Bill of Materials' },
+  supplierCode: { label: 'Supplier Code', tab: 'Bill of Materials' },
+  quantity: { label: 'Quantity', tab: 'Bill of Materials' },
+  uom: { label: 'Unit of Measure', tab: 'Bill of Materials' },
+  placement: { label: 'Placement', tab: 'Bill of Materials' },
+  size: { label: 'Size', tab: 'Bill of Materials' },
+  colorCode: { label: 'Color Code', tab: 'Bill of Materials' },
+  materialComposition: { label: 'Material Composition', tab: 'Bill of Materials' },
+  comments: { label: 'Comments', tab: 'Bill of Materials' },
+
+  // Measurements Tab
+  pomCode: { label: 'POM Code', tab: 'Measurements' },
+  pomName: { label: 'POM Name', tab: 'Measurements' },
+  minusTolerance: { label: 'Minus Tolerance', tab: 'Measurements' },
+  plusTolerance: { label: 'Plus Tolerance', tab: 'Measurements' },
+  measurement: { label: 'Measurement', tab: 'Measurements' },
+  unit: { label: 'Unit', tab: 'Measurements' },
+  category: { label: 'Category', tab: 'Measurements' },
+
+  // Colorways Tab
+  name: { label: 'Colorway Name', tab: 'Colorways' },
+  code: { label: 'Colorway Code', tab: 'Colorways' },
+  placement: { label: 'Placement', tab: 'Colorways' },
+  materialType: { label: 'Material Type', tab: 'Colorways' },
+  supplier: { label: 'Supplier', tab: 'Colorways' },
+  notes: { label: 'Notes', tab: 'Colorways' },
+  pantoneCode: { label: 'Pantone Code', tab: 'Colorways' },
+  hexCode: { label: 'Hex Code', tab: 'Colorways' },
+  colorName: { label: 'Color Name', tab: 'Colorways' },
+  description: { label: 'Description', tab: 'Colorways' },
+
+  // Construction / How To Measure Tab
+  steps: { label: 'Steps', tab: 'Construction' },
+  imageUrl: { label: 'Image URL', tab: 'Construction' },
+  videoUrl: { label: 'Video URL', tab: 'Construction' },
+  language: { label: 'Language', tab: 'Construction' },
+};
+
+function formatValidationMessage(fieldName: string, message: string): string {
+  const meta = FIELD_METADATA[fieldName];
+  if (!meta) return message;
+
+  const alreadyFormatted = message.includes(meta.label) && message.includes(meta.tab);
+  if (alreadyFormatted) {
+    return message;
+  }
+
+  return `${meta.tab} • ${meta.label}: ${message}`;
+}
+
 export interface ValidationResult {
   isValid: boolean;
   errors: ValidationError[];
@@ -54,9 +131,21 @@ export const VALIDATION_MESSAGES = {
 
 // Single field validation function
 export function validateField(value: any, rules: ValidationRule, fieldName: string): string | null {
-  // Required validation
-  if (rules.required && (value === null || value === undefined || value === '')) {
-    return VALIDATION_MESSAGES.required;
+  // If custom validation exists, run it first (it may handle required checks with custom messages)
+  if (rules.custom) {
+    const customError = rules.custom(value);
+    if (customError) {
+      return formatValidationMessage(fieldName, customError);
+    }
+    // If custom validation passes and field is empty but required, still check required
+    if (rules.required && (value === null || value === undefined || value === '')) {
+      return formatValidationMessage(fieldName, VALIDATION_MESSAGES.required);
+    }
+  } else {
+    // Required validation (only if no custom validation)
+    if (rules.required && (value === null || value === undefined || value === '')) {
+      return formatValidationMessage(fieldName, VALIDATION_MESSAGES.required);
+    }
   }
 
   // Skip other validations if field is empty and not required
@@ -68,45 +157,40 @@ export function validateField(value: any, rules: ValidationRule, fieldName: stri
 
   // Length validations
   if (rules.minLength && stringValue.length < rules.minLength) {
-    return VALIDATION_MESSAGES.minLength(rules.minLength);
+    return formatValidationMessage(fieldName, VALIDATION_MESSAGES.minLength(rules.minLength));
   }
 
   if (rules.maxLength && stringValue.length > rules.maxLength) {
-    return VALIDATION_MESSAGES.maxLength(rules.maxLength);
+    return formatValidationMessage(fieldName, VALIDATION_MESSAGES.maxLength(rules.maxLength));
   }
 
   // Numeric validations
   if (rules.min !== undefined || rules.max !== undefined) {
     const numValue = Number(value);
     if (isNaN(numValue)) {
-      return 'Must be a valid number';
+      return formatValidationMessage(fieldName, 'Must be a valid number');
     }
     if (rules.min !== undefined && numValue < rules.min) {
-      return VALIDATION_MESSAGES.min(rules.min);
+      return formatValidationMessage(fieldName, VALIDATION_MESSAGES.min(rules.min));
     }
     if (rules.max !== undefined && numValue > rules.max) {
-      return VALIDATION_MESSAGES.max(rules.max);
+      return formatValidationMessage(fieldName, VALIDATION_MESSAGES.max(rules.max));
     }
   }
 
   // Email validation
   if (rules.email && !VALIDATION_PATTERNS.email.test(stringValue)) {
-    return VALIDATION_MESSAGES.email;
+    return formatValidationMessage(fieldName, VALIDATION_MESSAGES.email);
   }
 
   // URL validation
   if (rules.url && !VALIDATION_PATTERNS.url.test(stringValue)) {
-    return VALIDATION_MESSAGES.url;
+    return formatValidationMessage(fieldName, VALIDATION_MESSAGES.url);
   }
 
   // Pattern validation
   if (rules.pattern && !rules.pattern.test(stringValue)) {
-    return VALIDATION_MESSAGES.pattern;
-  }
-
-  // Custom validation
-  if (rules.custom) {
-    return rules.custom(value);
+    return formatValidationMessage(fieldName, VALIDATION_MESSAGES.pattern);
   }
 
   return null;

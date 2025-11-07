@@ -2,44 +2,86 @@ import Redis from 'ioredis';
 import { config } from '../config/config';
 
 export class CacheService {
-  private redis: Redis;
+  private redis: Redis | null = null;
   private isConnected: boolean = false;
+  private isEnabled: boolean;
+  private connectionAttempted: boolean = false;
 
   constructor() {
-    this.redis = new Redis(config.redisUrl, {
-      maxRetriesPerRequest: 3,
-      lazyConnect: true
-    });
+    // Check if Redis is enabled via environment variable
+    this.isEnabled = process.env.REDIS_ENABLED !== 'false';
+    
+    if (!this.isEnabled) {
+      console.log('Redis caching is disabled (REDIS_ENABLED=false)');
+      return;
+    }
 
-    this.redis.on('connect', () => {
-      console.log('Redis connected');
-      this.isConnected = true;
-    });
+    try {
+      this.redis = new Redis(config.redisUrl, {
+        maxRetriesPerRequest: 3,
+        lazyConnect: true,
+        retryStrategy: (times) => {
+          // Stop retrying after 3 attempts
+          if (times > 3) {
+            console.warn('Redis connection failed after 3 attempts. Caching will be disabled.');
+            return null; // Stop retrying
+          }
+          return Math.min(times * 200, 2000);
+        },
+        enableOfflineQueue: false // Don't queue commands when disconnected
+      });
 
-    this.redis.on('error', (error) => {
-      console.error('Redis connection error:', error);
-      this.isConnected = false;
-    });
+      this.redis.on('connect', () => {
+        console.log('✅ Redis connected');
+        this.isConnected = true;
+      });
 
-    this.redis.on('close', () => {
-      console.log('Redis connection closed');
-      this.isConnected = false;
-    });
+      this.redis.on('error', (error) => {
+        // Only log error once, not on every retry
+        if (!this.connectionAttempted) {
+          console.warn('⚠️  Redis connection error. Caching will be disabled. Error:', error.message);
+          this.connectionAttempted = true;
+        }
+        this.isConnected = false;
+      });
+
+      this.redis.on('close', () => {
+        if (this.isConnected) {
+          console.log('Redis connection closed');
+        }
+        this.isConnected = false;
+      });
+    } catch (error) {
+      console.warn('⚠️  Failed to initialize Redis. Caching will be disabled.');
+      this.redis = null;
+      this.isEnabled = false;
+    }
   }
 
   /**
    * Get value from cache
    */
   async get<T>(key: string): Promise<T | null> {
+    if (!this.isEnabled || !this.redis) {
+      return null;
+    }
+
     try {
-      if (!this.isConnected) {
-        await this.redis.connect();
+      if (!this.isConnected && this.redis) {
+        await this.redis.connect().catch(() => {
+          // Connection failed, disable Redis
+          this.isEnabled = false;
+        });
+      }
+
+      if (!this.isConnected || !this.redis) {
+        return null;
       }
 
       const value = await this.redis.get(key);
       return value ? JSON.parse(value) : null;
     } catch (error) {
-      console.error('Cache get error:', error);
+      // Silently fail - caching is optional
       return null;
     }
   }
@@ -48,15 +90,25 @@ export class CacheService {
    * Set value in cache with TTL
    */
   async set(key: string, value: any, ttlSeconds: number = 3600): Promise<boolean> {
+    if (!this.isEnabled || !this.redis) {
+      return false;
+    }
+
     try {
-      if (!this.isConnected) {
-        await this.redis.connect();
+      if (!this.isConnected && this.redis) {
+        await this.redis.connect().catch(() => {
+          this.isEnabled = false;
+        });
+      }
+
+      if (!this.isConnected || !this.redis) {
+        return false;
       }
 
       await this.redis.setex(key, ttlSeconds, JSON.stringify(value));
       return true;
     } catch (error) {
-      console.error('Cache set error:', error);
+      // Silently fail - caching is optional
       return false;
     }
   }
@@ -65,15 +117,25 @@ export class CacheService {
    * Delete key from cache
    */
   async del(key: string): Promise<boolean> {
+    if (!this.isEnabled || !this.redis) {
+      return false;
+    }
+
     try {
-      if (!this.isConnected) {
-        await this.redis.connect();
+      if (!this.isConnected && this.redis) {
+        await this.redis.connect().catch(() => {
+          this.isEnabled = false;
+        });
+      }
+
+      if (!this.isConnected || !this.redis) {
+        return false;
       }
 
       await this.redis.del(key);
       return true;
     } catch (error) {
-      console.error('Cache delete error:', error);
+      // Silently fail - caching is optional
       return false;
     }
   }
@@ -82,9 +144,19 @@ export class CacheService {
    * Delete multiple keys matching pattern
    */
   async delPattern(pattern: string): Promise<boolean> {
+    if (!this.isEnabled || !this.redis) {
+      return false;
+    }
+
     try {
-      if (!this.isConnected) {
-        await this.redis.connect();
+      if (!this.isConnected && this.redis) {
+        await this.redis.connect().catch(() => {
+          this.isEnabled = false;
+        });
+      }
+
+      if (!this.isConnected || !this.redis) {
+        return false;
       }
 
       const keys = await this.redis.keys(pattern);
@@ -93,7 +165,7 @@ export class CacheService {
       }
       return true;
     } catch (error) {
-      console.error('Cache delete pattern error:', error);
+      // Silently fail - caching is optional
       return false;
     }
   }
@@ -102,15 +174,25 @@ export class CacheService {
    * Check if key exists
    */
   async exists(key: string): Promise<boolean> {
+    if (!this.isEnabled || !this.redis) {
+      return false;
+    }
+
     try {
-      if (!this.isConnected) {
-        await this.redis.connect();
+      if (!this.isConnected && this.redis) {
+        await this.redis.connect().catch(() => {
+          this.isEnabled = false;
+        });
+      }
+
+      if (!this.isConnected || !this.redis) {
+        return false;
       }
 
       const result = await this.redis.exists(key);
       return result === 1;
     } catch (error) {
-      console.error('Cache exists error:', error);
+      // Silently fail - caching is optional
       return false;
     }
   }
@@ -119,14 +201,24 @@ export class CacheService {
    * Get TTL of a key
    */
   async ttl(key: string): Promise<number> {
+    if (!this.isEnabled || !this.redis) {
+      return -1;
+    }
+
     try {
-      if (!this.isConnected) {
-        await this.redis.connect();
+      if (!this.isConnected && this.redis) {
+        await this.redis.connect().catch(() => {
+          this.isEnabled = false;
+        });
+      }
+
+      if (!this.isConnected || !this.redis) {
+        return -1;
       }
 
       return await this.redis.ttl(key);
     } catch (error) {
-      console.error('Cache TTL error:', error);
+      // Silently fail - caching is optional
       return -1;
     }
   }
@@ -135,9 +227,19 @@ export class CacheService {
    * Increment counter
    */
   async incr(key: string, ttlSeconds?: number): Promise<number> {
+    if (!this.isEnabled || !this.redis) {
+      return 0;
+    }
+
     try {
-      if (!this.isConnected) {
-        await this.redis.connect();
+      if (!this.isConnected && this.redis) {
+        await this.redis.connect().catch(() => {
+          this.isEnabled = false;
+        });
+      }
+
+      if (!this.isConnected || !this.redis) {
+        return 0;
       }
 
       const value = await this.redis.incr(key);
@@ -148,7 +250,7 @@ export class CacheService {
       
       return value;
     } catch (error) {
-      console.error('Cache increment error:', error);
+      // Silently fail - caching is optional
       return 0;
     }
   }
@@ -157,9 +259,19 @@ export class CacheService {
    * Set multiple key-value pairs
    */
   async mset(keyValuePairs: { [key: string]: any }, ttlSeconds: number = 3600): Promise<boolean> {
+    if (!this.isEnabled || !this.redis) {
+      return false;
+    }
+
     try {
-      if (!this.isConnected) {
-        await this.redis.connect();
+      if (!this.isConnected && this.redis) {
+        await this.redis.connect().catch(() => {
+          this.isEnabled = false;
+        });
+      }
+
+      if (!this.isConnected || !this.redis) {
+        return false;
       }
 
       const pipeline = this.redis.pipeline();
@@ -171,7 +283,7 @@ export class CacheService {
       await pipeline.exec();
       return true;
     } catch (error) {
-      console.error('Cache mset error:', error);
+      // Silently fail - caching is optional
       return false;
     }
   }
@@ -180,15 +292,25 @@ export class CacheService {
    * Get multiple values
    */
   async mget<T>(keys: string[]): Promise<(T | null)[]> {
+    if (!this.isEnabled || !this.redis) {
+      return keys.map(() => null);
+    }
+
     try {
-      if (!this.isConnected) {
-        await this.redis.connect();
+      if (!this.isConnected && this.redis) {
+        await this.redis.connect().catch(() => {
+          this.isEnabled = false;
+        });
+      }
+
+      if (!this.isConnected || !this.redis) {
+        return keys.map(() => null);
       }
 
       const values = await this.redis.mget(...keys);
       return values.map(value => value ? JSON.parse(value) : null);
     } catch (error) {
-      console.error('Cache mget error:', error);
+      // Silently fail - caching is optional
       return keys.map(() => null);
     }
   }
@@ -201,6 +323,11 @@ export class CacheService {
     fetchFunction: () => Promise<T>,
     ttlSeconds: number = 3600
   ): Promise<T> {
+    // If Redis is not enabled, just fetch the data
+    if (!this.isEnabled || !this.redis) {
+      return await fetchFunction();
+    }
+
     try {
       // Try to get from cache first
       const cached = await this.get<T>(key);
@@ -211,12 +338,11 @@ export class CacheService {
       // If not in cache, fetch data
       const data = await fetchFunction();
       
-      // Store in cache
+      // Store in cache (may fail silently)
       await this.set(key, data, ttlSeconds);
       
       return data;
     } catch (error) {
-      console.error('Cache getOrSet error:', error);
       // If cache fails, still return the fetched data
       return await fetchFunction();
     }
@@ -226,15 +352,25 @@ export class CacheService {
    * Flush all cache
    */
   async flushAll(): Promise<boolean> {
+    if (!this.isEnabled || !this.redis) {
+      return false;
+    }
+
     try {
-      if (!this.isConnected) {
-        await this.redis.connect();
+      if (!this.isConnected && this.redis) {
+        await this.redis.connect().catch(() => {
+          this.isEnabled = false;
+        });
+      }
+
+      if (!this.isConnected || !this.redis) {
+        return false;
       }
 
       await this.redis.flushall();
       return true;
     } catch (error) {
-      console.error('Cache flush error:', error);
+      // Silently fail - caching is optional
       return false;
     }
   }
@@ -243,15 +379,34 @@ export class CacheService {
    * Get cache info
    */
   async getInfo(): Promise<any> {
+    if (!this.isEnabled || !this.redis) {
+      return {
+        enabled: false,
+        connected: false,
+        message: 'Redis caching is disabled'
+      };
+    }
+
     try {
-      if (!this.isConnected) {
-        await this.redis.connect();
+      if (!this.isConnected && this.redis) {
+        await this.redis.connect().catch(() => {
+          this.isEnabled = false;
+        });
+      }
+
+      if (!this.isConnected || !this.redis) {
+        return {
+          enabled: true,
+          connected: false,
+          message: 'Redis is not connected'
+        };
       }
 
       const info = await this.redis.info();
       const keyCount = await this.redis.dbsize();
       
       return {
+        enabled: true,
         connected: this.isConnected,
         keyCount,
         info: info.split('\r\n').reduce((acc: any, line: string) => {
@@ -263,8 +418,8 @@ export class CacheService {
         }, {})
       };
     } catch (error) {
-      console.error('Cache info error:', error);
       return {
+        enabled: true,
         connected: false,
         error: error instanceof Error ? error.message : 'Unknown error'
       };
@@ -275,11 +430,15 @@ export class CacheService {
    * Close Redis connection
    */
   async disconnect(): Promise<void> {
+    if (!this.redis) {
+      return;
+    }
+
     try {
       await this.redis.quit();
       this.isConnected = false;
     } catch (error) {
-      console.error('Cache disconnect error:', error);
+      // Silently fail
     }
   }
 }

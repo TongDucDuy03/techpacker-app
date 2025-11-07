@@ -11,6 +11,10 @@ const HowToMeasureTab: React.FC = () => {
   const { state, addHowToMeasure, updateHowToMeasure, deleteHowToMeasure } = context ?? {};
   const { howToMeasures = [], measurements = [] } = state?.techpack ?? {};
 
+  const measurementNameMap = useMemo(() => {
+    return new Map((measurements as MeasurementPoint[]).map(m => [m.pomCode, m.pomName || '']));
+  }, [measurements]);
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<'en-US' | 'vi-VN' | 'zh-CN' | 'es-ES'>('en-US');
@@ -23,6 +27,11 @@ const HowToMeasureTab: React.FC = () => {
     steps: [],
     videoUrl: '',
     language: 'en-US',
+    pomName: '',
+    stepNumber: howToMeasures.length + 1,
+    tips: [],
+    commonMistakes: [],
+    relatedMeasurements: [],
   });
 
   const [currentStep, setCurrentStep] = useState('');
@@ -42,11 +51,29 @@ const HowToMeasureTab: React.FC = () => {
 
   // Filter how-to-measures by selected language
   const filteredHowToMeasures = useMemo(() => {
-    return howToMeasures.filter((htm: HowToMeasure) => htm.language === selectedLanguage);
-  }, [howToMeasures, selectedLanguage]);
+    return howToMeasures
+      .map((htm: HowToMeasure, index: number) => ({
+        ...htm,
+        pomName: htm.pomName || measurementNameMap.get(htm.pomCode) || '',
+        stepNumber: typeof htm.stepNumber === 'number' ? htm.stepNumber : index + 1,
+        steps: htm.steps && htm.steps.length > 0 ? htm.steps : (htm.instructions || []),
+      }))
+      .filter((htm: HowToMeasure) => htm.language === selectedLanguage);
+  }, [howToMeasures, selectedLanguage, measurementNameMap]);
 
   const handleInputChange = (field: keyof HowToMeasure) => (value: string | string[] | number) => {
-    setFormData(prev => ({ ...prev, [field]: typeof value === 'number' ? value.toString() : value }));
+    if (field === 'pomCode') {
+      const pomName = measurementNameMap.get(String(value)) || '';
+      setFormData(prev => ({
+        ...prev,
+        pomCode: String(value),
+        pomName,
+        stepNumber: prev.stepNumber ?? howToMeasures.length + 1,
+      }));
+      return;
+    }
+
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleAddStep = () => {
@@ -82,6 +109,14 @@ const HowToMeasureTab: React.FC = () => {
       steps: formData.steps || [],
       videoUrl: formData.videoUrl || '',
       language: formData.language || 'en-US',
+      pomName: formData.pomName || measurementNameMap.get(formData.pomCode!) || '',
+      stepNumber: typeof formData.stepNumber === 'number'
+        ? formData.stepNumber
+        : Number((formData as any).stepNumber) || howToMeasures.length + 1,
+      instructions: formData.steps || [],
+      tips: formData.tips || [],
+      commonMistakes: formData.commonMistakes || [],
+      relatedMeasurements: formData.relatedMeasurements || [],
     };
 
     if (editingIndex !== null) {
@@ -102,6 +137,11 @@ const HowToMeasureTab: React.FC = () => {
       steps: [],
       videoUrl: '',
       language: selectedLanguage,
+      pomName: '',
+      stepNumber: howToMeasures.length + 1,
+      tips: [],
+      commonMistakes: [],
+      relatedMeasurements: [],
     });
     setCurrentStep('');
     setShowAddForm(false);
@@ -109,7 +149,15 @@ const HowToMeasureTab: React.FC = () => {
   };
 
   const handleEdit = (howTo: HowToMeasure, index: number) => {
-    setFormData(howTo);
+    setFormData({
+      ...howTo,
+      steps: howTo.steps && howTo.steps.length > 0 ? howTo.steps : (howTo.instructions || []),
+      pomName: howTo.pomName || measurementNameMap.get(howTo.pomCode) || '',
+      stepNumber: howTo.stepNumber || (index + 1),
+      tips: howTo.tips || [],
+      commonMistakes: howTo.commonMistakes || [],
+      relatedMeasurements: howTo.relatedMeasurements || [],
+    });
     setEditingIndex(index);
     setShowAddForm(true);
   };

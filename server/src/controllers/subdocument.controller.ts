@@ -2,6 +2,9 @@ import { Response } from 'express';
 import { validationResult } from 'express-validator';
 import { Types } from 'mongoose';
 import TechPack from '../models/techpack.model';
+import Revision from '../models/revision.model';
+import RevisionService from '../services/revision.service';
+import CacheInvalidationUtil from '../utils/cache-invalidation.util';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { UserRole } from '../models/user.model';
 import { logActivity } from '../utils/activity-logger';
@@ -38,17 +41,20 @@ export class SubdocumentController {
 
       // Check access permissions based on role and sharing
       const isOwner = techpack.createdBy.toString() === user._id.toString();
-      const isTechnicalDesigner = techpack.technicalDesignerId.toString() === user._id.toString();
       const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
-      const hasEditAccess = sharedAccess?.permission === 'edit';
+      const hasEditAccess = !!sharedAccess && ['owner','admin','editor'].includes((sharedAccess as any).role);
 
-      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !hasEditAccess) {
+      // technicalDesigner does not automatically get edit rights. Only Admin, Owner, or explicit shared editors can modify.
+      if (user.role !== UserRole.Admin && !isOwner && !hasEditAccess) {
         res.status(403).json({
           success: false,
           message: 'Access denied. You do not have permission to modify this Tech Pack.'
         });
         return;
       }
+
+      // Keep a snapshot of the old techpack for revision comparison BEFORE mutation
+      const oldTechPack = techpack.toObject({ virtuals: true });
 
       // Add new BOM item
       const newBOMItem = {
@@ -59,7 +65,32 @@ export class SubdocumentController {
       techpack.bom.push(newBOMItem);
       techpack.updatedBy = user._id;
       techpack.updatedByName = `${user.firstName} ${user.lastName}`;
+
       await techpack.save();
+
+      // Create revision and invalidate cache (await to ensure subsequent GETs see fresh data)
+      try {
+        const changes = RevisionService.compareTechPacks(oldTechPack as any, techpack as any);
+        if (changes.summary && changes.summary !== 'No changes detected.' && changes.summary !== 'Error detecting changes.') {
+          const { revisionVersion } = await RevisionService.autoIncrementVersion(techpack._id as Types.ObjectId);
+          const newRevision = new Revision({
+            techPackId: techpack._id,
+            version: revisionVersion,
+            changes: { summary: changes.summary, details: changes.details, diff: changes.diffData },
+            createdBy: user._id,
+            createdByName: `${user.firstName} ${user.lastName}`,
+            description: changes.summary,
+            changeType: 'auto',
+            statusAtChange: oldTechPack.status || 'draft',
+            snapshot: techpack.toObject()
+          });
+          await newRevision.save();
+        }
+
+        await CacheInvalidationUtil.invalidateTechPackCache((techpack._id as Types.ObjectId).toString());
+      } catch (err) {
+        console.error('Subdocument revision/cache handling error (addBOMItem):', err);
+      }
 
       // Log activity
       await logActivity({
@@ -120,11 +151,10 @@ export class SubdocumentController {
 
       // Check access permissions based on role and sharing
       const isOwner = techpack.createdBy.toString() === user._id.toString();
-      const isTechnicalDesigner = techpack.technicalDesignerId.toString() === user._id.toString();
       const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
-      const hasEditAccess = sharedAccess?.permission === 'edit';
+      const hasEditAccess = !!sharedAccess && ['owner','admin','editor'].includes((sharedAccess as any).role);
 
-      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !hasEditAccess) {
+      if (user.role !== UserRole.Admin && !isOwner && !hasEditAccess) {
         res.status(403).json({
           success: false,
           message: 'Access denied. You do not have permission to modify this Tech Pack.'
@@ -141,11 +171,37 @@ export class SubdocumentController {
         });
         return;
       }
+      // Keep a snapshot of the old techpack for revision comparison BEFORE mutation
+      const oldTechPack = techpack.toObject({ virtuals: true });
 
       Object.assign(bomItem, req.body);
       techpack.updatedBy = user._id;
       techpack.updatedByName = `${user.firstName} ${user.lastName}`;
+
       await techpack.save();
+
+      try {
+        const changes = RevisionService.compareTechPacks(oldTechPack as any, techpack as any);
+        if (changes.summary && changes.summary !== 'No changes detected.' && changes.summary !== 'Error detecting changes.') {
+          const { revisionVersion } = await RevisionService.autoIncrementVersion(techpack._id as Types.ObjectId);
+          const newRevision = new Revision({
+            techPackId: techpack._id,
+            version: revisionVersion,
+            changes: { summary: changes.summary, details: changes.details, diff: changes.diffData },
+            createdBy: user._id,
+            createdByName: `${user.firstName} ${user.lastName}`,
+            description: changes.summary,
+            changeType: 'auto',
+            statusAtChange: oldTechPack.status || 'draft',
+            snapshot: techpack.toObject()
+          });
+          await newRevision.save();
+        }
+
+        await CacheInvalidationUtil.invalidateTechPackCache((techpack._id as Types.ObjectId).toString());
+      } catch (err) {
+        console.error('Subdocument revision/cache handling error (updateBOMItem):', err);
+      }
 
       // Log activity
       await logActivity({
@@ -196,11 +252,10 @@ export class SubdocumentController {
 
       // Check access permissions based on role and sharing
       const isOwner = techpack.createdBy.toString() === user._id.toString();
-      const isTechnicalDesigner = techpack.technicalDesignerId.toString() === user._id.toString();
       const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
-      const hasEditAccess = sharedAccess?.permission === 'edit';
+      const hasEditAccess = !!sharedAccess && ['owner','admin','editor'].includes((sharedAccess as any).role);
 
-      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !hasEditAccess) {
+      if (user.role !== UserRole.Admin && !isOwner && !hasEditAccess) {
         res.status(403).json({
           success: false,
           message: 'Access denied. You do not have permission to modify this Tech Pack.'
@@ -219,10 +274,38 @@ export class SubdocumentController {
       }
 
       const deletedItem = bomItem.toObject();
+
+      // Keep a snapshot of the old techpack for revision comparison BEFORE mutation
+      const oldTechPack = techpack.toObject({ virtuals: true });
+
       (techpack.bom as any).pull(bomId);
       techpack.updatedBy = user._id;
       techpack.updatedByName = `${user.firstName} ${user.lastName}`;
+
       await techpack.save();
+
+      try {
+        const changes = RevisionService.compareTechPacks(oldTechPack as any, techpack as any);
+        if (changes.summary && changes.summary !== 'No changes detected.' && changes.summary !== 'Error detecting changes.') {
+          const { revisionVersion } = await RevisionService.autoIncrementVersion(techpack._id as Types.ObjectId);
+          const newRevision = new Revision({
+            techPackId: techpack._id,
+            version: revisionVersion,
+            changes: { summary: changes.summary, details: changes.details, diff: changes.diffData },
+            createdBy: user._id,
+            createdByName: `${user.firstName} ${user.lastName}`,
+            description: changes.summary,
+            changeType: 'auto',
+            statusAtChange: oldTechPack.status || 'draft',
+            snapshot: techpack.toObject()
+          });
+          await newRevision.save();
+        }
+
+        await CacheInvalidationUtil.invalidateTechPackCache((techpack._id as Types.ObjectId).toString());
+      } catch (err) {
+        console.error('Subdocument revision/cache handling error (deleteBOMItem):', err);
+      }
 
       // Log activity
       await logActivity({
@@ -280,19 +363,22 @@ export class SubdocumentController {
         return;
       }
 
-      // Check access permissions based on role and sharing
-      const isOwner = techpack.createdBy.toString() === user._id.toString();
-      const isTechnicalDesigner = techpack.technicalDesignerId.toString() === user._id.toString();
-      const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
-      const hasEditAccess = sharedAccess?.permission === 'edit';
+  // Check access permissions based on role and sharing
+  const isOwner = techpack.createdBy.toString() === user._id.toString();
+  const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
+  const hasEditAccess = !!sharedAccess && ['owner','admin','editor'].includes((sharedAccess as any).role);
 
-      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !hasEditAccess) {
+  // technicalDesigner does NOT implicitly get edit rights. Require Admin, Owner, or explicit shared editor/admin role.
+  if (user.role !== UserRole.Admin && !isOwner && !hasEditAccess) {
         res.status(403).json({
           success: false,
           message: 'Access denied. You do not have permission to modify this Tech Pack.'
         });
         return;
       }
+
+      // Keep a snapshot of the old techpack for revision comparison BEFORE mutation
+      const oldTechPack = techpack.toObject({ virtuals: true });
 
       // Add new measurement
       const newMeasurement = {
@@ -303,7 +389,31 @@ export class SubdocumentController {
       techpack.measurements.push(newMeasurement);
       techpack.updatedBy = user._id;
       techpack.updatedByName = `${user.firstName} ${user.lastName}`;
+
       await techpack.save();
+
+      try {
+        const changes = RevisionService.compareTechPacks(oldTechPack as any, techpack as any);
+        if (changes.summary && changes.summary !== 'No changes detected.' && changes.summary !== 'Error detecting changes.') {
+          const { revisionVersion } = await RevisionService.autoIncrementVersion(techpack._id as Types.ObjectId);
+          const newRevision = new Revision({
+            techPackId: techpack._id,
+            version: revisionVersion,
+            changes: { summary: changes.summary, details: changes.details, diff: changes.diffData },
+            createdBy: user._id,
+            createdByName: `${user.firstName} ${user.lastName}`,
+            description: changes.summary,
+            changeType: 'auto',
+            statusAtChange: oldTechPack.status || 'draft',
+            snapshot: techpack.toObject()
+          });
+          await newRevision.save();
+        }
+
+        await CacheInvalidationUtil.invalidateTechPackCache((techpack._id as Types.ObjectId).toString());
+      } catch (err) {
+        console.error('Subdocument revision/cache handling error (addMeasurement):', err);
+      }
 
       // Log activity
       await logActivity({
@@ -335,8 +445,8 @@ export class SubdocumentController {
   }
 
   /**
-   * Update Measurement
-   * PUT /api/techpacks/:id/measurements/:measurementId
+      // Find and update measurement
+      const measurement = (techpack.measurements as any).id(measurementId);
    */
   async updateMeasurement(req: AuthRequest, res: Response): Promise<void> {
     try {
@@ -364,11 +474,10 @@ export class SubdocumentController {
 
       // Check access permissions based on role and sharing
       const isOwner = techpack.createdBy.toString() === user._id.toString();
-      const isTechnicalDesigner = techpack.technicalDesignerId.toString() === user._id.toString();
       const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
-      const hasEditAccess = sharedAccess?.permission === 'edit';
+      const hasEditAccess = !!sharedAccess && ['owner','admin','editor'].includes((sharedAccess as any).role);
 
-      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !hasEditAccess) {
+      if (user.role !== UserRole.Admin && !isOwner && !hasEditAccess) {
         res.status(403).json({
           success: false,
           message: 'Access denied. You do not have permission to modify this Tech Pack.'
@@ -386,10 +495,37 @@ export class SubdocumentController {
         return;
       }
 
+      // Keep a snapshot of the old techpack for revision comparison BEFORE mutation
+      const oldTechPack = techpack.toObject({ virtuals: true });
+
       Object.assign(measurement, req.body);
       techpack.updatedBy = user._id;
       techpack.updatedByName = `${user.firstName} ${user.lastName}`;
+
       await techpack.save();
+
+      try {
+        const changes = RevisionService.compareTechPacks(oldTechPack as any, techpack as any);
+        if (changes.summary && changes.summary !== 'No changes detected.' && changes.summary !== 'Error detecting changes.') {
+          const { revisionVersion } = await RevisionService.autoIncrementVersion(techpack._id as Types.ObjectId);
+          const newRevision = new Revision({
+            techPackId: techpack._id,
+            version: revisionVersion,
+            changes: { summary: changes.summary, details: changes.details, diff: changes.diffData },
+            createdBy: user._id,
+            createdByName: `${user.firstName} ${user.lastName}`,
+            description: changes.summary,
+            changeType: 'auto',
+            statusAtChange: oldTechPack.status || 'draft',
+            snapshot: techpack.toObject()
+          });
+          await newRevision.save();
+        }
+
+        await CacheInvalidationUtil.invalidateTechPackCache((techpack._id as Types.ObjectId).toString());
+      } catch (err) {
+        console.error('Subdocument revision/cache handling error (updateMeasurement):', err);
+      }
 
       // Log activity
       await logActivity({
@@ -440,11 +576,10 @@ export class SubdocumentController {
 
       // Check access permissions based on role and sharing
       const isOwner = techpack.createdBy.toString() === user._id.toString();
-      const isTechnicalDesigner = techpack.technicalDesignerId.toString() === user._id.toString();
       const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
       const hasEditAccess = sharedAccess?.permission === 'edit';
 
-      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !hasEditAccess) {
+      if (user.role !== UserRole.Admin && !isOwner && !hasEditAccess) {
         res.status(403).json({
           success: false,
           message: 'Access denied. You do not have permission to modify this Tech Pack.'
@@ -466,7 +601,31 @@ export class SubdocumentController {
       (techpack.measurements as any).pull(measurementId);
       techpack.updatedBy = user._id;
       techpack.updatedByName = `${user.firstName} ${user.lastName}`;
+      const oldTechPack = techpack.toObject({ virtuals: true });
       await techpack.save();
+
+      try {
+        const changes = RevisionService.compareTechPacks(oldTechPack as any, techpack as any);
+        if (changes.summary && changes.summary !== 'No changes detected.' && changes.summary !== 'Error detecting changes.') {
+          const { revisionVersion } = await RevisionService.autoIncrementVersion(techpack._id as Types.ObjectId);
+          const newRevision = new Revision({
+            techPackId: techpack._id,
+            version: revisionVersion,
+            changes: { summary: changes.summary, details: changes.details, diff: changes.diffData },
+            createdBy: user._id,
+            createdByName: `${user.firstName} ${user.lastName}`,
+            description: changes.summary,
+            changeType: 'auto',
+            statusAtChange: oldTechPack.status || 'draft',
+            snapshot: techpack.toObject()
+          });
+          await newRevision.save();
+        }
+
+        await CacheInvalidationUtil.invalidateTechPackCache((techpack._id as Types.ObjectId).toString());
+      } catch (err) {
+        console.error('Subdocument revision/cache handling error (deleteMeasurement):', err);
+      }
 
       // Log activity
       await logActivity({
@@ -526,11 +685,10 @@ export class SubdocumentController {
 
       // Check access permissions based on role and sharing
       const isOwner = techpack.createdBy.toString() === user._id.toString();
-      const isTechnicalDesigner = techpack.technicalDesignerId.toString() === user._id.toString();
       const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
       const hasEditAccess = sharedAccess?.permission === 'edit';
 
-      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !hasEditAccess) {
+      if (user.role !== UserRole.Admin && !isOwner && !hasEditAccess) {
         res.status(403).json({
           success: false,
           message: 'Access denied. You do not have permission to modify this Tech Pack.'
@@ -547,7 +705,31 @@ export class SubdocumentController {
       techpack.colorways.push(newColorway);
       techpack.updatedBy = user._id;
       techpack.updatedByName = `${user.firstName} ${user.lastName}`;
+      const oldTechPack = techpack.toObject({ virtuals: true });
       await techpack.save();
+
+      try {
+        const changes = RevisionService.compareTechPacks(oldTechPack as any, techpack as any);
+        if (changes.summary && changes.summary !== 'No changes detected.' && changes.summary !== 'Error detecting changes.') {
+          const { revisionVersion } = await RevisionService.autoIncrementVersion(techpack._id as Types.ObjectId);
+          const newRevision = new Revision({
+            techPackId: techpack._id,
+            version: revisionVersion,
+            changes: { summary: changes.summary, details: changes.details, diff: changes.diffData },
+            createdBy: user._id,
+            createdByName: `${user.firstName} ${user.lastName}`,
+            description: changes.summary,
+            changeType: 'auto',
+            statusAtChange: oldTechPack.status || 'draft',
+            snapshot: techpack.toObject()
+          });
+          await newRevision.save();
+        }
+
+        await CacheInvalidationUtil.invalidateTechPackCache((techpack._id as Types.ObjectId).toString());
+      } catch (err) {
+        console.error('Subdocument revision/cache handling error (addColorway):', err);
+      }
 
       // Log activity
       await logActivity({
@@ -606,13 +788,13 @@ export class SubdocumentController {
         return;
       }
 
-      // Check access permissions based on role and sharing
-      const isOwner = techpack.createdBy.toString() === user._id.toString();
-      const isTechnicalDesigner = techpack.technicalDesignerId.toString() === user._id.toString();
-      const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
-      const hasEditAccess = sharedAccess?.permission === 'edit';
+  // Check access permissions based on role and sharing
+  const isOwner = techpack.createdBy.toString() === user._id.toString();
+  const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
+  const hasEditAccess = sharedAccess?.permission === 'edit';
 
-      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !hasEditAccess) {
+  // technicalDesigner does NOT implicitly get edit rights. Require Admin, Owner, or explicit shared edit permission.
+  if (user.role !== UserRole.Admin && !isOwner && !hasEditAccess) {
         res.status(403).json({
           success: false,
           message: 'Access denied. You do not have permission to modify this Tech Pack.'
@@ -633,7 +815,31 @@ export class SubdocumentController {
       Object.assign(colorway, req.body);
       techpack.updatedBy = user._id;
       techpack.updatedByName = `${user.firstName} ${user.lastName}`;
+      const oldTechPack = techpack.toObject({ virtuals: true });
       await techpack.save();
+
+      try {
+        const changes = RevisionService.compareTechPacks(oldTechPack as any, techpack as any);
+        if (changes.summary && changes.summary !== 'No changes detected.' && changes.summary !== 'Error detecting changes.') {
+          const { revisionVersion } = await RevisionService.autoIncrementVersion(techpack._id as Types.ObjectId);
+          const newRevision = new Revision({
+            techPackId: techpack._id,
+            version: revisionVersion,
+            changes: { summary: changes.summary, details: changes.details, diff: changes.diffData },
+            createdBy: user._id,
+            createdByName: `${user.firstName} ${user.lastName}`,
+            description: changes.summary,
+            changeType: 'auto',
+            statusAtChange: oldTechPack.status || 'draft',
+            snapshot: techpack.toObject()
+          });
+          await newRevision.save();
+        }
+
+        await CacheInvalidationUtil.invalidateTechPackCache((techpack._id as Types.ObjectId).toString());
+      } catch (err) {
+        console.error('Subdocument revision/cache handling error (updateColorway):', err);
+      }
 
       // Log activity
       await logActivity({
@@ -682,13 +888,13 @@ export class SubdocumentController {
         return;
       }
 
-      // Check access permissions based on role and sharing
-      const isOwner = techpack.createdBy.toString() === user._id.toString();
-      const isTechnicalDesigner = techpack.technicalDesignerId.toString() === user._id.toString();
-      const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
-      const hasEditAccess = sharedAccess?.permission === 'edit';
+  // Check access permissions based on role and sharing
+  const isOwner = techpack.createdBy.toString() === user._id.toString();
+  const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
+  const hasEditAccess = sharedAccess?.permission === 'edit';
 
-      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !hasEditAccess) {
+  // technicalDesigner does NOT implicitly get edit rights. Require Admin, Owner, or explicit shared edit permission.
+  if (user.role !== UserRole.Admin && !isOwner && !hasEditAccess) {
         res.status(403).json({
           success: false,
           message: 'Access denied. You do not have permission to modify this Tech Pack.'
@@ -710,7 +916,31 @@ export class SubdocumentController {
       (techpack.colorways as any).pull(colorwayId);
       techpack.updatedBy = user._id;
       techpack.updatedByName = `${user.firstName} ${user.lastName}`;
+      const oldTechPack = techpack.toObject({ virtuals: true });
       await techpack.save();
+
+      try {
+        const changes = RevisionService.compareTechPacks(oldTechPack as any, techpack as any);
+        if (changes.summary && changes.summary !== 'No changes detected.' && changes.summary !== 'Error detecting changes.') {
+          const { revisionVersion } = await RevisionService.autoIncrementVersion(techpack._id as Types.ObjectId);
+          const newRevision = new Revision({
+            techPackId: techpack._id,
+            version: revisionVersion,
+            changes: { summary: changes.summary, details: changes.details, diff: changes.diffData },
+            createdBy: user._id,
+            createdByName: `${user.firstName} ${user.lastName}`,
+            description: changes.summary,
+            changeType: 'auto',
+            statusAtChange: oldTechPack.status || 'draft',
+            snapshot: techpack.toObject()
+          });
+          await newRevision.save();
+        }
+
+        await CacheInvalidationUtil.invalidateTechPackCache((techpack._id as Types.ObjectId).toString());
+      } catch (err) {
+        console.error('Subdocument revision/cache handling error (deleteColorway):', err);
+      }
 
       // Log activity
       await logActivity({

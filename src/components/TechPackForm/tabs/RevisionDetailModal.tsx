@@ -9,16 +9,8 @@ interface RevisionDetailModalProps {
 const RevisionDetailModal: React.FC<RevisionDetailModalProps> = ({ open, onClose, revision }) => {
   if (!open || !revision) return null;
 
-  // Debug logging to understand data structure
-  console.log('🔍 Revision data structure:', revision);
-  console.log('🔍 Changes object:', revision?.changes);
-  console.log[object Object]iff data:', revision?.changes?.diff);
-
   const changes = revision?.changes || {};
   const diffData = extractDiffData(revision);
-
-  console.log('🔍 Processed diffData:', diffData);
-  console.log('🔍 DiffData keys count:', Object.keys(diffData).length);
 
   const sectionChanges: string[] = (changes.details as any)?.sectionChanges || [];
 
@@ -138,8 +130,6 @@ function formatValue(val: any): string {
 
 // Helper function to extract diff data from various API response formats
 const extractDiffData = (revision: any): Record<string, { old: any; new: any }> => {
-  console.log('🔧 Extracting diff data from revision:', revision);
-
   // Try different possible locations for diff data
   const possibleSources = [
     revision?.changes?.diff,
@@ -151,7 +141,6 @@ const extractDiffData = (revision: any): Record<string, { old: any; new: any }> 
 
   for (const source of possibleSources) {
     if (source && typeof source === 'object' && Object.keys(source).length > 0) {
-      console.log('✅ Found diff data in source:', source);
       return source;
     }
   }
@@ -167,7 +156,6 @@ const extractDiffData = (revision: any): Record<string, { old: any; new: any }> 
         };
       }
     });
-    console.log('✅ Constructed diff from changes array:', diffData);
     return diffData;
   }
 
@@ -182,13 +170,11 @@ const extractDiffData = (revision: any): Record<string, { old: any; new: any }> 
         };
       }
     });
-    console.log('✅ Extracted from changeDetails:', diffData);
     return diffData;
   }
 
   // Try to construct from direct field comparisons if available
   if (revision?.fieldChanges && typeof revision.fieldChanges === 'object') {
-    console.log('✅ Found fieldChanges:', revision.fieldChanges);
     return revision.fieldChanges;
   }
 
@@ -202,13 +188,11 @@ const extractDiffData = (revision: any): Record<string, { old: any; new: any }> 
         item && typeof item === 'object' && ('old' in item || 'new' in item)
       );
       if (hasValidDiffStructure) {
-        console.log(`✅ Found diff-like structure in ${key}:`, value);
         return value;
       }
     }
   }
 
-  console.log('❌ No diff data found in revision');
   return {};
 };
 

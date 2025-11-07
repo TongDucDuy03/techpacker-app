@@ -18,6 +18,7 @@ export interface IBOMItem {
   quantity: number;
   uom: string;
   supplier: string;
+  supplierCode?: string;
   color?: string;
   pantoneCode?: string;
   unitPrice?: number;
@@ -160,6 +161,7 @@ const BOMItemSchema = new Schema<IBOMItem>({
   quantity: { type: Number, required: true, min: 0 },
   uom: { type: String, required: true },
   supplier: { type: String, required: true },
+  supplierCode: { type: String },
   color: { type: String },
   pantoneCode: { type: String },
   unitPrice: { type: Number, min: 0 },

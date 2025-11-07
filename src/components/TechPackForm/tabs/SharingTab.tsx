@@ -2,18 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ApiTechPack, TechPackRole, ShareableUser, AccessListItem } from '../../../types/techpack';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
-import {
-  User,
-  Share2,
-  Eye,
-  Trash2,
-  AlertCircle,
-  Crown,
-  Shield,
-  PenTool,
-  Factory,
-  UserPlus
-} from 'lucide-react';
+import { User, Share2, Eye, Trash2, Crown, Shield, PenTool, Factory, UserPlus } from 'lucide-react';
 import { showSuccess, showError } from '../../../lib/toast';
 
 interface SharingTabProps {
@@ -29,16 +18,12 @@ const roleIcons: { [key in TechPackRole]: React.ReactNode } = {
   [TechPackRole.Factory]: <Factory className="w-4 h-4 text-purple-500" />,
 };
 
-const roleDescriptions: { [key in TechPackRole]: string } = {
-  [TechPackRole.Owner]: 'Full access, can manage all settings and delete the Tech Pack.',
-  [TechPackRole.Admin]: 'Can edit content and manage sharing for other users.',
-  [TechPackRole.Editor]: 'Can view and edit all content in the Tech Pack.',
-  [TechPackRole.Viewer]: 'Can view all content, but cannot make changes.',
-  [TechPackRole.Factory]: 'Limited view-only access for production purposes.',
-};
+// Descriptions kept for future UI enhancements if needed
 
 const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
   const { user: currentUser } = useAuth();
+  // Normalize currentUserId: prefer `id`, then `_id`, always string
+  const currentUserId = String((currentUser as any)?.id || (currentUser as any)?._id || '');
   const [accessList, setAccessList] = useState<AccessListItem[]>([]);
   const [shareableUsers, setShareableUsers] = useState<ShareableUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,22 +31,53 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
   const [selectedUserId, setSelectedUserId] = useState('');
   const [selectedRole, setSelectedRole] = useState<TechPackRole>(TechPackRole.Viewer);
 
+  // Resolve TechPack ID from props or URL (fallback)
+  const resolvedTechpackId = useMemo(() => {
+    const directId = (techPack as any)?._id || (techPack as any)?.id || (techPack as any)?.techPackId;
+    if (directId) return String(directId);
+    try {
+      const parts = window.location.pathname.split('/').filter(Boolean);
+      const last = parts[parts.length - 1];
+      if (/^[a-fA-F0-9]{24}$/.test(last)) return last;
+    } catch {}
+    return undefined;
+  }, [techPack]);
+
   const currentUserTechPackRole = useMemo(() => {
     if (!techPack || !currentUser) return undefined;
-    // Use `createdBy` which is the actual owner ID from the backend
-    if (techPack.createdBy === currentUser._id) {
+
+    // Global Admin should have full administrative access
+    if (currentUser.role?.toLowerCase() === 'admin') {
+      return TechPackRole.Admin;
+    }
+
+    // Owner detection: handle both ObjectId and populated object
+    const createdByRaw: any = (techPack as any).createdBy;
+    const createdById = createdByRaw && typeof createdByRaw === 'object' ? createdByRaw._id : createdByRaw;
+    if (createdById && String(createdById) === String(currentUserId)) {
       return TechPackRole.Owner;
     }
-    const shared = accessList.find(item => item.userId === currentUser._id);
+
+    // Check for explicit sharing role (handle populated userId)
+    const shared = accessList.find(item => {
+      const uid: any = (item as any).userId;
+      const uidValue = uid && typeof uid === 'object' ? uid._id : uid;
+      return String(uidValue) === String(currentUserId);
+    });
     return shared?.role;
-  }, [techPack, currentUser, accessList]);
+  }, [techPack, currentUser, currentUserId, accessList]);
 
   const canManage = useMemo(() => {
+    // Global Admin should always be able to manage
+    // Check case-insensitive
+    if (currentUser?.role?.toLowerCase() === 'admin') {
+      return true;
+    }
     return currentUserTechPackRole === TechPackRole.Owner || currentUserTechPackRole === TechPackRole.Admin;
-  }, [currentUserTechPackRole]);
+  }, [currentUserTechPackRole, currentUser]);
 
   const fetchData = async () => {
-    if (!techPack?._id) {
+    if (!resolvedTechpackId) {
       setLoading(false);
       return;
     }
@@ -69,20 +85,108 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
     setLoading(true);
 
     try {
-      console.log('Fetching access list for techpack:', techPack._id);
-      const accessRes = await api.getAccessList(techPack._id);
-      const fetchedAccessList = accessRes.data || [];
-      setAccessList(fetchedAccessList);
+      console.log('🔍 Fetching access list for TechPack:', resolvedTechpackId);
+      console.log('👤 Current user:', {
+        id: currentUserId,
+        role: currentUser?.role,
+        email: currentUser?.email
+      });
+      // Debug tokens to help diagnose 401/403 issues
+      console.log('🔐 Tokens (localStorage):', {
+        accessToken: localStorage.getItem('accessToken') ? 'present' : 'missing',
+        refreshToken: localStorage.getItem('refreshToken') ? 'present' : 'missing'
+      });
+      console.log('📦 TechPack createdBy:', String((techPack as any).createdBy));
+      
+      // Fetching access list for techpack
+      let fetchedAccessList: any[] = [];
+      try {
+        const accessRes = await api.getAccessList(resolvedTechpackId);
+        fetchedAccessList = accessRes.data || [];
+        console.log('✅ Access list fetched:', fetchedAccessList);
+        setAccessList(fetchedAccessList);
+      } catch (accessErr: any) {
+        console.warn('⚠️ Failed to fetch access list, continuing if user is owner/admin:', accessErr?.message || accessErr);
+        // Reset access list locally but don't abort — we may still be able to fetch shareable users
+        fetchedAccessList = [];
+        setAccessList([]);
+      }
 
       // Determine if the current user can manage based on the fetched list
-      const userRole = techPack.createdBy === currentUser?._id
-        ? TechPackRole.Owner
-        : fetchedAccessList.find((item: AccessListItem) => item.userId === currentUser?._id)?.role;
+      let userRole;
+      if (currentUser?.role?.toLowerCase() === 'admin') {
+        userRole = TechPackRole.Admin;
+      } else {
+        const createdByRaw: any = (techPack as any).createdBy;
+        const createdById = createdByRaw && typeof createdByRaw === 'object' ? createdByRaw._id : createdByRaw;
+        if (createdById && String(createdById) === String(currentUserId)) {
+          userRole = TechPackRole.Owner;
+        } else {
+          const match = fetchedAccessList.find((item: AccessListItem) => {
+            const uid: any = (item as any).userId;
+            const uidValue = uid && typeof uid === 'object' ? uid._id : uid;
+            return String(uidValue) === String(currentUserId);
+          });
+          userRole = match?.role;
+        }
+      }
 
-      if (userRole === TechPackRole.Owner || userRole === TechPackRole.Admin) {
-        console.log('Fetching shareable users for techpack:', techPack._id);
-        const usersRes = await api.getShareableUsers(techPack._id);
-        setShareableUsers(usersRes.data || []);
+      console.log('🤔 Determined user role for sharing:', {
+        userRole,
+        isOwner: String((techPack as any).createdBy) === String(currentUserId),
+        isGlobalAdmin: currentUser?.role?.toLowerCase() === 'admin',
+        TechPackRoleOwner: TechPackRole.Owner,
+        TechPackRoleAdmin: TechPackRole.Admin,
+        comparison1: userRole === TechPackRole.Owner,
+        comparison2: userRole === TechPackRole.Admin
+      });
+
+      // Check if user can manage sharing (Owner, Admin, or Global Admin)
+      const canManageSharing = userRole === TechPackRole.Owner ||
+                              userRole === TechPackRole.Admin ||
+                              currentUser?.role?.toLowerCase() === 'admin';
+
+      console.log('🔐 Can manage sharing:', canManageSharing);
+      console.log('🔐 Conditions check:', {
+        userRole,
+        isOwner: userRole === TechPackRole.Owner,
+        isAdmin: userRole === TechPackRole.Admin,
+        isGlobalAdmin: currentUser?.role?.toLowerCase() === 'admin',
+        canManageSharing
+      });
+      // Try to fetch shareable users when:
+      // - we know the current user can manage sharing (owner/admin), OR
+      // - access list fetch failed but currentUser is owner/global admin (best-effort)
+  const shouldTryFetchShareable = Boolean(
+        canManageSharing ||
+        currentUser?.role?.toLowerCase() === 'admin' ||
+        ((): boolean => {
+          const createdByRaw: any = (techPack as any).createdBy;
+          const createdById = createdByRaw && typeof createdByRaw === 'object' ? createdByRaw._id : createdByRaw;
+          return createdById && String(createdById) === String(currentUserId);
+        })()
+      );
+
+      if (shouldTryFetchShareable) {
+        try {
+          console.log('📋 Fetching shareable users...', { techpackId: resolvedTechpackId, includeAdmins: true });
+          // Fetching shareable users for techpack (include admins to avoid empty list in small envs)
+          const usersRes = await api.getShareableUsers(resolvedTechpackId, { includeAdmins: true });
+          console.log('✅ Shareable users response:', usersRes);
+          const users = (usersRes as any).data || usersRes;
+          console.log('📋 Shareable users:', users);
+          setShareableUsers(users || []);
+          console.log('✅ setShareableUsers done, count:', Array.isArray(users) ? users.length : 0);
+        } catch (shareableError: any) {
+          console.error('❌ Could not fetch shareable users:', shareableError);
+          console.error('Error details:', {
+            message: shareableError.message,
+            response: shareableError.response?.data,
+            status: shareableError.response?.status
+          });
+          // Don't block the UI, just don't show shareable users dropdown
+          setShareableUsers([]);
+        }
       }
 
       console.log('Successfully loaded sharing data');
@@ -102,7 +206,7 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
     let isMounted = true;
 
     const loadData = async () => {
-      if (techPack?._id) {
+      if (resolvedTechpackId) {
         await fetchData();
       } else {
         // Ensure loading is false when no techpack ID
@@ -123,14 +227,16 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
     return () => {
       isMounted = false;
     };
-  }, [techPack?._id, currentUser?._id]);
+  }, [resolvedTechpackId, currentUserId]);
+
+  // Removed duplicate shareable users fetch to avoid overwriting state
 
   const handleShare = async () => {
-    if (!selectedUserId || !techPack?._id) return;
+    if (!selectedUserId || !resolvedTechpackId) return;
 
     setIsSubmitting(true);
     try {
-      await api.shareTechPack(techPack._id, { userId: selectedUserId, role: selectedRole });
+      await api.shareTechPack(resolvedTechpackId, { userId: selectedUserId, role: selectedRole });
       showSuccess('Access granted successfully.');
       setSelectedUserId('');
       setSelectedRole(TechPackRole.Viewer);
@@ -143,10 +249,10 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
   };
 
   const handleUpdateRole = async (userId: string, role: TechPackRole) => {
-    if (!techPack?._id) return;
+    if (!resolvedTechpackId) return;
 
     try {
-      await api.updateShareRole(techPack._id, userId, { role });
+      await api.updateShareRole(resolvedTechpackId, userId, { role });
       showSuccess('Role updated successfully.');
       fetchData();
     } catch (error: any) {
@@ -155,11 +261,11 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
   };
 
   const handleRevoke = async (userId: string, userName: string) => {
-    if (!techPack?._id) return;
+    if (!resolvedTechpackId) return;
     if (!window.confirm(`Are you sure you want to remove access for ${userName}?`)) return;
 
     try {
-      await api.revokeShare(techPack._id, userId);
+      await api.revokeShare(resolvedTechpackId, userId);
       showSuccess('Access removed successfully.');
       fetchData();
     } catch (error: any) {
@@ -177,12 +283,36 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
     );
   }
 
+  console.log('🔍 Debug Sharing Tab:', {
+    canManage,
+    currentUserRole: currentUser?.role,
+    currentUserRoleLowercase: currentUser?.role?.toLowerCase(),
+    currentUserTechPackRole,
+    isOwner: String((techPack as any).createdBy) === String(currentUserId),
+    userGlobalRole: currentUser?.role,
+    accessListLength: accessList.length,
+    shareableUsersLength: shareableUsers.length,
+    techpackIdForSharing: resolvedTechpackId
+  });
+
   if (!canManage) {
     return (
       <div className="p-8 text-center text-gray-500">
-        <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-        <h2 className="text-lg font-medium">Access Denied</h2>
-        <p className="mt-2">You do not have permission to manage sharing for this Tech Pack.</p>
+        <Eye className="w-12 h-12 mx-auto mb-4 text-blue-400" />
+        <h2 className="text-lg font-medium">You have view-only access to this TechPack</h2>
+        <p className="mt-2">
+          {currentUserTechPackRole === TechPackRole.Viewer
+            ? "You can view all content but cannot make changes or manage sharing."
+            : currentUserTechPackRole === TechPackRole.Editor
+            ? "You can edit content but cannot manage sharing settings."
+            : "Only the owner or administrators can manage sharing for this TechPack."
+          }
+        </p>
+        <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <p className="text-sm text-blue-700">
+            <strong>Your current role:</strong> {currentUserTechPackRole || 'No access'} (Global: {currentUser?.role})
+          </p>
+        </div>
       </div>
     );
   }
@@ -219,11 +349,15 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select a user...</option>
-              {shareableUsers.map((user) => (
-                <option key={user._id} value={user._id}>
-                  {user.firstName} {user.lastName} ({user.email})
-                </option>
-              ))}
+              {shareableUsers.length === 0 ? (
+                <option value="" disabled>No users available to share</option>
+              ) : (
+                shareableUsers.map((user) => (
+                  <option key={user._id} value={user._id}>
+                    {user.firstName} {user.lastName} ({user.email})
+                  </option>
+                ))
+              )}
             </select>
           </div>
           <div className="w-full md:w-48">
@@ -248,7 +382,31 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
           </button>
         </div>
         {shareableUsers.length === 0 && !loading && (
-          <p className="text-sm text-gray-500 mt-4">All users have been granted access.</p>
+          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-sm text-yellow-800">
+              <strong>No users available to share with.</strong>
+            </p>
+            <div className="text-xs text-yellow-600 mt-1">
+              <p>This could be because:</p>
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>All users have already been shared with this TechPack</li>
+                <li>There are no other users in the system</li>
+                <li>All users are either admins or the technical designer</li>
+              </ul>
+            </div>
+            <div className="mt-2 p-2 bg-gray-100 rounded text-xs">
+              <strong>Debug Info:</strong><br/>
+              shareableUsers.length: {shareableUsers.length}<br/>
+              canManage: {canManage.toString()}<br/>
+              currentUserRole: {currentUser?.role}<br/>
+              currentUserTechPackRole: {currentUserTechPackRole || 'undefined'}
+            </div>
+          </div>
+        )}
+        {shareableUsers.length > 0 && (
+          <p className="text-sm text-gray-500 mt-4">
+            {shareableUsers.length} user{shareableUsers.length !== 1 ? 's' : ''} available to share with.
+          </p>
         )}
       </div>
 
@@ -280,8 +438,8 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
                         <User className="w-4 h-4 text-gray-600" />
                       </div>
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{item.user.firstName} {item.user.lastName}</div>
-                        <div className="text-sm text-gray-500">{item.user.email}</div>
+                        <div className="text-sm font-medium text-gray-900">{item.user?.firstName || 'Unknown'} {item.user?.lastName || ''}</div>
+                        <div className="text-sm text-gray-500">{item.user?.email || '—'}</div>
                       </div>
                     </div>
                   </td>
@@ -292,7 +450,7 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
                         value={item.role}
                         onChange={(e) => handleUpdateRole(item.userId, e.target.value as TechPackRole)}
                         className="ml-2 capitalize border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                        disabled={item.role === TechPackRole.Owner || currentUserTechPackRole !== TechPackRole.Owner}
+                        disabled={item.role === TechPackRole.Owner || !canManage}
                       >
                         {Object.values(TechPackRole).map(role => (
                           <option key={role} value={role} disabled={role === TechPackRole.Owner}>{role}</option>
@@ -301,7 +459,7 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {item.sharedBy ? `${(item.sharedBy as any).firstName} ${(item.sharedBy as any).lastName}` : 'N/A'}
+                    {item.sharedBy ? `${(item.sharedBy as any)?.firstName || ''} ${(item.sharedBy as any)?.lastName || ''}`.trim() : 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(item.sharedAt).toLocaleDateString()}

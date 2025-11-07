@@ -2,13 +2,15 @@
 // Tech Pack Management System - TypeScript Interfaces
 // =====================================================
 
+export type TechPackStatus = 'Draft' | 'In Review' | 'Approved' | 'Rejected' | 'Archived';
+
 export interface ArticleInfo {
   id?: string;
   articleCode: string;
   productName: string;
-  version: number;
+  version: number | string; // Backend uses string 'V1', frontend can use number
   gender: 'Men' | 'Women' | 'Unisex' | 'Kids';
-  productClass: string;
+  productClass: string; // Maps to backend 'category'
   fitType: 'Regular' | 'Slim' | 'Loose' | 'Relaxed' | 'Oversized';
   supplier: string;
   technicalDesignerId: string;
@@ -17,6 +19,10 @@ export interface ArticleInfo {
   designSketchUrl?: string;
   season: 'Spring' | 'Summer' | 'Autumn' | 'Winter' | 'SS25' | 'FW25' | 'SS26' | 'FW26';
   lifecycleStage: 'Concept' | 'Design' | 'Development' | 'Pre-production' | 'Production' | 'Shipped';
+  status?: TechPackStatus; // Backend status field
+  category?: string; // Backend field name (maps to productClass)
+  currency?: string; // Default 'USD'
+  retailPrice?: number;
   createdDate: string;
   lastModified: string;
   brand?: string;
@@ -24,6 +30,13 @@ export interface ArticleInfo {
   targetMarket?: string;
   pricePoint?: 'Value' | 'Mid-range' | 'Premium' | 'Luxury';
   notes?: string;
+  // Readonly fields (from backend)
+  createdBy?: string;
+  createdByName?: string;
+  updatedBy?: string;
+  updatedByName?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface BomItem {
@@ -51,8 +64,8 @@ export interface MeasurementPoint {
   id: string;
   pomCode: string;
   pomName: string;
-  minusTolerance: string;
-  plusTolerance: string;
+  minusTolerance: number; // Changed from string to number (in cm)
+  plusTolerance: number; // Changed from string to number (in cm)
   sizes: Record<string, number>; // XS, S, M, L, XL, XXL, etc.
   notes?: string;
   measurementMethod?: string;
@@ -67,6 +80,12 @@ export interface HowToMeasure {
   steps?: string[];
   videoUrl?: string;
   language: 'en-US' | 'vi-VN' | 'zh-CN' | 'es-ES';
+  pomName?: string;
+  stepNumber?: number;
+  instructions?: string[];
+  tips?: string[];
+  commonMistakes?: string[];
+  relatedMeasurements?: string[];
 }
 
 export interface ColorwayPart {
@@ -83,13 +102,26 @@ export interface ColorwayPart {
 
 export interface Colorway {
   id: string;
-  colorwayName: string;
-  colorwayCode: string;
+  _id?: string;
+  name: string;
+  code: string;
+  placement: string;
+  materialType: string;
   season?: string;
   isDefault: boolean;
-  parts: ColorwayPart[];
   approvalStatus: 'Pending' | 'Approved' | 'Rejected';
   productionStatus: 'Lab Dip' | 'Bulk Fabric' | 'Finished';
+  pantoneCode?: string;
+  hexColor?: string;
+  rgbColor?: {
+    r: number;
+    g: number;
+    b: number;
+  };
+  supplier?: string;
+  notes?: string;
+  collectionName?: string;
+  parts: ColorwayPart[];
 }
 
 export interface RevisionEntry {
@@ -198,6 +230,7 @@ export interface ApiTechPack {
   sharedWith: SharedAccess[];
   auditLogs: AuditLogEntry[];
   isDeleted: boolean;
+  productClass?: string; // Alias được backend trả về cho category
   metadata?: {
     description?: string;
     category?: string;
@@ -427,7 +460,8 @@ export const UNITS_OF_MEASURE = [
   { value: 'inches', label: 'Inches' }
 ] as const;
 
-export const COMMON_MATERIALS = [
+// COMMON_PARTS - used for BOM part selection
+export const COMMON_PARTS = [
   'Main Fabric',
   'Lining',
   'Interfacing',
@@ -447,8 +481,20 @@ export const COMMON_MATERIALS = [
   'Piping',
   'Trim',
   'Embroidery',
-  'Print'
+  'Print',
+  'Ribbon',
+  'Cord',
+  'Hook and Loop',
+  'Buckle',
+  'D-Ring',
+  'Grommet',
+  'Stud',
+  'Tag',
+  'Hang Tag'
 ] as const;
+
+// COMMON_MATERIALS - legacy, use COMMON_PARTS instead
+export const COMMON_MATERIALS = COMMON_PARTS;
 
 export const COMMON_PLACEMENTS = [
   'Front Body',

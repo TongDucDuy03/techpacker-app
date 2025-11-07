@@ -8,6 +8,14 @@ export interface IRevisionChange {
   diff?: Record<string, { old: any; new: any }>; // Detailed field-level changes
 }
 
+export interface IRevisionComment {
+  _id?: Types.ObjectId;
+  userId: Types.ObjectId;
+  userName: string;
+  comment: string;
+  createdAt: Date;
+}
+
 export interface IRevision extends Document {
   techPackId: Types.ObjectId;
   version: string;
@@ -20,9 +28,13 @@ export interface IRevision extends Document {
   approvedBy?: Types.ObjectId;
   approvedByName?: string;
   approvedAt?: Date;
+  approvedReason?: string; // Reason for approval/rejection
+  status?: 'pending' | 'approved' | 'rejected'; // Approval status
   createdAt: Date;
   snapshot: any; // Full TechPack data at this revision
   revertedFrom?: string; // Version that was reverted from (e.g., "v1.3")
+  revertedFromId?: Types.ObjectId; // ID of revision that was reverted from
+  comments?: IRevisionComment[]; // Comments on this revision
 }
 
 const RevisionChangeSchema = new Schema<IRevisionChange>(
@@ -68,6 +80,15 @@ const RevisionSchema = new Schema<IRevision>(
     approvedAt: {
       type: Date
     },
+    approvedReason: {
+      type: String,
+      trim: true
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending'
+    },
     snapshot: {
       type: Schema.Types.Mixed,
       required: true
@@ -75,7 +96,31 @@ const RevisionSchema = new Schema<IRevision>(
     revertedFrom: {
       type: String,
       trim: true
-    }
+    },
+    revertedFromId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Revision'
+    },
+    comments: [{
+      userId: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+      },
+      userName: {
+        type: String,
+        required: true
+      },
+      comment: {
+        type: String,
+        required: true,
+        trim: true
+      },
+      createdAt: {
+        type: Date,
+        default: Date.now
+      }
+    }]
   },
   {
     timestamps: true

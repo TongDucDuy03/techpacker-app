@@ -98,10 +98,15 @@ export class TechPackPDFExporter {
 
   private generateColorwayTable() {
     return this.techpack.colorways.map(colorway => ({
-      name: colorway.colorwayName,
-      code: colorway.colorwayCode,
+      name: colorway.name,
+      code: colorway.code,
       isDefault: colorway.isDefault,
       approvalStatus: colorway.approvalStatus,
+      placement: colorway.placement,
+      materialType: colorway.materialType,
+      supplier: colorway.supplier,
+      pantoneCode: colorway.pantoneCode,
+      hexColor: colorway.hexColor,
       parts: colorway.parts.map(part => ({
         partName: part.partName,
         colorName: part.colorName,

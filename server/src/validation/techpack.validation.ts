@@ -8,8 +8,8 @@ const objectIdSchema = z.string().refine(
   { message: 'Invalid ObjectId format' }
 );
 
-// Material specification schema
-const materialSpecSchema = z.object({
+// Material specification schema (exported for potential future use)
+export const materialSpecSchema = z.object({
   name: z.string().min(1, 'Material name is required'),
   code: z.string().optional(),
   type: z.string().min(1, 'Material type is required'),

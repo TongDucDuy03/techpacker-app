@@ -227,6 +227,13 @@ const revokeValidation = [
 ];
 
 /**
+ * @route GET /api/techpacks/check-article-code/:articleCode
+ * @desc Check if article code exists (for duplicate validation)
+ * @access Private
+ */
+router.get('/check-article-code/:articleCode', requireAuth, techpackController.checkArticleCode);
+
+/**
  * @route GET /api/techpacks
  * @desc Get all TechPacks with pagination, search, and filters
  * @access Private (All authenticated users can view)

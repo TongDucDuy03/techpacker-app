@@ -196,12 +196,12 @@ Notes
 Optional: Local MongoDB + Express API
 
 1. Cài MongoDB Community Server trên máy và bật dịch vụ (URI mặc định `mongodb://127.0.0.1:27017`).
-2. Tạo file `.env` trong `server/`:
+2. Tạo file `.env` trong `server/` (mặc định API chạy cổng 4001 để khớp frontend):
 
 ```
 MONGO_URI=mongodb://127.0.0.1:27017
 DB_NAME=techpacker_app
-PORT=4000
+PORT=4001
 ```
 
 3. Chạy API server:
@@ -215,7 +215,7 @@ npm run dev
 4. Chạy frontend với biến môi trường trỏ đến API:
 
 ```
-VITE_API_BASE_URL=http://localhost:4000
+VITE_API_BASE_URL=http://localhost:4001/api/v1
 ```
 
 5. Khi `VITE_API_BASE_URL` được set, app sẽ dùng REST API (MongoDB). Nếu không, sẽ ưu tiên Supabase (nếu set) hoặc quay về `localStorage`.

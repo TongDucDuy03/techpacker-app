@@ -16,5 +16,14 @@ router.get('/techpacks/:id/revisions/compare', requireAuth, RevisionController.c
 // Revert TechPack to a previous revision (creates new revision entry)
 router.post('/revisions/revert/:techPackId/:revisionId', requireAuth, RevisionController.revertToRevision);
 
+// Add comment to a revision
+router.post('/revisions/:id/comments', requireAuth, RevisionController.addComment);
+
+// Approve a revision
+router.post('/revisions/:id/approve', requireAuth, RevisionController.approveRevision);
+
+// Reject a revision
+router.post('/revisions/:id/reject', requireAuth, RevisionController.rejectRevision);
+
 export default router;
 

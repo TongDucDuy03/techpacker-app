@@ -12,6 +12,77 @@ import { ActivityAction } from '../models/activity.model';
 import { sendSuccess, sendError, formatValidationErrors } from '../utils/response.util';
 import { Types } from 'mongoose';
 import PermissionManager from '../utils/permissions.util';
+import { cacheService, CacheKeys, CacheTTL } from '../services/cache.service';
+
+/**
+ * Helper function to merge arrays of subdocuments
+ * Handles new items (without _id) and existing items (with _id)
+ * Matches items by _id (ObjectId) or id (string) from frontend
+ */
+function mergeSubdocumentArray<T extends { _id?: Types.ObjectId; id?: string }>(
+  oldArray: T[],
+  newArray: T[]
+): T[] {
+  if (!newArray || !Array.isArray(newArray)) {
+    return oldArray || [];
+  }
+
+  // Create maps of existing items by _id and id for quick lookup
+  const existingById = new Map<string, T>();
+  const existingByStringId = new Map<string, T>();
+  
+  (oldArray || []).forEach(item => {
+    if (item._id) {
+      existingById.set(item._id.toString(), item);
+    }
+    // Also map by id string if it exists (for frontend compatibility)
+    if (item.id) {
+      existingByStringId.set(String(item.id), item);
+    }
+    // Note: _id.toString() might match id, but we still want to map by id separately
+    // for cases where frontend sends id as string representation of _id
+  });
+
+  // Process new array
+  const merged: T[] = [];
+  
+  newArray.forEach(newItem => {
+    let existingItem: T | undefined;
+    
+    // Priority 1: Try to find by _id (ObjectId) if provided
+    if (newItem._id) {
+      existingItem = existingById.get(newItem._id.toString());
+    }
+    
+    // Priority 2: Try to find by id (string) from frontend
+    if (!existingItem && newItem.id) {
+      existingItem = existingByStringId.get(String(newItem.id));
+    }
+    
+    if (existingItem) {
+      // Update existing item - preserve _id from existing item
+      const updatedItem = {
+        ...existingItem,
+        ...newItem,
+        _id: existingItem._id // Preserve original _id from database
+      };
+      // Remove temporary id if it exists (keep _id only for Mongoose)
+      delete (updatedItem as any).id;
+      merged.push(updatedItem as T);
+    } else {
+      // New item - create with new _id
+      const newItemWithId = {
+        ...newItem,
+        _id: newItem._id || new Types.ObjectId()
+      };
+      // Remove temporary id if it exists (keep _id only for Mongoose)
+      delete (newItemWithId as any).id;
+      merged.push(newItemWithId as T);
+    }
+  });
+  
+  return merged;
+}
 
 export class TechPackController {
   constructor() {
@@ -40,22 +111,54 @@ export class TechPackController {
       const limitNum = Math.min(config.maxPageSize, Math.max(1, parseInt(limit as string)));
       const skip = (pageNum - 1) * limitNum;
 
+      // Tạo cache key dựa trên query parameters và user ID
+      const queryString = JSON.stringify({
+        userId: user._id,
+        page: pageNum,
+        limit: limitNum,
+        q,
+        status,
+        season,
+        brand,
+        sortBy,
+        sortOrder
+      });
+      const cacheKey = CacheKeys.techpackList(queryString);
+
+      // Thử lấy từ cache trước
+      const cachedResult = await cacheService.get(cacheKey);
+      if (cachedResult) {
+        return sendSuccess(res, cachedResult, 'TechPacks retrieved from cache');
+      }
+
       let query: any = {};
 
-      // Base query for access control
+      // Base query for access control - Updated logic per requirements
       if (user.role === UserRole.Admin) {
-        // Admins can see all non-archived packs
-      } else if (user.role === UserRole.Designer) {
+        // Admins can see all TechPacks they own or are shared with
         query.$or = [
+          { createdBy: user._id },
+          { 'sharedWith.userId': user._id }
+        ];
+      } else if (user.role === UserRole.Designer) {
+        // Designers can see TechPacks they created, are technical designer for, or are shared with
+        query.$or = [
+          { createdBy: user._id },
           { technicalDesignerId: user._id },
           { 'sharedWith.userId': user._id }
         ];
-      } else {
-        // Other roles (Merchandiser, Viewer) are restricted by customerId and sharing
+      } else if (user.role === UserRole.Viewer) {
+        // Viewers can ONLY see TechPacks that are explicitly shared with them
+        query = { 'sharedWith.userId': user._id };
+      } else if (user.role === UserRole.Merchandiser) {
+        // Merchandisers can see TechPacks they created or are shared with
         query.$or = [
-          { customerId: user.customerId },
+          { createdBy: user._id },
           { 'sharedWith.userId': user._id }
         ];
+      } else {
+        // For any other roles, restrict to only shared TechPacks
+        query = { 'sharedWith.userId': user._id };
       }
 
       // Additional search and filter criteria
@@ -82,24 +185,82 @@ export class TechPackController {
       const [techpacks, total] = await Promise.all([
         TechPack.find(query)
           .populate('technicalDesignerId', 'firstName lastName')
+          .populate('createdBy', 'firstName lastName')
           .sort(sortOptions)
           .skip(skip)
           .limit(limitNum)
+          // Trả về tất cả các trường liên quan đến các tab
+          .select('articleCode productName brand season status category createdAt updatedAt technicalDesignerId createdBy sharedWith supplier lifecycleStage gender currency version auditLogs fabricDescription productDescription designSketchUrl bom measurements colorways howToMeasure revisionHistory sharing')
           .lean(),
         TechPack.countDocuments(query)
       ]);
 
       const pagination = { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) };
+      const result = { data: techpacks, pagination };
+
+      // Lưu kết quả vào cache với TTL ngắn (5 phút)
+      await cacheService.set(cacheKey, result, CacheTTL.SHORT);
+
       sendSuccess(res, techpacks, 'Tech packs retrieved successfully', 200, pagination);
     } catch (error: any) {
       console.error('Get TechPacks error:', error);
       sendError(res, 'Failed to retrieve tech packs');
     }
   }
+  
+  /**
+   * Check if article code exists (for duplicate validation)
+   * GET /api/v1/techpacks/check-article-code/:articleCode
+   */
+  async checkArticleCode(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { articleCode } = req.params;
+      
+      if (!articleCode || typeof articleCode !== 'string') {
+        return sendError(res, 'Article code is required', 400, 'VALIDATION_ERROR');
+      }
+
+      // Normalize to uppercase (backend stores as uppercase)
+      const normalizedCode = articleCode.toUpperCase().trim();
+
+      // Check if article code exists
+      const existing = await TechPack.findOne({ articleCode: normalizedCode }).select('_id articleCode productName').lean();
+
+      if (existing) {
+        return sendSuccess(res, { 
+          exists: true, 
+          articleCode: existing.articleCode,
+          productName: existing.productName 
+        }, 'Article code already exists');
+      }
+
+      return sendSuccess(res, { exists: false }, 'Article code is available');
+    } catch (error: any) {
+      console.error('Check article code error:', error);
+      sendError(res, 'Failed to check article code', 500);
+    }
+  }
 
   async getTechPack(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
+      const requestUser = req.user!;
+
+      // Thử lấy từ cache trước
+      const cacheKey = CacheKeys.techpack(id);
+      const cachedTechpack = await cacheService.get<any>(cacheKey);
+
+      if (cachedTechpack) {
+        // Kiểm tra quyền truy cập từ cached data
+        const isOwner = cachedTechpack.createdBy?._id?.toString() === requestUser._id.toString();
+        const isTechnicalDesigner = cachedTechpack.technicalDesignerId?._id?.toString() === requestUser._id.toString();
+        const sharedAccess = cachedTechpack.sharedWith?.find((s: any) => s.userId._id?.toString() === requestUser._id.toString());
+        const hasAccess = requestUser.role === UserRole.Admin || isOwner || isTechnicalDesigner || sharedAccess;
+
+        if (hasAccess) {
+          return sendSuccess(res, cachedTechpack, 'TechPack retrieved from cache');
+        }
+      }
 
       // Handle both ObjectId and string ID formats
       let techpack;
@@ -115,14 +276,16 @@ export class TechPackController {
         return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
       }
 
-      const user = req.user!;
-      const isOwner = techpack.createdBy?.toString() === user._id.toString();
-      const isTechnicalDesigner = techpack.technicalDesignerId?.toString() === user._id.toString();
-      const isSharedWith = techpack.sharedWith?.some(s => s.userId.toString() === user._id.toString()) || false;
+      const currentUser = req.user!;
+      const isOwner = techpack.createdBy?.toString() === currentUser._id.toString();
+      const isSharedWith = techpack.sharedWith?.some(s => s.userId.toString() === currentUser._id.toString()) || false;
 
-      if (user.role !== UserRole.Admin && !isOwner && !isTechnicalDesigner && !isSharedWith) {
+      if (currentUser.role !== UserRole.Admin && !isOwner && !isSharedWith) {
         return sendError(res, 'Access denied', 403, 'FORBIDDEN');
       }
+
+      // Lưu vào cache với TTL trung bình (30 phút)
+      await cacheService.set(cacheKey, techpack, CacheTTL.MEDIUM);
 
       sendSuccess(res, techpack);
     } catch (error: any) {
@@ -134,130 +297,173 @@ export class TechPackController {
   async createTechPack(req: AuthRequest, res: Response): Promise<void> {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      sendError(res, 'Validation failed', 400, 'VALIDATION_ERROR', formatValidationErrors(errors.array()));
-      return;
+      return sendError(res, 'Validation failed', 400, 'VALIDATION_ERROR', formatValidationErrors(errors.array()));
     }
 
     try {
-      const { articleInfo, bom, measurements, colorways, howToMeasures } = req.body;
-
-      // Ensure user is authenticated and has permission to create tech packs
       const user = req.user;
       if (!user) {
         return sendError(res, 'Authentication required', 401, 'UNAUTHORIZED');
       }
 
-      // Check if user has permission to create tech packs
       if (!PermissionManager.canCreateTechPacks(user.role)) {
         return sendError(res, 'Insufficient permissions to create tech packs', 403, 'FORBIDDEN');
       }
 
-      // Validate required fields
-      const productName = articleInfo?.productName || req.body.productName;
-      const articleCode = articleInfo?.articleCode || req.body.articleCode;
-      const supplier = articleInfo?.supplier || req.body.supplier;
-      const season = articleInfo?.season || req.body.season;
-      const fabricDescription = articleInfo?.fabricDescription || req.body.fabricDescription;
+      const { mode = 'new', sourceId, newProductName, newArticleCode, copySections = [], ...restOfBody } = req.body;
 
-      if (!productName) {
-        return sendError(res, 'Product name is required', 400, 'VALIDATION_ERROR');
-      }
-      if (!articleCode) {
-        return sendError(res, 'Article code is required', 400, 'VALIDATION_ERROR');
-      }
-      if (!supplier) {
-        return sendError(res, 'Supplier is required', 400, 'VALIDATION_ERROR');
-      }
-      if (!season) {
-        return sendError(res, 'Season is required', 400, 'VALIDATION_ERROR');
-      }
-      if (!fabricDescription) {
-        return sendError(res, 'Fabric description is required', 400, 'VALIDATION_ERROR');
-      }
-
-      // Derive status from lifecycleStage if provided
-      const lifecycleStage = articleInfo?.lifecycleStage || req.body.lifecycleStage;
-      const statusFromLifecycle = (() => {
-        switch (lifecycleStage) {
-          case 'Concept':
-          case 'Design':
-            return TechPackStatus.Draft;
-          case 'Development':
-          case 'Pre-production':
-            return TechPackStatus.InReview;
-          case 'Production':
-          case 'Shipped':
-            return TechPackStatus.Approved;
-          default:
-            return undefined;
+      if (mode === 'clone') {
+        // --- CLONE LOGIC ---
+        if (!sourceId || !newProductName || !newArticleCode) {
+          return sendError(res, 'Source ID, new product name, and new article code are required for cloning.', 400, 'VALIDATION_ERROR');
         }
-      })();
 
-      const technicalDesignerId = articleInfo?.technicalDesignerId || req.body.technicalDesignerId;
-      if (!technicalDesignerId || !Types.ObjectId.isValid(technicalDesignerId)) {
-        return sendError(res, 'A valid Technical Designer is required', 400, 'VALIDATION_ERROR');
+        const sourceTechPack = await TechPack.findById(sourceId).lean();
+        if (!sourceTechPack) {
+          return sendError(res, 'Source TechPack not found.', 404, 'NOT_FOUND');
+        }
+
+        // Build the new tech pack data from the source
+        const newTechPackData: Partial<ITechPack> = {};
+
+        // Copy sections based on the checkbox selection
+        if (copySections.includes('ArticleInfo')) {
+          Object.assign(newTechPackData, {
+            supplier: sourceTechPack.supplier,
+            season: sourceTechPack.season,
+            fabricDescription: sourceTechPack.fabricDescription,
+            productDescription: sourceTechPack.productDescription,
+            designSketchUrl: sourceTechPack.designSketchUrl,
+            category: sourceTechPack.category,
+            gender: sourceTechPack.gender,
+            brand: sourceTechPack.brand,
+            collectionName: sourceTechPack.collectionName,
+            targetMarket: sourceTechPack.targetMarket,
+            pricePoint: sourceTechPack.pricePoint,
+            retailPrice: sourceTechPack.retailPrice,
+            currency: sourceTechPack.currency,
+            description: sourceTechPack.description,
+            notes: sourceTechPack.notes,
+            technicalDesignerId: sourceTechPack.technicalDesignerId,
+          });
+        }
+        if (copySections.includes('BOM')) newTechPackData.bom = sourceTechPack.bom;
+        if (copySections.includes('Measurements')) newTechPackData.measurements = sourceTechPack.measurements;
+        if (copySections.includes('Colorways')) newTechPackData.colorways = sourceTechPack.colorways;
+        if (copySections.includes('HowToMeasure')) newTechPackData.howToMeasure = sourceTechPack.howToMeasure;
+
+        // Override with new details and reset metadata
+        Object.assign(newTechPackData, {
+          productName: newProductName,
+          articleCode: newArticleCode.toUpperCase(),
+          status: TechPackStatus.Draft,
+          version: 'v1.0',
+          createdBy: user._id,
+          createdByName: `${user.firstName} ${user.lastName}`,
+          updatedBy: user._id,
+          updatedByName: `${user.firstName} ${user.lastName}`,
+          sharedWith: [],
+          auditLogs: [],
+          revisions: [], // Revisions are not copied
+        });
+
+        const newTechPack = new TechPack(newTechPackData);
+        await newTechPack.save();
+
+        // Create an initial 'clone' revision
+        const initialRevision = new Revision({
+          techPackId: newTechPack._id,
+          version: 'v1.0',
+          changeType: 'manual', // Use 'manual' instead of 'clone' (not in enum)
+          changes: {
+            summary: `Cloned from ${sourceTechPack.productName} (v${sourceTechPack.version})`,
+            details: { clone: { cloned: 1 }, sourceId: sourceTechPack._id.toString() },
+          },
+          createdBy: user._id,
+          createdByName: `${user.firstName} ${user.lastName}`,
+          description: `Initial version created by cloning from ${sourceTechPack.articleCode}`,
+          statusAtChange: newTechPack.status,
+          snapshot: newTechPack.toObject(),
+        });
+        await initialRevision.save();
+
+        sendSuccess(res, newTechPack, 'TechPack cloned successfully', 201);
+
+      } else {
+        // --- CREATE FROM SCRATCH LOGIC (existing logic) ---
+        const { articleInfo, bom, measurements, colorways, howToMeasures } = restOfBody;
+
+        const productName = articleInfo?.productName || req.body.productName;
+        const articleCode = articleInfo?.articleCode || req.body.articleCode;
+        if (!productName || !articleCode) {
+          return sendError(res, 'Product Name and Article Code are required.', 400, 'VALIDATION_ERROR');
+        }
+
+        const techpackData = {
+          productName,
+          articleCode: articleCode.toUpperCase(),
+          version: 'v1.0',
+          supplier: articleInfo?.supplier || req.body.supplier,
+          season: articleInfo?.season || req.body.season,
+          fabricDescription: articleInfo?.fabricDescription || req.body.fabricDescription,
+          productDescription: articleInfo?.productDescription || req.body.productDescription,
+          designSketchUrl: articleInfo?.designSketchUrl || req.body.designSketchUrl,
+          technicalDesignerId: articleInfo?.technicalDesignerId || req.body.technicalDesignerId || user._id,
+          status: TechPackStatus.Draft,
+          // Additional fields from articleInfo
+          category: articleInfo?.productClass || req.body.category || req.body.productClass,
+          gender: articleInfo?.gender || req.body.gender,
+          brand: articleInfo?.brand || req.body.brand,
+          collectionName: articleInfo?.collection || articleInfo?.collectionName || req.body.collectionName,
+          targetMarket: articleInfo?.targetMarket || req.body.targetMarket,
+          pricePoint: articleInfo?.pricePoint || req.body.pricePoint,
+          retailPrice: articleInfo?.retailPrice || req.body.retailPrice,
+          currency: articleInfo?.currency || req.body.currency || 'USD',
+          description: articleInfo?.notes || articleInfo?.description || req.body.description,
+          notes: articleInfo?.notes || req.body.notes,
+          lifecycleStage: articleInfo?.lifecycleStage || req.body.lifecycleStage,
+          createdBy: user._id,
+          createdByName: `${user.firstName} ${user.lastName}`,
+          updatedBy: user._id,
+          updatedByName: `${user.firstName} ${user.lastName}`,
+          bom: bom || [],
+          measurements: measurements || [],
+          colorways: colorways || [],
+          howToMeasure: howToMeasures || [],
+          sharedWith: [],
+          auditLogs: [],
+        };
+
+        const newTechPack = await TechPack.create(techpackData);
+
+        // Create an initial revision with valid changeType and required details
+        const initialRevision = new Revision({
+          techPackId: newTechPack._id,
+          version: 'v1.0',
+          changeType: 'manual', // Use 'manual' instead of 'creation' (not in enum)
+          changes: {
+            summary: 'Initial version created.',
+            details: { creation: { created: 1 } }, // Required field
+          },
+          createdBy: user._id,
+          createdByName: `${user.firstName} ${user.lastName}`,
+          description: 'First version of the TechPack.',
+          statusAtChange: newTechPack.status,
+          snapshot: newTechPack.toObject(),
+        });
+        await initialRevision.save();
+
+        sendSuccess(res, newTechPack, 'TechPack created successfully', 201);
       }
-
-      // Map frontend data to backend format
-      const techpackData = {
-        productName,
-        articleCode: articleCode.toUpperCase(),
-        version: articleInfo?.version?.toString() || 'V1',
-        supplier,
-        season,
-        fabricDescription,
-        productDescription: articleInfo?.productDescription,
-        designSketchUrl: articleInfo?.designSketchUrl,
-        category: articleInfo?.productClass || req.body.category,
-        gender: articleInfo?.gender || req.body.gender,
-        brand: articleInfo?.brand || req.body.brand,
-        technicalDesignerId,
-        customerId: user.customerId, // Assign customerId from the user
-        lifecycleStage: lifecycleStage,
-        collectionName: articleInfo?.collection || req.body.collectionName || req.body.collection,
-        targetMarket: articleInfo?.targetMarket || req.body.targetMarket,
-        pricePoint: articleInfo?.pricePoint || req.body.pricePoint,
-        description: articleInfo?.notes || req.body.description,
-        notes: req.body.notes || articleInfo?.notes,
-        retailPrice: req.body.retailPrice ?? undefined,
-        currency: req.body.currency ?? undefined,
-        status: statusFromLifecycle || req.body.status || TechPackStatus.Draft,
-        bom: bom || [],
-        measurements: measurements || [],
-        colorways: colorways || [],
-        howToMeasure: howToMeasures || [],
-        createdBy: user._id,
-        createdByName: `${user.firstName} ${user.lastName}`,
-        updatedBy: user._id,
-        updatedByName: `${user.firstName} ${user.lastName}`,
-        sharedWith: [],
-        auditLogs: [],
-      };
-
-      console.log('Creating techpack with data:', JSON.stringify(techpackData, null, 2));
-
-      const techpack = await TechPack.create(techpackData);
-
-      // Skip activity logging for demo
-      sendSuccess(res, techpack, 'TechPack created successfully', 201);
     } catch (error: any) {
       console.error('Create TechPack error:', error);
-
-      // Handle specific MongoDB errors
       if (error.code === 11000) {
-        const field = Object.keys(error.keyValue || {})[0];
-        return sendError(res, `${field} already exists. Please use a different value.`, 409, 'DUPLICATE_KEY');
+        return sendError(res, 'Article code already exists. Please use a different value.', 409, 'DUPLICATE_KEY');
       }
-
-      // Handle Mongoose validation errors
       if (error.name === 'ValidationError') {
-        const validationErrors = Object.values(error.errors).map((err: any) => ({
-          field: err.path,
-          message: err.message
-        }));
+        const validationErrors = Object.values(error.errors).map((err: any) => ({ field: err.path, message: err.message }));
         return sendError(res, 'Validation failed', 400, 'VALIDATION_ERROR', validationErrors);
       }
-
       sendError(res, 'Failed to create tech pack');
     }
   }
@@ -328,12 +534,12 @@ export class TechPackController {
 
       // Check access permissions based on role and sharing
       const isOwner = techpack.createdBy?.toString() === user._id.toString();
-      const isTechnicalDesigner = techpack.technicalDesignerId?.toString() === user._id.toString();
-      const sharedAccess = techpack.sharedWith?.find(s => s.userId.toString() === user._id.toString());
-      const hasEditAccess = sharedAccess?.permission === 'edit';
+  const sharedAccess = techpack.sharedWith?.find(s => s.userId.toString() === user._id.toString());
+  const hasEditAccess = !!sharedAccess && ['owner','admin','editor'].includes((sharedAccess as any).role);
 
-      // For existing TechPacks without technicalDesignerId, allow the creator to edit
-      const canEdit = user.role === UserRole.Admin || isOwner || isTechnicalDesigner || hasEditAccess;
+  // IMPORTANT: technical designer should NOT implicitly receive edit permissions.
+  // Edit permission is only granted to Admin, Owner, or explicit shared edit roles.
+  const canEdit = user.role === UserRole.Admin || isOwner || hasEditAccess;
 
       if (!canEdit) {
         return sendError(res, 'Access denied. You do not have permission to edit this tech pack.', 403, 'FORBIDDEN');
@@ -354,9 +560,23 @@ export class TechPackController {
         updatedByName: `${user.firstName} ${user.lastName}`
       };
 
+      // Array fields that need special merging logic
+      const arrayFields = ['bom', 'measurements', 'colorways', 'howToMeasure'];
+
       allowedFields.forEach(field => {
         if (req.body.hasOwnProperty(field)) {
-          updateData[field] = req.body[field];
+          // Handle array fields specially - merge instead of replace
+          if (arrayFields.includes(field)) {
+            const oldArray = (techpack as any)[field] || [];
+            const newArray = req.body[field];
+            if (Array.isArray(newArray)) {
+              updateData[field] = mergeSubdocumentArray(oldArray, newArray);
+            } else {
+              updateData[field] = req.body[field];
+            }
+          } else {
+            updateData[field] = req.body[field];
+          }
         }
       });
 
@@ -384,6 +604,13 @@ export class TechPackController {
 
       // Apply user's updates to the in-memory document
       Object.assign(techpack, updateData);
+      
+      // Mark array fields as modified to ensure Mongoose saves them correctly
+      arrayFields.forEach(field => {
+        if (updateData.hasOwnProperty(field)) {
+          techpack.markModified(field);
+        }
+      });
 
       // Compare the old version with the updated in-memory version
       const changes = RevisionService.compareTechPacks(oldTechPack, techpack as ITechPack);
@@ -517,6 +744,13 @@ export class TechPackController {
       techpack.updatedByName = `${user.firstName} ${user.lastName}`;
       await techpack.save();
 
+      // Invalidate cache sau khi update
+      await Promise.all([
+        cacheService.del(CacheKeys.techpack(id)),
+        cacheService.delPattern(CacheKeys.techpackPattern(id)),
+        cacheService.delPattern('techpack:list:*') // Invalidate all list caches
+      ]);
+
       await logActivity({ userId: user._id, userName: `${user.firstName} ${user.lastName}`, action: ActivityAction.TECHPACK_DELETE, target: { type: 'TechPack', id: techpack._id as Types.ObjectId, name: techpack.productName }, req });
       sendSuccess(res, {}, 'TechPack archived successfully');
     } catch (error: any) {
@@ -537,8 +771,10 @@ export class TechPackController {
       }
 
       const isOwner = originalTechPack.createdBy?.toString() === user._id.toString();
-      const isTechnicalDesigner = originalTechPack.technicalDesignerId?.toString() === user._id.toString();
-      const hasPermission = user.role === UserRole.Admin || isOwner || isTechnicalDesigner;
+  // Duplicating a techpack is an operation akin to edit/create. Only Admin, Owner or explicitly shared editors/admins should be allowed.
+  const sharerAccess = originalTechPack.sharedWith?.find((s: any) => s.userId.toString() === user._id.toString());
+  const hasEditPermission = !!sharerAccess && ['owner','admin','editor'].includes(sharerAccess.role);
+  const hasPermission = user.role === UserRole.Admin || isOwner || hasEditPermission;
 
       if (!hasPermission) {
         return sendError(res, 'Access denied. You do not have permission to duplicate this tech pack.', 403, 'FORBIDDEN');
@@ -823,9 +1059,12 @@ export class TechPackController {
         return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
       }
 
+      // Global Admin always has access
       // Check if user has permission to share
       const isOwner = techpack.createdBy?.toString() === user._id.toString();
       const userAccess = techpack.sharedWith?.find(s => s.userId.toString() === user._id.toString());
+      
+      // Global Admin OR Owner OR Shared Admin can share
       const canShare = user.role === UserRole.Admin || isOwner ||
                       (userAccess && ['admin'].includes(userAccess.role));
 
@@ -844,11 +1083,68 @@ export class TechPackController {
         ...(techpack.sharedWith?.map(s => s.userId.toString()) || [])
       ].filter(Boolean);
 
-      const shareableUsers = await User.find({
+      console.log('🔍 Debug shareable users filters:', {
+        currentUserId: user._id.toString(),
+        currentUserRole: user.role,
+        techpackId: (techpack._id as any).toString(),
+        techpackCreatedBy: techpack.createdBy?.toString(),
+        technicalDesignerId: techpack.technicalDesignerId?.toString(),
+        sharedWithCount: techpack.sharedWith?.length || 0,
+        excludedUserIds,
+        excludedCount: excludedUserIds.length
+      });
+
+      // First, let's see total users in system
+      const totalUsers = await User.countDocuments({ isActive: true });
+      console.log('📊 Total active users in system:', totalUsers);
+
+      // Check users by role
+      const usersByRole = await User.aggregate([
+        { $match: { isActive: true } },
+        { $group: { _id: '$role', count: { $sum: 1 } } }
+      ]);
+      console.log('👥 Users by role:', usersByRole);
+
+  // Parse query params to booleans explicitly
+  const includeAdmins = String((req.query || {}).includeAdmins || 'false') === 'true';
+  const includeAll = String((req.query || {}).includeAll || 'false') === 'true';
+
+      // Build base filters
+      const baseFilters: any = {
         _id: { $nin: excludedUserIds },
-        role: { $ne: UserRole.Admin },
         isActive: true
-      }).select('firstName lastName email role').lean();
+      };
+
+      // includeAll=true returns everyone except current/excluded
+      if (!includeAll) {
+        // By default, exclude admins unless explicitly included
+        if (!includeAdmins) {
+          baseFilters.role = { $ne: UserRole.Admin };
+        }
+      }
+
+      let shareableUsers = await User.find({
+        ...baseFilters
+      }).select('firstName lastName email role').limit(100).lean();
+
+      // Fallback: if still empty and includeAll not requested, try including admins
+      if (!shareableUsers.length && !includeAll && !includeAdmins) {
+        console.log('ℹ️ No non-admin shareable users found, applying admin-included fallback');
+        shareableUsers = await User.find({
+          _id: { $nin: excludedUserIds },
+          isActive: true
+        }).select('firstName lastName email role').limit(100).lean();
+      }
+
+      console.log('✅ Found shareable users:', {
+        count: shareableUsers.length,
+        users: shareableUsers.map(u => ({
+          id: u._id,
+          name: `${u.firstName} ${u.lastName}`,
+          email: u.email,
+          role: u.role
+        }))
+      });
 
       sendSuccess(res, shareableUsers, 'Shareable users retrieved successfully');
     } catch (error: any) {
@@ -867,9 +1163,12 @@ export class TechPackController {
         return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
       }
 
+      // Global Admin always has access
       // Check if user has permission to view access list
       const isOwner = techpack.createdBy?.toString() === user._id.toString();
       const userAccess = techpack.sharedWith?.find(s => s.userId.toString() === user._id.toString());
+      
+      // Global Admin OR Owner OR Shared Admin can view
       const canView = user.role === UserRole.Admin || isOwner ||
                      (userAccess && ['admin'].includes(userAccess.role));
 
@@ -883,13 +1182,17 @@ export class TechPackController {
           const sharedUser = await User.findById(share.userId).select('firstName lastName email role');
           const sharedByUser = share.sharedBy ? await User.findById(share.sharedBy).select('firstName lastName email') : null;
 
+          // Fallbacks when user records were deleted or missing
+          const sharedUserFallback = sharedUser || { firstName: 'Unknown', lastName: '', email: '', role: 'viewer' };
+          const sharedByFallback = sharedByUser || null;
+
           return {
             userId: share.userId.toString(),
             role: share.role,
             permission: share.permission || 'view', // Backward compatibility
             sharedAt: share.sharedAt,
-            sharedBy: sharedByUser,
-            user: sharedUser
+            sharedBy: sharedByFallback,
+            user: sharedUserFallback
           };
         })
       );

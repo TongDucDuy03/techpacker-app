@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
-import { TechPack, TechPackListResponse, CreateTechPackInput, BulkOperationPayload, ApiTechPack } from '../types/techpack';
+import { TechPackListResponse, CreateTechPackInput, ApiTechPack } from '../types/techpack';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001/api/v1';
 
@@ -49,37 +49,64 @@ class ApiClient {
     this.axiosInstance.interceptors.request.use(
       (config) => {
         const token = this.getAccessToken();
+        console.log('🔐 Request interceptor - Token exists:', !!token);
+        console.log('🌐 Request URL:', config.url);
+
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
+          console.log('✅ Authorization header added to request');
+        } else {
+          console.log('⚠️ No token available for request');
         }
         return config;
       },
-      (error) => Promise.reject(error)
+      (error) => {
+        console.error('❌ Request interceptor error:', error);
+        return Promise.reject(error);
+      }
     );
 
     // Response interceptor for error handling and token refresh
     this.axiosInstance.interceptors.response.use(
-      (response: AxiosResponse<ApiResponse>) => response,
+      (response: AxiosResponse<ApiResponse>) => {
+        console.log('✅ API Response successful:', response.config.url, response.status);
+        return response;
+      },
       async (error: AxiosError<ApiError>) => {
         const originalRequest = error.config as any;
+        console.log('❌ API Response error:', {
+          url: originalRequest?.url,
+          status: error.response?.status,
+          message: error.response?.data?.message,
+          hasAuthHeader: !!originalRequest?.headers?.Authorization
+        });
 
         // Don't try to refresh token for login/register requests
         const isAuthRequest = originalRequest?.url?.includes('/auth/login') ||
                              originalRequest?.url?.includes('/auth/register');
 
         if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
+          console.log('🔄 Attempting token refresh for 401 error');
           originalRequest._retry = true;
 
           try {
             const newToken = await this.refreshAccessToken();
             if (newToken && originalRequest) {
+              console.log('✅ Token refreshed, retrying request');
               originalRequest.headers.Authorization = `Bearer ${newToken}`;
               return this.axiosInstance(originalRequest);
             }
           } catch (refreshError) {
+            console.log('❌ Token refresh failed:', refreshError);
             this.handleAuthError();
             return Promise.reject(refreshError);
           }
+        }
+
+        // For 401 errors on auth requests or when refresh fails
+        if (error.response?.status === 401) {
+          console.log('🔐 401 Unauthorized - handling auth error');
+          this.handleAuthError();
         }
 
         return Promise.reject(this.formatError(error));
@@ -142,10 +169,14 @@ class ApiClient {
   }
 
   private handleAuthError() {
+    console.log('🔐 Handling authentication error - clearing tokens');
     this.clearTokens();
     // Only redirect if not already on login page
     if (window.location.pathname !== '/login') {
+      console.log('🔄 Redirecting to login page');
       window.location.href = '/login';
+    } else {
+      console.log('ℹ️ Already on login page, not redirecting');
     }
     console.error('Authentication error. Redirecting to login.');
   }
@@ -208,10 +239,19 @@ class ApiClient {
 
   // Authentication methods
   async login(email: string, password: string): Promise<{ user: any; tokens: any }> {
-    const response = await this.axiosInstance.post<ApiResponse<{ user: any; tokens: any }>>('/auth/login', {
-      email,
-      password,
-    });
+    const payload = { email, password };
+
+    const response = await this.axiosInstance.post<ApiResponse<{ user: any; tokens: any }>>(
+      '/auth/login',
+      payload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        transformRequest: [(data) => JSON.stringify(data)],
+      }
+    );
 
     const responseData = response.data?.data ?? {};
     const { user, tokens } = responseData;
@@ -233,18 +273,10 @@ class ApiClient {
     username: string;
     role?: string;
   }): Promise<{ user: any; tokens: any }> {
-    const response = await this.axiosInstance.post<ApiResponse<{ user: any; tokens: any }>>('/auth/register', userData);
-
-    const responseData = response.data?.data ?? {};
-    const { user, tokens } = responseData;
-
-    if (!user || !tokens?.accessToken || !tokens?.refreshToken) {
-      throw new Error('Invalid registration response');
-    }
-
-    this.setTokens(tokens.accessToken, tokens.refreshToken);
-
-    return { user, tokens };
+    // Public registration has been disabled in this deployment. Users must be created by an Admin
+    // via the Admin panel. This client-side method is intentionally disabled to avoid accidental
+    // calls to a removed endpoint.
+    throw new Error('Registration is disabled. Please ask an admin to create an account.');
   }
 
   async logout(): Promise<void> {
@@ -280,13 +312,13 @@ class ApiClient {
   // Tech Pack methods
   async listTechPacks(params: { page?: number; limit?: number; q?: string; status?: string; designer?: string; } = {}): Promise<TechPackListResponse> {
     console.log('📡 API: listTechPacks called with params:', params);
-    const response = await this.axiosInstance.get<ApiResponse<TechPack[]>>('/techpacks', { params });
+    const response = await this.axiosInstance.get<ApiResponse<ApiTechPack[]>>('/techpacks', { params });
     console.log('📡 API: Raw response:', response.data);
-    const responseData = response.data ?? {};
+    const responseData = response.data ?? {} as any;
     const { data = [], pagination } = responseData;
 
-    const result = {
-      data,
+    const result: TechPackListResponse = {
+      data: data as ApiTechPack[],
       total: pagination?.total || 0,
       page: pagination?.page || 1,
       totalPages: pagination?.totalPages || 1,
@@ -304,6 +336,24 @@ class ApiClient {
     return techPack;
   }
 
+  async cloneTechPack(config: {
+    sourceId: string;
+    newProductName: string;
+    newArticleCode: string;
+    season?: string;
+    copySections: string[];
+  }): Promise<ApiTechPack> {
+    const response = await this.axiosInstance.post<ApiResponse<ApiTechPack>>('/techpacks', {
+      mode: 'clone',
+      ...config
+    });
+    const techPack = response.data?.data;
+    if (!techPack) {
+      throw new Error('Invalid clone tech pack response');
+    }
+    return techPack;
+  }
+
   async getTechPack(id: string): Promise<ApiTechPack> {
     const response = await this.axiosInstance.get<ApiResponse<ApiTechPack>>(`/techpacks/${id}`);
     const techPack = response.data?.data;
@@ -315,12 +365,9 @@ class ApiClient {
 
   async updateTechPack(id: string, data: Partial<ApiTechPack>): Promise<ApiTechPack> {
     const response = await this.axiosInstance.put<ApiResponse<any>>(`/techpacks/${id}`, data);
-    // Backend may return one of:
-    // - { success, message, data: TechPack }
-    // - { success, message, data: { techpack, revisionCreated } }
-    // - { success, message, updatedTechPack, revisionCreated }
-    const root = response.data ?? {};
-    const payload = root.data ?? root;
+    // Backend may return one of various shapes; normalize defensively
+    const root = response.data ?? {} as any;
+    const payload: any = root.data ?? root;
     const techPack = payload.techpack ?? payload.updatedTechPack ?? payload;
     if (!techPack || (techPack && techPack.success !== undefined)) {
       // If we accidentally captured the wrapper, log and throw
@@ -333,7 +380,7 @@ class ApiClient {
   async patchTechPack(id: string, data: Partial<ApiTechPack>): Promise<ApiTechPack> {
     const response = await this.axiosInstance.patch<ApiResponse<any>>(`/techpacks/${id}`, data);
     // Support both legacy and new response shapes
-    const payload = response.data ?? {};
+    const payload: any = response.data ?? {};
     const updatedTechPack = payload.updatedTechPack ?? payload.data?.techpack ?? payload.data;
     if (!updatedTechPack) {
       console.error('Invalid patch tech pack response received:', response.data);
@@ -356,9 +403,9 @@ class ApiClient {
     return techPack;
   }
 
-  async bulkOperations(data: BulkOperationPayload): Promise<{ message: string; modifiedCount: number }> {
+  async bulkOperations(data: any): Promise<{ message: string; modifiedCount: number }> {
     const response = await this.axiosInstance.patch<ApiResponse<{ modifiedCount: number }>>('/techpacks/bulk', data);
-    const responseData = response.data ?? {};
+    const responseData: any = response.data ?? {};
     return {
       message: responseData.message || 'Bulk operation completed',
       modifiedCount: responseData.data?.modifiedCount || 0
@@ -470,10 +517,27 @@ class ApiClient {
   getRevision = (revisionId: string): Promise<any> => this.get(`/revisions/${revisionId}`);
   compareRevisions = (techPackId: string, from: string, to: string): Promise<any> => this.get(`/techpacks/${techPackId}/revisions/compare`, { params: { from, to } });
 
+  // Revert API with reason
+  revertToRevision = async (techPackId: string, revisionId: string, reason?: string): Promise<ApiResponse<any>> => {
+    const response = await this.axiosInstance.post<ApiResponse<any>>(`/revisions/revert/${techPackId}/${revisionId}`, { reason });
+    return response.data;
+  };
 
-  // New revert API method
-  revertToRevision = async (techPackId: string, revisionId: string): Promise<ApiResponse<any>> => {
-    const response = await this.axiosInstance.post<ApiResponse<any>>(`/revisions/revert/${techPackId}/${revisionId}`);
+  // Add comment to revision
+  addRevisionComment = async (revisionId: string, comment: string): Promise<ApiResponse<any>> => {
+    const response = await this.axiosInstance.post<ApiResponse<any>>(`/revisions/${revisionId}/comments`, { comment });
+    return response.data;
+  };
+
+  // Approve revision
+  approveRevision = async (revisionId: string, reason?: string): Promise<ApiResponse<any>> => {
+    const response = await this.axiosInstance.post<ApiResponse<any>>(`/revisions/${revisionId}/approve`, { reason });
+    return response.data;
+  };
+
+  // Reject revision
+  rejectRevision = async (revisionId: string, reason: string): Promise<ApiResponse<any>> => {
+    const response = await this.axiosInstance.post<ApiResponse<any>>(`/revisions/${revisionId}/reject`, { reason });
     return response.data;
   };
 
@@ -483,9 +547,18 @@ class ApiClient {
     return response.data;
   }
 
-  async getShareableUsers(techPackId: string): Promise<any> {
-    const response = await this.axiosInstance.get(`/techpacks/${techPackId}/shareable-users`);
-    return response.data;
+  async getShareableUsers(techPackId: string, opts: { includeAdmins?: boolean; includeAll?: boolean } = {}): Promise<any> {
+    const params: any = {};
+    if (opts.includeAdmins) params.includeAdmins = true;
+    if (opts.includeAll) params.includeAll = true;
+    const response = await this.axiosInstance.get(`/techpacks/${techPackId}/shareable-users`, { params });
+    // Normalize: ensure we always return an array of users regardless of wrapper shape
+    const root = response.data ?? {};
+    if (Array.isArray(root)) return root;
+    if (Array.isArray(root.data)) return root.data;
+    // If server returned wrapper { success, data: [...] } or { data: [...] }
+    // fallback to empty array to avoid UI crashes
+    return [];
   }
 
   async shareTechPack(techPackId: string, data: { userId: string; role: string }): Promise<any> {

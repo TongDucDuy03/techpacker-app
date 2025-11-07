@@ -93,11 +93,29 @@ export class PDFController {
       const filename = result.data?.filename || `${techpack.articleCode}_${techpack.version}.pdf`;
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.setHeader('Content-Length', result.data?.size || 0);
-      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Cache-Control', 'private, max-age=3600'); // Cache for 1 hour
 
-      // Send PDF buffer
-      res.send(result.data?.buffer);
+      // Stream PDF buffer để tối ưu memory usage
+      if (result.data?.buffer) {
+        if (result.data.size) {
+          res.setHeader('Content-Length', result.data.size);
+        }
+
+        // Stream the buffer in chunks để tránh memory issues với large files
+        const chunkSize = 64 * 1024; // 64KB chunks
+        const buffer = result.data.buffer;
+
+        for (let i = 0; i < buffer.length; i += chunkSize) {
+          const chunk = buffer.slice(i, i + chunkSize);
+          res.write(chunk);
+        }
+        res.end();
+      } else {
+        res.status(500).json({
+          success: false,
+          message: 'PDF generation failed - no buffer returned'
+        });
+      }
 
     } catch (error: any) {
       console.error('PDF export error:', error);

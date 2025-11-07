@@ -27,7 +27,7 @@ export const config = {
   // CORS - Support multiple origins
   corsOrigin: process.env.CORS_ORIGIN ?
     process.env.CORS_ORIGIN.split(',').map(origin => origin.trim()) :
-    ['http://localhost:5173', 'http://localhost:5174'],
+    ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
 
   // Rate Limiting
   rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15 minutes
