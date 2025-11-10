@@ -17,7 +17,6 @@ export const sendSuccess = <T>(
 ): void => {
   // Ensure we don't send a response if headers are already sent
   if (res.headersSent) {
-    console.error('Attempted to send success response after headers were sent:', { message, statusCode });
     return;
   }
 
@@ -29,7 +28,6 @@ export const sendSuccess = <T>(
     response.pagination = pagination;
   }
 
-  console.log('Sending success response:', { statusCode, message });
   res.status(statusCode).json(response);
 };
 
@@ -47,7 +45,6 @@ export const sendError = (
 ): void => {
   // Ensure we don't send a response if headers are already sent
   if (res.headersSent) {
-    console.error('Attempted to send error response after headers were sent:', { message, statusCode, code });
     return;
   }
 
@@ -63,7 +60,6 @@ export const sendError = (
     },
   };
 
-  console.log('Sending error response:', { statusCode, message, code });
   res.status(statusCode).json(response);
 };
 

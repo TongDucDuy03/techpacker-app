@@ -69,6 +69,12 @@ UserSchema.methods.comparePassword = async function (password: string): Promise<
   return bcrypt.compare(password, this.password);
 };
 
+// Indexes for performance
+// Note: `email` field already has `unique: true` which creates an index.
+// Avoid declaring a duplicate index here to prevent Mongoose warnings.
+UserSchema.index({ role: 1, isActive: 1 }); // Common filter pattern
+UserSchema.index({ isActive: 1 }); // Active users filter
+
 const User = model<IUser>('User', UserSchema);
 
 export default User;

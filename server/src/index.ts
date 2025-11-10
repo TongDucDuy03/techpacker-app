@@ -157,11 +157,7 @@ async function startServer() {
 
     // Start HTTP server
     app.listen(config.port, '0.0.0.0', () => {
-      console.log(`🚀 TechPacker API running on http://localhost:${config.port}`);
-      console.log(`📝 Environment: ${config.nodeEnv}`);
-      console.log(`🗄️  Database: Connected`);
-      console.log(`📊 Health check: http://localhost:${config.port}/health`);
-      console.log(`📚 API Documentation: http://localhost:${config.port}/api/docs`);
+      // Server started successfully
     });
   } catch (error) {
     console.error('Failed to start server:', error);

@@ -14,6 +14,7 @@ import { Types } from 'mongoose';
 import PermissionManager from '../utils/permissions.util';
 import { cacheService, CacheKeys, CacheTTL } from '../services/cache.service';
 import _ from 'lodash';
+import { hasEditAccess, getEffectiveRole } from '../utils/access-control.util';
 
 /**
  * Helper function to merge arrays of subdocuments
@@ -183,6 +184,7 @@ export class TechPackController {
 
       const sortOptions: any = { [sortBy as string]: sortOrder === 'asc' ? 1 : -1 };
 
+      // Optimize: Only select fields needed for list view, exclude heavy nested arrays
       const [techpacks, total] = await Promise.all([
         TechPack.find(query)
           .populate('technicalDesignerId', 'firstName lastName')
@@ -190,8 +192,7 @@ export class TechPackController {
           .sort(sortOptions)
           .skip(skip)
           .limit(limitNum)
-          // Trả về tất cả các trường liên quan đến các tab
-          .select('articleCode productName brand season status category createdAt updatedAt technicalDesignerId createdBy sharedWith supplier lifecycleStage gender currency version auditLogs fabricDescription productDescription designSketchUrl bom measurements colorways howToMeasure revisionHistory sharing')
+          .select('articleCode productName brand season status category createdAt updatedAt technicalDesignerId createdBy sharedWith supplier lifecycleStage gender currency version fabricDescription productDescription designSketchUrl')
           .lean(),
         TechPack.countDocuments(query)
       ]);
@@ -267,7 +268,7 @@ export class TechPackController {
       let techpack;
       try {
         techpack = await TechPack.findById(id)
-          .populate('technicalDesignerId createdBy updatedBy sharedWith.userId', 'firstName lastName email')
+          .populate('technicalDesignerId createdBy updatedBy sharedWith.userId', 'firstName lastName email role')
           .lean();
       } catch (error) {
         techpack = null;
@@ -283,6 +284,56 @@ export class TechPackController {
 
       if (currentUser.role !== UserRole.Admin && !isOwner && !isSharedWith) {
         return sendError(res, 'Access denied', 403, 'FORBIDDEN');
+      }
+
+      // Normalize roles in sharedWith based on Global Role Override
+      // This ensures old data with invalid roles is automatically corrected at logic layer
+      // No database migration needed - just fix when loading
+      if (techpack.sharedWith && Array.isArray(techpack.sharedWith)) {
+        // Collect any audit entries we need to persist if we change stored roles
+        const auditEntries: any[] = [];
+        for (const share of techpack.sharedWith) {
+          const sharedUser = share.userId as any;
+          if (sharedUser && sharedUser.role) {
+            const originalRole = share.role;
+            const effectiveRole = getEffectiveRole(sharedUser.role, share.role);
+            if (effectiveRole !== originalRole) {
+              // Auto-downgrade invalid role silently (no error, just fix it in response)
+              share.role = effectiveRole;
+              share.permission = effectiveRole === TechPackRole.Viewer || effectiveRole === TechPackRole.Factory ? 'view' : 'edit';
+
+              // Add an audit log entry to persist the normalization
+              const audit = {
+                action: 'role_normalized',
+                performedBy: currentUser._id,
+                targetUser: sharedUser._id || sharedUser,
+                role: effectiveRole,
+                timestamp: new Date(),
+                techpackId: techpack._id as Types.ObjectId,
+                permission: share.permission
+              };
+              auditEntries.push(audit);
+
+              // Log the auto-downgrade for observability
+              console.log(`[AUDIT] Auto-downgraded role for user ${sharedUser._id || sharedUser} in TechPack ${id}: '${originalRole}' -> '${effectiveRole}' (SystemRole: ${sharedUser.role})`);
+            }
+          }
+        }
+
+        // If we made any changes to stored sharedWith roles, persist them and their audit logs
+        if (auditEntries.length > 0) {
+          try {
+            // Persist the normalized sharedWith and append audit logs
+            await TechPack.findByIdAndUpdate(id, {
+              $set: { sharedWith: techpack.sharedWith },
+              $push: { auditLogs: { $each: auditEntries } }
+            });
+            // Update local copy's auditLogs for response cache/storage
+            techpack.auditLogs = Array.isArray(techpack.auditLogs) ? techpack.auditLogs.concat(auditEntries) : auditEntries.slice();
+          } catch (saveErr) {
+            console.error('Failed to persist normalized sharedWith/auditLogs:', saveErr);
+          }
+        }
       }
 
       // Lưu vào cache với TTL trung bình (30 phút)
@@ -479,13 +530,6 @@ export class TechPackController {
     try {
       const { id } = req.params;
       const user = req.user!;
-      
-      console.log('🔧 PATCH TechPack request received:', {
-        techPackId: id,
-        userId: user._id,
-        userName: `${user.firstName} ${user.lastName}`,
-        requestBody: req.body
-      });
 
       // Check if user has permission to edit tech packs
       if (!PermissionManager.canEditTechPacks(user.role)) {
@@ -520,29 +564,11 @@ export class TechPackController {
 
       // Data integrity patch: If createdBy is missing, assign it from technical designer or current user
       if (!techpack.createdBy) {
-        console.warn(`TechPack ${techpack._id} is missing 'createdBy' field. Patching data...`);
         techpack.createdBy = techpack.technicalDesignerId || user._id;
       }
 
-      // Debug logging
-      console.log('TechPack found:', {
-        id: techpack._id,
-        technicalDesignerId: techpack.technicalDesignerId,
-        createdBy: techpack.createdBy,
-        userRole: user.role,
-        userId: user._id
-      });
-
-      // Check access permissions based on role and sharing
-      const isOwner = techpack.createdBy?.toString() === user._id.toString();
-  const sharedAccess = techpack.sharedWith?.find(s => s.userId.toString() === user._id.toString());
-  const hasEditAccess = !!sharedAccess && ['owner','admin','editor'].includes((sharedAccess as any).role);
-
-  // IMPORTANT: technical designer should NOT implicitly receive edit permissions.
-  // Edit permission is only granted to Admin, Owner, or explicit shared edit roles.
-  const canEdit = user.role === UserRole.Admin || isOwner || hasEditAccess;
-
-      if (!canEdit) {
+      // Check access permissions using centralized helper
+      if (!hasEditAccess(techpack, user)) {
         return sendError(res, 'Access denied. You do not have permission to edit this tech pack.', 403, 'FORBIDDEN');
       }
 
@@ -631,13 +657,10 @@ export class TechPackController {
               
               // Only merge and update if arrays are actually different
               if (!arraysEqual) {
-                console.log(`📊 Array ${field} has changes - old: ${oldArray.length}, new: ${newArray.length}`);
                 const merged = mergeSubdocumentArray(oldArray, newArray);
                 updateData[field] = merged;
-              } else {
-                console.log(`✅ Array ${field} unchanged - skipping update to prevent false revision`);
-                // Don't include in updateData - this prevents false revision detection
               }
+              // If arrays are equal, don't include in updateData to prevent false revision detection
             } else {
               updateData[field] = req.body[field];
             }
@@ -697,8 +720,6 @@ export class TechPackController {
       try {
         // Use the pre-calculated 'changes' object. Only create a revision if there were changes.
         if (changes.summary !== 'No changes detected.' && changes.summary !== 'Error detecting changes.') {
-          console.log('🔍 Creating revision with version:', revisionVersion);
-
           const newRevision = new Revision({
             techPackId: updatedTechPack._id,
             version: revisionVersion, // Use the auto-incremented version
@@ -716,15 +737,6 @@ export class TechPackController {
           });
 
           revisionCreated = await newRevision.save();
-          console.log('✅ Revision created successfully:', revisionCreated._id);
-          console.log('📊 Revision details:', {
-            version: revisionCreated.version,
-            summary: revisionCreated.changes.summary,
-            createdBy: revisionCreated.createdByName
-          });
-        } else {
-          console.log('❌ No revision created - no significant changes detected');
-          console.log('🔍 Changes summary was:', changes.summary);
         }
       } catch (revError: any) {
         // Log revision creation error but don't fail the entire operation
@@ -970,45 +982,73 @@ export class TechPackController {
         return sendError(res, 'Cannot share with system admin or the assigned technical designer.', 400, 'BAD_REQUEST');
       }
 
-      const existingShareIndex = techpack.sharedWith?.findIndex(s => s.userId.toString() === userId) || -1;
-      let action: 'share_granted' | 'role_changed' = 'share_granted';
+      // Apply Global Role Override: get effective role based on target user's system role
+      const effectiveRole = getEffectiveRole(targetUser.role, role);
+      const wasDowngraded = effectiveRole !== role;
+
+      // Log auto-downgrade if it occurred
+      if (wasDowngraded) {
+        console.log(`[AUDIT] User with SystemRole.${targetUser.role} was shared as '${role}' — downgraded to '${effectiveRole}'. TechPack: ${techpack._id}, Target User: ${targetUser._id}`);
+      }
+
+  const existingShareIndex = techpack.sharedWith?.findIndex(s => s.userId.toString() === userId) || -1;
+  let action: 'share_granted' | 'role_changed' = 'share_granted';
 
       if (existingShareIndex > -1) {
         action = 'role_changed';
-        techpack.sharedWith![existingShareIndex].role = role;
+        techpack.sharedWith![existingShareIndex].role = effectiveRole;
         // Update backward compatibility field
-        techpack.sharedWith![existingShareIndex].permission = role === TechPackRole.Viewer || role === TechPackRole.Factory ? 'view' : 'edit';
+        techpack.sharedWith![existingShareIndex].permission = effectiveRole === TechPackRole.Viewer || effectiveRole === TechPackRole.Factory ? 'view' : 'edit';
       } else {
         if (!techpack.sharedWith) {
           techpack.sharedWith = [];
         }
         techpack.sharedWith.push({
           userId,
-          role,
+          role: effectiveRole,
           sharedAt: new Date(),
           sharedBy: sharer._id,
           // Backward compatibility
-          permission: role === TechPackRole.Viewer || role === TechPackRole.Factory ? 'view' : 'edit'
+          permission: effectiveRole === TechPackRole.Viewer || effectiveRole === TechPackRole.Factory ? 'view' : 'edit'
         });
       }
 
       if (!techpack.auditLogs) {
         techpack.auditLogs = [];
       }
+      
+      // Add audit log with effective role
       techpack.auditLogs.push({
         action,
         performedBy: sharer._id,
         targetUser: userId,
-        role,
+        role: effectiveRole,
         timestamp: new Date(),
         techpackId: techpack._id as Types.ObjectId,
         // Backward compatibility
-        permission: role === TechPackRole.Viewer || role === TechPackRole.Factory ? 'view' : 'edit'
+        permission: effectiveRole === TechPackRole.Viewer || effectiveRole === TechPackRole.Factory ? 'view' : 'edit'
       });
+
+      // Add additional audit log entry for auto-downgrade if it occurred
+      if (wasDowngraded) {
+        techpack.auditLogs.push({
+          action: 'role_changed',
+          performedBy: sharer._id,
+          targetUser: userId,
+          role: effectiveRole,
+          timestamp: new Date(),
+          techpackId: techpack._id as Types.ObjectId,
+          permission: effectiveRole === TechPackRole.Viewer || effectiveRole === TechPackRole.Factory ? 'view' : 'edit'
+        });
+      }
 
       await techpack.save();
 
       // Log activity
+      const activityDetails = wasDowngraded 
+        ? `Shared with ${targetUser.firstName} ${targetUser.lastName} as ${effectiveRole} (downgraded from ${role} due to SystemRole.${targetUser.role} limit)`
+        : `Shared with ${targetUser.firstName} ${targetUser.lastName} as ${effectiveRole}`;
+      
       await logActivity({
         userId: sharer._id,
         userName: `${sharer.firstName} ${sharer.lastName}`,
@@ -1019,7 +1059,7 @@ export class TechPackController {
           name: techpack.productName
         },
         req,
-        details: `Shared with ${targetUser.firstName} ${targetUser.lastName} as ${role}`
+        details: activityDetails
       });
 
       sendSuccess(res, techpack.sharedWith, `TechPack shared successfully with ${targetUser.firstName} ${targetUser.lastName}`);
@@ -1196,22 +1236,11 @@ export class TechPackController {
 
       // Fallback: if still empty and includeAll not requested, try including admins
       if (!shareableUsers.length && !includeAll && !includeAdmins) {
-        console.log('ℹ️ No non-admin shareable users found, applying admin-included fallback');
         shareableUsers = await User.find({
           _id: { $nin: excludedUserIds },
           isActive: true
         }).select('firstName lastName email role').limit(100).lean();
       }
-
-      console.log('✅ Found shareable users:', {
-        count: shareableUsers.length,
-        users: shareableUsers.map(u => ({
-          id: u._id,
-          name: `${u.firstName} ${u.lastName}`,
-          email: u.email,
-          role: u.role
-        }))
-      });
 
       sendSuccess(res, shareableUsers, 'Shareable users retrieved successfully');
     } catch (error: any) {
@@ -1243,26 +1272,43 @@ export class TechPackController {
         return sendError(res, 'Access denied. Only Owner or Admin can view access list.', 403, 'FORBIDDEN');
       }
 
-      // Get shared users information manually
-      const accessList = await Promise.all(
-        (techpack.sharedWith || []).map(async (share) => {
-          const sharedUser = await User.findById(share.userId).select('firstName lastName email role');
-          const sharedByUser = share.sharedBy ? await User.findById(share.sharedBy).select('firstName lastName email') : null;
+      // Get shared users information - optimize with single query instead of N+1
+      const sharedUserIds = (techpack.sharedWith || []).map(s => s.userId);
+      const sharedByUserIds = (techpack.sharedWith || [])
+        .map(s => s.sharedBy)
+        .filter((id): id is Types.ObjectId => !!id);
+      const allUserIds = [...new Set([...sharedUserIds, ...sharedByUserIds])];
+      
+      const usersMap = new Map();
+      if (allUserIds.length > 0) {
+        const users = await User.find({ _id: { $in: allUserIds } })
+          .select('firstName lastName email role')
+          .lean();
+        users.forEach(u => usersMap.set(u._id.toString(), u));
+      }
 
-          // Fallbacks when user records were deleted or missing
-          const sharedUserFallback = sharedUser || { firstName: 'Unknown', lastName: '', email: '', role: 'viewer' };
-          const sharedByFallback = sharedByUser || null;
+      const accessList = (techpack.sharedWith || []).map((share) => {
+        const sharedUser = usersMap.get(share.userId?.toString());
+        const sharedByUser = share.sharedBy ? usersMap.get(share.sharedBy.toString()) : null;
 
-          return {
-            userId: share.userId.toString(),
-            role: share.role,
-            permission: share.permission || 'view', // Backward compatibility
-            sharedAt: share.sharedAt,
-            sharedBy: sharedByFallback,
-            user: sharedUserFallback
-          };
-        })
-      );
+        // Fallbacks when user records were deleted or missing
+        const sharedUserFallback = sharedUser || { firstName: 'Unknown', lastName: '', email: '', role: 'viewer' };
+        const sharedByFallback = sharedByUser || null;
+
+        // Get effective role based on Global Role Override
+        const effectiveRole = sharedUserFallback.role 
+          ? getEffectiveRole(sharedUserFallback.role as UserRole, share.role)
+          : share.role;
+
+        return {
+          userId: share.userId.toString(),
+          role: effectiveRole, // Return effective role, not stored role
+          permission: effectiveRole === TechPackRole.Viewer || effectiveRole === TechPackRole.Factory ? 'view' : 'edit',
+          sharedAt: share.sharedAt,
+          sharedBy: sharedByFallback,
+          user: sharedUserFallback
+        };
+      });
 
       sendSuccess(res, accessList, 'Access list retrieved successfully');
     } catch (error: any) {
@@ -1312,11 +1358,20 @@ export class TechPackController {
         return sendError(res, 'Target user not found', 404, 'NOT_FOUND');
       }
 
-      // Update the role
+      // Apply Global Role Override: get effective role based on target user's system role
+      const effectiveRole = getEffectiveRole(targetUser.role, role);
+      const wasDowngraded = effectiveRole !== role;
       const oldRole = techpack.sharedWith![shareIndex].role;
-      techpack.sharedWith![shareIndex].role = role;
+
+      // Log auto-downgrade if it occurred
+      if (wasDowngraded) {
+        console.log(`[AUDIT] User with SystemRole.${targetUser.role} was updated to '${role}' — downgraded to '${effectiveRole}'. TechPack: ${techpack._id}, Target User: ${targetUser._id}`);
+      }
+
+      // Update the role with effective role
+      techpack.sharedWith![shareIndex].role = effectiveRole;
       // Update backward compatibility field
-      techpack.sharedWith![shareIndex].permission = role === TechPackRole.Viewer || role === TechPackRole.Factory ? 'view' : 'edit';
+      techpack.sharedWith![shareIndex].permission = effectiveRole === TechPackRole.Viewer || effectiveRole === TechPackRole.Factory ? 'view' : 'edit';
 
       // Add audit log
       if (!techpack.auditLogs) {
@@ -1326,16 +1381,33 @@ export class TechPackController {
         action: 'role_changed',
         performedBy: updater._id,
         targetUser: new Types.ObjectId(userId),
-        role,
+        role: effectiveRole,
         timestamp: new Date(),
         techpackId: techpack._id as Types.ObjectId,
         // Backward compatibility
-        permission: role === TechPackRole.Viewer || role === TechPackRole.Factory ? 'view' : 'edit'
+        permission: effectiveRole === TechPackRole.Viewer || effectiveRole === TechPackRole.Factory ? 'view' : 'edit'
       });
+
+      // Add additional audit log entry for auto-downgrade if it occurred
+      if (wasDowngraded) {
+        techpack.auditLogs.push({
+          action: 'role_changed',
+          performedBy: updater._id,
+          targetUser: new Types.ObjectId(userId),
+          role: effectiveRole,
+          timestamp: new Date(),
+          techpackId: techpack._id as Types.ObjectId,
+          permission: effectiveRole === TechPackRole.Viewer || effectiveRole === TechPackRole.Factory ? 'view' : 'edit'
+        });
+      }
 
       await techpack.save();
 
       // Log activity
+      const activityDetails = wasDowngraded
+        ? `Updated ${targetUser.firstName} ${targetUser.lastName} role from ${oldRole} to ${effectiveRole} (downgraded from ${role} due to SystemRole.${targetUser.role} limit)`
+        : `Updated ${targetUser.firstName} ${targetUser.lastName} role from ${oldRole} to ${effectiveRole}`;
+      
       await logActivity({
         userId: updater._id,
         userName: `${updater.firstName} ${updater.lastName}`,
@@ -1346,7 +1418,7 @@ export class TechPackController {
           name: techpack.productName
         },
         req,
-        details: `Updated ${targetUser.firstName} ${targetUser.lastName} role from ${oldRole} to ${role}`
+        details: activityDetails
       });
 
       sendSuccess(res, techpack.sharedWith, `Role updated successfully for ${targetUser.firstName} ${targetUser.lastName}`);

@@ -49,19 +49,12 @@ class ApiClient {
     this.axiosInstance.interceptors.request.use(
       (config) => {
         const token = this.getAccessToken();
-        console.log('🔐 Request interceptor - Token exists:', !!token);
-        console.log('🌐 Request URL:', config.url);
-
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
-          console.log('✅ Authorization header added to request');
-        } else {
-          console.log('⚠️ No token available for request');
         }
         return config;
       },
       (error) => {
-        console.error('❌ Request interceptor error:', error);
         return Promise.reject(error);
       }
     );
@@ -69,35 +62,25 @@ class ApiClient {
     // Response interceptor for error handling and token refresh
     this.axiosInstance.interceptors.response.use(
       (response: AxiosResponse<ApiResponse>) => {
-        console.log('✅ API Response successful:', response.config.url, response.status);
         return response;
       },
       async (error: AxiosError<ApiError>) => {
         const originalRequest = error.config as any;
-        console.log('❌ API Response error:', {
-          url: originalRequest?.url,
-          status: error.response?.status,
-          message: error.response?.data?.message,
-          hasAuthHeader: !!originalRequest?.headers?.Authorization
-        });
 
         // Don't try to refresh token for login/register requests
         const isAuthRequest = originalRequest?.url?.includes('/auth/login') ||
                              originalRequest?.url?.includes('/auth/register');
 
         if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
-          console.log('🔄 Attempting token refresh for 401 error');
           originalRequest._retry = true;
 
           try {
             const newToken = await this.refreshAccessToken();
             if (newToken && originalRequest) {
-              console.log('✅ Token refreshed, retrying request');
               originalRequest.headers.Authorization = `Bearer ${newToken}`;
               return this.axiosInstance(originalRequest);
             }
           } catch (refreshError) {
-            console.log('❌ Token refresh failed:', refreshError);
             this.handleAuthError();
             return Promise.reject(refreshError);
           }
@@ -105,7 +88,6 @@ class ApiClient {
 
         // For 401 errors on auth requests or when refresh fails
         if (error.response?.status === 401) {
-          console.log('🔐 401 Unauthorized - handling auth error');
           this.handleAuthError();
         }
 
@@ -169,16 +151,11 @@ class ApiClient {
   }
 
   private handleAuthError() {
-    console.log('🔐 Handling authentication error - clearing tokens');
     this.clearTokens();
     // Only redirect if not already on login page
     if (window.location.pathname !== '/login') {
-      console.log('🔄 Redirecting to login page');
       window.location.href = '/login';
-    } else {
-      console.log('ℹ️ Already on login page, not redirecting');
     }
-    console.error('Authentication error. Redirecting to login.');
   }
 
   private formatError(error: AxiosError<ApiError>): Error {
@@ -323,7 +300,6 @@ class ApiClient {
       page: pagination?.page || 1,
       totalPages: pagination?.totalPages || 1,
     };
-    console.log('📡 API: Processed result:', result);
     return result;
   }
 
@@ -383,7 +359,7 @@ class ApiClient {
     const payload: any = response.data ?? {};
     const updatedTechPack = payload.updatedTechPack ?? payload.data?.techpack ?? payload.data;
     if (!updatedTechPack) {
-      console.error('Invalid patch tech pack response received:', response.data);
+      // Invalid response format
       throw new Error('Invalid patch tech pack response');
     }
     return updatedTechPack as ApiTechPack;

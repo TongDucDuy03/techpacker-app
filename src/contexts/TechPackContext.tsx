@@ -258,7 +258,7 @@ const clearDraftFromStorage = (techpackId?: string) => {
   try {
     localStorage.removeItem(getDraftStorageKey(techpackId));
   } catch (error) {
-    console.warn('Failed to clear tech pack draft from storage', error);
+    // Failed to clear draft from storage
   }
 };
 
@@ -325,21 +325,18 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     try {
       localStorage.setItem(draftKeyRef.current, serialized);
     } catch (error) {
-      console.warn('Failed to persist tech pack draft', error);
+      // Failed to persist draft
     }
   }, [state.techpack, state.currentTab, state.tabStates, state.hasUnsavedChanges, state.lastSaved]);
 
 
   const loadTechPacks = useCallback(async (params = {}) => {
-    console.log('🔄 Loading tech packs...', params);
     setLoading(true);
     try {
       const response = await api.listTechPacks(params);
-      console.log('✅ Tech packs loaded:', response);
       setTechPacks(response.data);
       setPagination({ total: response.total, page: response.page, totalPages: response.totalPages });
     } catch (error: any) {
-      console.error('❌ Failed to load tech packs:', error);
       showError(error.message || 'Failed to load tech packs');
     } finally {
       setLoading(false);
@@ -590,7 +587,6 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
 
         // After a successful save, reload the revisions and refresh current form state from server
         if (updatedTP) {
-          console.log('🔄 Reloading revisions after update for TechPack ID:', techpackData.id);
           await loadRevisions(techpackData.id);
 
           // Fetch latest detail to avoid stale local state and ensure Product Class is shown
@@ -654,7 +650,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
               } as any);
             }
           } catch (e) {
-            console.warn('⚠️ Failed to refresh techpack detail after update:', e);
+            // Silently handle refresh error
           }
         }
       } else {
@@ -697,7 +693,6 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         if (newTechPack) {
           const techPackId = newTechPack._id || newTechPack.id;
           if (techPackId) {
-            console.log('🔄 Loading revisions after create for TechPack ID:', techPackId);
             await loadRevisions(techPackId);
           }
         }
@@ -722,7 +717,6 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
 
   const exportToPDF = () => {
     // Simulate PDF export
-    console.log('Exporting to PDF...');
   };
 
   const addMeasurement = (measurement: MeasurementPoint) => {
@@ -974,11 +968,9 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
 
   // Revision management functions
   const loadRevisions = useCallback(async (techPackId: string, params = {}) => {
-    console.log('🔄 Attempting to load revisions for TechPack ID:', techPackId);
     setRevisionsLoading(true);
     try {
       const response = await api.getRevisions(techPackId, params);
-      console.log('✅ API response for revisions:', response);
       
       // Handle possible shapes:
       // 1) AxiosResponse<{ success, data: { revisions, pagination } }>
@@ -990,20 +982,9 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
       const revisions = payload?.revisions ?? [];
       const pagination = payload?.pagination ?? { total: 0, page: 1, totalPages: 1 };
 
-      console.log('📊 Revisions parsing debug:', {
-        hasAxiosData: !!(response as any)?.data,
-        hasRootData: !!root,
-        keysAtRoot: root ? Object.keys(root) : [],
-        keysAtPayload: payload ? Object.keys(payload) : [],
-        parsedCount: revisions.length
-      });
-      
-      console.log('📊 Revisions count:', revisions.length);
       setRevisions(Array.isArray(revisions) ? revisions : []);
       setRevisionPagination(pagination);
-      console.log('✅ Revisions state updated with', Array.isArray(revisions) ? revisions.length : 0, 'revisions');
     } catch (error: any) {
-      console.error('❌ Failed to load revisions:', error);
       showError(error.message || 'Failed to load revisions');
     } finally {
       setRevisionsLoading(false);

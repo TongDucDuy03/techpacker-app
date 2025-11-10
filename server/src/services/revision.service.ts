@@ -489,7 +489,7 @@ class RevisionService {
             changes.sectionChanges!.push(String(section));
           }
         } catch (sectionError) {
-          console.warn(`Error comparing section ${String(section)}:`, sectionError);
+          // Silently continue if section comparison fails
         }
       });
 
@@ -500,7 +500,6 @@ class RevisionService {
         oldObj = typeof (oldTechPack as any).toObject === 'function' ? (oldTechPack as any).toObject() : oldTechPack;
         newObj = typeof (newTechPack as any).toObject === 'function' ? (newTechPack as any).toObject() : newTechPack;
       } catch (objError) {
-        console.warn('Error converting techpack to object:', objError);
         oldObj = oldTechPack;
         newObj = newTechPack;
       }
@@ -563,7 +562,6 @@ class RevisionService {
       changes.summary = this.generateSummary(changes.details as Record<string, any>, changes.sectionChanges!);
 
     } catch (error) {
-      console.error('Error in compareTechPacks:', error);
       changes.summary = 'Error detecting changes.';
     }
 

@@ -5,6 +5,7 @@ import TechPack from '../models/techpack.model';
 import Revision from '../models/revision.model';
 import RevisionService from '../services/revision.service';
 import CacheInvalidationUtil from '../utils/cache-invalidation.util';
+import { hasEditAccess } from '../utils/access-control.util';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { UserRole } from '../models/user.model';
 import { logActivity } from '../utils/activity-logger';
@@ -39,13 +40,8 @@ export class SubdocumentController {
         return;
       }
 
-      // Check access permissions based on role and sharing
-      const isOwner = techpack.createdBy.toString() === user._id.toString();
-      const sharedAccess = techpack.sharedWith.find(s => s.userId.toString() === user._id.toString());
-      const hasEditAccess = !!sharedAccess && ['owner','admin','editor'].includes((sharedAccess as any).role);
-
-      // technicalDesigner does not automatically get edit rights. Only Admin, Owner, or explicit shared editors can modify.
-      if (user.role !== UserRole.Admin && !isOwner && !hasEditAccess) {
+      // Check access permissions using centralized helper
+      if (!hasEditAccess(techpack, user)) {
         res.status(403).json({
           success: false,
           message: 'Access denied. You do not have permission to modify this Tech Pack.'

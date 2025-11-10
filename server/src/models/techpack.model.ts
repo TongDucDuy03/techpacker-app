@@ -342,15 +342,20 @@ const TechPackSchema = new Schema<ITechPack>(
   }
 );
 
-// Indexes for performance
-TechPackSchema.index({ articleCode: 1 });
-TechPackSchema.index({ technicalDesignerId: 1, createdAt: -1 });
-TechPackSchema.index({ createdBy: 1, createdAt: -1 });
-TechPackSchema.index({ customerId: 1, createdAt: -1 });
-TechPackSchema.index({ 'sharedWith.userId': 1 });
-TechPackSchema.index({ status: 1, updatedAt: -1 });
-TechPackSchema.index({ season: 1, brand: 1 });
-TechPackSchema.index({ createdAt: -1 });
+// Indexes for performance - optimized for common query patterns
+ // `articleCode` schema path is declared with `unique: true`, which creates an index.
+ // Avoid declaring a duplicate index here to prevent Mongoose warnings.
+TechPackSchema.index({ technicalDesignerId: 1, createdAt: -1 }); // Designer's techpacks
+TechPackSchema.index({ createdBy: 1, createdAt: -1 }); // Owner's techpacks
+TechPackSchema.index({ customerId: 1, createdAt: -1 }); // Customer filter
+TechPackSchema.index({ 'sharedWith.userId': 1 }); // Shared access lookup
+TechPackSchema.index({ status: 1, updatedAt: -1 }); // Status filter with sorting
+TechPackSchema.index({ season: 1, brand: 1 }); // Season/brand filter
+TechPackSchema.index({ createdAt: -1 }); // General sorting
+// Compound index for common list query pattern
+TechPackSchema.index({ status: 1, createdAt: -1 });
+// Text search index for productName and articleCode
+TechPackSchema.index({ productName: 'text', articleCode: 'text' });
 
 // Removed virtual 'lifecycleStage' because it's now a real schema path
 

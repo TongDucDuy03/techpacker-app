@@ -11,6 +11,7 @@ import { logActivity } from '../utils/activity-logger';
 import { ActivityAction } from '../models/activity.model';
 import NotificationService from '../services/notification.service';
 import _ from 'lodash';
+import { getEffectiveRole } from '../utils/access-control.util';
 
 /**
  * Helper function to safely extract ID from object (handles both populated and non-populated)
@@ -23,6 +24,7 @@ const safeId = (obj: any): string => {
 
 /**
  * Helper function to check if user has view access to TechPack
+ * Now uses getEffectiveRole to respect system role limits
  */
 const hasViewAccess = (techpack: any, user: any): boolean => {
   const isOwner = safeId(techpack.createdBy) === safeId(user._id);
@@ -34,13 +36,19 @@ const hasViewAccess = (techpack: any, user: any): boolean => {
     return sharedUserId === safeId(user._id);
   });
   
-  const hasSharedViewAccess = !!sharedAccess && ['owner', 'admin', 'editor', 'viewer', 'factory'].includes(sharedAccess.role);
+  if (sharedAccess) {
+    // Use effective role to check permissions
+    const effectiveRole = getEffectiveRole(user.role, sharedAccess.role);
+    const hasSharedViewAccess = ['owner', 'admin', 'editor', 'viewer', 'factory'].includes(effectiveRole);
+    return isAdmin || isOwner || isTechnicalDesigner || hasSharedViewAccess;
+  }
   
-  return isAdmin || isOwner || isTechnicalDesigner || hasSharedViewAccess;
+  return isAdmin || isOwner || isTechnicalDesigner;
 };
 
 /**
  * Helper function to check if user has edit access to TechPack
+ * Now uses getEffectiveRole to respect system role limits
  */
 const hasEditAccess = (techpack: any, user: any): boolean => {
   const isOwner = safeId(techpack.createdBy) === safeId(user._id);
@@ -51,10 +59,15 @@ const hasEditAccess = (techpack: any, user: any): boolean => {
     return sharedUserId === safeId(user._id);
   });
   
-  const hasSharedEditAccess = !!sharedAccess && ['owner', 'admin', 'editor'].includes(sharedAccess.role);
+  if (sharedAccess) {
+    // Use effective role to check permissions
+    const effectiveRole = getEffectiveRole(user.role, sharedAccess.role);
+    const hasSharedEditAccess = ['owner', 'admin', 'editor'].includes(effectiveRole);
+    return isAdmin || isOwner || hasSharedEditAccess;
+  }
   
   // Technical Designer chỉ có quyền xem, không có quyền edit/revert
-  return isAdmin || isOwner || hasSharedEditAccess;
+  return isAdmin || isOwner;
 };
 
 export class RevisionController {
