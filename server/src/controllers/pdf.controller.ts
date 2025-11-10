@@ -1,227 +1,169 @@
 import { Response } from 'express';
+import fs from 'fs';
+import { Types } from 'mongoose';
 import TechPack from '../models/techpack.model';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { UserRole } from '../models/user.model';
+import { hasViewAccess } from '../utils/access-control.util';
+import pdfService from '../services/pdf.service';
 import { logActivity } from '../utils/activity-logger';
 import { ActivityAction } from '../models/activity.model';
-import { TechPackData } from '../types/techpack.types';
-import { Types } from 'mongoose';
+import { buildRenderModel } from '../services/pdf-renderer.service';
 
-// Import PDF service from existing implementation
-import pdfService from '../services/pdf.service';
+const CACHE_MAX_AGE = Number(process.env.PDF_CACHE_TTL || 21_600);
+
+const streamFile = (filePath: string, res: Response): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const stream = fs.createReadStream(filePath);
+    stream.on('error', reject);
+    stream.on('end', resolve);
+    stream.pipe(res);
+  });
+
+function getPrintedBy(user: any): string {
+  if (user?.fullName) return user.fullName;
+  return `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'TechPacker User';
+}
+
+function estimatePages(model: Awaited<ReturnType<typeof buildRenderModel>>) {
+  const bomPages = model.bom.rows.length ? Math.max(1, Math.ceil(model.bom.rows.length / 14)) : 0;
+  const bomImagePages = model.bomImages.length ? Math.ceil(model.bomImages.length / 12) : 0;
+  const measurementRows = model.measurements.rows.filter((row) => !row.isGroup).length;
+  const measurementPages = measurementRows ? Math.max(1, Math.ceil(measurementRows / 18)) : 0;
+  const howToMeasurePages = model.howToMeasure.length ? Math.ceil(model.howToMeasure.length / 2) : 0;
+  const notesPages = model.notes.length ? Math.ceil(model.notes.length / 10) : 0;
+  const carePages = model.careSymbols.length ? 1 : 0;
+  return 1 + bomPages + bomImagePages + measurementPages + howToMeasurePages + notesPages + carePages;
+}
 
 export class PDFController {
-  /**
-   * Export TechPack as PDF
-   * GET /api/techpacks/:id/pdf
-   */
   async exportTechPackPDF(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
       const user = req.user!;
-      const { options } = req.query;
+      // allow overriding orientation via query param ?landscape=true
+      const landscape = req.query?.landscape === 'true' || req.query?.landscape === '1';
 
-      // Get TechPack with all related data
       const techpack = await TechPack.findById(id)
-        .populate('technicalDesignerId', 'firstName lastName username')
-        .populate('createdBy', 'firstName lastName username')
-        .populate('updatedBy', 'firstName lastName username')
+        .populate('technicalDesignerId', 'firstName lastName email role')
         .lean();
 
       if (!techpack) {
-        res.status(404).json({
-          success: false,
-          message: 'TechPack not found'
-        });
+        res.status(404).json({ success: false, message: 'TechPack not found' });
         return;
       }
 
-      // Check access permissions
-      if (user.role === UserRole.Designer &&
-          techpack.technicalDesignerId._id.toString() !== user._id.toString()) {
-        res.status(403).json({
-          success: false,
-          message: 'Access denied. You can only export your own TechPacks.'
-        });
+      if (!hasViewAccess(techpack, user)) {
+        res.status(403).json({ success: false, message: 'Access denied' });
         return;
       }
 
-      // Transform TechPack data to PDF service format
-      const pdfData: TechPackData = this.transformTechPackForPDF(techpack);
+      const metadata = await pdfService.getOrCreatePdf({
+        techpack,
+        printedBy: getPrintedBy(user),
+        landscape,
+      });
 
-      // Parse PDF options if provided
-      let pdfOptions = {};
-      if (options && typeof options === 'string') {
-        try {
-          pdfOptions = JSON.parse(options);
-        } catch (error) {
-          console.warn('Invalid PDF options format:', options);
-        }
-      }
+      const filename = `Techpack_${techpack.articleCode || techpack._id}.pdf`;
 
-      // Generate PDF using existing service
-      const result = await pdfService.generateTechPackPDF(pdfData, pdfOptions);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', metadata.size);
+      res.setHeader('Cache-Control', `private, max-age=${Math.min(CACHE_MAX_AGE, 3600)}`);
 
-      if (!result.success) {
-        res.status(500).json({
-          success: false,
-          message: 'Failed to generate PDF',
-          error: result.error
-        });
-        return;
-      }
+      await streamFile(metadata.path, res);
 
-      // Log activity
       await logActivity({
         userId: user._id,
-        userName: user.fullName,
+        userName: getPrintedBy(user),
         action: ActivityAction.PDF_EXPORT,
         target: {
           type: 'TechPack',
           id: techpack._id as Types.ObjectId,
-          name: techpack.productName
+          name: techpack.productName,
         },
         details: {
-          filename: result.data?.filename,
-          size: result.data?.size,
-          pages: result.data?.pages
+          pages: metadata.pages,
+          size: metadata.size,
+          cached: metadata.cached,
         },
-        req
+        req,
       });
-
-      // Set response headers for PDF download
-      const filename = result.data?.filename || `${techpack.articleCode}_${techpack.version}.pdf`;
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.setHeader('Cache-Control', 'private, max-age=3600'); // Cache for 1 hour
-
-      // Stream PDF buffer để tối ưu memory usage
-      if (result.data?.buffer) {
-        if (result.data.size) {
-          res.setHeader('Content-Length', result.data.size);
-        }
-
-        // Stream the buffer in chunks để tránh memory issues với large files
-        const chunkSize = 64 * 1024; // 64KB chunks
-        const buffer = result.data.buffer;
-
-        for (let i = 0; i < buffer.length; i += chunkSize) {
-          const chunk = buffer.slice(i, i + chunkSize);
-          res.write(chunk);
-        }
-        res.end();
-      } else {
-        res.status(500).json({
-          success: false,
-          message: 'PDF generation failed - no buffer returned'
-        });
-      }
-
     } catch (error: any) {
       console.error('PDF export error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error during PDF export',
-        error: error.message
-      });
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          message: 'Failed to generate TechPack PDF',
+          error: error?.message || 'Unknown error',
+        });
+      }
     }
   }
 
-  /**
-   * Generate PDF preview
-   * GET /api/techpacks/:id/pdf/preview
-   */
   async generatePDFPreview(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const { page = 1, options } = req.query;
       const user = req.user!;
 
-      // Get TechPack data
       const techpack = await TechPack.findById(id)
-        .populate('designer', 'firstName lastName username')
+        .populate('technicalDesignerId', 'firstName lastName email role')
         .lean();
 
       if (!techpack) {
-        res.status(404).json({
-          success: false,
-          message: 'TechPack not found'
-        });
+        res.status(404).json({ success: false, message: 'TechPack not found' });
         return;
       }
 
-      // Check access permissions
-      if (user.role === UserRole.Designer &&
-          techpack.technicalDesignerId._id.toString() !== user._id.toString()) {
-        res.status(403).json({
-          success: false,
-          message: 'Access denied. You can only preview your own TechPacks.'
-        });
+      if (!hasViewAccess(techpack, user)) {
+        res.status(403).json({ success: false, message: 'Access denied' });
         return;
       }
 
-      // Transform data and generate preview
-      const pdfData: TechPackData = this.transformTechPackForPDF(techpack);
+      const preview = await pdfService.generatePreview({
+        techpack,
+        printedBy: getPrintedBy(user),
+      });
 
-      let pdfOptions = {};
-      if (options && typeof options === 'string') {
-        try {
-          pdfOptions = JSON.parse(options);
-        } catch (error) {
-          console.warn('Invalid PDF options format:', options);
-        }
-      }
-
-      const result = await pdfService.generatePDFPreview(
-        pdfData,
-        parseInt(page as string) || 1,
-        pdfOptions
-      );
-
-      res.json(result);
-
+      res.json({
+        success: true,
+        data: {
+          previewUrl: preview,
+        },
+      });
     } catch (error: any) {
       console.error('PDF preview error:', error);
       res.status(500).json({
         success: false,
-        message: 'Failed to generate PDF preview',
-        error: error.message
+        message: 'Failed to generate preview',
+        error: error?.message || 'Unknown error',
       });
     }
   }
 
-  /**
-   * Get PDF generation info
-   * GET /api/techpacks/:id/pdf/info
-   */
   async getPDFInfo(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
       const user = req.user!;
 
-      const techpack = await TechPack.findById(id).lean();
+      const techpack = await TechPack.findById(id)
+        .populate('technicalDesignerId', 'firstName lastName email role')
+        .lean();
 
       if (!techpack) {
-        res.status(404).json({
-          success: false,
-          message: 'TechPack not found'
-        });
+        res.status(404).json({ success: false, message: 'TechPack not found' });
         return;
       }
 
-      // Check access permissions
-      if (user.role === UserRole.Designer &&
-          techpack.technicalDesignerId.toString() !== user._id.toString()) {
-        res.status(403).json({
-          success: false,
-          message: 'Access denied. You can only view info for your own TechPacks.'
-        });
+      if (!hasViewAccess(techpack, user)) {
+        res.status(403).json({ success: false, message: 'Access denied' });
         return;
       }
 
-      // Transform data for validation
-      const pdfData: TechPackData = this.transformTechPackForPDF(techpack);
-      const validation = pdfService.validateTechPackData(pdfData);
+      const validation = await pdfService.validate(techpack);
+      const renderModel = await buildRenderModel(techpack, {
+        printedBy: getPrintedBy(user),
+        generatedAt: new Date(),
+      });
 
       res.json({
         success: true,
@@ -233,101 +175,21 @@ export class PDFController {
           status: techpack.status,
           isValid: validation.isValid,
           validationErrors: validation.errors,
-          estimatedPages: this.estimatePageCount(pdfData),
+          estimatedPages: estimatePages(renderModel),
           lastModified: techpack.updatedAt,
           canGeneratePDF: validation.isValid,
-          supportedFormats: ['A4', 'Letter', 'Legal'],
-          supportedOrientations: ['portrait', 'landscape']
-        }
+          summary: renderModel.summary,
+        },
       });
-
     } catch (error: any) {
       console.error('PDF info error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to get PDF info',
-        error: error.message
+        error: error?.message || 'Unknown error',
       });
     }
   }
-
-  /**
-   * Transform TechPack model data to PDF service format
-   */
-  private transformTechPackForPDF(techpack: any): TechPackData {
-    return {
-      techpack: {
-        _id: techpack._id,
-        name: techpack.productName,
-        articleCode: techpack.articleCode,
-        version: techpack.version,
-        designer: techpack.technicalDesignerId ? `${techpack.technicalDesignerId.firstName} ${techpack.technicalDesignerId.lastName}` : 'Unknown Designer',
-        supplier: techpack.supplier,
-        season: techpack.season,
-        fabricDescription: techpack.fabricDescription,
-        lifecycleStage: techpack.status,
-        createdAt: techpack.createdAt,
-        lastModified: techpack.updatedAt,
-        category: techpack.category,
-        gender: techpack.gender,
-        brand: techpack.brand,
-        collection: techpack.collection,
-        retailPrice: techpack.retailPrice,
-        currency: techpack.currency,
-        description: techpack.description,
-        notes: techpack.notes
-      },
-      materials: techpack.bom || [],
-      measurements: techpack.measurements || [],
-      howToMeasure: techpack.howToMeasure || [],
-      colorways: techpack.colorways || [],
-      logoUrl: this.getLogoUrl(techpack.supplier)
-    };
-  }
-
-  /**
-   * Get logo URL based on supplier
-   */
-  private getLogoUrl(supplier: string): string {
-    // This could be enhanced to fetch actual logos from a database or service
-    const logoMap: { [key: string]: string } = {
-      'LS Apparel': 'https://example.com/logos/ls-apparel.png',
-      'Fashion Co': 'https://example.com/logos/fashion-co.png',
-      'Textile Mills': 'https://example.com/logos/textile-mills.png'
-    };
-
-    return logoMap[supplier] || 'https://example.com/logos/default.png';
-  }
-
-  /**
-   * Estimate page count based on content
-   */
-  private estimatePageCount(data: TechPackData): number {
-    let pages = 1; // Header page
-
-    // BOM pages
-    if (data.materials.length > 0) {
-      pages += Math.ceil(data.materials.length / 15); // ~15 materials per page
-    }
-
-    // Measurement pages
-    if (data.measurements.length > 0) {
-      pages += Math.ceil(data.measurements.length / 20); // ~20 measurements per page
-    }
-
-    // How to measure pages
-    if (data.howToMeasure.length > 0) {
-      pages += Math.ceil(data.howToMeasure.length / 3); // ~3 instructions per page
-    }
-
-    // Colorways page
-    if (data.colorways.length > 0) {
-      pages += 1;
-    }
-
-    return pages;
-  }
-
 }
 
 export default new PDFController();

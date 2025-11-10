@@ -1,0 +1,26 @@
+<div class="section-title"><%= strings.careSymbolsTitle %></div>
+
+<% if (careSymbols && careSymbols.length) { %>
+  <div class="care-grid">
+    <% careSymbols.forEach((symbol) => { %>
+      <div class="care-item avoid-break">
+        <% if (symbol.image) { %>
+          <img src="<%= symbol.image %>" alt="<%= symbol.label %>" />
+        <% } else { %>
+          <div style="width:48px; height:48px; border:1px dashed #d1d5db; margin:0 auto 6px; display:flex; align-items:center; justify-content:center; color:#9ca3af; font-size:8px;">
+            N/A
+          </div>
+        <% } %>
+        <div style="font-size:8px;">
+          <strong><%= symbol.label %></strong>
+          <% if (symbol.description) { %>
+            <div class="text-muted"><%= symbol.description %></div>
+          <% } %>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+<% } else { %>
+  <div style="padding:32px; text-align:center; color:#94a3b8;"><%= strings.emptyCareSymbols %></div>
+<% } %>
+

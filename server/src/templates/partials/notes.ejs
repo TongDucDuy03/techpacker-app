@@ -1,0 +1,18 @@
+<div class="section-title"><%= strings.notesTitle %></div>
+
+<% if (notes && notes.length) { %>
+  <ul class="notes-list">
+    <% notes.forEach((note) => { %>
+      <li class="avoid-break">
+        <strong><%= note.title %></strong>
+        <% if (note.updatedAt) { %>
+          <span class="text-muted"> — <%= note.updatedAt %></span>
+        <% } %>
+        <div style="margin-top:4px; font-size:9px;"><%= note.body %></div>
+      </li>
+    <% }) %>
+  </ul>
+<% } else { %>
+  <div style="padding:32px; text-align:center; color:#94a3b8;"><%= strings.emptyNotes %></div>
+<% } %>
+

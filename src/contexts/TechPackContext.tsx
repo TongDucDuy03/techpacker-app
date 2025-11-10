@@ -3,6 +3,7 @@ import { useAuth } from './AuthContext';
 import { ApiTechPack, CreateTechPackInput, TechPackListResponse, TechPackFormState, MeasurementPoint, HowToMeasure, BomItem, Colorway, ColorwayPart } from '../types/techpack';
 import { api } from '../lib/api';
 import { showPromise, showError } from '../lib/toast';
+import { exportTechPackToPDF as clientExportToPDF } from '../utils/pdfExport';
 
 interface TechPackContextType {
   techPacks: ApiTechPack[];
@@ -716,7 +717,49 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const exportToPDF = () => {
-    // Simulate PDF export
+    // If the techpack has been saved to the server, request server-generated PDF
+    const techpackId = state.techpack?.id || state.techpack?.articleInfo?.articleCode;
+    // Prefer server PDF when we have an id
+    if (techpackId) {
+      const useLandscape = true;
+      (async () => {
+        try {
+          // Use api client to request binary PDF
+          const response = await api.get(`/techpacks/${techpackId}/pdf`, { responseType: 'arraybuffer', params: { landscape: useLandscape ? 'true' : 'false' } });
+          const arrayBuffer = response.data as ArrayBuffer;
+          const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+          const url = window.URL.createObjectURL(blob);
+
+          // Open in new tab (user gesture already triggered by click) or download
+          const win = window.open(url, '_blank');
+          if (!win) {
+            // If popup blocked, trigger download instead
+            const link = document.createElement('a');
+            link.href = url;
+            const filename = `${state.techpack.articleInfo.articleCode || 'techpack'}_v${state.techpack.articleInfo.version || 1}.pdf`;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }
+
+          // Revoke object URL after a short delay to allow browser to load it
+          setTimeout(() => window.URL.revokeObjectURL(url), 60 * 1000);
+        } catch (err: any) {
+          showError(err?.message || 'Failed to export PDF from server. Falling back to client export.');
+          // Fallback to client-side export (HTML print)
+          try {
+            clientExportToPDF(state.techpack as any);
+          } catch (e) {
+            showError('Client-side export failed as well.');
+          }
+        }
+      })();
+      return;
+    }
+
+    // If not saved on server, fall back to client-side HTML export/print
+    clientExportToPDF(state.techpack as any);
   };
 
   const addMeasurement = (measurement: MeasurementPoint) => {

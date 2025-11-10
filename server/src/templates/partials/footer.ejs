@@ -1,0 +1,24 @@
+<style>
+  .pdf-footer {
+    width: 100%;
+    font-family: 'Roboto', Arial, sans-serif;
+    font-size: 8px;
+    color: #475569;
+    padding: 6px 0;
+    border-top: 1px solid #cbd5e1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+</style>
+<div class="pdf-footer">
+  <div>
+    <span><%= meta.companyName || 'TechPacker' %></span>
+    &nbsp;•&nbsp;
+    <span><%= meta.companyWebsite || 'techpacker.app' %></span>
+  </div>
+  <div>
+    Page <span class="pageNumber"></span> of <span class="totalPages"></span>
+  </div>
+</div>
+

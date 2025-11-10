@@ -1,147 +1,78 @@
-<!-- Measurement Chart Table Partial -->
-<div class="section-title">MEASUREMENT CHART</div>
+<div class="section-title"><%= strings.measurementTitle %></div>
 
-<% if (measurements && measurements.length > 0) { %>
-<table class="measurement-table">
+<% const sizeHeaders = measurements.columns.sizes || []; %>
+<% const groupColspan = 5 + sizeHeaders.length; %>
+
+<% if (measurements.rows && measurements.rows.length) { %>
+  <table class="measurement-table">
     <thead>
-        <tr>
-            <th>POM Code</th>
-            <th>POM Name</th>
-            <th>-Tol</th>
-            <th>+Tol</th>
-            <th>XS</th>
-            <th>S</th>
-            <th>M</th>
-            <th>L</th>
-            <th>XL</th>
-            <th>XXL</th>
-            <th>Notes</th>
-        </tr>
+      <tr>
+        <th style="width:10%;">POM</th>
+        <th style="width:26%;">Description</th>
+        <th style="width:6%;" class="text-center">- Tol</th>
+        <th style="width:6%;" class="text-center">+ Tol</th>
+        <% sizeHeaders.forEach((size) => { %>
+          <th class="size-col"><%= size %></th>
+        <% }) %>
+        <th style="width:18%;">Notes</th>
+      </tr>
     </thead>
     <tbody>
-        <% measurements.forEach((measurement, index) => { %>
-        <tr>
-            <td style="font-weight: bold;"><%= measurement.pomCode || '' %></td>
+      <% measurements.rows.forEach((row) => { %>
+        <% if (row.isGroup) { %>
+          <tr class="group-row">
+            <td colspan="<%= groupColspan %>"><%= row.label %></td>
+          </tr>
+        <% } else { %>
+          <tr class="<%= row.critical ? 'avoid-break' : '' %>">
             <td>
-                <%= measurement.pomName || '' %>
-                <% if (measurement.critical) { %>
-                <br><span style="background: #fee; color: #c00; font-size: 7px; padding: 1px 3px; border-radius: 2px;">CRITICAL</span>
-                <% } %>
-                <% if (measurement.measurementType) { %>
-                <br><small style="color: #666; font-size: 7px;"><%= measurement.measurementType %></small>
-                <% } %>
+              <div><strong><%= row.pomCode %></strong></div>
+              <% if (row.type) { %>
+                <div class="text-muted">Type: <%= row.type %></div>
+              <% } %>
+              <% if (row.category) { %>
+                <div class="text-muted">Category: <%= row.category %></div>
+              <% } %>
+              <% if (row.critical) { %>
+                <div style="margin-top:4px;">
+                  <span style="background:#fee2e2; color:#b91c1c; padding:2px 6px; border-radius:4px; font-size:8px; font-weight:700;">
+                    CRITICAL
+                  </span>
+                </div>
+              <% } %>
             </td>
-            <td style="text-align: center; color: #c00;">
-                <% if (measurement.toleranceMinus !== undefined && measurement.toleranceMinus !== null) { %>
-                -<%= measurement.toleranceMinus %>
-                <% } %>
-            </td>
-            <td style="text-align: center; color: #090;">
-                <% if (measurement.tolerancePlus !== undefined && measurement.tolerancePlus !== null) { %>
-                +<%= measurement.tolerancePlus %>
-                <% } %>
-            </td>
-            <% ['XS', 'S', 'M', 'L', 'XL', 'XXL'].forEach(size => { %>
-            <td style="text-align: center;">
-                <% if (measurement.sizes && measurement.sizes[size] !== undefined && measurement.sizes[size] !== null) { %>
-                <%= measurement.sizes[size] %>
-                <% } else { %>
-                -
-                <% } %>
-            </td>
+            <td><%= row.pomName %></td>
+            <td class="tol-minus"><%= row.toleranceMinus %></td>
+            <td class="tol-plus"><%= row.tolerancePlus %></td>
+            <% sizeHeaders.forEach((size) => { %>
+              <td class="size-col"><%= row.sizes[size] !== undefined ? row.sizes[size] : '—' %></td>
             <% }) %>
-            <td style="font-size: 8px;">
-                <%= measurement.notes || '' %>
-                <% if (measurement.category) { %>
-                <br><small style="color: #666;">Cat: <%= measurement.category %></small>
-                <% } %>
+            <td>
+              <div><%= row.notes || '—' %></div>
+              <% if (row.updatedAt) { %>
+                <div class="text-muted">Updated: <%= row.updatedAt %></div>
+              <% } %>
             </td>
-        </tr>
-        <% }) %>
+          </tr>
+        <% } %>
+      <% }) %>
     </tbody>
-</table>
+  </table>
 
-<!-- Measurement Summary -->
-<div style="margin-top: 15px; padding: 10px; background: #f9f9f9; border: 1px solid #ddd; font-size: 9px;">
-    <div style="display: flex; justify-content: space-between;">
-        <div>
-            <strong>Measurement Summary:</strong>
-            <span style="margin-left: 10px;">Total Points: <%= measurements.length %></span>
-            <span style="margin-left: 10px;">
-                Critical: <%= measurements.filter(m => m.critical).length %>
-            </span>
-        </div>
-        <div>
-            <strong>Unit: cm</strong>
-        </div>
+  <div class="summary-grid">
+    <div class="summary-card">
+      <h4><%= strings.measurementSummary %></h4>
+      <p>Total POM: <strong><%= measurements.stats.total %></strong></p>
+      <p>Critical: <strong><%= measurements.stats.critical %></strong></p>
+      <p>Groups: <strong><%= measurements.stats.groups %></strong></p>
     </div>
-    
-    <!-- Measurement Categories -->
-    <% 
-    const measurementCategories = {};
-    measurements.forEach(m => {
-        const category = m.category || m.measurementType || 'General';
-        if (!measurementCategories[category]) measurementCategories[category] = 0;
-        measurementCategories[category]++;
-    });
-    %>
-    <% if (Object.keys(measurementCategories).length > 1) { %>
-    <div style="margin-top: 8px;">
-        <strong>Categories:</strong>
-        <% Object.entries(measurementCategories).forEach(([category, count]) => { %>
-        <span style="margin-left: 10px; background: #e8f0ff; padding: 1px 4px; border-radius: 2px;">
-            <%= category %>: <%= count %>
-        </span>
-        <% }) %>
+    <div class="summary-card">
+      <h4><%= strings.measurementSizes %></h4>
+      <p>Range: <strong><%= measurements.stats.sizeRange %></strong></p>
+      <p>Size columns: <strong><%= sizeHeaders.length %></strong></p>
+      <p>Complete rows: <strong><%= measurements.stats.completeRows %></strong></p>
     </div>
-    <% } %>
-</div>
-
-<!-- Size Range Information -->
-<div style="margin-top: 15px; font-size: 9px;">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-            <strong>Size Range:</strong>
-            <% 
-            const availableSizes = [];
-            ['XS', 'S', 'M', 'L', 'XL', 'XXL'].forEach(size => {
-                const hasSize = measurements.some(m => m.sizes && m.sizes[size] !== undefined && m.sizes[size] !== null);
-                if (hasSize) availableSizes.push(size);
-            });
-            %>
-            <%= availableSizes.join(' - ') %>
-        </div>
-        <div>
-            <strong>Total Sizes:</strong> <%= availableSizes.length %>
-        </div>
-    </div>
-</div>
-
+  </div>
 <% } else { %>
-<div style="text-align: center; padding: 40px; color: #999; font-style: italic;">
-    No measurements defined for this tech pack.
-</div>
+  <div style="padding:32px; text-align:center; color:#94a3b8;"><%= strings.emptyMeasurements %></div>
 <% } %>
-
-<!-- Measurement Guidelines -->
-<div style="margin-top: 20px; font-size: 9px; color: #666;">
-    <p><strong>Measurement Guidelines:</strong></p>
-    <ul style="margin-left: 15px; margin-top: 5px;">
-        <li>All measurements are in centimeters (cm) unless otherwise specified</li>
-        <li>Tolerances are applied to finished garment measurements</li>
-        <li>Critical measurements require special attention during production</li>
-        <li>Measurements should be taken on relaxed, flat garments</li>
-        <li>Refer to "How to Measure" section for detailed instructions</li>
-        <li>Size grading follows standard industry practices</li>
-    </ul>
-</div>
-
-<!-- Tolerance Legend -->
-<div style="margin-top: 15px; padding: 8px; background: #f0f8ff; border: 1px solid #b8d4f0; font-size: 8px;">
-    <strong>Tolerance Legend:</strong>
-    <div style="margin-top: 5px; display: flex; gap: 20px;">
-        <span><span style="color: #c00;">-Tol:</span> Minus tolerance (acceptable shrinkage)</span>
-        <span><span style="color: #090;">+Tol:</span> Plus tolerance (acceptable stretch)</span>
-        <span><span style="background: #fee; color: #c00; padding: 1px 3px; border-radius: 2px;">CRITICAL</span> Critical measurement point</span>
-    </div>
-</div>

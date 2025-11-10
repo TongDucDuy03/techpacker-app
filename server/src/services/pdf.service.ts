@@ -1,344 +1,303 @@
-import puppeteer, { Browser, PDFOptions } from 'puppeteer';
-import ejs from 'ejs';
+import fs from 'fs';
 import path from 'path';
-import { 
-  TechPackData, 
-  PDFGenerationOptions, 
-  PDFResponse, 
-  PDFPreviewResponse,
-  TemplateData,
-  PDFGenerationError,
-  PDFErrorCode
-} from '../types/techpack.types';
+import os from 'os';
+import { promisify } from 'util';
+import ejs from 'ejs';
+import { Browser } from 'puppeteer';
+import puppeteer from 'puppeteer';
+import PQueue from 'p-queue';
+import { buildRenderModel } from './pdf-renderer.service';
+import { cacheService } from './cache.service';
+import { PDFGenerationError, PDFErrorCode } from '../types/techpack.types';
+
+const mkdir = promisify(fs.mkdir);
+const stat = promisify(fs.stat);
+const unlink = promisify(fs.unlink);
+
+const TEMPLATE_DIR = path.join(__dirname, '../templates');
+const TMP_DIR = process.env.PDF_TMP_DIR || path.join(os.tmpdir(), 'techpack-pdf');
+const PDF_TIMEOUT = Number(process.env.PDF_TIMEOUT || 60_000);
+const PDF_CACHE_TTL = Number(process.env.PDF_CACHE_TTL || 21_600);
+const PDF_CONCURRENCY = Number(process.env.PDF_CONCURRENCY || 3);
+
+interface GenerateOptions {
+  techpack: any;
+  printedBy: string;
+  includeSections?: string[];
+  force?: boolean;
+  // If true, generate PDF in landscape orientation
+  landscape?: boolean;
+}
+
+interface PDFMetadata {
+  path: string;
+  size: number;
+  pages: number;
+  generatedAt: string;
+  cached: boolean;
+}
+
+interface PreviewOptions extends GenerateOptions {
+  width?: number;
+}
 
 export class PDFService {
-  private browser: Browser | null = null;
-  private readonly templatePath: string;
-  private readonly defaultOptions: PDFGenerationOptions;
+  private browserPromise: Promise<Browser> | null = null;
+  private readonly queue: PQueue;
+  private readonly inFlight: Map<string, Promise<PDFMetadata>>;
 
   constructor() {
-    this.templatePath = path.join(__dirname, '../templates');
-    this.defaultOptions = {
-      format: 'A4',
-      orientation: 'portrait',
-      margin: {
-        top: '30px',
-        bottom: '40px',
-        left: '20px',
-        right: '20px'
-      },
-      printBackground: true,
-      displayHeaderFooter: true,
-      scale: 1,
-      preferCSSPageSize: false,
-      generateTaggedPDF: true,
-      includeImages: true,
-      imageQuality: 90,
-      compressImages: true
-    };
+    this.queue = new PQueue({
+      concurrency: PDF_CONCURRENCY,
+    });
+    this.inFlight = new Map();
+    this.ensureTmpDir();
   }
 
-  /**
-   * Initialize Puppeteer browser instance
-   */
-  private async initBrowser(): Promise<Browser> {
-    if (!this.browser) {
-      this.browser = await puppeteer.launch({
+  private async ensureTmpDir() {
+    try {
+      await mkdir(TMP_DIR, { recursive: true });
+    } catch (error) {
+      console.warn('Unable to create PDF temp directory', TMP_DIR, error);
+    }
+  }
+
+  private async getBrowser(): Promise<Browser> {
+    if (!this.browserPromise) {
+      this.browserPromise = puppeteer.launch({
         headless: 'new',
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
+          '--disable-gpu',
           '--no-zygote',
           '--single-process',
-          '--disable-gpu'
-        ]
+        ],
       });
     }
-    return this.browser;
+    return this.browserPromise;
   }
 
-  /**
-   * Close browser instance
-   */
-  async closeBrowser(): Promise<void> {
-    if (this.browser) {
-      await this.browser.close();
-      this.browser = null;
-    }
+  private buildCacheKey(techpack: any, options?: GenerateOptions) {
+    const updatedAt = techpack.updatedAt ? new Date(techpack.updatedAt).getTime() : 0;
+    const orientation = options?.landscape === false ? 'portrait' : 'landscape';
+    return `pdf:techpack:${techpack._id}:v${techpack.version}:${updatedAt}:${orientation}`;
   }
 
-  /**
-   * Generate PDF from TechPack data
-   */
-  async generateTechPackPDF(
-    data: TechPackData, 
-    options: Partial<PDFGenerationOptions> = {}
-  ): Promise<PDFResponse> {
+  private buildFilePath(techpack: any) {
+    const safeName = String(techpack.articleCode || techpack._id).replace(/[^a-z0-9_-]+/gi, '_');
+    return path.join(TMP_DIR, `techpack-${safeName}-v${techpack.version}.pdf`);
+  }
+
+  private async renderTemplate(payload: any): Promise<string> {
+    const templatePath = path.join(TEMPLATE_DIR, 'techpack-template.ejs');
     try {
-      const mergedOptions = { ...this.defaultOptions, ...options };
-      const templateData = this.prepareTemplateData(data);
-      
-      // Render HTML from EJS template
-      const html = await this.renderTemplate(templateData);
-      
-      // Generate PDF using Puppeteer
-      const pdfBuffer = await this.generatePDFFromHTML(html, mergedOptions);
-      
-      const filename = `${data.techpack.articleCode}_v${data.techpack.version}.pdf`;
-      
-      return {
-        success: true,
-        message: 'PDF generated successfully',
-        data: {
-          buffer: pdfBuffer,
-          filename,
-          size: pdfBuffer.length,
-          pages: await this.countPDFPages(pdfBuffer),
-          generatedAt: new Date().toISOString()
-        }
-      };
-    } catch (error) {
-      console.error('PDF Generation Error:', error);
-      return {
-        success: false,
-        message: 'Failed to generate PDF',
-        error: {
-          code: this.getErrorCode(error),
-          message: error instanceof Error ? error.message : 'Unknown error',
-          details: error
-        }
-      };
-    }
-  }
-
-  /**
-   * Generate PDF preview (base64 encoded)
-   */
-  async generatePDFPreview(
-    data: TechPackData,
-    page: number = 1,
-    _options: Partial<PDFGenerationOptions> = {}
-  ): Promise<PDFPreviewResponse> {
-    try {
-      // Options are merged implicitly when used
-      const templateData = this.prepareTemplateData(data);
-      const html = await this.renderTemplate(templateData);
-      
-      const browser = await this.initBrowser();
-      const browserPage = await browser.newPage();
-      
-      await browserPage.setContent(html, { waitUntil: 'networkidle0' });
-      
-      // Generate screenshot of specific page
-      const screenshot = await browserPage.screenshot({
-        type: 'png',
-        fullPage: false,
-        clip: {
-          x: 0,
-          y: (page - 1) * 842, // A4 height in pixels at 72 DPI
-          width: 595, // A4 width in pixels at 72 DPI
-          height: 842
-        }
-      });
-      
-      await browserPage.close();
-      
-      const base64 = screenshot.toString('base64');
-      const filename = `${data.techpack.articleCode}_preview_p${page}.png`;
-      
-      return {
-        success: true,
-        message: 'Preview generated successfully',
-        data: {
-          base64,
-          filename,
-          previewUrl: `data:image/png;base64,${base64}`
-        }
-      };
-    } catch (error) {
-      console.error('PDF Preview Error:', error);
-      return {
-        success: false,
-        message: 'Failed to generate preview',
-        error: {
-          code: this.getErrorCode(error),
-          message: error instanceof Error ? error.message : 'Unknown error'
-        }
-      };
-    }
-  }
-
-  /**
-   * Render EJS template with data
-   */
-  private async renderTemplate(data: TemplateData): Promise<string> {
-    try {
-      const templateFile = path.join(this.templatePath, 'techpack-template.ejs');
-      const html = await ejs.renderFile(templateFile, data, {
-        async: true,
-        cache: false
-      });
-      return html;
+      return await ejs.renderFile(templatePath, payload, { async: true });
     } catch (error) {
       throw new PDFGenerationError(
         PDFErrorCode.TEMPLATE_ERROR,
-        `Template rendering failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `Template rendering failed: ${(error as Error)?.message ?? 'unknown error'}`,
         error
       );
     }
   }
 
-  /**
-   * Generate PDF from HTML using Puppeteer
-   */
-  private async generatePDFFromHTML(
-    html: string, 
-    options: PDFGenerationOptions
-  ): Promise<Buffer> {
-    const browser = await this.initBrowser();
+  private async renderPartial(name: string, payload: any): Promise<string> {
+    const filePath = path.join(TEMPLATE_DIR, 'partials', `${name}.ejs`);
+    return ejs.renderFile(filePath, payload, { async: true });
+  }
+
+  private async generateForKey(cacheKey: string, options: GenerateOptions): Promise<PDFMetadata> {
+    const filePath = this.buildFilePath(options.techpack);
+    const renderOptions: any = {
+      printedBy: options.printedBy,
+      generatedAt: new Date(),
+    };
+    if (options.includeSections !== undefined) {
+      renderOptions.includeSections = options.includeSections;
+    }
+    const htmlPayload = await buildRenderModel(options.techpack, renderOptions);
+    const html = await this.renderTemplate(htmlPayload);
+
+    const headerTemplate = await this.renderPartial('header', {
+      meta: htmlPayload.meta,
+      printedBy: options.printedBy,
+      generatedAt: htmlPayload.generatedAt,
+    });
+    const footerTemplate = await this.renderPartial('footer', {
+      meta: htmlPayload.meta,
+    });
+
+    const browser = await this.getBrowser();
     const page = await browser.newPage();
-    
+    const isLandscape = options.landscape !== false;
+
     try {
-      // Set viewport for consistent rendering
-      await page.setViewport({ width: 1200, height: 1600 });
-      
-      // Set content and wait for all resources to load
-      await page.setContent(html, { 
-        waitUntil: ['networkidle0', 'domcontentloaded'] 
+      await page.setContent(html, {
+        waitUntil: ['networkidle0', 'domcontentloaded'],
       });
-      
-      // Wait for images to load
-      if (options.includeImages) {
-        await page.evaluate(() => {
-          return Promise.all(
-            Array.from(document.images, img => {
-              if (img.complete) return Promise.resolve();
-              return new Promise(resolve => {
-                img.onload = img.onerror = resolve;
-              });
-            })
-          );
-        });
-      }
-      
-      // Generate PDF
-      const pdfOptions: PDFOptions = {
-        format: options.format,
-        landscape: options.orientation === 'landscape',
-        margin: options.margin,
-        printBackground: options.printBackground,
-        displayHeaderFooter: options.displayHeaderFooter,
-        headerTemplate: options.headerTemplate || '',
-        footerTemplate: options.footerTemplate || this.getDefaultFooter(),
-        scale: options.scale,
-        preferCSSPageSize: options.preferCSSPageSize,
-        tagged: options.generateTaggedPDF
-      };
-      
-      const pdfBuffer = await page.pdf(pdfOptions);
-      return pdfBuffer;
+
+      await page.pdf({
+        path: filePath,
+        format: 'A4',
+        landscape: isLandscape,
+        printBackground: true,
+        displayHeaderFooter: true,
+        headerTemplate,
+        footerTemplate,
+        margin: { top: '20mm', bottom: '20mm', left: '15mm', right: '15mm' },
+      });
     } catch (error) {
       throw new PDFGenerationError(
         PDFErrorCode.PUPPETEER_ERROR,
-        `PDF generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `PDF generation failed: ${(error as Error)?.message ?? 'unknown error'}`,
         error
       );
     } finally {
       await page.close();
     }
-  }
 
-  /**
-   * Prepare template data with additional metadata
-   */
-  private prepareTemplateData(data: TechPackData): TemplateData {
-    return {
-      ...data,
-      generatedAt: new Date().toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
-      pageTitle: `${data.techpack.name} - Tech Pack`,
-      showWatermark: !!data.watermark,
-      pageBreaks: {
-        afterHeader: true,
-        afterBOM: true,
-        afterMeasurements: true,
-        afterHowToMeasure: false
-      },
-      logoUrl: data.logoUrl || this.getDefaultLogoUrl()
+    const { size, pages } = await this.inspectPdf(filePath);
+    const metadata: PDFMetadata = {
+      path: filePath,
+      size,
+      pages,
+      generatedAt: new Date().toISOString(),
+      cached: false,
     };
+
+    await cacheService.set(cacheKey, metadata, PDF_CACHE_TTL);
+    return metadata;
   }
 
-  /**
-   * Count pages in PDF buffer
-   */
-  private async countPDFPages(buffer: Buffer): Promise<number> {
-    // Simple page count estimation based on buffer size
-    // In production, you might want to use a PDF parsing library
-    const avgPageSize = 50000; // Average bytes per page
-    return Math.max(1, Math.ceil(buffer.length / avgPageSize));
+  private async inspectPdf(filePath: string) {
+    const stats = await stat(filePath);
+    const pageCount = await this.countPages(filePath);
+    return { size: stats.size, pages: pageCount };
   }
 
-  /**
-   * Get error code from error object
-   */
-  private getErrorCode(error: any): string {
-    if (error instanceof PDFGenerationError) {
-      return error.code;
+  private async countPages(filePath: string): Promise<number> {
+    const stream = fs.createReadStream(filePath);
+    let pages = 0;
+    const pattern = /\/Type\s*\/Page[^s]/g;
+
+    return new Promise<number>((resolve, reject) => {
+      stream.on('data', (chunk) => {
+        const matches = chunk.toString('utf8').match(pattern);
+        if (matches) pages += matches.length;
+      });
+      stream.on('end', () => resolve(Math.max(pages, 1)));
+      stream.on('error', reject);
+    });
+  }
+
+  async getOrCreatePdf(options: GenerateOptions): Promise<PDFMetadata> {
+    const cacheKey = this.buildCacheKey(options.techpack, options);
+
+    if (!options.force) {
+      const cached = await cacheService.get<PDFMetadata>(cacheKey);
+      if (cached) {
+        try {
+          const stats = await stat(cached.path);
+          if (stats.isFile()) {
+            return { ...cached, cached: true };
+          }
+        } catch {
+          await cacheService.del(cacheKey);
+        }
+      }
     }
-    if (error.message?.includes('Template')) {
-      return PDFErrorCode.TEMPLATE_ERROR;
+
+    if (this.inFlight.has(cacheKey)) {
+      return this.inFlight.get(cacheKey)!;
     }
-    if (error.message?.includes('Puppeteer')) {
-      return PDFErrorCode.PUPPETEER_ERROR;
+
+    const job: Promise<PDFMetadata> = this.queue.add(async () => {
+      let timer: NodeJS.Timeout | null = null;
+      try {
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            reject(new PDFGenerationError(PDFErrorCode.PUPPETEER_ERROR, 'PDF generation timeout'));
+          }, PDF_TIMEOUT);
+        });
+
+        const result = await Promise.race<PDFMetadata>([
+          this.generateForKey(cacheKey, options),
+          timeoutPromise,
+        ]);
+
+        return result;
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    }) as Promise<PDFMetadata>;
+
+    this.inFlight.set(cacheKey, job);
+
+    try {
+      const result = await job;
+      return result;
+    } finally {
+      this.inFlight.delete(cacheKey);
     }
-    return PDFErrorCode.NETWORK_ERROR;
   }
 
-  /**
-   * Get default footer template
-   */
-  private getDefaultFooter(): string {
-    return `
-      <div style="font-size: 10px; text-align: center; width: 100%; color: #666; margin-top: 10px;">
-        <span>Generated on <span class="date"></span> | Page <span class="pageNumber"></span> of <span class="totalPages"></span> | Powered by TechPacker App</span>
-      </div>
-    `;
+  async generatePreview(options: PreviewOptions): Promise<string> {
+    const renderOptions: any = {
+      printedBy: options.printedBy,
+      generatedAt: new Date(),
+    };
+    if (options.includeSections !== undefined) {
+      renderOptions.includeSections = options.includeSections;
+    }
+    const payload = await buildRenderModel(options.techpack, renderOptions);
+
+    const html = await this.renderTemplate(payload);
+    const browser = await this.getBrowser();
+    const page = await browser.newPage();
+
+    try {
+      await page.setViewport({ width: 1200, height: 1600 });
+      await page.setContent(html, { waitUntil: ['networkidle0', 'domcontentloaded'] });
+      const buffer = await page.screenshot({
+        type: 'png',
+        fullPage: false,
+        clip: { x: 0, y: 0, width: options.width || 1280, height: 960 },
+      });
+      return `data:image/png;base64,${buffer.toString('base64')}`;
+    } finally {
+      await page.close();
+    }
   }
 
-  /**
-   * Get default logo URL
-   */
-  private getDefaultLogoUrl(): string {
-    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjQwIiB2aWV3Qm94PSIwIDAgMTAwIDQwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8dGV4dCB4PSI1MCIgeT0iMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IiMzMzMiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlRlY2hQYWNrZXI8L3RleHQ+Cjwvc3ZnPgo=';
-  }
-
-  /**
-   * Validate TechPack data before PDF generation
-   */
-  validateTechPackData(data: TechPackData): { isValid: boolean; errors: string[] } {
+  async validate(techpack: any) {
     const errors: string[] = [];
-    
-    if (!data.techpack?.name) errors.push('TechPack name is required');
-    if (!data.techpack?.articleCode) errors.push('Article code is required');
-    if (!data.techpack?.version) errors.push('Version is required');
-    if (!data.materials || data.materials.length === 0) errors.push('At least one material is required');
-    if (!data.measurements || data.measurements.length === 0) errors.push('At least one measurement is required');
-    
+    if (!techpack.productName) errors.push('Product name is required');
+    if (!techpack.articleCode) errors.push('Article code is required');
+    if (!techpack.version) errors.push('Version is required');
+    if (!Array.isArray(techpack.bom) || techpack.bom.length === 0) {
+      errors.push('At least one BOM item is required');
+    }
+    if (!Array.isArray(techpack.measurements) || techpack.measurements.length === 0) {
+      errors.push('At least one measurement is required');
+    }
     return {
       isValid: errors.length === 0,
-      errors
+      errors,
     };
+  }
+
+  async cleanup(filePath: string) {
+    try {
+      await unlink(filePath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        console.warn('Failed to remove temp PDF', filePath, error);
+      }
+    }
   }
 }
 
-// Export singleton instance
 export const pdfService = new PDFService();
 export default pdfService;
