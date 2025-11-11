@@ -120,7 +120,7 @@ export const TechPackSelectionModal: React.FC<TechPackSelectionModalProps> = ({
                       border: selectedTechPack?.id === techPack.id ? '2px solid #1890ff' : '1px solid #d9d9d9',
                       cursor: 'pointer',
                     }}
-                    bodyStyle={{ padding: '16px' }}
+                    styles={{ body: { padding: '16px' } }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={{ flex: 1 }}>

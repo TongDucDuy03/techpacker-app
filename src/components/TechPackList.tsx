@@ -60,6 +60,9 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
   const [seasonFilter, setSeasonFilter] = useState('');
   const [showCreateWorkflow, setShowCreateWorkflow] = useState(false);
 
+  // Ensure techPacks is always an array to prevent "filter is not a function" errors
+  const safeTechPacks = Array.isArray(techPacks) ? techPacks : [];
+
   // Permission checks based on user role
   const canCreate = user?.role === 'admin' || user?.role === 'designer';
   const canEdit = user?.role === 'admin' || user?.role === 'designer';
@@ -78,7 +81,7 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
   };
 
   const filteredTechPacks = useMemo(() => {
-    return techPacks.filter(tp => {
+    return safeTechPacks.filter(tp => {
       const name = (tp as any).productName || tp.name || '';
       const category = (tp as any).productClass || (tp as any).category || tp.metadata?.category || '';
       const season = (tp as any).season || tp.metadata?.season || '';
@@ -90,7 +93,7 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
         (seasonFilter ? season === seasonFilter : true)
       );
     });
-  }, [techPacks, searchTerm, statusFilter, categoryFilter, seasonFilter]);
+  }, [safeTechPacks, searchTerm, statusFilter, categoryFilter, seasonFilter]);
 
   const showDeleteConfirm = (id: string) => {
     Modal.confirm({
@@ -124,7 +127,7 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
     {
       title: 'Status',
       dataIndex: 'status',
-      filters: [...new Set(techPacks.map(tp => tp.status))].map(s => ({ text: s, value: s })),
+      filters: [...new Set(safeTechPacks.map(tp => tp.status))].map(s => ({ text: s, value: s })),
       onFilter: (value: any, record: any) => record.status.indexOf(value) === 0,
       render: (status: string) => <Tag color={getStatusColor(status)} className="status-tag">{status.toUpperCase()}</Tag>
     },
@@ -151,10 +154,10 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
       </div>
 
       <Row gutter={16} className="techpack-stats">
-        <Col span={6}><Card><Statistic title="Total Packs" value={techPacks.length} prefix={<FileTextOutlined />} /></Card></Col>
-        <Col span={6}><Card><Statistic title="Draft" value={techPacks.filter(tp => tp.status === 'Draft').length} prefix={<EditOutlined />} /></Card></Col>
-        <Col span={6}><Card><Statistic title="In Review" value={techPacks.filter(tp => tp.status === 'In Review').length} prefix={<ClockCircleOutlined />} /></Card></Col>
-        <Col span={6}><Card><Statistic title="Approved" value={techPacks.filter(tp => tp.status === 'Approved').length} prefix={<CheckCircleOutlined />} /></Card></Col>
+        <Col span={6}><Card><Statistic title="Total Packs" value={safeTechPacks.length} prefix={<FileTextOutlined />} /></Card></Col>
+        <Col span={6}><Card><Statistic title="Draft" value={safeTechPacks.filter(tp => tp.status === 'Draft').length} prefix={<EditOutlined />} /></Card></Col>
+        <Col span={6}><Card><Statistic title="In Review" value={safeTechPacks.filter(tp => tp.status === 'In Review').length} prefix={<ClockCircleOutlined />} /></Card></Col>
+        <Col span={6}><Card><Statistic title="Approved" value={safeTechPacks.filter(tp => tp.status === 'Approved').length} prefix={<CheckCircleOutlined />} /></Card></Col>
       </Row>
 
       <Card className="techpack-table-card">
@@ -164,13 +167,13 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
               <Space>
                 <Search placeholder="Search by name or code" onSearch={setSearchTerm} style={{ width: 250 }} allowClear enterButton />
                 <Select placeholder="Filter by status" onChange={setStatusFilter} style={{ width: 150 }} allowClear>
-                  {[...new Set(techPacks.map(tp => tp.status))].map(s => <Option key={s} value={s}>{s}</Option>)}
+                  {[...new Set(safeTechPacks.map(tp => tp.status))].map(s => <Option key={s} value={s}>{s}</Option>)}
                 </Select>
                 <Select placeholder="Filter by category" onChange={setCategoryFilter} style={{ width: 150 }} allowClear>
-                  {[...new Set(techPacks.map(tp => (tp as any).productClass || (tp as any).category || tp.metadata?.category))].filter(Boolean).map(c => <Option key={c} value={c}>{c}</Option>)}
+                  {[...new Set(safeTechPacks.map(tp => (tp as any).productClass || (tp as any).category || tp.metadata?.category))].filter(Boolean).map(c => <Option key={c} value={c}>{c}</Option>)}
                 </Select>
                 <Select placeholder="Filter by season" onChange={setSeasonFilter} style={{ width: 150 }} allowClear>
-                  {[...new Set(techPacks.map(tp => (tp as any).season || tp.metadata?.season))].filter(Boolean).map(s => <Option key={s} value={s}>{s}</Option>)}
+                  {[...new Set(safeTechPacks.map(tp => (tp as any).season || tp.metadata?.season))].filter(Boolean).map(s => <Option key={s} value={s}>{s}</Option>)}
                 </Select>
               </Space>
             </Col>

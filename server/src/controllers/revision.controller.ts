@@ -120,7 +120,6 @@ export class RevisionController {
       const [revisions, total] = await Promise.all([
         Revision.find(query)
           .populate('createdBy', 'firstName lastName email')
-          .populate('approvedBy', 'firstName lastName email')
           .select(includeSnapshot ? '' : '-snapshot') // Exclude snapshot from list view unless requested
           .sort({ createdAt: -1 })
           .skip(skip)
@@ -159,7 +158,6 @@ export class RevisionController {
 
       const revision = await Revision.findById(id)
         .populate('createdBy', 'firstName lastName email')
-        .populate('approvedBy', 'firstName lastName email')
         .populate('techPackId', 'productName articleCode');
 
       if (!revision) {
@@ -184,7 +182,51 @@ export class RevisionController {
         return sendError(res, 'Access denied', 403, 'FORBIDDEN');
       }
 
-      // Return full revision details including snapshot
+      // If this revision lacks stored field-level diff, compute it on-the-fly against the previous revision
+      try {
+        const hasStoredDiff =
+          revision.changes &&
+          (revision.changes as any).diff &&
+          typeof (revision.changes as any).diff === 'object' &&
+          Object.keys((revision.changes as any).diff || {}).length > 0;
+        const hasSnapshot = !!revision.snapshot;
+        if (!hasStoredDiff && hasSnapshot) {
+          // Find previous revision for the same TechPack by createdAt
+          const previous = await Revision.findOne({
+            techPackId: techPackId,
+            createdAt: { $lt: revision.createdAt }
+          })
+            .sort({ createdAt: -1 })
+            .select('snapshot version createdAt');
+          if (previous && previous.snapshot) {
+            const comparison = RevisionService.compareTechPacks(previous.snapshot as any, revision.snapshot as any);
+            // Enrich revision object for response only (do not persist)
+            (revision as any).changes = {
+              ...(revision.changes as any),
+              diff: comparison.diffData,
+              // Optionally attach formatted helpers
+              details: {
+                ...((revision.changes as any)?.details || {}),
+                ...(function () {
+                  const formatted = RevisionService.formatDiffData(
+                    comparison.diffData as any,
+                    previous.snapshot as any,
+                    revision.snapshot as any
+                  );
+                  return {
+                    formattedBySection: formatted.perSection,
+                    formattedText: formatted.asText
+                  };
+                })()
+              }
+            };
+          }
+        }
+      } catch (_e) {
+        // If dynamic diff computation fails, still return the revision
+      }
+
+      // Return full revision details including snapshot and computed diff (if any)
       sendSuccess(res, revision);
     } catch (error: any) {
       sendError(res, error.message || 'Failed to fetch revision', 500);
@@ -314,9 +356,10 @@ export class RevisionController {
       let targetRevision: any;
       let newVersion: string = '';
 
-      await session.withTransaction(async () => {
+      const runRevertLogic = async (useSession: boolean) => {
         // Check TechPack access and edit permissions
-        const techpack = await TechPack.findById(techPackId).session(session);
+        const techpackQuery = TechPack.findById(techPackId);
+        const techpack = useSession ? await techpackQuery.session(session) : await techpackQuery;
         if (!techpack) {
           throw new Error('TechPack not found');
         }
@@ -329,7 +372,8 @@ export class RevisionController {
         }
 
         // Get the revision to revert to
-        targetRevision = await Revision.findById(revisionId).session(session);
+        const revQuery = Revision.findById(revisionId);
+        targetRevision = useSession ? await revQuery.session(session) : await revQuery;
         if (!targetRevision) {
           throw new Error('Revision not found');
         }
@@ -359,21 +403,55 @@ export class RevisionController {
         delete clonedSnapshot.createdAt;
         delete clonedSnapshot.updatedAt;
 
+        // Prepare diff before applying snapshot (old vs. target snapshot)
+        let oldTechpackObject: any;
+        try {
+          oldTechpackObject = techpack.toObject({ virtuals: true });
+        } catch {
+          oldTechpackObject = (techpack as any);
+        }
+        // Build a preview of the new object by overlaying snapshot on current
+        const previewNewObject = _.cloneDeep(oldTechpackObject);
+        Object.assign(previewNewObject, clonedSnapshot);
+        // Ensure arrays are taken from snapshot when available
+        ['bom', 'measurements', 'colorways', 'howToMeasure'].forEach((key) => {
+          if ((clonedSnapshot as any)[key] !== undefined) {
+            (previewNewObject as any)[key] = (clonedSnapshot as any)[key];
+          }
+        });
+        const changes = RevisionService.compareTechPacks(oldTechpackObject, previewNewObject);
+        const formatted = RevisionService.formatDiffData(
+          changes.diffData as any,
+          oldTechpackObject,
+          previewNewObject
+        );
+
         // Apply reverted data to TechPack
         Object.assign(techpack, clonedSnapshot);
 
-        // Generate new version number
+        // Ensure Mongoose detects array modifications
+        const arrayFields: string[] = ['bom', 'measurements', 'colorways', 'howToMeasure'];
+        arrayFields.forEach((field) => {
+          if ((clonedSnapshot as any)[field] !== undefined) {
+            try {
+              techpack.markModified(field as any);
+            } catch (_) {
+              // ignore
+            }
+          }
+        });
+
+        // Generate new revision version number (do not change TechPack.version)
         const versionResult = await RevisionService.autoIncrementVersion(new Types.ObjectId(techPackId));
         newVersion = versionResult.revisionVersion;
 
-        // Update metadata
-        techpack.version = newVersion;
+        // Update metadata (keep product version unchanged)
         techpack.updatedBy = user._id;
         techpack.updatedByName = `${user.firstName} ${user.lastName}`;
         techpack.updatedAt = new Date();
 
         // Save TechPack within transaction
-        savedTechpack = await techpack.save({ session });
+        savedTechpack = useSession ? await techpack.save({ session }) : await techpack.save();
 
         // Create a new revision entry for the revert action
         revertRevision = new Revision({
@@ -381,16 +459,19 @@ export class RevisionController {
           version: newVersion,
           changeType: 'rollback',
           changes: {
-            summary: `Reverted to Revision ${targetRevision.version}`,
+            summary: `Reverted to Revision ${targetRevision.version} — ${changes.summary}`,
             details: {
               revertedFrom: targetRevision.version,
               revertedFromId: String(targetRevision._id),
-              revertAction: true
-            }
+              revertAction: true,
+              formattedBySection: formatted.perSection,
+              formattedText: formatted.asText
+            },
+            diff: changes.diffData
           },
           createdBy: user._id,
           createdByName: `${user.firstName} ${user.lastName}`,
-          description: reason || `Reverted to revision ${targetRevision.version}`,
+          description: reason || formatted.asText || `Reverted to revision ${targetRevision.version}`,
           statusAtChange: savedTechpack.status,
           snapshot: savedTechpack.toObject({ virtuals: true }),
           revertedFrom: targetRevision.version,
@@ -398,8 +479,29 @@ export class RevisionController {
         });
 
         // Save revision within transaction
-        await revertRevision.save({ session });
-      });
+        if (useSession) {
+          await revertRevision.save({ session });
+        } else {
+          await revertRevision.save();
+        }
+      };
+
+      // Prefer transaction, fallback to non-transactional if not supported
+      try {
+        await session.withTransaction(async () => {
+          await runRevertLogic(true);
+        });
+      } catch (txErr: any) {
+        const msg = String(txErr?.message || '');
+        if (msg.includes('Transaction numbers are only allowed on a replica set member') ||
+            msg.includes('ReplicaSet') ||
+            msg.includes('not supported')) {
+          // Fallback: run without transactions for standalone MongoDB
+          await runRevertLogic(false);
+        } else {
+          throw txErr;
+        }
+      }
 
       // Post-transaction actions (after successful commit)
       // Cache invalidation
@@ -581,198 +683,6 @@ export class RevisionController {
     }
   }
 
-  /**
-   * Approve a revision
-   * POST /api/v1/revisions/:id/approve
-   */
-  async approveRevision(req: AuthRequest, res: Response): Promise<void> {
-    try {
-      const { id } = req.params;
-      const { reason } = req.body;
-      const user = req.user!;
-
-      // Validate ObjectId
-      if (!Types.ObjectId.isValid(id)) {
-        return sendError(res, 'Invalid revision ID format', 400, 'VALIDATION_ERROR');
-      }
-
-      // Check permission: only Admin or Merchandiser can approve
-      if (user.role !== UserRole.Admin && user.role !== UserRole.Merchandiser) {
-        return sendError(res, 'Only Admin or Merchandiser can approve revisions', 403, 'FORBIDDEN');
-      }
-
-      // Get revision
-      const revision = await Revision.findById(id)
-        .populate('createdBy', 'firstName lastName email');
-      if (!revision) {
-        return sendError(res, 'Revision not found', 404, 'NOT_FOUND');
-      }
-
-      // Get TechPack
-      const techPackId = safeId(revision.techPackId);
-      const techpack = await TechPack.findById(techPackId);
-      if (!techpack) {
-        return sendError(res, 'Associated TechPack not found', 404, 'NOT_FOUND');
-      }
-
-      // Update revision
-      revision.approvedBy = user._id;
-      revision.approvedByName = `${user.firstName} ${user.lastName}`;
-      revision.approvedAt = new Date();
-      revision.approvedReason = reason || undefined;
-      revision.status = 'approved';
-
-      await revision.save();
-
-      // Cache invalidation
-      try {
-        await CacheInvalidationUtil.invalidateRevisions(techPackId);
-      } catch (cacheErr) {
-        console.error('Failed to invalidate cache after approval:', cacheErr);
-      }
-
-      // Audit log
-      try {
-        await logActivity({
-          userId: user._id,
-          userName: `${user.firstName} ${user.lastName}`,
-          action: ActivityAction.TECHPACK_UPDATE,
-          target: {
-            type: 'TechPack',
-            id: techpack._id as Types.ObjectId,
-            name: techpack.productName
-          },
-          details: {
-            action: 'approve_revision',
-            revisionId: String(revision._id),
-            revisionVersion: revision.version,
-            reason: reason || undefined
-          },
-          req
-        });
-      } catch (auditErr) {
-        console.error('Failed to log approval activity:', auditErr);
-      }
-
-      // Notification
-      try {
-        const revisionCreatorId = safeId(revision.createdBy);
-        await NotificationService.notifyApproval(
-          String(revision._id),
-          techPackId,
-          { _id: user._id, firstName: user.firstName, lastName: user.lastName },
-          revisionCreatorId,
-          'approved',
-          reason
-        );
-      } catch (notifErr) {
-        console.error('Failed to send approval notification:', notifErr);
-      }
-
-      sendSuccess(res, revision, 'Revision approved successfully');
-    } catch (error: any) {
-      sendError(res, error.message || 'Failed to approve revision', 500);
-    }
-  }
-
-  /**
-   * Reject a revision
-   * POST /api/v1/revisions/:id/reject
-   */
-  async rejectRevision(req: AuthRequest, res: Response): Promise<void> {
-    try {
-      const { id } = req.params;
-      const { reason } = req.body;
-      const user = req.user!;
-
-      // Validate ObjectId
-      if (!Types.ObjectId.isValid(id)) {
-        return sendError(res, 'Invalid revision ID format', 400, 'VALIDATION_ERROR');
-      }
-
-      // Validate reason is provided for rejection
-      if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
-        return sendError(res, 'Reason is required for rejection', 400, 'VALIDATION_ERROR');
-      }
-
-      // Check permission: only Admin or Merchandiser can reject
-      if (user.role !== UserRole.Admin && user.role !== UserRole.Merchandiser) {
-        return sendError(res, 'Only Admin or Merchandiser can reject revisions', 403, 'FORBIDDEN');
-      }
-
-      // Get revision
-      const revision = await Revision.findById(id)
-        .populate('createdBy', 'firstName lastName email');
-      if (!revision) {
-        return sendError(res, 'Revision not found', 404, 'NOT_FOUND');
-      }
-
-      // Get TechPack
-      const techPackId = safeId(revision.techPackId);
-      const techpack = await TechPack.findById(techPackId);
-      if (!techpack) {
-        return sendError(res, 'Associated TechPack not found', 404, 'NOT_FOUND');
-      }
-
-      // Update revision
-      revision.approvedBy = user._id;
-      revision.approvedByName = `${user.firstName} ${user.lastName}`;
-      revision.approvedAt = new Date();
-      revision.approvedReason = reason.trim();
-      revision.status = 'rejected';
-
-      await revision.save();
-
-      // Cache invalidation
-      try {
-        await CacheInvalidationUtil.invalidateRevisions(techPackId);
-      } catch (cacheErr) {
-        console.error('Failed to invalidate cache after rejection:', cacheErr);
-      }
-
-      // Audit log
-      try {
-        await logActivity({
-          userId: user._id,
-          userName: `${user.firstName} ${user.lastName}`,
-          action: ActivityAction.TECHPACK_UPDATE,
-          target: {
-            type: 'TechPack',
-            id: techpack._id as Types.ObjectId,
-            name: techpack.productName
-          },
-          details: {
-            action: 'reject_revision',
-            revisionId: String(revision._id),
-            revisionVersion: revision.version,
-            reason: reason
-          },
-          req
-        });
-      } catch (auditErr) {
-        console.error('Failed to log rejection activity:', auditErr);
-      }
-
-      // Notification
-      try {
-        const revisionCreatorId = safeId(revision.createdBy);
-        await NotificationService.notifyApproval(
-          String(revision._id),
-          techPackId,
-          { _id: user._id, firstName: user.firstName, lastName: user.lastName },
-          revisionCreatorId,
-          'rejected',
-          reason
-        );
-      } catch (notifErr) {
-        console.error('Failed to send rejection notification:', notifErr);
-      }
-
-      sendSuccess(res, revision, 'Revision rejected successfully');
-    } catch (error: any) {
-      sendError(res, error.message || 'Failed to reject revision', 500);
-    }
-  }
 }
 
 export default new RevisionController();

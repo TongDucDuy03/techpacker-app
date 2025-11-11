@@ -7,18 +7,31 @@
     padding: 6px 0;
     border-top: 1px solid #cbd5e1;
     display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .pdf-footer__info {
+    display: flex;
     justify-content: space-between;
     align-items: center;
   }
+  .pdf-footer__confidential {
+    text-align: center;
+    font-size: 7px;
+    color: #64748b;
+    font-style: italic;
+  }
 </style>
 <div class="pdf-footer">
-  <div>
-    <span><%= meta.companyName || 'TechPacker' %></span>
-    &nbsp;•&nbsp;
-    <span><%= meta.companyWebsite || 'techpacker.app' %></span>
+  <div class="pdf-footer__info">
+    <div>
+      Printed by: <span><%= printedBy || 'TechPacker User' %></span> | 
+      Date: <span><%= generatedAt || new Date().toLocaleDateString() %></span> | 
+      Page <span class="pageNumber"></span> of <span class="totalPages"></span>
+    </div>
   </div>
-  <div>
-    Page <span class="pageNumber"></span> of <span class="totalPages"></span>
+  <div class="pdf-footer__confidential">
+    Confidential — TechPacker System
   </div>
 </div>
 

@@ -6,6 +6,7 @@ import { measurementValidationSchema } from '../../../utils/validationSchemas';
 import Input from '../shared/Input';
 import { Plus, Upload, Download, Ruler, AlertTriangle, Info, AlertCircle, X } from 'lucide-react';
 import { showSuccess, showWarning, showError } from '../../../lib/toast';
+import { validateFields } from '../../../utils/validation';
 
 // Helper to parse tolerance from string format (for backward compatibility)
 const parseTolerance = (value: string | number | undefined): number => {
@@ -183,6 +184,20 @@ const MeasurementTab: React.FC = () => {
     };
   }, [progressionMode]);
 
+  // Helper to format validation alert message
+  const formatValidationAlert = (fieldKey: string): string => {
+    const FIELD_LABEL_MAP: Record<string, string> = {
+      pomCode: 'POM Code',
+      pomName: 'POM Name',
+      minusTolerance: 'Minus Tolerance',
+      plusTolerance: 'Plus Tolerance',
+      sizes: 'Size Measurements', // Changed from 'measurement' to 'sizes' to match UI
+    };
+    
+    const fieldLabel = FIELD_LABEL_MAP[fieldKey] || fieldKey;
+    return `Trường ${fieldLabel}, thuộc tab Measurements chưa được điền. Vui lòng điền đầy đủ thông tin.`;
+  };
+
   const handleSubmit = () => {
     // Validate pomCode and pomName separately
     const pomCodeValid = validation.validateField('pomCode', formData.pomCode);
@@ -194,6 +209,12 @@ const MeasurementTab: React.FC = () => {
       Object.keys(measurementValidationSchema).forEach(field => {
         validation.setFieldTouched(field, true);
       });
+      // Show alert for first error field
+      const errors = validation.errors;
+      const firstField = Object.keys(errors).find(key => errors[key] && validation.touched[key]);
+      if (firstField) {
+        showError(formatValidationAlert(firstField));
+      }
       return;
     }
 
@@ -213,6 +234,7 @@ const MeasurementTab: React.FC = () => {
     
     if (!hasValidMeasurements) {
       validation.setFieldError('measurement', 'At least one size measurement must be greater than 0');
+      showError(formatValidationAlert('sizes'));
       return;
     }
 
@@ -560,13 +582,13 @@ const MeasurementTab: React.FC = () => {
                             <div className="text-red-800 font-medium mb-1">Errors:</div>
                           )}
                           {progValidation.errors.map((err, idx) => (
-                            <div key={idx} className="text-red-700">{err}</div>
+                            <div key={`${err}-${idx}`} className="text-red-700">{err}</div>
                           ))}
                           {progValidation.warnings.length > 0 && (
                             <div className="text-yellow-800 font-medium mt-2 mb-1">Warnings:</div>
                           )}
                           {progValidation.warnings.map((warn, idx) => (
-                            <div key={idx} className="text-yellow-700">{warn}</div>
+                            <div key={`${warn}-${idx}`} className="text-yellow-700">{warn}</div>
                           ))}
                         </div>
                       </div>
@@ -692,7 +714,7 @@ const MeasurementTab: React.FC = () => {
                   
                   return (
                     <tr 
-                      key={measurement.id} 
+                      key={measurement.id || `measurement-${index}`} 
                       className={`hover:bg-gray-50 ${
                         validationResult.errors.length > 0 ? 'bg-red-50' : 
                         validationResult.warnings.length > 0 ? 'bg-yellow-50' : ''
@@ -782,6 +804,78 @@ const MeasurementTab: React.FC = () => {
       </div>
     </div>
   );
+};
+
+// Export validate function for use in parent component
+// Only validate fields that are actually displayed on the UI form
+export const validateMeasurementsForSave = (measurements: MeasurementPoint[]): { isValid: boolean; errors: Array<{ id: string; item: MeasurementPoint; errors: Record<string, string> }> } => {
+  const errors: Array<{ id: string; item: MeasurementPoint; errors: Record<string, string> }> = [];
+  
+  // Only validate fields that exist on the UI form
+  const visibleFields = ['pomCode', 'pomName', 'minusTolerance', 'plusTolerance'];
+  
+  measurements.forEach((item) => {
+    const itemErrors: Record<string, string> = {};
+    
+    // Validate only visible fields from schema
+    visibleFields.forEach(fieldKey => {
+      const rule = measurementValidationSchema[fieldKey as keyof typeof measurementValidationSchema];
+      if (rule) {
+        const value = item[fieldKey as keyof MeasurementPoint];
+        let error: string | null = null;
+        
+        // Check required
+        if (rule.required) {
+          if (value === null || value === undefined || value === '') {
+            error = `${fieldKey === 'pomCode' ? 'POM Code' : fieldKey === 'pomName' ? 'POM Name' : fieldKey} is required`;
+          }
+        }
+        
+        // Check custom validation if no error yet
+        if (!error && rule.custom) {
+          error = rule.custom(value as any);
+        }
+        
+        // Check minLength/maxLength for strings
+        if (!error && typeof value === 'string' && value) {
+          if (rule.minLength && value.length < rule.minLength) {
+            error = `Must be at least ${rule.minLength} characters long`;
+          }
+          if (rule.maxLength && value.length > rule.maxLength) {
+            error = `Must be no more than ${rule.maxLength} characters long`;
+          }
+        }
+        
+        // Check min/max for numbers
+        if (!error && typeof value === 'number') {
+          if (rule.min !== undefined && value < rule.min) {
+            error = `Must be at least ${rule.min}`;
+          }
+          if (rule.max !== undefined && value > rule.max) {
+            error = `Must be no more than ${rule.max}`;
+          }
+        }
+        
+        if (error) {
+          itemErrors[fieldKey] = error;
+        }
+      }
+    });
+    
+    // Validate that at least one size has a value > 0
+    // Use "sizes" as field name instead of "measurement" since that's what's on the UI
+    const sizeValues = Object.values(item.sizes || {});
+    const hasValidMeasurements = sizeValues.some(v => v !== undefined && v !== null && v > 0);
+    if (!hasValidMeasurements) {
+      itemErrors.sizes = 'At least one size measurement must be greater than 0';
+    }
+    
+    if (Object.keys(itemErrors).length > 0) {
+      errors.push({ id: item.id, item, errors: itemErrors });
+    }
+  });
+  
+  return { isValid: errors.length === 0, errors };
 };
 
 export default MeasurementTab;

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How to Measure</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 15mm 20mm;
+    }
+
+    body {
+      font-family: 'Roboto', Arial, sans-serif;
+      font-size: 10px;
+      line-height: 1.45;
+      color: #1f2933;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      margin: 0;
+      padding: 0;
+    }
+
+    .section-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      border-bottom: 2px solid #111827;
+      padding-bottom: 6px;
+      margin: 24px 0 12px;
+      page-break-after: avoid;
+    }
+
+    .howto {
+      display: flex;
+      gap: 16px;
+      padding: 14px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: #f8fafc;
+      margin-bottom: 18px;
+      page-break-inside: avoid;
+    }
+
+    .howto img {
+      width: 320px;
+      max-width: 45%;
+      object-fit: contain;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      background: #fff;
+    }
+
+    .howto-content h3 {
+      font-size: 11px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .text-muted {
+      color: #6b7280;
+      font-size: 8px;
+    }
+
+    .avoid-break {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+  </style>
+</head>
+<body>
+  <div class="section-title"><%= strings.howToMeasureTitle %></div>
+
+  <% if (howToMeasure && howToMeasure.length) { %>
+    <% howToMeasure.forEach((item) => { %>
+      <div class="howto avoid-break">
+        <% if (item.image) { %>
+          <img src="<%= item.image %>" alt="<%= item.title %>" />
+        <% } else { %>
+          <div style="width:320px; max-width:45%; border:1px dashed #d1d5db; border-radius:4px; display:flex; align-items:center; justify-content:center; color:#9ca3af; font-size:9px;">
+            No diagram available
+          </div>
+        <% } %>
+        <div class="howto-content">
+          <h3><%= item.title %></h3>
+          <p style="margin-bottom:8px;"><%= item.description %></p>
+
+          <% if (item.steps && item.steps.length) { %>
+            <strong style="font-size:9px; text-transform:uppercase; display:block; margin-bottom:4px;"><%= strings.howToMeasureSteps %></strong>
+            <ol style="margin-left:18px; margin-bottom:10px;">
+              <% item.steps.forEach((step) => { %>
+                <li><%= step %></li>
+              <% }) %>
+            </ol>
+          <% } %>
+
+          <% if (item.tips && item.tips.length) { %>
+            <strong style="font-size:9px; color:#2563eb; display:block; margin-bottom:4px;"><%= strings.howToMeasureTips %></strong>
+            <ul style="margin-left:16px; margin-bottom:10px; font-size:8px; color:#2563eb;">
+              <% item.tips.forEach((tip) => { %>
+                <li><%= tip %></li>
+              <% }) %>
+            </ul>
+          <% } %>
+
+          <% if (item.mistakes && item.mistakes.length) { %>
+            <strong style="font-size:9px; color:#f97316; display:block; margin-bottom:4px;"><%= strings.howToMeasureWarnings %></strong>
+            <ul style="margin-left:16px; margin-bottom:8px; font-size:8px; color:#f97316;">
+              <% item.mistakes.forEach((mistake) => { %>
+                <li><%= mistake %></li>
+              <% }) %>
+            </ul>
+          <% } %>
+
+          <% if (item.related && item.related.length) { %>
+            <div class="text-muted" style="font-size:8px;">
+              <strong><%= strings.howToMeasureRelated %></strong> <%= item.related.join(', ') %>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    <% }) %>
+  <% } else { %>
+    <div style="padding:32px; text-align:center; color:#94a3b8;"><%= strings.emptyHowToMeasure %></div>
+  <% } %>
+</body>
+</html>
+

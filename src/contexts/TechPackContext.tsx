@@ -51,6 +51,8 @@ const TechPackContext = createContext<TechPackContextType | undefined>(undefined
 
 const TECHPACK_DRAFT_STORAGE_PREFIX = 'techpack:draft:';
 const TECHPACK_DRAFT_VERSION = 1;
+const TECHPACK_LIST_CACHE_KEY = 'techpack:list:cache';
+const TECHPACK_LIST_PAGINATION_CACHE_KEY = 'techpack:list:pagination';
 
 type PartialColorway = Partial<Colorway> & { parts?: Array<Partial<ColorwayPart>> };
 
@@ -263,12 +265,42 @@ const clearDraftFromStorage = (techpackId?: string) => {
   }
 };
 
+const loadCachedTechPacks = (): ApiTechPack[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(TECHPACK_LIST_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.warn('Failed to load cached techpacks from storage', error);
+    return [];
+  }
+};
+
+const loadCachedPagination = (): Omit<TechPackListResponse, 'data'> => {
+  if (typeof window === 'undefined') return { total: 0, page: 1, totalPages: 1 };
+  try {
+    const raw = localStorage.getItem(TECHPACK_LIST_PAGINATION_CACHE_KEY);
+    if (!raw) return { total: 0, page: 1, totalPages: 1 };
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === 'object' && parsed !== null) {
+      const { total = 0, page = 1, totalPages = 1 } = parsed as any;
+      return { total, page, totalPages };
+    }
+    return { total: 0, page: 1, totalPages: 1 };
+  } catch (error) {
+    console.warn('Failed to load cached pagination from storage', error);
+    return { total: 0, page: 1, totalPages: 1 };
+  }
+};
+
 export const TechPackProvider = ({ children }: { children: ReactNode }) => {
   // Access auth state to decide when to load protected data
   const auth = useAuth();
-  const [techPacks, setTechPacks] = useState<ApiTechPack[]>([]);
+  const [techPacks, setTechPacks] = useState<ApiTechPack[]>(() => loadCachedTechPacks());
   const [loading, setLoading] = useState<boolean>(true);
-  const [pagination, setPagination] = useState<Omit<TechPackListResponse, 'data'>>({ total: 0, page: 1, totalPages: 1 });
+  const [pagination, setPagination] = useState<Omit<TechPackListResponse, 'data'>>(() => loadCachedPagination());
   const [revisions, setRevisions] = useState<any[]>([]);
   const [revisionsLoading, setRevisionsLoading] = useState<boolean>(false);
   const [revisionPagination, setRevisionPagination] = useState<any>({ total: 0, page: 1, totalPages: 1 });
@@ -335,14 +367,39 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       const response = await api.listTechPacks(params);
-      setTechPacks(response.data);
+      // Ensure response.data is always an array
+      const techPacksData = Array.isArray(response.data) ? response.data : [];
+      setTechPacks(techPacksData);
       setPagination({ total: response.total, page: response.page, totalPages: response.totalPages });
     } catch (error: any) {
       showError(error.message || 'Failed to load tech packs');
+      // On error, fallback to cached data (if available) without clearing current state
+      if (techPacks.length === 0) {
+        setTechPacks(loadCachedTechPacks());
+        setPagination(loadCachedPagination());
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [techPacks.length]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(TECHPACK_LIST_CACHE_KEY, JSON.stringify(techPacks));
+    } catch (error) {
+      console.warn('Failed to cache techpacks list', error);
+    }
+  }, [techPacks]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(TECHPACK_LIST_PAGINATION_CACHE_KEY, JSON.stringify(pagination));
+    } catch (error) {
+      console.warn('Failed to cache techpack pagination', error);
+    }
+  }, [pagination]);
 
   useEffect(() => {
     // Only attempt to load tech packs after auth initialization.
@@ -425,26 +482,55 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     setState(prev => ({ ...prev, currentTab: tab }));
   };
 
-  const updateFormState = useCallback((updates: Partial<ApiTechPack>) => {
+  const updateFormState = useCallback((updates: Partial<ApiTechPack>, skipUnsavedFlag = false) => {
     setState(prev => {
+      // Xử lý colorways đặc biệt
       const incomingColorways = (updates as any).colorways;
       const nextColorways = incomingColorways !== undefined
         ? sanitizeColorwayList(incomingColorways as Array<PartialColorway>)
         : prev.techpack.colorways;
 
-      return {
+      // Xử lý các mảng khác: chỉ ghi đè nếu updates có giá trị (không phải undefined)
+      // Nếu updates có field (kể cả mảng rỗng []), thì dùng giá trị đó
+      // Nếu updates không có field (undefined), thì giữ giá trị cũ
+      const incomingBom = (updates as any).bom;
+      const nextBom = incomingBom !== undefined ? (Array.isArray(incomingBom) ? incomingBom : []) : prev.techpack.bom;
+
+      const incomingMeasurements = (updates as any).measurements;
+      const nextMeasurements = incomingMeasurements !== undefined 
+        ? (Array.isArray(incomingMeasurements) ? incomingMeasurements : [])
+        : prev.techpack.measurements;
+
+      const incomingHowToMeasures = (updates as any).howToMeasures;
+      const nextHowToMeasures = incomingHowToMeasures !== undefined 
+        ? (Array.isArray(incomingHowToMeasures) ? incomingHowToMeasures : [])
+        : prev.techpack.howToMeasures;
+
+      // Tách riêng các field cần xử lý đặc biệt để tránh bị ghi đè
+      const { bom: _bom, measurements: _measurements, howToMeasures: _howToMeasures, colorways: _colorways, articleInfo: _articleInfo, ...restUpdates } = updates as any;
+
+      const newState = {
         ...prev,
         techpack: {
           ...prev.techpack,
-          ...(updates as any),
+          ...restUpdates, // Spread các field khác (không phải mảng)
+          // Đảm bảo các mảng được merge đúng cách - đặt sau để không bị ghi đè
+          bom: nextBom,
+          measurements: nextMeasurements,
+          howToMeasures: nextHowToMeasures,
           colorways: nextColorways,
           articleInfo: {
             ...(prev.techpack as any).articleInfo,
-            ...(updates as any).articleInfo,
+            ...(_articleInfo || {}),
           }
         },
-        hasUnsavedChanges: true
+        // Nếu skipUnsavedFlag = true (load từ server), set hasUnsavedChanges = false
+        // Nếu skipUnsavedFlag = false (user edit), set hasUnsavedChanges = true
+        hasUnsavedChanges: skipUnsavedFlag ? false : true
       };
+
+
+      return newState;
     });
   }, []);
 
@@ -626,6 +712,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
                 };
               });
 
+              // Refresh data từ server - không set hasUnsavedChanges
               updateFormState({
                 id: (fresh as any)._id || techpackData.id,
                 articleInfo: {
@@ -648,7 +735,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
                 } as any,
                 status: (fresh as any).status ?? (state.techpack as any).status,
                 howToMeasures: freshHowToMeasures,
-              } as any);
+              } as any, true);
             }
           } catch (e) {
             // Silently handle refresh error
@@ -1045,10 +1132,16 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         }
       );
 
-      // Reload the current techpack data after revert
+      // Reload the current techpack data after revert - không set hasUnsavedChanges
       const updatedTechPack = await getTechPack(techPackId);
       if (updatedTechPack) {
-        updateFormState(updatedTechPack);
+        updateFormState(updatedTechPack, true);
+        // Cập nhật luôn danh sách techpacks để list phản ánh thay đổi ngay lập tức
+        setTechPacks(prev =>
+          Array.isArray(prev)
+            ? prev.map(tp => (tp._id === techPackId ? { ...tp, ...updatedTechPack } as any : tp))
+            : prev
+        );
       }
 
       // Reload revisions to show the new rollback revision

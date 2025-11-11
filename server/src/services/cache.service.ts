@@ -1,11 +1,14 @@
 import Redis from 'ioredis';
 import { config } from '../config/config';
+import NodeCache from 'node-cache';
 
 export class CacheService {
   private redis: Redis | null = null;
+  private memoryCache: NodeCache | null = null;
   private isConnected: boolean = false;
   private isEnabled: boolean;
   private connectionAttempted: boolean = false;
+  private useMemoryCache: boolean = false;
 
   constructor() {
     // Check if Redis is enabled via environment variable
@@ -39,8 +42,10 @@ export class CacheService {
       this.redis.on('error', (error) => {
         // Only log error once, not on every retry
         if (!this.connectionAttempted) {
-          console.warn('⚠️  Redis connection error. Caching will be disabled. Error:', error.message);
+          console.warn('⚠️  Redis connection error. Falling back to in-memory cache. Error:', error.message);
           this.connectionAttempted = true;
+          // Enable in-memory cache as fallback
+          this.enableMemoryCache();
         }
         this.isConnected = false;
       });
@@ -52,9 +57,25 @@ export class CacheService {
         this.isConnected = false;
       });
     } catch (error) {
-      console.warn('⚠️  Failed to initialize Redis. Caching will be disabled.');
+      console.warn('⚠️  Failed to initialize Redis. Falling back to in-memory cache.');
       this.redis = null;
-      this.isEnabled = false;
+      this.enableMemoryCache();
+    }
+  }
+
+  /**
+   * Enable in-memory cache as fallback when Redis is unavailable
+   */
+  private enableMemoryCache(): void {
+    if (!this.memoryCache) {
+      this.memoryCache = new NodeCache({
+        stdTTL: 300, // 5 minutes default TTL
+        checkperiod: 60, // Check for expired keys every 60 seconds
+        maxKeys: 1000, // Limit to 1000 keys to prevent memory issues
+        useClones: false // Better performance, but be careful with mutations
+      });
+      this.useMemoryCache = true;
+      console.log('✅ In-memory cache enabled as fallback');
     }
   }
 
@@ -62,63 +83,91 @@ export class CacheService {
    * Get value from cache
    */
   async get<T>(key: string): Promise<T | null> {
-    if (!this.isEnabled || !this.redis) {
-      return null;
+    // Try Redis first if available
+    if (this.isEnabled && this.redis && !this.useMemoryCache) {
+      try {
+        if (!this.isConnected && this.redis) {
+          await this.redis.connect().catch(() => {
+            // Connection failed, fallback to memory cache
+            this.enableMemoryCache();
+          });
+        }
+
+        if (this.isConnected && this.redis) {
+          const value = await this.redis.get(key);
+          return value ? JSON.parse(value) : null;
+        }
+      } catch (error) {
+        // Redis failed, fallback to memory cache
+        this.enableMemoryCache();
+      }
     }
 
-    try {
-      if (!this.isConnected && this.redis) {
-        await this.redis.connect().catch(() => {
-          // Connection failed, disable Redis
-          this.isEnabled = false;
-        });
-      }
-
-      if (!this.isConnected || !this.redis) {
+    // Fallback to in-memory cache
+    if (this.useMemoryCache && this.memoryCache) {
+      try {
+        return this.memoryCache.get<T>(key) || null;
+      } catch (error) {
         return null;
       }
-
-      const value = await this.redis.get(key);
-      return value ? JSON.parse(value) : null;
-    } catch (error) {
-      // Silently fail - caching is optional
-      return null;
     }
+
+    return null;
   }
 
   /**
    * Set value in cache with TTL
    */
   async set(key: string, value: any, ttlSeconds: number = 3600): Promise<boolean> {
-    if (!this.isEnabled || !this.redis) {
-      return false;
+    // Try Redis first if available
+    if (this.isEnabled && this.redis && !this.useMemoryCache) {
+      try {
+        if (!this.isConnected && this.redis) {
+          await this.redis.connect().catch(() => {
+            this.enableMemoryCache();
+          });
+        }
+
+        if (this.isConnected && this.redis) {
+          await this.redis.setex(key, ttlSeconds, JSON.stringify(value));
+          return true;
+        }
+      } catch (error) {
+        // Redis failed, fallback to memory cache
+        this.enableMemoryCache();
+      }
     }
 
-    try {
-      if (!this.isConnected && this.redis) {
-        await this.redis.connect().catch(() => {
-          this.isEnabled = false;
-        });
-      }
-
-      if (!this.isConnected || !this.redis) {
+    // Fallback to in-memory cache
+    if (this.useMemoryCache && this.memoryCache) {
+      try {
+        this.memoryCache.set(key, value, ttlSeconds);
+        return true;
+      } catch (error) {
         return false;
       }
-
-      await this.redis.setex(key, ttlSeconds, JSON.stringify(value));
-      return true;
-    } catch (error) {
-      // Silently fail - caching is optional
-      return false;
     }
+
+    return false;
   }
 
   /**
    * Delete key from cache
    */
   async del(key: string): Promise<boolean> {
+    // If using in-memory cache, delete there first
+    if (this.useMemoryCache && this.memoryCache) {
+      try {
+        this.memoryCache.del(key);
+        // Continue to try Redis as well if available, but succeed regardless
+      } catch (_err) {
+        // ignore memory delete errors
+      }
+    }
+
     if (!this.isEnabled || !this.redis) {
-      return false;
+      // Consider as success when memory cache is primary
+      return this.useMemoryCache ? true : false;
     }
 
     try {
@@ -129,14 +178,14 @@ export class CacheService {
       }
 
       if (!this.isConnected || !this.redis) {
-        return false;
+        return this.useMemoryCache ? true : false;
       }
 
       await this.redis.del(key);
       return true;
     } catch (error) {
       // Silently fail - caching is optional
-      return false;
+      return this.useMemoryCache ? true : false;
     }
   }
 
@@ -144,8 +193,25 @@ export class CacheService {
    * Delete multiple keys matching pattern
    */
   async delPattern(pattern: string): Promise<boolean> {
+    // If using in-memory cache, emulate pattern deletion
+    if (this.useMemoryCache && this.memoryCache) {
+      try {
+        const keys = this.memoryCache.keys() || [];
+        // Convert simple Redis-style pattern with * wildcards to regex
+        const escaped = pattern.replace(/[-\/\\^$+?.()|[\]{}]/g, '\\$&');
+        const regex = new RegExp('^' + escaped.replace(/\*/g, '.*') + '$');
+        const toDelete = keys.filter(k => regex.test(k));
+        if (toDelete.length > 0) {
+          this.memoryCache.del(toDelete);
+        }
+      } catch (_err) {
+        // ignore memory pattern delete errors
+      }
+    }
+
     if (!this.isEnabled || !this.redis) {
-      return false;
+      // Consider success when memory cache handled it
+      return this.useMemoryCache ? true : false;
     }
 
     try {
@@ -156,7 +222,7 @@ export class CacheService {
       }
 
       if (!this.isConnected || !this.redis) {
-        return false;
+        return this.useMemoryCache ? true : false;
       }
 
       const keys = await this.redis.keys(pattern);
@@ -166,7 +232,7 @@ export class CacheService {
       return true;
     } catch (error) {
       // Silently fail - caching is optional
-      return false;
+      return this.useMemoryCache ? true : false;
     }
   }
 

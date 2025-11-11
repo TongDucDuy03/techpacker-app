@@ -508,7 +508,7 @@ class RevisionService {
         // All fields from Article Info that should be tracked
         'productName',
         'articleCode',
-        'version',
+        // 'version', // Do not track product version changes automatically
         'supplier',
         'season',
         'fabricDescription',
@@ -566,6 +566,201 @@ class RevisionService {
     }
 
     return changes;
+  }
+
+  /**
+   * Format diffData into human-readable strings per section (BOM, Measurements, Colorways, Construction)
+   * without changing comparison logic. Optionally use snapshots to resolve item names from IDs.
+   */
+  public formatDiffData(
+    diffData: Record<string, { old: any; new: any } & Record<string, any>> | undefined,
+    oldTechPack?: any,
+    newTechPack?: any
+  ): { perSection: Record<string, string[]>; asText: string } {
+    const resultBySection: Record<string, string[]> = {
+      bom: [],
+      measurements: [],
+      colorways: [],
+      howToMeasure: []
+    };
+    if (!diffData || Object.keys(diffData).length === 0) {
+      return { perSection: resultBySection, asText: '' };
+    }
+
+    // Build lookup maps to resolve names by id
+    const buildMap = (arr: any[] | undefined) => {
+      const map = new Map<string, any>();
+      if (!Array.isArray(arr)) return map;
+      arr.forEach((item: any) => {
+        if (!item) return;
+        const id = (item._id ?? item.id)?.toString?.() ?? String(item._id ?? item.id ?? '');
+        if (id) map.set(id, item);
+      });
+      return map;
+    };
+
+    const oldMaps: Record<string, Map<string, any>> = {
+      bom: buildMap(oldTechPack?.bom),
+      measurements: buildMap(oldTechPack?.measurements),
+      colorways: buildMap(oldTechPack?.colorways),
+      howToMeasure: buildMap(oldTechPack?.howToMeasure)
+    };
+    const newMaps: Record<string, Map<string, any>> = {
+      bom: buildMap(newTechPack?.bom),
+      measurements: buildMap(newTechPack?.measurements),
+      colorways: buildMap(newTechPack?.colorways),
+      howToMeasure: buildMap(newTechPack?.howToMeasure)
+    };
+
+    const sectionDisplayName = (section: string): string => {
+      switch (section) {
+        case 'bom': return 'BOM';
+        case 'measurements': return 'Measurements';
+        case 'colorways': return 'Colorways';
+        case 'howToMeasure': return 'Construction';
+        default: return section;
+      }
+    };
+
+    const getItemPrimaryName = (section: string, item: any): string => {
+      if (!item || typeof item !== 'object') return '';
+      switch (section) {
+        case 'bom': {
+          const part = item.part;
+          const material = item.materialName;
+          return material || part || '';
+        }
+        case 'measurements':
+          return item.pomName || item.pomCode || '';
+        case 'colorways':
+          return item.name || item.code || '';
+        case 'howToMeasure':
+          return item.pomName || (item.stepNumber !== undefined ? `Step ${item.stepNumber}` : '') || item.pomCode || '';
+        default:
+          return item.name || item.title || '';
+      }
+    };
+
+    // Group diffs by section and by item id to collate field changes
+    type ItemChange = {
+      section: string;
+      id: string;
+      added?: any; // new key fields
+      removed?: any; // old key fields
+      updates: Array<{ field: string; old: any; new: any }>;
+    };
+    const itemsByKey = new Map<string, ItemChange>();
+
+    const ensureItemEntry = (section: string, id: string): ItemChange => {
+      const key = `${section}::${id}`;
+      if (!itemsByKey.has(key)) {
+        itemsByKey.set(key, { section, id, updates: [] });
+      }
+      return itemsByKey.get(key)!;
+    };
+
+    Object.entries(diffData).forEach(([path, payload]) => {
+      // Identify section
+      const sectionMatch = path.match(/^(bom|measurements|colorways|howToMeasure)\[(.+?)\](?:\.|$)/);
+      if (!sectionMatch) {
+        // ignore non-section fields (e.g., articleInfo); this formatter focuses on the requested tabs
+        return;
+      }
+      const section = sectionMatch[1];
+      const idToken = sectionMatch[2]; // could be id:XYZ, +id:XYZ, -id:XYZ
+      const isAdded = idToken.startsWith('+id:');
+      const isRemoved = idToken.startsWith('-id:');
+      const id = idToken.replace(/^(\+id:|-id:|id:)/, '');
+
+      if (isAdded) {
+        const entry = ensureItemEntry(section, id);
+        entry.added = (payload as any).new ?? (payload as any);
+        return;
+      }
+      if (isRemoved) {
+        const entry = ensureItemEntry(section, id);
+        entry.removed = (payload as any).old ?? (payload as any);
+        return;
+      }
+
+      // Updated field change; extract field name after the item locator
+      const fieldMatch = path.replace(/^(bom|measurements|colorways|howToMeasure)\[.+?\]\.?/, '');
+      const fieldName = fieldMatch || ''; // e.g., quantity, value, description, nested.paths[0]
+      const entry = ensureItemEntry(section, id);
+      entry.updates.push({ field: fieldName, old: payload.old, new: payload.new });
+    });
+
+    // Render per item entries into section lines
+    itemsByKey.forEach(change => {
+      const mapOld = oldMaps[change.section];
+      const mapNew = newMaps[change.section];
+      const oldItem = mapOld?.get(change.id);
+      const newItem = mapNew?.get(change.id);
+      const displayName =
+        (change.added && getItemPrimaryName(change.section, change.added)) ||
+        (change.removed && getItemPrimaryName(change.section, change.removed)) ||
+        getItemPrimaryName(change.section, newItem || oldItem) ||
+        '';
+
+      const secArray = resultBySection[change.section] || (resultBySection[change.section] = []);
+
+      if (change.added && !change.removed && change.updates.length === 0) {
+        const name = displayName || '[Item mới]';
+        secArray.push(`Thêm “${name}”`);
+        return;
+      }
+      if (change.removed && !change.added && change.updates.length === 0) {
+        const name = displayName || '[Item đã xóa]';
+        secArray.push(`Xóa “${name}”`);
+        return;
+      }
+
+      // Updated (or both added+removed with updates treated as update)
+      if (change.updates.length > 0) {
+        const name = displayName || '';
+        const fields = change.updates.map(u => {
+          // Simplify field display: take last segment of nested path
+          const lastSeg = u.field.split('.').pop() || u.field;
+          const oldVal = this.formatScalar(u.old);
+          const newVal = this.formatScalar(u.new);
+          return `${lastSeg}: ${oldVal} → ${newVal}`;
+        }).join(', ');
+        if (name) {
+          secArray.push(`Sửa “${name}” (${fields})`);
+        } else {
+          secArray.push(`Sửa (${fields})`);
+        }
+      } else if (change.added && change.removed) {
+        // Fallback: treat as replacement
+        const nameOld = getItemPrimaryName(change.section, change.removed) || '[Item cũ]';
+        const nameNew = getItemPrimaryName(change.section, change.added) || '[Item mới]';
+        secArray.push(`Thay thế “${nameOld}” → “${nameNew}”`);
+      }
+    });
+
+    // Build combined single-line text grouped by section with existing names
+    const orderedSections: Array<keyof typeof resultBySection> = ['bom', 'measurements', 'colorways', 'howToMeasure'];
+    const parts: string[] = [];
+    orderedSections.forEach(sec => {
+      const lines = resultBySection[sec];
+      if (lines && lines.length > 0) {
+        parts.push(`${sectionDisplayName(sec)}: ${lines.join('; ')}`);
+      }
+    });
+
+    return { perSection: resultBySection, asText: parts.join(' | ') };
+  }
+
+  private formatScalar(value: any): string {
+    if (value === null || value === undefined) return '—';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (value instanceof Date) return value.toISOString();
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
   }
 
   private compareSimpleFields(oldObj: any, newObj: any, fields: string[]): Record<string, any> {

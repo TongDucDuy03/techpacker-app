@@ -396,6 +396,29 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
     }
   };
 
+  const isArticleInfoChanged = (): boolean => {
+    const current = (techPack || {}) as any;
+    const currentInfo = (current.articleInfo || {}) as any;
+    const nextInfo = safeArticleInfo as any;
+    // Shallow compare relevant fields of Article Info and status
+    const fieldsToCompare = [
+      'articleCode','productName','version','gender','productClass','fitType','supplier','technicalDesignerId',
+      'fabricDescription','productDescription','designSketchUrl','season','lifecycleStage','brand','collection',
+      'targetMarket','pricePoint','currency','retailPrice','notes'
+    ];
+    for (const key of fieldsToCompare) {
+      if ((currentInfo as any)?.[key] !== (nextInfo as any)?.[key]) {
+        return true;
+      }
+    }
+    // status can be on root or inside articleInfo safe
+    const nextStatus = nextInfo.status || current.status || 'Draft';
+    if (current.status !== nextStatus) {
+      return true;
+    }
+    return false;
+  };
+
   const handleSave = () => {
     // Check for duplicate articleCode before saving
     if (mode === 'create' && isDuplicate) {
@@ -409,15 +432,37 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
       Object.keys(articleInfoValidationSchema).forEach(field => {
         validation.setFieldTouched(field, true);
       });
+      // Show user-friendly alert for the first error field
+      const firstField = Object.keys(errors)[0];
+      const fieldLabelMap: Record<string, string> = {
+        articleCode: 'Article Code',
+        productName: 'Product Name',
+        version: 'Version',
+        gender: 'Gender',
+        productClass: 'Product Class',
+        fitType: 'Fit Type',
+        supplier: 'Supplier',
+        technicalDesignerId: 'Technical Designer',
+        fabricDescription: 'Fabric Description',
+        productDescription: 'Product Description',
+        designSketchUrl: 'Design Sketch',
+        season: 'Season',
+        lifecycleStage: 'Lifecycle Stage'
+      };
+      const fieldLabel = firstField ? (fieldLabelMap[firstField] || firstField) : 'Một trường bắt buộc';
+      showError(`Trường ${fieldLabel}, thuộc tab Article Info chưa được điền. Vui lòng điền đầy đủ thông tin.`);
       scrollToFirstError(errors);
       return;
     }
 
-    onUpdate?.({
-      ...(techPack || {}),
-      articleInfo: safeArticleInfo,
-      status: safeArticleInfo.status || techPack?.status || 'Draft'
-    });
+    // Only propagate updates if actually changed to avoid toggling unsaved state
+    if (isArticleInfoChanged()) {
+      onUpdate?.({
+        ...(techPack || {}),
+        articleInfo: safeArticleInfo,
+        status: safeArticleInfo.status || techPack?.status || 'Draft'
+      });
+    }
   };
 
   // Expose validateAndSave for parent via ref
@@ -434,15 +479,36 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
         Object.keys(articleInfoValidationSchema).forEach(field => {
           validation.setFieldTouched(field, true);
         });
+        const firstField = Object.keys(errors)[0];
+        const fieldLabelMap: Record<string, string> = {
+          articleCode: 'Article Code',
+          productName: 'Product Name',
+          version: 'Version',
+          gender: 'Gender',
+          productClass: 'Product Class',
+          fitType: 'Fit Type',
+          supplier: 'Supplier',
+          technicalDesignerId: 'Technical Designer',
+          fabricDescription: 'Fabric Description',
+          productDescription: 'Product Description',
+          designSketchUrl: 'Design Sketch',
+          season: 'Season',
+          lifecycleStage: 'Lifecycle Stage'
+        };
+        const fieldLabel = firstField ? (fieldLabelMap[firstField] || firstField) : 'Một trường bắt buộc';
+        showError(`Trường ${fieldLabel}, thuộc tab Article Info chưa được điền. Vui lòng điền đầy đủ thông tin.`);
         scrollToFirstError(errors);
         return false;
       }
 
-      onUpdate?.({
-        ...(techPack || {}),
-        articleInfo: safeArticleInfo,
-        status: safeArticleInfo.status || techPack?.status || 'Draft'
-      });
+      // Only update if changed; still return true to pass validation
+      if (isArticleInfoChanged()) {
+        onUpdate?.({
+          ...(techPack || {}),
+          articleInfo: safeArticleInfo,
+          status: safeArticleInfo.status || techPack?.status || 'Draft'
+        });
+      }
       return true;
     }
   }));
@@ -902,6 +968,16 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
                           >
                             Replace image
                           </label>
+                          {/* Always-present hidden input to support Replace image */}
+                          <input
+                            id="design-sketch-upload"
+                            name="design-sketch-upload"
+                            type="file"
+                            className="sr-only"
+                            accept="image/jpeg,image/jpg,image/png,image/gif,image/svg+xml"
+                            onChange={handleImageUpload}
+                            disabled={uploading}
+                          />
                         </>
                       ) : (
                         <>

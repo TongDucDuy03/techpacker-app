@@ -594,7 +594,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   }), [validateAllBomItems]);
 
   // Table columns configuration with error highlighting
-  const columns = useMemo(() => [
+  const columns = useMemo<ColumnType[]>(() => [
     {
       key: 'part' as keyof BomItem,
       header: 'Part',
@@ -1056,8 +1056,10 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                 {importPreview.map((item, idx) => {
                   const rowErrors = importErrors.find(e => e.row === idx + 2);
                   const isValid = !rowErrors;
+                  // Try to create a stable key from available fields; fall back to index
+                  const rowKey = item.supplierCode || item.supplier || item.part || `row-${idx}`;
                   return (
-                    <tr key={idx} className={isValid ? '' : 'bg-red-50'}>
+                    <tr key={rowKey} className={isValid ? '' : 'bg-red-50'}>
                       <td className="px-4 py-2 text-sm">{idx + 2}</td>
                       <td className="px-4 py-2 text-sm">{item.part || '-'}</td>
                       <td className="px-4 py-2 text-sm">{item.materialName || '-'}</td>
@@ -1123,14 +1125,17 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                   </td>
                 </tr>
               ) : (
-                tableDataWithErrors.map((item, index) => {
+                tableDataWithErrors.map((item, mapIndex) => {
                   const originalIndex = bom.findIndex(b => b.id === item.id);
                   const hasErrors = item._hasErrors;
                   const errors = item._errors;
                   
+                  // Đảm bảo key luôn unique: ưu tiên item.id, nếu không có thì dùng mapIndex
+                  const uniqueKey = item.id || `bom-item-${mapIndex}`;
+                  
                   return (
                     <tr
-                      key={item.id}
+                      key={uniqueKey}
                       className={`hover:bg-gray-50 ${hasErrors ? 'bg-red-50 border-l-4 border-red-500' : ''}`}
                     >
                       {columns.map((column) => {
@@ -1143,7 +1148,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                             }`}
                             title={hasErrors && errors[column.key as string] ? errors[column.key as string] : undefined}
                           >
-                            {column.render ? column.render(value as any, item, index) : (value || '-')}
+                            {column.render ? column.render(value) : (value || '-')}
                             {hasErrors && errors[column.key as string] && (
                               <div className="mt-1">
                                 <AlertCircle className="w-4 h-4 text-red-400 inline" />
@@ -1389,8 +1394,9 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                 {importPreview.map((item, idx) => {
                   const rowErrors = importErrors.find(e => e.row === idx + 2);
                   const isValid = !rowErrors;
+                  const rowKey = item.supplierCode || item.supplier || item.part || `row-${idx}`;
                   return (
-                    <tr key={idx} className={isValid ? '' : 'bg-red-50'}>
+                    <tr key={rowKey} className={isValid ? '' : 'bg-red-50'}>
                       <td className="px-4 py-2 text-sm">{idx + 2}</td>
                       <td className="px-4 py-2 text-sm">{item.part || '-'}</td>
                       <td className="px-4 py-2 text-sm">{item.materialName || '-'}</td>

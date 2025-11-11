@@ -7,6 +7,8 @@ import Input from '../shared/Input';
 import Select from '../shared/Select';
 import DataTable from '../shared/DataTable';
 import { Plus, Palette, Copy, Eye, Star, Upload, Download, AlertCircle } from 'lucide-react';
+import { validateFields } from '../../../utils/validation';
+import { showError } from '../../../lib/toast';
 
 const ColorwayTab: React.FC = () => {
   const context = useTechPack();
@@ -160,12 +162,30 @@ const ColorwayTab: React.FC = () => {
     handleRemovePart(part.id);
   };
 
+  // Helper to format validation alert message
+  const formatValidationAlert = (fieldKey: string): string => {
+    const FIELD_LABEL_MAP: Record<string, string> = {
+      name: 'Colorway Name',
+      code: 'Colorway Code',
+      placement: 'Placement',
+      materialType: 'Material Type',
+    };
+    
+    const fieldLabel = FIELD_LABEL_MAP[fieldKey] || fieldKey;
+    return `Trường ${fieldLabel}, thuộc tab Colorways chưa được điền. Vui lòng điền đầy đủ thông tin.`;
+  };
+
   const handleSubmit = () => {
-    const { isValid } = validation.validateForm(formData as Record<string, any>);
+    const { isValid, errors } = validation.validateForm(formData as Record<string, any>);
     if (!isValid) {
       Object.keys(colorwayFormValidationSchema).forEach(field => {
         validation.setFieldTouched(field, true);
       });
+      // Show alert for first error field
+      const firstField = Object.keys(errors).find(key => errors[key] && validation.touched[key]);
+      if (firstField) {
+        showError(formatValidationAlert(firstField));
+      }
       return;
     }
 
@@ -807,6 +827,40 @@ const ColorwayTab: React.FC = () => {
       </div>
     </div>
   );
+};
+
+// Export validate function for use in parent component
+export const validateColorwaysForSave = (colorways: Colorway[]): { isValid: boolean; errors: Array<{ id: string; item: Colorway; errors: Record<string, string> }> } => {
+  const errors: Array<{ id: string; item: Colorway; errors: Record<string, string> }> = [];
+  
+  colorways.forEach((item) => {
+    const itemErrors: Record<string, string> = {};
+    
+    // Convert validation schema to ValidationRule format for validateFields
+    const schema: Record<string, any> = {};
+    Object.entries(colorwayFormValidationSchema).forEach(([key, rule]) => {
+      schema[key] = {
+        required: rule.required,
+        minLength: rule.minLength,
+        maxLength: rule.maxLength,
+        min: rule.min,
+        max: rule.max,
+        custom: rule.custom
+      };
+    });
+    
+    // Validate basic fields
+    const validationResult = validateFields(item as Record<string, any>, schema);
+    validationResult.errors.forEach(err => {
+      itemErrors[err.field] = err.message;
+    });
+    
+    if (Object.keys(itemErrors).length > 0) {
+      errors.push({ id: item.id, item, errors: itemErrors });
+    }
+  });
+  
+  return { isValid: errors.length === 0, errors };
 };
 
 export default ColorwayTab;

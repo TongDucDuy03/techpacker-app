@@ -25,11 +25,6 @@ export interface IRevision extends Document {
   description?: string; // User-provided reason for the change
   changeType: ChangeType;
   statusAtChange: string; // The status of the TechPack when this revision was created
-  approvedBy?: Types.ObjectId;
-  approvedByName?: string;
-  approvedAt?: Date;
-  approvedReason?: string; // Reason for approval/rejection
-  status?: 'pending' | 'approved' | 'rejected'; // Approval status
   createdAt: Date;
   snapshot: any; // Full TechPack data at this revision
   revertedFrom?: string; // Version that was reverted from (e.g., "v1.3")
@@ -70,25 +65,6 @@ const RevisionSchema = new Schema<IRevision>(
     description: { type: String, trim: true },
     changeType: { type: String, enum: ['auto', 'manual', 'approval', 'rollback'], required: true },
     statusAtChange: { type: String, required: true },
-    approvedBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    approvedByName: {
-      type: String
-    },
-    approvedAt: {
-      type: Date
-    },
-    approvedReason: {
-      type: String,
-      trim: true
-    },
-    status: {
-      type: String,
-      enum: ['pending', 'approved', 'rejected'],
-      default: 'pending'
-    },
     snapshot: {
       type: Schema.Types.Mixed,
       required: true

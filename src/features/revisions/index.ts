@@ -10,7 +10,6 @@ export * from './components/RevisionDetail';
 export * from './components/RevisionCompare';
 export * from './components/RevertModal';
 export * from './components/CommentsSection';
-export * from './components/ApproveRejectActions';
 export * from './components/RevisionManager';
 export * from './utils/permissions';
 

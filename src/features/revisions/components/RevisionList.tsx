@@ -72,8 +72,8 @@ export const RevisionList: React.FC<RevisionListProps> = ({
           </div>
         </div>
       }
-      className="h-full"
-      bodyStyle={{ padding: 0 }}
+  className="h-full"
+  styles={{ body: { padding: 0 } }}
     >
       {/* Filters */}
       <div className="p-4 border-b space-y-2">

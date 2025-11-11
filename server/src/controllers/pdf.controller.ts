@@ -5,6 +5,7 @@ import TechPack from '../models/techpack.model';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { hasViewAccess } from '../utils/access-control.util';
 import pdfService from '../services/pdf.service';
+import pdfMultiSectionService from '../services/pdf-multi-section.service';
 import { logActivity } from '../utils/activity-logger';
 import { ActivityAction } from '../models/activity.model';
 import { buildRenderModel } from '../services/pdf-renderer.service';
@@ -40,8 +41,6 @@ export class PDFController {
     try {
       const { id } = req.params;
       const user = req.user!;
-      // allow overriding orientation via query param ?landscape=true
-      const landscape = req.query?.landscape === 'true' || req.query?.landscape === '1';
 
       const techpack = await TechPack.findById(id)
         .populate('technicalDesignerId', 'firstName lastName email role')
@@ -57,10 +56,10 @@ export class PDFController {
         return;
       }
 
-      const metadata = await pdfService.getOrCreatePdf({
+      // Use multi-section service for full PDF with landscape measurement table
+      const metadata = await pdfMultiSectionService.getOrCreatePdf({
         techpack,
         printedBy: getPrintedBy(user),
-        landscape,
       });
 
       const filename = `Techpack_${techpack.articleCode || techpack._id}.pdf`;

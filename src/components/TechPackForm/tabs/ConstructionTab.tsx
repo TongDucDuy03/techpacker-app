@@ -63,7 +63,7 @@ export interface ConstructionTabRef {
 }
 
 // CSV Import/Export utilities
-const CSV_HEADERS = ['POM Code', 'Description', 'Steps', 'Image URL', 'Video URL', 'Language', 'Status', 'Comments'];
+const CSV_HEADERS = ['POM Code', 'Description', 'Steps', 'Image URL', 'Video URL', 'Language', 'Comments'];
 
 const exportToCSV = (items: Construction[]): string => {
   const rows = items.map(item => {
@@ -75,7 +75,6 @@ const exportToCSV = (items: Construction[]): string => {
       item.imageUrl || '',
       item.videoUrl || '', // This is the decoded videoUrl (without metadata)
       item.language || 'en-US',
-      (item as any).status || 'Draft',
       (item as any).comments || ''
     ];
   });
@@ -178,12 +177,7 @@ const validateConstructionItem = (item: Partial<Construction>, measurements: Mea
     }
   }
   
-  // Validate status transitions
-  if ((item as any).status) {
-    const status = (item as any).status as ConstructionStatus;
-    // Disallow direct Draft → Approved
-    // This will be checked during save/request approval
-  }
+  // Approval/status flow disabled
   
   return { isValid: Object.keys(errors).length === 0, errors };
 };
@@ -239,7 +233,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterByStatus, setFilterByStatus] = useState<ConstructionStatus | ''>('');
+  // const [filterByStatus, setFilterByStatus] = useState<ConstructionStatus | ''>('');
   const [showImportModal, setShowImportModal] = useState(false);
   const [showMappingModal, setShowMappingModal] = useState(false);
   const [importPreview, setImportPreview] = useState<any[]>([]);
@@ -284,11 +278,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
   ];
 
   // Status options
-  const statusOptions = [
-    { value: 'Draft', label: 'Draft' },
-    { value: 'Requested', label: 'Requested' },
-    { value: 'Approved', label: 'Approved' },
-  ];
+  // const statusOptions = [];
 
   // Get available POM codes from measurements
   const availablePomCodes = useMemo(() => {
@@ -303,11 +293,9 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
         item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         ((item as any).comments && (item as any).comments.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      const matchesFilter = filterByStatus === '' || (item as any).status === filterByStatus;
-
-      return matchesSearch && matchesFilter;
+      return matchesSearch;
     });
-  }, [constructions, searchTerm, filterByStatus]);
+  }, [constructions, searchTerm]);
 
   // Pagination
   const paginatedConstructions = useMemo(() => {
@@ -495,13 +483,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
     }
 
     // Validate status transitions
-    if (saveAsRequested) {
-      const currentStatus = (formData as any).status || 'Draft';
-      if (currentStatus === 'Approved') {
-        showError('Cannot request approval for already approved item.');
-        return;
-      }
-    }
+    // Approval disabled
 
     const status = saveAsRequested ? 'Requested' : ((formData as any).status || 'Draft');
     const comments = (formData as any).comments || '';
@@ -533,11 +515,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
 
     if (editingId) {
       // Check if item is approved
-      const existingItem = constructions.find(c => c.id === editingId);
-      if (existingItem && (existingItem as any).status === 'Approved') {
-        showWarning('Approved items cannot be edited directly. Please create a duplicate/revision.');
-        return;
-      }
+      // Approved lock removed
       
       updateHowToMeasureById(editingId, construction);
       showSuccess('Construction updated successfully');
@@ -575,16 +553,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
 
   const handleEdit = (item: Construction) => {
     // Check if item is approved
-    if ((item as any).status === 'Approved') {
-      const shouldDuplicate = window.confirm(
-        'This item is approved and cannot be edited directly. Would you like to create a duplicate/revision instead?'
-      );
-      if (shouldDuplicate) {
-        handleDuplicate(item);
-        return;
-      }
-      return;
-    }
+    // Approved lock removed
     
     // Decode metadata when editing
     const decoded = decodeMetadata(item.videoUrl || '');
@@ -880,18 +849,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
           </div>
           
           {/* Summary Stats */}
-          <div className="flex items-center space-x-6 text-sm">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{constructions.length}</div>
-              <div className="text-gray-500">Total</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {constructions.filter(c => (c as any).status === 'Approved').length}
-              </div>
-              <div className="text-gray-500">Approved</div>
-            </div>
-          </div>
+          <div className="flex items-center space-x-6 text-sm"></div>
         </div>
       </div>
 
@@ -912,19 +870,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
             </div>
 
             {/* Filter */}
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <select
-                value={filterByStatus}
-                onChange={(e) => setFilterByStatus(e.target.value as ConstructionStatus | '')}
-                className="pl-10 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">All Status</option>
-                {statusOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
+            {/* Status filter removed */}
           </div>
 
           <div className="flex items-center space-x-3">
@@ -1004,17 +950,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
             >
               Save Draft
             </button>
-            <button
-              onClick={() => handleSubmit(true)}
-              disabled={!validation.isValid || !formData.pomCode || !formData.description || (formData.steps || []).length === 0}
-              className={`px-4 py-2 text-sm font-medium border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                validation.isValid && formData.pomCode && formData.description && (formData.steps || []).length > 0
-                  ? 'text-white bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
-                  : 'text-gray-400 bg-gray-200 cursor-not-allowed'
-              }`}
-            >
-              Save & Request Approval
-            </button>
+            {/* Approval button removed */}
           </>
         }
       >
@@ -1216,7 +1152,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">POM Code</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Steps</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                {/* Status column removed */}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Language</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
@@ -1232,12 +1168,12 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
                 paginatedConstructions.map((item) => {
                   const hasErrors = validationErrors[item.id] && Object.keys(validationErrors[item.id]).length > 0;
                   const errors = validationErrors[item.id] || {};
-                  const isApproved = (item as any).status === 'Approved';
+                  const isApproved = false;
                   
                   return (
                     <tr
                       key={item.id}
-                      className={`hover:bg-gray-50 ${hasErrors ? 'bg-red-50 border-l-4 border-red-500' : ''} ${isApproved ? 'bg-green-50' : ''}`}
+                      className={`hover:bg-gray-50 ${hasErrors ? 'bg-red-50 border-l-4 border-red-500' : ''}`}
                     >
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {item.pomCode}
@@ -1253,58 +1189,19 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {(item.steps || []).length} step(s)
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          (item as any).status === 'Approved' ? 'bg-green-100 text-green-800' :
-                          (item as any).status === 'Requested' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {(item as any).status || 'Draft'}
-                        </span>
-                      </td>
+                      {/* Status cell removed */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {languageOptions.find(l => l.value === item.language)?.label}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">
-                          {!isApproved && (
-                            <>
-                              <button
-                                onClick={() => handleEdit(item)}
-                                className="text-blue-600 hover:text-blue-900"
-                                title="Edit"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              {(item as any).status === 'Draft' && (
-                                <button
-                                  onClick={() => handleRequestApproval(item)}
-                                  className="text-yellow-600 hover:text-yellow-900"
-                                  title="Request Approval"
-                                >
-                                  <CheckCircle className="w-4 h-4" />
-                                </button>
-                              )}
-                            </>
-                          )}
-                          {(item as any).status === 'Requested' && (
-                            <>
-                              <button
-                                onClick={() => handleApprove(item)}
-                                className="text-green-600 hover:text-green-900"
-                                title="Approve"
-                              >
-                                <CheckCircle className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleRequestChanges(item)}
-                                className="text-orange-600 hover:text-orange-900"
-                                title="Request Changes"
-                              >
-                                <RotateCcw className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
+                          <button
+                            onClick={() => handleEdit(item)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="Edit"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => handleDuplicate(item)}
                             className="text-purple-600 hover:text-purple-900"
@@ -1426,7 +1323,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
                     <option value="imageUrl">Image URL</option>
                     <option value="videoUrl">Video URL</option>
                     <option value="language">Language</option>
-                    <option value="status">Status</option>
+                    {/* Status mapping removed */}
                     <option value="comments">Comments</option>
                   </select>
                 </div>
@@ -1521,7 +1418,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">POM Code</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Description</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Steps</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Status</th>
+                  {/* Status column removed */}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">

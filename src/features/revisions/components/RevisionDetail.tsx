@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { Card, Button, Space, Tag, Divider, Table, Image } from 'antd';
-import { Undo2, GitCompare, MessageCircle, CheckCircle, XCircle, Clock } from 'lucide-react';
-import { Revision } from '../types';
+import { Card, Button, Space, Divider, Table } from 'antd';
+import { Undo2, GitCompare } from 'lucide-react';
+import { Revision, RevertResponse } from '../types';
 import { RevertModal } from './RevertModal';
 import { CommentsSection } from './CommentsSection';
-import { ApproveRejectActions } from './ApproveRejectActions';
 import { useRevert } from '../hooks/useRevert';
 import { useRevision } from '../hooks/useRevision';
 
@@ -13,8 +12,9 @@ interface RevisionDetailProps {
   techPackId: string | undefined;
   canEdit: boolean;
   canView: boolean;
+  isCurrent?: boolean;
   onCompare: () => void;
-  onRevertSuccess: () => void;
+  onRevertSuccess: (result: RevertResponse) => void;
 }
 
 export const RevisionDetail: React.FC<RevisionDetailProps> = ({
@@ -22,14 +22,16 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
   techPackId,
   canEdit,
   canView,
+  isCurrent = false,
   onCompare,
   onRevertSuccess
 }) => {
   const { revert, loading: reverting, error: revertError } = useRevert();
-  const { refetch } = useRevision(revision?._id);
+  const { revision: detailedRevision, refetch } = useRevision(revision?._id);
+  const activeRevision = detailedRevision || revision;
   const [showRevertModal, setShowRevertModal] = useState(false);
 
-  if (!revision) {
+  if (!activeRevision) {
     return (
       <Card>
         <div className="text-center py-12 text-gray-500">
@@ -40,21 +42,23 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
   }
 
   const handleRevert = async (reason?: string) => {
-    if (!techPackId || !revision._id) return;
+    if (!techPackId || !activeRevision._id) return;
 
-    const result = await revert(techPackId, revision._id, reason);
+    const result = await revert(techPackId, activeRevision._id, reason);
     if (result) {
       setShowRevertModal(false);
-      onRevertSuccess();
+      onRevertSuccess(result);
       refetch();
     }
   };
 
-  const canRevert = canEdit && revision.snapshot && revision.changeType !== 'rollback';
-  const revertDisabledReason = !revision.snapshot
+  const canRevert = canEdit && !!activeRevision.snapshot && activeRevision.changeType !== 'rollback' && !isCurrent;
+  const revertDisabledReason = !activeRevision.snapshot
     ? 'Cannot revert — snapshot data missing for this revision'
-    : revision.changeType === 'rollback'
+    : activeRevision.changeType === 'rollback'
     ? 'Reverting to a rollback revision is not allowed'
+    : isCurrent
+    ? 'This is the current revision'
     : !canEdit
     ? 'You need Editor access to revert this TechPack'
     : '';
@@ -130,6 +134,25 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
   const formatValue = (val: any, isObject = false): React.ReactNode => {
     if (val === null || val === undefined || val === '') return <span className="text-gray-400">—</span>;
     
+    // Helper: determine if a string looks like an image URL/path
+    const isLikelyImageUrl = (s: string): boolean => {
+      const lower = s.toLowerCase();
+      return (
+        lower.startsWith('http://') ||
+        lower.startsWith('https://') ||
+        lower.startsWith('/uploads/') ||
+        /\.(png|jpg|jpeg|gif|svg|webp)$/.test(lower)
+      );
+    };
+    // Helper: normalize URL to absolute if backend returns relative
+    const getImageUrl = (url: string): string => {
+      if (!url) return '';
+      if (url.startsWith('http://') || url.startsWith('https://')) return url;
+      const base = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:4001/api/v1';
+      if (url.startsWith('/')) return `${base}${url}`;
+      return `${base}/${url}`;
+    };
+
     if (typeof val === 'object' && !Array.isArray(val)) {
       // For objects, show as formatted key-value pairs
       const entries = Object.entries(val);
@@ -157,7 +180,26 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
       return <span className="text-sm">{val.join(', ')}</span>;
     }
     
-    return <span className="text-sm">{String(val)}</span>;
+    // String formatting: render image preview if looks like an image URL/path
+    const s = String(val);
+    if (isLikelyImageUrl(s)) {
+      const src = getImageUrl(s);
+      return (
+        <div className="flex items-center space-x-2">
+          <img
+            src={src}
+            alt="Changed"
+            className="w-12 h-12 object-cover rounded border border-gray-200"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+          <span className="text-xs text-gray-600 break-all">{s}</span>
+        </div>
+      );
+    }
+
+    return <span className="text-sm break-all">{s}</span>;
   };
 
   const diffColumns = [
@@ -196,9 +238,9 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
 
   // Process and group diff data by section
   const processDiffData = () => {
-    if (!revision.changes?.diff) return [];
+    if (!activeRevision.changes?.diff) return [];
     
-    const entries = Object.entries(revision.changes.diff);
+    const entries = Object.entries(activeRevision.changes.diff);
     const grouped: Record<string, any[]> = {};
     
     entries.forEach(([field, change]: [string, any]) => {
@@ -234,6 +276,141 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
     return result;
   };
 
+  // Build concise human-readable summary per section (Added/Removed/Updated)
+  const buildSectionSummaries = (): Record<string, string> => {
+    const diffs = activeRevision.changes?.diff || {};
+    const summaries: Record<string, string> = {};
+
+    // Helper to extract section and id info
+    const parseKey = (k: string) => {
+      const m = k.match(/^(\w+)\[(.+?)\](?:\.(.+))?$/); // section[...].fieldPath?
+      if (!m) {
+        const m2 = k.match(/^(\w+)\.(.+)$/);
+        return { section: m2 ? m2[1] : k, id: null as any, fieldPath: m2 ? m2[2] : null };
+      }
+      return { section: m[1], id: m[2], fieldPath: m[3] || null };
+    };
+    const getItemLabel = (section: string, payload: any): string => {
+      if (section === 'bom') {
+        const part = payload?.part || '';
+        const material = payload?.materialName || '';
+        return [part, material].filter(Boolean).join(' — ') || 'Item';
+      }
+      if (section === 'measurements') {
+        return payload?.pomCode || 'Measurement';
+      }
+      if (section === 'colorways') {
+        const name = payload?.name || '';
+        const code = payload?.code || '';
+        return [name, code].filter(Boolean).join(' / ') || 'Colorway';
+      }
+      if (section === 'howToMeasure') {
+        const code = payload?.pomCode || '';
+        const step = payload?.stepNumber != null ? `Step ${payload.stepNumber}` : '';
+        return [code, step].filter(Boolean).join(' — ') || 'Instruction';
+      }
+      if (section === 'articleInfo') {
+        return 'Article Info';
+      }
+      return section;
+    };
+
+    // Aggregate per section
+    const perSection: Record<
+      string,
+      { added: string[]; removed: string[]; updated: Record<string, string[]> }
+    > = {};
+
+    Object.entries(diffs).forEach(([k, v]: [string, any]) => {
+      const { section, id, fieldPath } = parseKey(k);
+      if (!perSection[section]) {
+        perSection[section] = { added: [], removed: [], updated: {} };
+      }
+      const bucket = perSection[section];
+
+      // Added/Removed entries have synthetic ids like [+id:xxx] / [-id:xxx]
+      if (id && id.startsWith('+id:')) {
+        const label = getItemLabel(section, v?.new || {});
+        if (label) bucket.added.push(label);
+        return;
+      }
+      if (id && id.startsWith('-id:')) {
+        const label = getItemLabel(section, v?.old || {});
+        if (label) bucket.removed.push(label);
+        return;
+      }
+
+      // Updated fields: group by item (id:xxx) or for articleInfo by top-level field
+      let itemKey = 'root';
+      if (id && id.startsWith('id:')) {
+        itemKey = id;
+      } else if (section === 'articleInfo') {
+        itemKey = 'articleInfo';
+      }
+      if (!bucket.updated[itemKey]) bucket.updated[itemKey] = [];
+      // Build compact field change text for some common fields
+      const shortField = (fieldPath || '').split('.').slice(-1)[0] || '';
+      const from = v?.old;
+      const to = v?.new;
+      const formatVal = (val: any) => {
+        if (val === null || val === undefined || val === '') return '—';
+        if (typeof val === 'object') return JSON.stringify(val);
+        return String(val);
+      };
+      if (shortField) {
+        bucket.updated[itemKey].push(`${shortField}: ${formatVal(from)} → ${formatVal(to)}`);
+      }
+    });
+
+    // Build final strings
+    Object.entries(perSection).forEach(([section, agg]) => {
+      const parts: string[] = [];
+      if (agg.added.length) {
+        parts.push(`Thêm ${agg.added.map(n => `“${n}”`).join(', ')}`);
+      }
+      if (agg.removed.length) {
+        parts.push(`Xóa ${agg.removed.map(n => `“${n}”`).join(', ')}`);
+      }
+      // For updated, show up to a few items with key field changes
+      const updatedEntries: string[] = [];
+      Object.entries(agg.updated).forEach(([itemKey, changes]) => {
+        if (changes.length === 0) return;
+        // Try to find a label for the item (look into any diff key for this item)
+        let label = '';
+        if (itemKey.startsWith('id:')) {
+          const anyKey = Object.keys(diffs).find(dk => dk.startsWith(`${section}[${itemKey}]`));
+          if (anyKey) {
+            const payloadOld = (diffs as any)[anyKey]?.old;
+            const payloadNew = (diffs as any)[anyKey]?.new;
+            label = getItemLabel(section, payloadNew || payloadOld || {});
+          }
+        } else if (section === 'articleInfo') {
+          label = 'Article Info';
+        }
+        const preview = changes.slice(0, 2).join('; ');
+        updatedEntries.push(label ? `“${label}” (${preview})` : `(${preview})`);
+      });
+      if (updatedEntries.length) {
+        parts.push(`Sửa ${updatedEntries.join(', ')}`);
+      }
+
+      if (parts.length) {
+        const sectionNames: Record<string, string> = {
+          bom: 'BOM',
+          measurements: 'Measurements',
+          colorways: 'Colorways',
+          howToMeasure: 'Construction',
+          articleInfo: 'Article Info'
+        };
+        summaries[section] = `${sectionNames[section] || section}: ${parts.join(', ')}`;
+      }
+    });
+
+    return summaries;
+  };
+
+  const sectionSummaries = buildSectionSummaries();
+
   const diffData = processDiffData();
 
   return (
@@ -242,9 +419,9 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
         title={
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold">Revision {revision.version}</h3>
+              <h3 className="text-lg font-semibold">Revision {activeRevision.version}</h3>
               <p className="text-sm text-gray-600 mt-1">
-                By {revision.createdByName} • {formatDate(revision.createdAt)}
+                By {activeRevision.createdByName} • {formatDate(activeRevision.createdAt)}
               </p>
             </div>
             <Space>
@@ -270,14 +447,9 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
           <h4 className="text-sm font-semibold text-gray-900 mb-2">Change Summary</h4>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <p className="text-sm text-blue-800">
-              {revision.changes?.summary || revision.description || 'No summary provided'}
+              {activeRevision.changes?.summary || activeRevision.description || 'No summary provided'}
             </p>
           </div>
-        </div>
-
-        {/* Status & Approval */}
-        <div className="mb-6">
-          <ApproveRejectActions revision={revision} onUpdate={refetch} />
         </div>
 
         <Divider />
@@ -285,13 +457,23 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
         {/* Field Changes */}
         <div>
           <h4 className="text-sm font-semibold text-gray-900 mb-3">Field Changes</h4>
+          {/* High-level per-section summary */}
+          {Object.keys(sectionSummaries).length > 0 && (
+            <div className="mb-3">
+              <ul className="list-disc list-inside text-sm text-gray-800 space-y-1">
+                {Object.entries(sectionSummaries).map(([sec, text]) => (
+                  <li key={sec}>{text}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {diffData.length === 0 ? (
             <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed">
-              {revision.changes?.details && Object.keys(revision.changes.details).length > 0 ? (
+              {activeRevision.changes?.details && Object.keys(activeRevision.changes.details).length > 0 ? (
                 <div>
                   <p className="text-sm mb-2">No detailed field-level diff available, but changes were detected:</p>
                   <div className="text-left max-w-md mx-auto">
-                    {Object.entries(revision.changes.details).map(([section, details]: [string, any]) => {
+                    {Object.entries(activeRevision.changes.details).map(([section, details]: [string, any]) => {
                       const changes: string[] = [];
                       if (details.added) changes.push(`${details.added} added`);
                       if (details.modified) changes.push(`${details.modified} modified`);
@@ -358,14 +540,14 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
 
         {/* Comments */}
         <div className="mt-6">
-          <CommentsSection revision={revision} canView={canView} />
+          <CommentsSection revision={activeRevision} canView={canView} />
         </div>
       </Card>
 
       {/* Revert Modal */}
       <RevertModal
         open={showRevertModal}
-        revision={revision}
+        revision={activeRevision}
         loading={reverting}
         error={revertError}
         onConfirm={handleRevert}

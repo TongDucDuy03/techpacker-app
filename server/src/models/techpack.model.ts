@@ -357,6 +357,19 @@ TechPackSchema.index({ status: 1, createdAt: -1 });
 // Text search index for productName and articleCode
 TechPackSchema.index({ productName: 'text', articleCode: 'text' });
 
+// Performance optimization: Compound indexes for complex queries in getTechPacks
+// These indexes optimize the $or queries with status filtering
+TechPackSchema.index({ createdBy: 1, status: 1, updatedAt: -1 }); // For Admin/Designer queries
+TechPackSchema.index({ technicalDesignerId: 1, status: 1, updatedAt: -1 }); // For Designer queries
+TechPackSchema.index({ 'sharedWith.userId': 1, status: 1, updatedAt: -1 }); // For shared access queries
+// Compound index for the most complex query pattern (createdBy OR sharedWith)
+TechPackSchema.index({ 
+  createdBy: 1, 
+  'sharedWith.userId': 1, 
+  status: 1, 
+  updatedAt: -1 
+}, { name: 'complex_query_optimization' });
+
 // Removed virtual 'lifecycleStage' because it's now a real schema path
 
 const TechPack = model<ITechPack>('TechPack', TechPackSchema);

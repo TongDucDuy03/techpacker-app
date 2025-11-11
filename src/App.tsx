@@ -75,22 +75,75 @@ const UserMenu: React.FC = () => {
 function AppContent() {
   const [currentTab, setCurrentTab] = useState('list');
   const [selectedTechPack, setSelectedTechPack] = useState<ApiTechPack | null>(null);
+  const [loadingTechPack, setLoadingTechPack] = useState(false);
   const context = useTechPack();
-  const { techPacks = [], updateTechPack, deleteTechPack } = context ?? {};
+  const { techPacks = [], updateTechPack, deleteTechPack, getTechPack } = context ?? {};
   const { user } = useAuth();
 
   // Permission checks based on user role
   const canCreate = user?.role === 'admin' || user?.role === 'designer';
   const canEdit = user?.role === 'admin' || user?.role === 'designer';
 
-  const handleViewTechPack = (techPack: ApiTechPack) => {
-    setSelectedTechPack(techPack);
-    setCurrentTab('view');
+  const handleViewTechPack = async (techPack: ApiTechPack) => {
+    const techPackId = techPack._id || techPack.id;
+    if (!techPackId || !getTechPack) {
+      // Fallback: dùng data từ list nếu không có getTechPack hoặc ID
+      setSelectedTechPack(techPack);
+      setCurrentTab('view');
+      return;
+    }
+
+    // Fetch full detail từ API trước khi mở view
+    setLoadingTechPack(true);
+    try {
+      const fullTechPack = await getTechPack(techPackId);
+      if (fullTechPack) {
+        setSelectedTechPack(fullTechPack);
+        setCurrentTab('view');
+      } else {
+        // Fallback: dùng data từ list nếu fetch fail
+        setSelectedTechPack(techPack);
+        setCurrentTab('view');
+      }
+    } catch (error) {
+      console.error('[App] Failed to fetch full techpack for view:', error);
+      // Fallback: dùng data từ list nếu fetch fail
+      setSelectedTechPack(techPack);
+      setCurrentTab('view');
+    } finally {
+      setLoadingTechPack(false);
+    }
   };
 
-  const handleEditTechPack = (techPack: ApiTechPack) => {
-    setSelectedTechPack(techPack);
-    setCurrentTab('edit');
+  const handleEditTechPack = async (techPack: ApiTechPack) => {
+    const techPackId = techPack._id || techPack.id;
+    if (!techPackId || !getTechPack) {
+      // Fallback: dùng data từ list nếu không có getTechPack hoặc ID
+      setSelectedTechPack(techPack);
+      setCurrentTab('edit');
+      return;
+    }
+
+    // Fetch full detail từ API trước khi mở edit
+    setLoadingTechPack(true);
+    try {
+      const fullTechPack = await getTechPack(techPackId);
+      if (fullTechPack) {
+        setSelectedTechPack(fullTechPack);
+        setCurrentTab('edit');
+      } else {
+        // Fallback: dùng data từ list nếu fetch fail
+        setSelectedTechPack(techPack);
+        setCurrentTab('edit');
+      }
+    } catch (error) {
+      console.error('[App] Failed to fetch full techpack for edit:', error);
+      // Fallback: dùng data từ list nếu fetch fail
+      setSelectedTechPack(techPack);
+      setCurrentTab('edit');
+    } finally {
+      setLoadingTechPack(false);
+    }
   };
 
   const handleBackToList = () => {
@@ -134,12 +187,32 @@ function AppContent() {
           <TechPackTabs onBackToList={handleBackToList} />
         );
       case 'edit':
+        if (loadingTechPack) {
+          return (
+            <div className="flex items-center justify-center min-h-screen">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">Đang tải dữ liệu TechPack...</p>
+              </div>
+            </div>
+          );
+        }
         return selectedTechPack ? (
           <TechPackTabs onBackToList={handleBackToList} mode="edit" techPack={selectedTechPack} />
         ) : (
           <div>Tech pack not found</div>
         );
       case 'view':
+        if (loadingTechPack) {
+          return (
+            <div className="flex items-center justify-center min-h-screen">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">Đang tải dữ liệu TechPack...</p>
+              </div>
+            </div>
+          );
+        }
         return selectedTechPack ? (
           <TechPackTabs onBackToList={handleBackToList} mode="view" techPack={selectedTechPack} />
         ) : (

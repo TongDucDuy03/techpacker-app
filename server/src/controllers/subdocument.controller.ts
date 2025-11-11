@@ -69,13 +69,19 @@ export class SubdocumentController {
         const changes = RevisionService.compareTechPacks(oldTechPack as any, techpack as any);
         if (changes.summary && changes.summary !== 'No changes detected.' && changes.summary !== 'Error detecting changes.') {
           const { revisionVersion } = await RevisionService.autoIncrementVersion(techpack._id as Types.ObjectId);
+          const formatted = RevisionService.formatDiffData(changes.diffData as any, oldTechPack as any, techpack.toObject());
+          const enrichedDetails = {
+            ...(changes.details || {}),
+            formattedBySection: formatted.perSection,
+            formattedText: formatted.asText
+          };
           const newRevision = new Revision({
             techPackId: techpack._id,
             version: revisionVersion,
-            changes: { summary: changes.summary, details: changes.details, diff: changes.diffData },
+            changes: { summary: changes.summary, details: enrichedDetails, diff: changes.diffData },
             createdBy: user._id,
             createdByName: `${user.firstName} ${user.lastName}`,
-            description: changes.summary,
+            description: formatted.asText || changes.summary,
             changeType: 'auto',
             statusAtChange: oldTechPack.status || 'draft',
             snapshot: techpack.toObject()
@@ -180,13 +186,19 @@ export class SubdocumentController {
         const changes = RevisionService.compareTechPacks(oldTechPack as any, techpack as any);
         if (changes.summary && changes.summary !== 'No changes detected.' && changes.summary !== 'Error detecting changes.') {
           const { revisionVersion } = await RevisionService.autoIncrementVersion(techpack._id as Types.ObjectId);
+          const formatted = RevisionService.formatDiffData(changes.diffData as any, oldTechPack as any, techpack.toObject());
+          const enrichedDetails = {
+            ...(changes.details || {}),
+            formattedBySection: formatted.perSection,
+            formattedText: formatted.asText
+          };
           const newRevision = new Revision({
             techPackId: techpack._id,
             version: revisionVersion,
-            changes: { summary: changes.summary, details: changes.details, diff: changes.diffData },
+            changes: { summary: changes.summary, details: enrichedDetails, diff: changes.diffData },
             createdBy: user._id,
             createdByName: `${user.firstName} ${user.lastName}`,
-            description: changes.summary,
+            description: formatted.asText || changes.summary,
             changeType: 'auto',
             statusAtChange: oldTechPack.status || 'draft',
             snapshot: techpack.toObject()
@@ -284,13 +296,19 @@ export class SubdocumentController {
         const changes = RevisionService.compareTechPacks(oldTechPack as any, techpack as any);
         if (changes.summary && changes.summary !== 'No changes detected.' && changes.summary !== 'Error detecting changes.') {
           const { revisionVersion } = await RevisionService.autoIncrementVersion(techpack._id as Types.ObjectId);
+          const formatted = RevisionService.formatDiffData(changes.diffData as any, oldTechPack as any, techpack.toObject());
+          const enrichedDetails = {
+            ...(changes.details || {}),
+            formattedBySection: formatted.perSection,
+            formattedText: formatted.asText
+          };
           const newRevision = new Revision({
             techPackId: techpack._id,
             version: revisionVersion,
-            changes: { summary: changes.summary, details: changes.details, diff: changes.diffData },
+            changes: { summary: changes.summary, details: enrichedDetails, diff: changes.diffData },
             createdBy: user._id,
             createdByName: `${user.firstName} ${user.lastName}`,
-            description: changes.summary,
+            description: formatted.asText || changes.summary,
             changeType: 'auto',
             statusAtChange: oldTechPack.status || 'draft',
             snapshot: techpack.toObject()
@@ -392,13 +410,19 @@ export class SubdocumentController {
         const changes = RevisionService.compareTechPacks(oldTechPack as any, techpack as any);
         if (changes.summary && changes.summary !== 'No changes detected.' && changes.summary !== 'Error detecting changes.') {
           const { revisionVersion } = await RevisionService.autoIncrementVersion(techpack._id as Types.ObjectId);
+          const formatted = RevisionService.formatDiffData(changes.diffData as any, oldTechPack as any, techpack.toObject());
+          const enrichedDetails = {
+            ...(changes.details || {}),
+            formattedBySection: formatted.perSection,
+            formattedText: formatted.asText
+          };
           const newRevision = new Revision({
             techPackId: techpack._id,
             version: revisionVersion,
-            changes: { summary: changes.summary, details: changes.details, diff: changes.diffData },
+            changes: { summary: changes.summary, details: enrichedDetails, diff: changes.diffData },
             createdBy: user._id,
             createdByName: `${user.firstName} ${user.lastName}`,
-            description: changes.summary,
+            description: formatted.asText || changes.summary,
             changeType: 'auto',
             statusAtChange: oldTechPack.status || 'draft',
             snapshot: techpack.toObject()
@@ -504,13 +528,19 @@ export class SubdocumentController {
         const changes = RevisionService.compareTechPacks(oldTechPack as any, techpack as any);
         if (changes.summary && changes.summary !== 'No changes detected.' && changes.summary !== 'Error detecting changes.') {
           const { revisionVersion } = await RevisionService.autoIncrementVersion(techpack._id as Types.ObjectId);
+          const formatted = RevisionService.formatDiffData(changes.diffData as any, oldTechPack as any, techpack.toObject());
+          const enrichedDetails = {
+            ...(changes.details || {}),
+            formattedBySection: formatted.perSection,
+            formattedText: formatted.asText
+          };
           const newRevision = new Revision({
             techPackId: techpack._id,
             version: revisionVersion,
-            changes: { summary: changes.summary, details: changes.details, diff: changes.diffData },
+            changes: { summary: changes.summary, details: enrichedDetails, diff: changes.diffData },
             createdBy: user._id,
             createdByName: `${user.firstName} ${user.lastName}`,
-            description: changes.summary,
+            description: formatted.asText || changes.summary,
             changeType: 'auto',
             statusAtChange: oldTechPack.status || 'draft',
             snapshot: techpack.toObject()

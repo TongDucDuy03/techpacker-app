@@ -291,14 +291,31 @@ class ApiClient {
     console.log('📡 API: listTechPacks called with params:', params);
     const response = await this.axiosInstance.get<ApiResponse<ApiTechPack[]>>('/techpacks', { params });
     console.log('📡 API: Raw response:', response.data);
-    const responseData = response.data ?? {} as any;
-    const { data = [], pagination } = responseData;
+    const responseData = (response.data ?? {}) as any;
+    // Handle both normal and cached response shapes
+    // Normal: { success, data: ApiTechPack[], pagination }
+    // Cached: { success, data: { data: ApiTechPack[], pagination } }
+    let items: ApiTechPack[] = [];
+    let pagination: any = undefined;
+
+    if (Array.isArray(responseData.data)) {
+      // Normal shape
+      items = responseData.data as ApiTechPack[];
+      pagination = responseData.pagination;
+    } else if (responseData.data && typeof responseData.data === 'object') {
+      // Cached shape with nested data
+      const nested = responseData.data as any;
+      if (Array.isArray(nested.data)) {
+        items = nested.data as ApiTechPack[];
+        pagination = nested.pagination ?? responseData.pagination;
+      }
+    }
 
     const result: TechPackListResponse = {
-      data: data as ApiTechPack[],
-      total: pagination?.total || 0,
-      page: pagination?.page || 1,
-      totalPages: pagination?.totalPages || 1,
+      data: items,
+      total: pagination?.total ?? 0,
+      page: pagination?.page ?? 1,
+      totalPages: pagination?.totalPages ?? 1,
     };
     return result;
   }
@@ -332,7 +349,24 @@ class ApiClient {
 
   async getTechPack(id: string): Promise<ApiTechPack> {
     const response = await this.axiosInstance.get<ApiResponse<ApiTechPack>>(`/techpacks/${id}`);
-    const techPack = response.data?.data;
+    const raw = response.data?.data as any;
+    if (!raw) {
+      throw new Error('Tech pack not found');
+    }
+    // Normalize server snapshots to client shape
+    const techPack = {
+      ...raw,
+      // Ensure arrays exist
+      bom: Array.isArray(raw.bom) ? raw.bom : [],
+      measurements: Array.isArray(raw.measurements) ? raw.measurements : [],
+      // Backend uses howToMeasure; client uses howToMeasures
+      howToMeasures: Array.isArray(raw.howToMeasures)
+        ? raw.howToMeasures
+        : Array.isArray(raw.howToMeasure)
+          ? raw.howToMeasure
+          : [],
+      colorways: Array.isArray(raw.colorways) ? raw.colorways : []
+    } as any;
     if (!techPack) {
       throw new Error('Tech pack not found');
     }
@@ -502,18 +536,6 @@ class ApiClient {
   // Add comment to revision
   addRevisionComment = async (revisionId: string, comment: string): Promise<ApiResponse<any>> => {
     const response = await this.axiosInstance.post<ApiResponse<any>>(`/revisions/${revisionId}/comments`, { comment });
-    return response.data;
-  };
-
-  // Approve revision
-  approveRevision = async (revisionId: string, reason?: string): Promise<ApiResponse<any>> => {
-    const response = await this.axiosInstance.post<ApiResponse<any>>(`/revisions/${revisionId}/approve`, { reason });
-    return response.data;
-  };
-
-  // Reject revision
-  rejectRevision = async (revisionId: string, reason: string): Promise<ApiResponse<any>> => {
-    const response = await this.axiosInstance.post<ApiResponse<any>>(`/revisions/${revisionId}/reject`, { reason });
     return response.data;
   };
 

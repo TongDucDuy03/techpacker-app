@@ -9,6 +9,7 @@ interface RevisionTabProps {
   mode?: 'create' | 'edit' | 'view';
   onUpdate?: (updates: Partial<TechPack>) => void;
   setCurrentTab?: (tab: number) => void;
+  onBackToList?: () => void;
 }
 
 export interface RevisionTabRef {
@@ -16,7 +17,7 @@ export interface RevisionTabRef {
 }
 
 const RevisionTab = forwardRef<RevisionTabRef, RevisionTabProps>((props, ref) => {
-  const { techPack, mode = 'create' } = props;
+  const { techPack, mode = 'create', onBackToList } = props;
   const { canView, canEdit } = useRevisionPermissions(techPack);
 
   // Validate and save function for parent component
@@ -53,6 +54,7 @@ const RevisionTab = forwardRef<RevisionTabRef, RevisionTabProps>((props, ref) =>
         techPackId={techPack?.id || techPack?._id}
         canEdit={canEdit}
         canView={canView}
+        onBackToList={onBackToList}
       />
     </div>
   );

@@ -83,22 +83,27 @@ export class WorkflowController {
         const revision = new Revision({
           techPackId: techpack._id,
           version: techpack.version,
-          changes: [{
-            field: 'status',
-            oldValue: oldStatus,
-            newValue: newStatus
-          }],
+          changes: {
+            summary: `Status changed from ${oldStatus} to ${newStatus}`,
+            details: {
+              status: {
+                modified: 1
+              }
+            },
+            diff: {
+              status: {
+                old: oldStatus,
+                new: newStatus
+              }
+            }
+          },
           createdBy: user._id,
           createdByName: `${user.firstName} ${user.lastName}`,
-          reason: comments || `Status changed from ${oldStatus} to ${newStatus}`,
+          description: comments || `Status changed from ${oldStatus} to ${newStatus}`,
+          changeType: 'auto',
+          statusAtChange: oldStatus,
           snapshot: techpack.toObject()
         });
-
-        if (action === 'approve') {
-          revision.approvedBy = user._id;
-          revision.approvedByName = `${user.firstName} ${user.lastName}`;
-          revision.approvedAt = new Date();
-        }
 
         await revision.save();
       }
@@ -201,7 +206,6 @@ export class WorkflowController {
       const [revisions, total] = await Promise.all([
         Revision.find({ techPackId: id })
           .populate('createdBy', 'firstName lastName username')
-          .populate('approvedBy', 'firstName lastName username')
           .sort(sortOptions)
           .skip(skip)
           .limit(limitNum)

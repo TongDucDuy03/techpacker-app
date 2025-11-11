@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BOM Images</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 15mm 20mm;
+    }
+
+    body {
+      font-family: 'Roboto', Arial, sans-serif;
+      font-size: 10px;
+      line-height: 1.45;
+      color: #1f2933;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      margin: 0;
+      padding: 0;
+    }
+
+    .section-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      border-bottom: 2px solid #111827;
+      padding-bottom: 6px;
+      margin: 0 0 12px 0;
+      page-break-after: avoid;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .grid-item {
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 10px;
+      background: #fff;
+      min-height: 120px;
+      page-break-inside: avoid;
+    }
+
+    .grid-item img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+
+    .text-muted {
+      color: #6b7280;
+      font-size: 8px;
+    }
+
+    .avoid-break {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+  </style>
+</head>
+<body>
+  <div class="section-title"><%= strings.bomImageSheetTitle %></div>
+
+  <% if (bomImages && bomImages.length) { %>
+    <div class="grid">
+      <% bomImages.forEach((item) => { %>
+        <div class="grid-item avoid-break">
+          <% if (item.image) { %>
+            <img src="<%= item.image %>" alt="<%= item.name %>" />
+          <% } else { %>
+            <div style="width:100%; height:120px; border:1px dashed #d1d5db; border-radius:4px; display:flex; align-items:center; justify-content:center; color:#9ca3af; font-size:9px;">
+              No image available
+            </div>
+          <% } %>
+          <div style="font-size:9px;">
+            <p><strong><%= item.name %></strong></p>
+            <% if (item.part) { %>
+              <p class="text-muted">Part: <%= item.part %></p>
+            <% } %>
+            <% if (item.placement) { %>
+              <p class="text-muted">Placement: <%= item.placement %></p>
+            <% } %>
+            <% if (item.supplier) { %>
+              <p class="text-muted">Supplier: <%= item.supplier %></p>
+            <% } %>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  <% } else { %>
+    <div style="padding:32px; text-align:center; color:#94a3b8;"><%= strings.emptyBomImages %></div>
+  <% } %>
+</body>
+</html>
+

@@ -1,7 +1,6 @@
 // Revision Types for Frontend
 
 export type ChangeType = 'auto' | 'manual' | 'approval' | 'rollback';
-export type RevisionStatus = 'pending' | 'approved' | 'rejected';
 
 export interface RevisionComment {
   _id?: string;
@@ -28,11 +27,6 @@ export interface Revision {
   description?: string;
   changeType: ChangeType;
   statusAtChange: string;
-  approvedBy?: string;
-  approvedByName?: string;
-  approvedAt?: string | Date;
-  approvedReason?: string;
-  status?: RevisionStatus;
   createdAt: string | Date;
   snapshot?: any;
   revertedFrom?: string;

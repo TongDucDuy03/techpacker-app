@@ -26,7 +26,8 @@ import {
   Loader2,
   ArrowLeft
 } from 'lucide-react';
-import { showError } from '../../lib/toast';
+import { showError, showWarning } from '../../lib/toast';
+import { Modal } from 'antd';
 
 interface TechPackTabsProps {
   onBackToList: () => void;
@@ -46,8 +47,9 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
   const [showSaveNotification, setShowSaveNotification] = useState(false);
 
   // Permission checks based on user role
-  const canEdit = user?.role === 'admin' || user?.role === 'designer';
-  const isReadOnly = user?.role === 'merchandiser' || user?.role === 'viewer' || mode === 'view';
+  // Allow edit if user is admin/designer, OR if mode is 'create' (new techpack)
+  const canEdit = (user?.role === 'admin' || user?.role === 'designer') || mode === 'create';
+  const isReadOnly = (user?.role === 'merchandiser' || user?.role === 'viewer') && mode !== 'create';
 
   useEffect(() => {
     if ((mode === 'edit' || mode === 'view') && initialTechPack) {
@@ -192,7 +194,9 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
         createdAt: (initialTechPack as any).createdAt,
         updatedAt: (initialTechPack as any).updatedAt,
       };
-      updateFormState(mappedTechPack);
+      // Load từ server - không set hasUnsavedChanges (skipUnsavedFlag = true)
+      // Note: initialTechPack đã được fetch full detail từ App.tsx trước khi truyền vào đây
+      updateFormState(mappedTechPack, true);
     } else if (mode === 'create') {
       // Reset the form for creating a new tech pack
       resetFormState?.();
@@ -240,7 +244,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       id: 5,
       name: 'Revision History',
       icon: Clock,
-      component: RevisionTab,
+      component: (props: any) => <RevisionTab onBackToList={onBackToList} {...props} />,
       description: 'Change tracking',
     },
     {
@@ -293,52 +297,96 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
     setCurrentTab(tabId);
   };
 
+  // Helper function to format validation alert message
+  const formatValidationAlert = (fieldKey: string, tabName: string): string => {
+    const FIELD_LABEL_MAP: Record<string, string> = {
+      // BOM fields
+      part: 'Part',
+      materialName: 'Material Name',
+      materialCode: 'Material Code',
+      quantity: 'Quantity',
+      uom: 'Unit of Measure',
+      // Measurements fields
+      pomCode: 'POM Code',
+      pomName: 'POM Name',
+      minusTolerance: 'Minus Tolerance',
+      plusTolerance: 'Plus Tolerance',
+      sizes: 'Size Measurements', // Changed from 'measurement' to 'sizes' to match UI
+      // Colorways fields
+      name: 'Colorway Name',
+      code: 'Colorway Code',
+      placement: 'Placement',
+      materialType: 'Material Type',
+      // Construction fields
+      pomCode: 'POM Code',
+      description: 'Description',
+      steps: 'Steps',
+    };
+    
+    const fieldLabel = FIELD_LABEL_MAP[fieldKey] || fieldKey;
+    return `Trường ${fieldLabel}, thuộc tab ${tabName} chưa được điền. Vui lòng điền đầy đủ thông tin.`;
+  };
+
   const handleSave = async () => {
+    // Debug: Log để kiểm tra
+    console.log('[TechPackTabs] handleSave called', { mode, canEdit, isSaving, currentTab });
+    
     // If we're on the Article Info tab (tab 0), validate before saving
     if (currentTab === 0 && articleInfoTabRef.current) {
       const isValid = articleInfoTabRef.current.validateAndSave();
       if (!isValid) {
+        console.log('[TechPackTabs] Article Info validation failed');
         return; // Stop saving if validation fails
       }
     }
 
     // Validate BOM if on BOM tab (tab 1) or if BOM has items
     if (techpack.bom && techpack.bom.length > 0) {
+      let bomValidation;
       if (bomTabRef.current) {
-        const bomValidation = bomTabRef.current.validateAll();
-        if (!bomValidation.isValid) {
-          showError(`Cannot save: ${bomValidation.errors.length} BOM item(s) have validation errors. Please fix them first.`);
-          // Switch to BOM tab to show errors
-          if (currentTab !== 1) {
-            setCurrentTab(1);
-          }
-          return;
-        }
+        bomValidation = bomTabRef.current.validateAll();
       } else {
         // Fallback: use exported function
         const { validateBomForSave } = await import('./tabs/BomTab');
-        const bomValidation = validateBomForSave(techpack.bom);
-        if (!bomValidation.isValid) {
-          showError(`Cannot save: ${bomValidation.errors.length} BOM item(s) have validation errors. Please fix them first.`);
-          // Switch to BOM tab to show errors and try to trigger validation via ref
-          if (currentTab !== 1) {
-            setCurrentTab(1);
-            // Wait for tab to mount, then trigger validation to update UI
-            setTimeout(() => {
-              if (bomTabRef.current) {
-                bomTabRef.current.validateAll();
-              }
-            }, 100);
-          } else {
-            // Already on BOM tab, trigger validation to update UI
-            setTimeout(() => {
-              if (bomTabRef.current) {
-                bomTabRef.current.validateAll();
-              }
-            }, 100);
-          }
-          return;
+        bomValidation = validateBomForSave(techpack.bom);
+      }
+      
+      if (!bomValidation.isValid) {
+        // Get first error field from first error item
+        const firstError = bomValidation.errors[0];
+        const firstField = Object.keys(firstError.errors)[0];
+        const alertMessage = formatValidationAlert(firstField, 'Bill of Materials');
+        showError(alertMessage);
+        // Switch to BOM tab to show errors
+        if (currentTab !== 1) {
+          setCurrentTab(1);
         }
+        // Trigger validation to update UI
+        setTimeout(() => {
+          if (bomTabRef.current) {
+            bomTabRef.current.validateAll();
+          }
+        }, 100);
+        return;
+      }
+    }
+
+    // Validate Measurements if on Measurements tab (tab 2) or if Measurements has items
+    if (techpack.measurements && techpack.measurements.length > 0) {
+      const { validateMeasurementsForSave } = await import('./tabs/MeasurementTab');
+      const measurementsValidation = validateMeasurementsForSave(techpack.measurements);
+      
+      if (!measurementsValidation.isValid) {
+        // Get first error field from first error item
+        const firstError = measurementsValidation.errors[0];
+        const firstField = Object.keys(firstError.errors)[0];
+        const alertMessage = formatValidationAlert(firstField, 'Measurements');
+        showError(alertMessage);
+        // Switch to Measurements tab to show errors
+        if (currentTab !== 2) {
+          setCurrentTab(2);
+        }
+        return;
       }
     }
 
@@ -347,7 +395,11 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       if (constructionTabRef.current) {
         const constructionValidation = constructionTabRef.current.validateAll();
         if (!constructionValidation.isValid) {
-          showError(`Cannot save: ${constructionValidation.errors.length} Construction item(s) have validation errors. Please fix them first.`);
+          // Get first error field from first error item
+          const firstError = constructionValidation.errors[0];
+          const firstField = Object.keys(firstError.errors)[0];
+          const alertMessage = formatValidationAlert(firstField, 'Construction');
+          showError(alertMessage);
           // Switch to Construction tab to show errors
           if (currentTab !== 3) {
             setCurrentTab(3);
@@ -357,7 +409,49 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       }
     }
 
+    // Validate Colorways if on Colorways tab (tab 4) or if Colorways has items
+    if (techpack.colorways && techpack.colorways.length > 0) {
+      const { validateColorwaysForSave } = await import('./tabs/ColorwayTab');
+      const colorwaysValidation = validateColorwaysForSave(techpack.colorways);
+      
+      if (!colorwaysValidation.isValid) {
+        // Get first error field from first error item
+        const firstError = colorwaysValidation.errors[0];
+        const firstField = Object.keys(firstError.errors)[0];
+        const alertMessage = formatValidationAlert(firstField, 'Colorways');
+        showError(alertMessage);
+        // Switch to Colorways tab to show errors
+        if (currentTab !== 4) {
+          setCurrentTab(4);
+        }
+        return;
+      }
+    }
+
+    // For update flow, require confirmation and skip when no changes
+    if (mode === 'edit') {
+      if (!hasUnsavedChanges) {
+        showWarning('Chưa có gì thay đổi.');
+        return;
+      }
+      Modal.confirm({
+        title: 'Xác nhận cập nhật',
+        content: 'Bạn có muốn cập nhật TechPack này?',
+        okText: 'Cập nhật',
+        cancelText: 'Hủy',
+        onOk: async () => {
+          console.log('[TechPackTabs] Calling saveTechPack (confirmed)...');
+          await saveTechPack();
+          console.log('[TechPackTabs] saveTechPack completed');
+        }
+      });
+      return;
+    }
+
+    // For create flow: no confirmation
+    console.log('[TechPackTabs] Calling saveTechPack (create)...');
     await saveTechPack();
+    console.log('[TechPackTabs] saveTechPack completed');
   };
 
   const handleExportPDF = () => {
@@ -376,10 +470,20 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
               <button
                 onClick={() => {
                   console.log('Back to List clicked, onBackToList:', onBackToList);
-                  if (onBackToList) {
-                    onBackToList();
-                  } else {
+                  if (!onBackToList) {
                     console.error('onBackToList is not defined');
+                    return;
+                  }
+                  if (hasUnsavedChanges) {
+                    Modal.confirm({
+                      title: 'Thoát mà không lưu?',
+                      content: 'Bạn có muốn thoát mà không lưu các thay đổi?',
+                      okText: 'Thoát',
+                      cancelText: 'Tiếp tục chỉnh sửa',
+                      onOk: () => onBackToList()
+                    });
+                  } else {
+                    onBackToList();
                   }
                 }}
                 className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
@@ -453,9 +557,14 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
               {/* Action Buttons */}
               {canEdit && mode !== 'view' && (
                 <button
-                  onClick={handleSave}
+                  onClick={(e) => {
+                    console.log('[TechPackTabs] Update button clicked', { mode, canEdit, isSaving, hasUnsavedChanges });
+                    e.preventDefault();
+                    handleSave();
+                  }}
                   disabled={isSaving}
-                  className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                  className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={isSaving ? 'Đang lưu...' : mode === 'edit' ? 'Cập nhật TechPack' : 'Lưu TechPack mới'}
                 >
                   <Save className="w-4 h-4 mr-2" />
                   {mode === 'edit' ? 'Update' : 'Save'}
