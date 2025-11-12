@@ -1,7 +1,33 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
 import { TechPackListResponse, CreateTechPackInput, ApiTechPack } from '../types/techpack';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001/api/v1';
+// Auto-detect API base URL based on current hostname
+const getApiBaseUrl = (): string => {
+  // If explicitly set in env, use that
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+
+  // Auto-detect based on current hostname
+  const hostname = window.location.hostname;
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '';
+
+  if (isLocalhost) {
+    // Running locally - use localhost
+    return 'http://localhost:4001/api/v1';
+  } else {
+    // Running on server - use same hostname with port 4001
+    return `http://${hostname}:4001/api/v1`;
+  }
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+// Log API base URL for debugging (only in development)
+if (import.meta.env.DEV) {
+  console.log('🔗 API Base URL:', API_BASE_URL);
+  console.log('🌐 Current hostname:', window.location.hostname);
+}
 
 export function isApiConfigured(): boolean {
   return !!API_BASE_URL;
