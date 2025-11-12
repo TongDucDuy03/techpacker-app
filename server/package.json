@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "generate:pdf": "ts-node src/tools/generate-sample-pdf.ts",
     "generate:pdf-dist": "node tools/generate-sample-pdf.js",
+    "seed:admin": "ts-node scripts/seed-admin.ts",
     "test": "jest --runInBand",
     "test:watch": "jest --watch --runInBand",
     "lint": "eslint src/**/*.ts",
