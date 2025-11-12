@@ -44,29 +44,44 @@ const normalizeOrigin = (value: string | undefined | null): string | null => {
   }
 };
 
-const corsOptions = {
-  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    const incomingOrigin = normalizeOrigin(origin);
+const parseHostname = (value: string | null): string | null => {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.hostname;
+  } catch {
+    // value might already be host:port
+    return value.split(':')[0] || null;
+  }
+};
 
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!incomingOrigin) return callback(null, true);
+const baseCorsOptions = {
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Disposition']
+};
 
-    const rawAllowedOrigins = Array.isArray(config.corsOrigin) ? config.corsOrigin : [config.corsOrigin];
-    const allowedOrigins = rawAllowedOrigins
-      .map(entry => normalizeOrigin(entry as string))
-      .filter((entry): entry is string => !!entry);
+const corsOptionsDelegate = (req: express.Request, callback: (err: Error | null, options?: cors.CorsOptions) => void) => {
+  const originHeader = req.header('Origin');
+  const incomingOrigin = normalizeOrigin(originHeader);
 
-    // Allow all if wildcard present
-    if (allowedOrigins.includes('*')) {
-      return callback(null, true);
-    }
+  const rawAllowedOrigins = Array.isArray(config.corsOrigin) ? config.corsOrigin : [config.corsOrigin];
+  const allowedOrigins = rawAllowedOrigins
+    .map(entry => normalizeOrigin(entry as string))
+    .filter((entry): entry is string => !!entry);
 
-    // Exact match (after normalization)
-    if (allowedOrigins.includes(incomingOrigin)) {
-      return callback(null, true);
-    }
+  let allowOrigin = false;
 
-    // Support simple wildcard patterns like https://*.example.com
+  if (!incomingOrigin) {
+    // No origin (e.g., curl, mobile apps) -> allow
+    allowOrigin = true;
+  } else if (allowedOrigins.includes('*')) {
+    allowOrigin = true;
+  } else if (allowedOrigins.includes(incomingOrigin)) {
+    allowOrigin = true;
+  } else {
+    // Wildcard patterns
     const wildcardMatch = allowedOrigins.some(pattern => {
       if (!pattern.includes('*')) return false;
       const regexPattern = '^' + pattern.split('*').map(seg => seg.replace(/[-/\\^$+?.()|[\]{}]/g, '\\$&')).join('.*') + '$';
@@ -79,22 +94,35 @@ const corsOptions = {
     });
 
     if (wildcardMatch) {
-      return callback(null, true);
-    }
+      allowOrigin = true;
+    } else {
+      // Allow same host (different ports) automatically
+      const originHostname = parseHostname(incomingOrigin);
+      const hostHeader = req.headers.host || '';
+      const serverHostname = hostHeader.split(':')[0];
 
+      if (originHostname && serverHostname && originHostname === serverHostname) {
+        allowOrigin = true;
+      }
+    }
+  }
+
+  if (!allowOrigin) {
     console.warn(`[CORS] Blocked origin: ${incomingOrigin}. Allowed origins: ${allowedOrigins.join(', ')}`);
-    return callback(new Error('Not allowed by CORS'), false);
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Content-Disposition']
+  }
+
+  const options: cors.CorsOptions = {
+    ...baseCorsOptions,
+    origin: allowOrigin
+  };
+
+  callback(null, options);
 };
 
-app.use(cors(corsOptions));
+app.use(cors(corsOptionsDelegate));
 
 // Handle preflight OPTIONS requests
-app.options('*', cors(corsOptions));
+app.options('*', cors(corsOptionsDelegate));
 
 // Rate limiting
 const limiter = rateLimit({
