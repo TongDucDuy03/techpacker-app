@@ -12,10 +12,17 @@
 const axios = require('axios');
 
 // Cấu hình
-const BASE_URL = process.env.API_URL || 'http://localhost:4001/api/v1';
+// Auto-detect API URL: use 127.0.0.1 instead of localhost to avoid IPv6 issues
+const getApiUrl = () => {
+  if (process.env.API_URL) return process.env.API_URL;
+  // Use 127.0.0.1 instead of localhost to force IPv4
+  return 'http://127.0.0.1:4001/api/v1';
+};
+
+const BASE_URL = getApiUrl();
 const TEST_USER = {
-  email: process.env.TEST_EMAIL || 'test@techpacker.com',
-  password: process.env.TEST_PASSWORD || 'password123'
+  email: process.env.TEST_EMAIL || 'admin@techpacker.com',
+  password: process.env.TEST_PASSWORD || 'Admin123!'
 };
 
 let authToken = '';
