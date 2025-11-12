@@ -34,22 +34,61 @@ app.use(helmet({
 }));
 
 // CORS configuration
+const normalizeOrigin = (value: string | undefined | null): string | null => {
+  if (!value) return null;
+  try {
+    // Remove trailing slash for reliable comparison
+    return value.trim().replace(/\/$/, '');
+  } catch {
+    return value;
+  }
+};
+
 const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    const incomingOrigin = normalizeOrigin(origin);
 
-    // Check if origin is in allowed list
-    const allowedOrigins = Array.isArray(config.corsOrigin) ? config.corsOrigin : [config.corsOrigin];
-    if (allowedOrigins.includes(origin)) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!incomingOrigin) return callback(null, true);
+
+    const rawAllowedOrigins = Array.isArray(config.corsOrigin) ? config.corsOrigin : [config.corsOrigin];
+    const allowedOrigins = rawAllowedOrigins
+      .map(entry => normalizeOrigin(entry as string))
+      .filter((entry): entry is string => !!entry);
+
+    // Allow all if wildcard present
+    if (allowedOrigins.includes('*')) {
       return callback(null, true);
-    } else {
-      return callback(new Error('Not allowed by CORS'), false);
     }
+
+    // Exact match (after normalization)
+    if (allowedOrigins.includes(incomingOrigin)) {
+      return callback(null, true);
+    }
+
+    // Support simple wildcard patterns like https://*.example.com
+    const wildcardMatch = allowedOrigins.some(pattern => {
+      if (!pattern.includes('*')) return false;
+      const regexPattern = '^' + pattern.split('*').map(seg => seg.replace(/[-/\\^$+?.()|[\]{}]/g, '\\$&')).join('.*') + '$';
+      try {
+        const regex = new RegExp(regexPattern);
+        return regex.test(incomingOrigin);
+      } catch {
+        return false;
+      }
+    });
+
+    if (wildcardMatch) {
+      return callback(null, true);
+    }
+
+    console.warn(`[CORS] Blocked origin: ${incomingOrigin}. Allowed origins: ${allowedOrigins.join(', ')}`);
+    return callback(new Error('Not allowed by CORS'), false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Disposition']
 };
 
 app.use(cors(corsOptions));
