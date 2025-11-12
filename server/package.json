@@ -44,7 +44,7 @@
     "morgan": "^1.10.0",
     "multer": "^2.0.2",
     "node-cache": "^5.1.2",
-    "p-queue": "^8.0.1",
+    "p-queue": "^6.0.1",
     "pdf-lib": "^1.17.1",
     "puppeteer": "^21.5.2",
     "sharp": "^0.33.3",
