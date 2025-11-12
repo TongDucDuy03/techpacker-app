@@ -1,5 +1,4 @@
 import dotenv from 'dotenv';
-import path from 'path';
 import mongoose from 'mongoose';
 import User, { UserRole } from '../src/models/user.model';
 import { config } from '../src/config/config';
