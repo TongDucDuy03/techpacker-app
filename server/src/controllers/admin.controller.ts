@@ -15,6 +15,7 @@ class AdminController {
     this.updateUserRole = this.updateUserRole.bind(this);
     this.resetUserPassword = this.resetUserPassword.bind(this);
     this.getUserStats = this.getUserStats.bind(this);
+    this.updateUserTwoFactor = this.updateUserTwoFactor.bind(this);
   }
 
   async getAllUsers(req: AuthRequest, res: Response): Promise<void> {
@@ -196,6 +197,52 @@ class AdminController {
     } catch (error: any) {
       console.error('Update user error:', error);
       sendError(res, 'Failed to update user');
+    }
+  }
+
+  async updateUserTwoFactor(req: AuthRequest, res: Response): Promise<void> {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return sendError(res, 'Validation failed', 400, 'VALIDATION_ERROR', formatValidationErrors(errors.array()));
+    }
+
+    try {
+      const { id } = req.params;
+      const { enabled } = req.body as { enabled: boolean };
+
+      const user = await User.findById(id).select('+twoFactorCode');
+      if (!user) {
+        return sendError(res, 'User not found', 404, 'NOT_FOUND');
+      }
+
+      user.is2FAEnabled = enabled;
+
+      if (!enabled) {
+        delete user.twoFactorCode;
+        delete user.twoFactorCodeExpires;
+        user.twoFactorCodeAttempts = 0;
+      } else {
+        user.twoFactorCodeAttempts = 0;
+      }
+
+      await user.save();
+
+      await auditLogService.log({
+        user: req.user!,
+        action: 'UPDATE_USER_2FA',
+        resource: 'user',
+        resourceId: user._id.toString(),
+        details: {
+          enabled,
+          targetUser: user.email
+        },
+        req
+      });
+
+      sendSuccess(res, { is2FAEnabled: enabled }, 'User 2FA setting updated successfully');
+    } catch (error: any) {
+      console.error('Update user 2FA error:', error);
+      sendError(res, 'Failed to update user 2FA setting');
     }
   }
 

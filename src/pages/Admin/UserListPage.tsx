@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Button, Table, Input, Select, Tag, Space, Tooltip, Modal, message, Card, Row, Col, Statistic, Typography } from 'antd';
+import { Button, Table, Input, Select, Tag, Space, Tooltip, Modal, message, Card, Row, Col, Statistic, Typography, Switch } from 'antd';
 import { ArrowLeftOutlined, PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, UserOutlined, TeamOutlined, RiseOutlined } from '@ant-design/icons';
 import { api } from '../../lib/api';
 import UserModal from './components/UserModal';
@@ -19,6 +19,7 @@ interface User {
   role: 'admin' | 'designer' | 'merchandiser' | 'viewer';
   createdAt: string;
   lastLogin?: string;
+  is2FAEnabled?: boolean;
 }
 
 interface UserStatsData {
@@ -38,6 +39,7 @@ const UserListPage: React.FC = () => {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
   const [filters, setFilters] = useState({ search: '', role: '' });
   const [sorter, setSorter] = useState({ field: 'createdAt', order: 'descend' });
+  const [twoFactorLoadingIds, setTwoFactorLoadingIds] = useState<string[]>([]);
 
   const fetchUsers = async () => {
     try {
@@ -107,6 +109,19 @@ const UserListPage: React.FC = () => {
     });
   };
 
+  const handleToggleTwoFactor = async (user: User, enabled: boolean) => {
+    setTwoFactorLoadingIds(prev => [...prev, user._id]);
+    try {
+      await api.updateUserTwoFactor(user._id, enabled);
+      message.success(`Two-factor authentication ${enabled ? 'enabled' : 'disabled'} for ${user.email}`);
+      fetchUsers();
+    } catch (error) {
+      message.error(`Failed to update 2FA for ${user.email}`);
+    } finally {
+      setTwoFactorLoadingIds(prev => prev.filter(id => id !== user._id));
+    }
+  };
+
   const roleColors: { [key: string]: string } = {
     admin: 'red',
     designer: 'blue',
@@ -120,6 +135,17 @@ const UserListPage: React.FC = () => {
     { title: 'Role', dataIndex: 'role', sorter: true, render: (role: string) => <Tag color={roleColors[role]}>{role.toUpperCase()}</Tag> },
     { title: 'Created At', dataIndex: 'createdAt', sorter: true, render: (date: string) => new Date(date).toLocaleDateString() },
     { title: 'Last Login', dataIndex: 'lastLogin', sorter: true, render: (date: string) => date ? new Date(date).toLocaleString() : 'N/A' },
+    {
+      title: '2FA',
+      dataIndex: 'is2FAEnabled',
+      render: (_: any, record: User) => (
+        <Switch
+          checked={record.is2FAEnabled !== false}
+          onChange={(checked) => handleToggleTwoFactor(record, checked)}
+          loading={twoFactorLoadingIds.includes(record._id)}
+        />
+      ),
+    },
     {
       title: 'Actions',
       key: 'actions',

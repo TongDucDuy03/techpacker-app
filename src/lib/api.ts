@@ -241,10 +241,10 @@ class ApiClient {
   }
 
   // Authentication methods
-  async login(email: string, password: string): Promise<{ user: any; tokens: any }> {
+  async login(email: string, password: string): Promise<{ user: any; tokens: any; requires2FA?: boolean; sessionToken?: string }> {
     const payload = { email, password };
 
-    const response = await this.axiosInstance.post<ApiResponse<{ user: any; tokens: any }>>(
+    const response = await this.axiosInstance.post<ApiResponse<{ user: any; tokens: any; requires2FA?: boolean; sessionToken?: string }>>(
       '/auth/login',
       payload,
       {
@@ -257,10 +257,42 @@ class ApiClient {
     );
 
     const responseData = response.data?.data ?? {};
-    const { user, tokens } = responseData;
+    const { user, tokens, requires2FA, sessionToken } = responseData;
+
+    // If 2FA is required, return session token without setting tokens
+    if (requires2FA && sessionToken) {
+      return { user: null, tokens: null, requires2FA: true, sessionToken };
+    }
 
     if (!user || !tokens?.accessToken || !tokens?.refreshToken) {
       throw new Error('Invalid login response');
+    }
+
+    this.setTokens(tokens.accessToken, tokens.refreshToken);
+
+    return { user, tokens };
+  }
+
+  // 2FA methods
+  async send2FACode(sessionToken: string): Promise<void> {
+    const response = await this.axiosInstance.post<ApiResponse<{ message: string }>>(
+      '/auth/2fa/send',
+      { sessionToken }
+    );
+    return response.data?.data as any;
+  }
+
+  async verify2FA(sessionToken: string, code: string): Promise<{ user: any; tokens: any }> {
+    const response = await this.axiosInstance.post<ApiResponse<{ user: any; tokens: any }>>(
+      '/auth/2fa/verify',
+      { sessionToken, code }
+    );
+
+    const responseData = response.data?.data ?? {};
+    const { user, tokens } = responseData;
+
+    if (!user || !tokens?.accessToken || !tokens?.refreshToken) {
+      throw new Error('Invalid 2FA verification response');
     }
 
     this.setTokens(tokens.accessToken, tokens.refreshToken);
@@ -523,6 +555,15 @@ class ApiClient {
     const response = await this.axiosInstance.patch<ApiResponse<{ role: string }>>(`/admin/users/${id}/role`, { role });
     const responseData = response.data?.data ?? {};
     return { role: responseData.role || role };
+  }
+
+  async updateUserTwoFactor(id: string, enabled: boolean): Promise<{ is2FAEnabled: boolean }> {
+    const response = await this.axiosInstance.patch<ApiResponse<{ is2FAEnabled: boolean }>>(
+      `/admin/users/${id}/2fa`,
+      { enabled }
+    );
+    const responseData = response.data?.data ?? {};
+    return { is2FAEnabled: responseData.is2FAEnabled ?? enabled };
   }
 
   async resetUserPassword(id: string, newPassword: string): Promise<{ message: string }> {

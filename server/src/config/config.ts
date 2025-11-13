@@ -44,10 +44,10 @@ export const config = {
   // Logging
   logLevel: process.env.LOG_LEVEL || 'info',
   
-  // Email (for future notifications)
+  // Email (for 2FA and notifications)
   emailService: process.env.EMAIL_SERVICE || 'gmail',
-  emailUser: process.env.EMAIL_USER || '',
-  emailPass: process.env.EMAIL_PASS || '',
+  emailUser: process.env.EMAIL_USER || 'tongducduy4@gmail.com',
+  emailPass: process.env.EMAIL_PASS || 'pmlt ikfa tsli yruq',
 
   // Pagination defaults
   defaultPageSize: parseInt(process.env.DEFAULT_PAGE_SIZE || '20', 10),

@@ -8,13 +8,14 @@ interface User {
   lastName: string;
   role: string;
   username?: string;
+  is2FAEnabled?: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ requires2FA: boolean; sessionToken?: string } | void>;
   logout: () => Promise<void>;
   register: (userData: {
     email: string;
@@ -25,6 +26,8 @@ interface AuthContextType {
     role?: string;
   }) => Promise<void>;
   refreshUser: () => Promise<void>;
+  verify2FA: (sessionToken: string, code: string) => Promise<void>;
+  send2FACode: (sessionToken: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -56,10 +59,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = useCallback(async (email: string, password: string) => {
     try {
-      const { user: userData } = await api.login(email, password);
-      setUser(userData);
+      const result = await api.login(email, password);
+      
+      // Check if 2FA is required
+      if (result.requires2FA && result.sessionToken) {
+        return { requires2FA: true, sessionToken: result.sessionToken };
+      }
+
+      // Normal login
+      if (result.user) {
+        setUser(result.user);
+        return;
+      }
+
+      throw new Error('Invalid login response');
     } catch (error: any) {
       throw new Error(error.message || 'Login failed');
+    }
+  }, []);
+
+  const verify2FA = useCallback(async (sessionToken: string, code: string) => {
+    try {
+      const { user: userData } = await api.verify2FA(sessionToken, code);
+      setUser(userData);
+    } catch (error: any) {
+      throw new Error(error.message || '2FA verification failed');
+    }
+  }, []);
+
+  const send2FACode = useCallback(async (sessionToken: string) => {
+    try {
+      await api.send2FACode(sessionToken);
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to send 2FA code');
     }
   }, []);
 
@@ -103,6 +135,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     logout,
     register,
     refreshUser,
+    verify2FA,
+    send2FACode,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

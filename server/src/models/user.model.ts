@@ -20,6 +20,11 @@ export interface IUser extends Document {
   lastLogin: Date;
   refreshTokens: string[];
   fullName: string;
+  // 2FA fields
+  is2FAEnabled: boolean;
+  twoFactorCode?: string;
+  twoFactorCodeExpires?: Date;
+  twoFactorCodeAttempts: number;
   comparePassword(password: string): Promise<boolean>;
 }
 
@@ -34,6 +39,11 @@ const UserSchema = new Schema<IUser>(
     isActive: { type: Boolean, default: true },
     lastLogin: { type: Date },
     refreshTokens: [{ type: String }],
+    // 2FA fields
+    is2FAEnabled: { type: Boolean, default: true },
+    twoFactorCode: { type: String, select: false },
+    twoFactorCodeExpires: { type: Date },
+    twoFactorCodeAttempts: { type: Number, default: 0 },
   },
   {
     timestamps: true,

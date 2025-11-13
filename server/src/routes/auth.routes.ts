@@ -43,4 +43,21 @@ router.post(
   authController.refreshToken
 );
 
+// POST /api/v1/auth/2fa/send - Resend 2FA code
+router.post(
+  '/2fa/send',
+  body('sessionToken').notEmpty().withMessage('Session token is required'),
+  authController.send2FACode
+);
+
+// POST /api/v1/auth/2fa/verify - Verify 2FA code
+router.post(
+  '/2fa/verify',
+  [
+    body('sessionToken').notEmpty().withMessage('Session token is required'),
+    body('code').isLength({ min: 6, max: 6 }).withMessage('Code must be 6 digits'),
+  ],
+  authController.verify2FA
+);
+
 export default router;

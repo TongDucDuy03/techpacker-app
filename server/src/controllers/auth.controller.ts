@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 import User from '../models/user.model';
 import { authService } from '../services/auth.service';
+import { twoFactorService } from '../services/twoFactor.service';
+import { emailService } from '../services/email.service';
 import { sendSuccess, sendError, formatValidationErrors } from '../utils/response.util';
 import { AuthRequest } from '../middleware/auth.middleware';
 
@@ -14,6 +16,8 @@ class AuthController {
     this.refreshToken = this.refreshToken.bind(this);
     this.getProfile = this.getProfile.bind(this);
     this.updateProfile = this.updateProfile.bind(this);
+    this.send2FACode = this.send2FACode.bind(this);
+    this.verify2FA = this.verify2FA.bind(this);
   }
 
   async register(req: Request, res: Response): Promise<void> {
@@ -77,6 +81,47 @@ class AuthController {
         return sendError(res, 'Invalid email or password', 401, 'UNAUTHORIZED');
       }
 
+      const requiresTwoFactor = user.is2FAEnabled !== false;
+
+      // Check if 2FA is enabled (default: enabled for all users)
+      if (requiresTwoFactor) {
+        // Generate 2FA code
+        const code = twoFactorService.generateCode();
+        const hashedCode = await twoFactorService.hashCode(code);
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+        // Store hashed code and expiration
+        user.twoFactorCode = hashedCode;
+        user.twoFactorCodeExpires = expiresAt;
+        user.twoFactorCodeAttempts = 0;
+        await user.save();
+
+        // Send code via email
+        const emailSent = await emailService.send2FACode(
+          user.email,
+          code,
+          `${user.firstName} ${user.lastName}`
+        );
+
+        if (!emailSent) {
+          console.error('Failed to send 2FA email');
+          // Reset 2FA code on failure
+          await twoFactorService.reset2FACode(user);
+          return sendError(res, 'Failed to send verification code. Please try again.', 500, 'EMAIL_ERROR');
+        }
+
+        // Generate temporary session token
+        const sessionToken = twoFactorService.generateSessionToken(user._id.toString());
+
+        console.log('2FA code sent to:', email);
+        return sendSuccess(res, {
+          requires2FA: true,
+          sessionToken,
+          message: 'Verification code sent to your email'
+        }, 'Verification code sent');
+      }
+
+      // Normal login flow (no 2FA)
       const accessToken = authService.generateAccessToken(user);
       const refreshToken = authService.generateRefreshToken(user);
 
@@ -208,6 +253,143 @@ class AuthController {
       sendError(res, 'Failed to update profile');
     }
   }
+
+  /**
+   * Send 2FA code (resend)
+   */
+  async send2FACode(req: Request, res: Response): Promise<void> {
+    try {
+      const { sessionToken } = req.body;
+
+      if (!sessionToken) {
+        return sendError(res, 'Session token is required', 400, 'BAD_REQUEST');
+      }
+
+      // Verify session token
+      let decoded: { userId: string; type: string };
+      try {
+        decoded = twoFactorService.verifySessionToken(sessionToken);
+      } catch (error) {
+        return sendError(res, 'Invalid or expired session token', 401, 'UNAUTHORIZED');
+      }
+
+      // Get user
+      const user = await User.findById(decoded.userId).select('+twoFactorCode');
+      if (!user || user.is2FAEnabled === false) {
+        return sendError(res, 'User not found or 2FA not enabled', 404, 'NOT_FOUND');
+      }
+
+      // Generate new code
+      const code = twoFactorService.generateCode();
+      const hashedCode = await twoFactorService.hashCode(code);
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      user.twoFactorCode = hashedCode;
+      user.twoFactorCodeExpires = expiresAt;
+      user.twoFactorCodeAttempts = 0;
+      await user.save();
+
+      // Send email
+      const emailSent = await emailService.send2FACode(
+        user.email,
+        code,
+        `${user.firstName} ${user.lastName}`
+      );
+
+      if (!emailSent) {
+        await twoFactorService.reset2FACode(user);
+        return sendError(res, 'Failed to send verification code', 500, 'EMAIL_ERROR');
+      }
+
+      sendSuccess(res, { message: 'Verification code sent to your email' }, 'Code sent successfully');
+    } catch (error: any) {
+      console.error('Send 2FA code error:', error);
+      sendError(res, 'Failed to send verification code', 500, 'INTERNAL_ERROR');
+    }
+  }
+
+  /**
+   * Verify 2FA code and complete login
+   */
+  async verify2FA(req: Request, res: Response): Promise<void> {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return sendError(res, 'Validation failed', 400, 'VALIDATION_ERROR', formatValidationErrors(errors.array()));
+    }
+
+    try {
+      const { sessionToken, code } = req.body;
+
+      if (!sessionToken || !code) {
+        return sendError(res, 'Session token and code are required', 400, 'BAD_REQUEST');
+      }
+
+      // Verify session token
+      let decoded: { userId: string; type: string };
+      try {
+        decoded = twoFactorService.verifySessionToken(sessionToken);
+      } catch (error) {
+        return sendError(res, 'Invalid or expired session token', 401, 'UNAUTHORIZED');
+      }
+
+      // Get user with 2FA code
+      const user = await User.findById(decoded.userId).select('+twoFactorCode');
+      if (!user || user.is2FAEnabled === false) {
+        return sendError(res, 'User not found or 2FA not enabled', 404, 'NOT_FOUND');
+      }
+
+      // Check if code is expired
+      if (twoFactorService.isCodeExpired(user.twoFactorCodeExpires)) {
+        await twoFactorService.reset2FACode(user);
+        return sendError(res, 'Verification code has expired. Please request a new one.', 401, 'CODE_EXPIRED');
+      }
+
+      // Check attempts
+      if (twoFactorService.hasExceededAttempts(user.twoFactorCodeAttempts || 0)) {
+        await twoFactorService.reset2FACode(user);
+        return sendError(res, 'Too many failed attempts. Please request a new code.', 429, 'TOO_MANY_ATTEMPTS');
+      }
+
+      // Verify code
+      if (!user.twoFactorCode) {
+        return sendError(res, 'No verification code found. Please request a new one.', 400, 'NO_CODE');
+      }
+
+      const isValid = await twoFactorService.verifyCode(code, user.twoFactorCode);
+      if (!isValid) {
+        await twoFactorService.incrementAttempts(user);
+        return sendError(res, 'Invalid verification code', 401, 'INVALID_CODE');
+      }
+
+      // Code is valid - complete login
+      await twoFactorService.reset2FACode(user);
+
+      // Generate tokens
+      const accessToken = authService.generateAccessToken(user);
+      const refreshToken = authService.generateRefreshToken(user);
+
+      // Store refresh token
+      user.refreshTokens.push(refreshToken);
+      user.lastLogin = new Date();
+      await user.save();
+
+      // Exclude sensitive data
+      const { password: _, refreshTokens: __, twoFactorCode: ___, ...userResponse } = user.toObject();
+
+      console.log('2FA verification successful for user:', user.email);
+      sendSuccess(res, {
+        user: userResponse,
+        tokens: {
+          accessToken,
+          refreshToken
+        }
+      }, 'Login successful');
+    } catch (error: any) {
+      console.error('Verify 2FA error:', error);
+      sendError(res, 'Failed to verify code', 500, 'INTERNAL_ERROR');
+    }
+  }
+
 }
 
 export default new AuthController();

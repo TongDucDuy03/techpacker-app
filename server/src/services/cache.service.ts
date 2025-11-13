@@ -200,7 +200,7 @@ export class CacheService {
         // Convert simple Redis-style pattern with * wildcards to regex
         const escaped = pattern.replace(/[-\/\\^$+?.()|[\]{}]/g, '\\$&');
         const regex = new RegExp('^' + escaped.replace(/\*/g, '.*') + '$');
-        const toDelete = keys.filter(k => regex.test(k));
+        const toDelete = keys.filter((k: string) => regex.test(k));
         if (toDelete.length > 0) {
           this.memoryCache.del(toDelete);
         }

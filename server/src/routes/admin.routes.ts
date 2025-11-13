@@ -81,6 +81,16 @@ router.patch(
   adminController.updateUserRole
 );
 
+// PATCH /api/v1/admin/users/:id/2fa - Update user 2FA setting
+router.patch(
+  '/users/:id/2fa',
+  [
+    param('id').isMongoId().withMessage('Invalid user ID'),
+    body('enabled').isBoolean().withMessage('Enabled must be a boolean value'),
+  ],
+  adminController.updateUserTwoFactor
+);
+
 // PATCH /api/v1/admin/users/:id/password - Reset user password
 router.patch(
   '/users/:id/password',
