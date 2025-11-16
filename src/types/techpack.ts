@@ -349,6 +349,7 @@ export interface InputProps {
   maxLength?: number;
   min?: number;
   max?: number;
+  step?: number | string;
 }
 
 export interface SelectProps {

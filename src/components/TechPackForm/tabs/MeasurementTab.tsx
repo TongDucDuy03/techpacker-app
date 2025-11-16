@@ -491,7 +491,7 @@ const MeasurementTab: React.FC = () => {
               onChange={(value) => handleInputChange('minusTolerance')(typeof value === 'string' ? parseFloat(value) || 0 : value)}
               onBlur={() => validation.setFieldTouched('minusTolerance')}
               type="number"
-              step="0.1"
+              step="0.0000001"
               min="0"
               max="50"
               placeholder="e.g., 1.0"
@@ -506,7 +506,7 @@ const MeasurementTab: React.FC = () => {
               onChange={(value) => handleInputChange('plusTolerance')(typeof value === 'string' ? parseFloat(value) || 0 : value)}
               onBlur={() => validation.setFieldTouched('plusTolerance')}
               type="number"
-              step="0.1"
+              step="0.0000001"
               min="0"
               max="50"
               placeholder="e.g., 1.0"

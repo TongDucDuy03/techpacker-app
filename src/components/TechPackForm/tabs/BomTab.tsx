@@ -883,7 +883,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               onBlur={() => validation.setFieldTouched('quantity')}
               type="number"
               min={0}
-              step={0.01}
+              step={0.0000001}
               placeholder="e.g., 1.50"
               required
               error={validation.getFieldProps('quantity').error}

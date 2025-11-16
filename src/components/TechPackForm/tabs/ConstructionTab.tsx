@@ -934,7 +934,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
       <Modal
         isOpen={showModal}
         onClose={resetForm}
-        title={editingId ? 'Edit Construction' : 'Add New Construction'}
+        title={editingId ? 'Edit Construction' : 'Detail Construction'}
         size="lg"
         footer={
           <>

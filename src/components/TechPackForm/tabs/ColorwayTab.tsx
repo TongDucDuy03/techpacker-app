@@ -78,6 +78,18 @@ const ColorwayTab: React.FC = () => {
     { value: 'Finished', label: 'Finished' },
   ];
 
+  // Season options
+  const seasonOptions = [
+    { value: 'Spring', label: 'Spring' },
+    { value: 'Summer', label: 'Summer' },
+    { value: 'Autumn', label: 'Autumn' },
+    { value: 'Winter', label: 'Winter' },
+    { value: 'SS25', label: 'Spring/Summer 2025' },
+    { value: 'FW25', label: 'Fall/Winter 2025' },
+    { value: 'SS26', label: 'Spring/Summer 2026' },
+    { value: 'FW26', label: 'Fall/Winter 2026' }
+  ];
+
   const handleInputChange = (field: keyof Colorway) => (value: string | boolean) => {
     let nextValue: string | boolean = value;
 
@@ -443,12 +455,12 @@ const ColorwayTab: React.FC = () => {
               helperText={validation.getFieldProps('code').helperText}
             />
 
-            <Input
+            <Select
               label="Season"
               value={formData.season || ''}
               onChange={handleInputChange('season')}
-              onBlur={validation.getFieldProps('season').onBlur}
-              placeholder="e.g., SS25"
+              onBlur={() => validation.setFieldTouched('season')}
+              options={seasonOptions}
               error={validation.getFieldProps('season').error}
               helperText={validation.getFieldProps('season').helperText}
             />
