@@ -423,6 +423,7 @@ class ApiClient {
         : Array.isArray(raw.howToMeasure)
           ? raw.howToMeasure
           : [],
+      sampleMeasurementRounds: Array.isArray(raw.sampleMeasurementRounds) ? raw.sampleMeasurementRounds : [],
       colorways: Array.isArray(raw.colorways) ? raw.colorways : []
     } as any;
     if (!techPack) {

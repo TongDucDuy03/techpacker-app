@@ -13,6 +13,7 @@ import { sendSuccess, sendError, formatValidationErrors } from '../utils/respons
 import { Types } from 'mongoose';
 import PermissionManager from '../utils/permissions.util';
 import { cacheService, CacheKeys, CacheTTL } from '../services/cache.service';
+import CacheInvalidationUtil from '../utils/cache-invalidation.util';
 import _ from 'lodash';
 import { hasEditAccess } from '../utils/access-control.util';
 
@@ -286,6 +287,62 @@ export class TechPackController {
         return sendError(res, 'Access denied', 403, 'FORBIDDEN');
       }
 
+      // Bootstrap sample measurement rounds if missing (backward compatibility)
+      const needsSampleRoundBootstrap =
+        (!Array.isArray((techpack as any).sampleMeasurementRounds) || (techpack as any).sampleMeasurementRounds.length === 0) &&
+        Array.isArray(techpack.measurements) &&
+        techpack.measurements.length > 0;
+
+      if (needsSampleRoundBootstrap) {
+        const bootstrapRoundId = new Types.ObjectId();
+        const bootstrapEntries = techpack.measurements.map(measurement => {
+          const sizeEntries = (measurement as any)?.sizes || {};
+          const requestedMap: Record<string, string> = {};
+
+          Object.entries(sizeEntries).forEach(([size, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+              requestedMap[size] = String(value);
+            }
+          });
+
+          return {
+            _id: new Types.ObjectId(),
+            measurementId: (measurement as any)?._id || (measurement as any)?.id || undefined,
+            pomCode: (measurement as any)?.pomCode || '',
+            pomName: (measurement as any)?.pomName || '',
+            requested: requestedMap,
+            measured: {},
+            diff: {},
+            revised: {},
+            comments: {},
+          };
+        });
+
+        const bootstrapRound = {
+          _id: bootstrapRoundId,
+          name: 'Initial Sample',
+          order: 1,
+          measurementDate: techpack.updatedAt || techpack.createdAt || new Date(),
+          reviewer: (techpack as any).updatedByName || (techpack as any).createdByName || '',
+          requestedSource: 'original',
+          overallComments: '',
+          measurements: bootstrapEntries,
+        };
+
+        (techpack as any).sampleMeasurementRounds = [bootstrapRound];
+
+        // Persist bootstrap asynchronously; failures shouldn't block response
+        TechPack.updateOne(
+          { _id: techpack._id },
+          { $set: { sampleMeasurementRounds: (techpack as any).sampleMeasurementRounds } }
+        ).catch(error => {
+          console.warn('Failed to persist bootstrap sample round', {
+            techpackId: techpack._id,
+            error: error?.message || error,
+          });
+        });
+      }
+
       // Lưu vào cache với TTL trung bình (30 phút)
       await cacheService.set(cacheKey, techpack, CacheTTL.MEDIUM);
 
@@ -393,7 +450,7 @@ export class TechPackController {
 
       } else {
         // --- CREATE FROM SCRATCH LOGIC (existing logic) ---
-        const { articleInfo, bom, measurements, colorways, howToMeasures } = restOfBody;
+      const { articleInfo, bom, measurements, colorways, howToMeasures, sampleMeasurementRounds } = restOfBody;
 
         const productName = articleInfo?.productName || req.body.productName;
         const articleCode = articleInfo?.articleCode || req.body.articleCode;
@@ -432,6 +489,7 @@ export class TechPackController {
           measurements: measurements || [],
           colorways: colorways || [],
           howToMeasure: howToMeasures || [],
+          sampleMeasurementRounds: sampleMeasurementRounds || [],
           sharedWith: [],
           auditLogs: [],
         };
@@ -528,7 +586,7 @@ export class TechPackController {
         'fabricDescription', 'productDescription', 'designSketchUrl', 'status', 'category', 'gender', 'brand',
         'technicalDesignerId', 'lifecycleStage', 'collectionName', 'targetMarket', 'pricePoint',
         'retailPrice', 'currency', 'description', 'notes', 'bom',
-        'measurements', 'colorways', 'howToMeasure'
+        'measurements', 'colorways', 'howToMeasure', 'sampleMeasurementRounds'
       ];
 
       // Safely update only whitelisted fields that exist in request body
@@ -538,7 +596,7 @@ export class TechPackController {
       };
 
       // Array fields that need special merging logic
-      const arrayFields = ['bom', 'measurements', 'colorways', 'howToMeasure'];
+      const arrayFields = ['bom', 'measurements', 'colorways', 'howToMeasure', 'sampleMeasurementRounds'];
 
       allowedFields.forEach(field => {
         if (req.body.hasOwnProperty(field)) {
@@ -708,6 +766,15 @@ export class TechPackController {
           techPackId: updatedTechPack._id,
           userId: user._id
         });
+      }
+
+      // Invalidate caches so subsequent fetches get fresh data
+      const updatedTechPackId =
+        typeof updatedTechPack._id === 'string'
+          ? updatedTechPack._id
+          : (updatedTechPack._id as Types.ObjectId)?.toString();
+      if (updatedTechPackId) {
+        await CacheInvalidationUtil.invalidateTechPackCache(updatedTechPackId);
       }
 
       // Build response payload per spec

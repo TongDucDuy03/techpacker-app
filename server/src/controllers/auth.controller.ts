@@ -6,6 +6,7 @@ import { twoFactorService } from '../services/twoFactor.service';
 import { emailService } from '../services/email.service';
 import { sendSuccess, sendError, formatValidationErrors } from '../utils/response.util';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { config } from '../config/config';
 
 class AuthController {
   constructor() {
@@ -81,7 +82,7 @@ class AuthController {
         return sendError(res, 'Invalid email or password', 401, 'UNAUTHORIZED');
       }
 
-      const requiresTwoFactor = user.is2FAEnabled !== false;
+      const requiresTwoFactor = config.twoFactorEnabled && user.is2FAEnabled !== false;
 
       // Check if 2FA is enabled (default: enabled for all users)
       if (requiresTwoFactor) {

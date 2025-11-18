@@ -43,6 +43,34 @@ export interface Measurement {
   sizes: { [key: string]: string };
 }
 
+export type MeasurementRequestedSource = 'original' | 'previous';
+
+export interface MeasurementSampleValueMap {
+  [size: string]: string;
+}
+
+export interface MeasurementSampleEntry {
+  id: string;
+  measurementId?: string;
+  pomCode?: string;
+  point: string;
+  requested: MeasurementSampleValueMap;
+  measured: MeasurementSampleValueMap;
+  diff: MeasurementSampleValueMap;
+  revised: MeasurementSampleValueMap;
+  comments: MeasurementSampleValueMap;
+}
+
+export interface MeasurementSampleRound {
+  id: string;
+  name: string;
+  date: string;
+  reviewer: string;
+  requestedSource: MeasurementRequestedSource;
+  measurements: MeasurementSampleEntry[];
+  overallComments?: string;
+}
+
 export interface Colorway {
   id: string;
   name: string;
@@ -73,4 +101,30 @@ export interface TechPackRevision {
   status: 'pending' | 'approved' | 'rejected';
   changes: any; // minimal diff payload
   comments: RevisionComment[];
+}
+
+export type SampleRequestedSource = 'original' | 'previous';
+
+export interface SampleMeasurementValueMap {
+  [size: string]: string;
+}
+
+export interface SampleMeasurementEntryLite {
+  id: string;
+  point: string;
+  requested: SampleMeasurementValueMap;
+  measured: SampleMeasurementValueMap;
+  diff: SampleMeasurementValueMap;
+  revised: SampleMeasurementValueMap;
+  comments: SampleMeasurementValueMap;
+}
+
+export interface SampleMeasurementRoundLite {
+  id: string;
+  name: string;
+  date: string;
+  reviewer: string;
+  requestedSource: SampleRequestedSource;
+  measurements: SampleMeasurementEntryLite[];
+  overallComments?: string;
 }

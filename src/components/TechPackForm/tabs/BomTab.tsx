@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useCallback, memo, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useTechPack } from '../../../contexts/TechPackContext';
-import { BomItem, UNITS_OF_MEASURE, COMMON_MATERIALS, COMMON_PLACEMENTS } from '../../../types/techpack';
+import { BomItem, UNITS_OF_MEASURE, COMMON_MATERIALS, COMMON_PLACEMENTS, TechPackRole } from '../../../types/techpack';
 import { useFormValidation } from '../../../hooks/useFormValidation';
 import { bomItemValidationSchema } from '../../../utils/validationSchemas';
 import { useDebounce } from '../../../hooks/useDebounce';
+import { useAuth } from '../../../contexts/AuthContext';
 import DataTable from '../shared/DataTable';
 import Input from '../shared/Input';
 import Select from '../shared/Select';
@@ -22,25 +23,42 @@ const generateUUID = (): string => {
 };
 
 // CSV Import/Export utilities
-const CSV_HEADERS = ['Part', 'MaterialCode', 'MaterialName', 'Placement', 'Size', 'Quantity', 'UOM', 'Supplier', 'ColorCode', 'MaterialComposition', 'Comments'];
+const getCSVHeaders = (includePrice: boolean = false): string[] => {
+  const baseHeaders = ['Part', 'MaterialCode', 'MaterialName', 'Placement', 'Size', 'Quantity', 'UOM', 'Supplier', 'ColorCode', 'MaterialComposition', 'Comments'];
+  if (includePrice) {
+    return [...baseHeaders, 'UnitPrice', 'TotalPrice'];
+  }
+  return baseHeaders;
+};
 
-const exportToCSV = (items: BomItem[]): string => {
-  const rows = items.map(item => [
-    item.part || '',
-    item.supplierCode || '',
-    item.materialName || '',
-    item.placement || '',
-    item.size || '',
-    item.quantity?.toString() || '0',
-    item.uom || '',
-    item.supplier || '',
-    item.colorCode || '',
-    item.materialComposition || '',
-    item.comments || ''
-  ]);
+const exportToCSV = (items: BomItem[], includePrice: boolean = false): string => {
+  const headers = getCSVHeaders(includePrice);
+  const rows = items.map(item => {
+    const baseRow = [
+      item.part || '',
+      item.supplierCode || '',
+      item.materialName || '',
+      item.placement || '',
+      item.size || '',
+      item.quantity?.toString() || '0',
+      item.uom || '',
+      item.supplier || '',
+      item.colorCode || '',
+      item.materialComposition || '',
+      item.comments || ''
+    ];
+    if (includePrice) {
+      const totalPrice = item.totalPrice ?? (item.quantity && item.unitPrice ? item.quantity * item.unitPrice : undefined);
+      baseRow.push(
+        item.unitPrice?.toString() || '',
+        totalPrice?.toString() || ''
+      );
+    }
+    return baseRow;
+  });
   
   const csvContent = [
-    CSV_HEADERS.join(','),
+    headers.join(','),
     ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
   ].join('\n');
   
@@ -120,7 +138,9 @@ interface ColumnMapping {
 const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   const context = useTechPack();
   const { state, addBomItem, updateBomItem, updateBomItemById, deleteBomItem, deleteBomItemById, insertBomItemAt, updateFormState } = context ?? {};
-  const { bom = [] } = state?.techpack ?? {};
+  const techpack = state?.techpack;
+  const bom = techpack?.bom ?? [];
+  const { user } = useAuth();
 
   const [showModal, setShowModal] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -160,6 +180,8 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     materialComposition: '',
     colorCode: '',
     supplierCode: '',
+    unitPrice: undefined,
+    totalPrice: undefined,
   });
 
   // Filter and search BOM items
@@ -208,6 +230,18 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
 
   const handleInputChange = useCallback((field: keyof BomItem) => (value: string | number) => {
     const updatedFormData = { ...formData, [field]: value };
+    
+    // Auto-calculate totalPrice when quantity or unitPrice changes
+    if (field === 'quantity' || field === 'unitPrice') {
+      const quantity = field === 'quantity' ? Number(value) : Number(updatedFormData.quantity || 0);
+      const unitPrice = field === 'unitPrice' ? Number(value) : Number(updatedFormData.unitPrice || 0);
+      if (quantity > 0 && unitPrice > 0) {
+        updatedFormData.totalPrice = quantity * unitPrice;
+      } else {
+        updatedFormData.totalPrice = undefined;
+      }
+    }
+    
     setFormData(updatedFormData);
 
     // Validate the field in real-time
@@ -266,19 +300,26 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       }
     }
 
+    // Calculate totalPrice if quantity and unitPrice are provided
+    const quantity = Number(formData.quantity) || 0;
+    const unitPrice = formData.unitPrice ? Number(formData.unitPrice) : undefined;
+    const totalPrice = quantity > 0 && unitPrice ? quantity * unitPrice : undefined;
+    
     const bomItem: BomItem = {
       id: editingIndex !== null ? bom[editingIndex].id : generateUUID(),
       part: formData.part!,
       materialName: formData.materialName!,
       placement: formData.placement || '',
       size: formData.size || '',
-      quantity: Number(formData.quantity),
+      quantity: quantity,
       uom: formData.uom as any || 'm',
       supplier: formData.supplier || '',
       comments: formData.comments || '',
       materialComposition: formData.materialComposition || '',
       colorCode: formData.colorCode || '',
       supplierCode: formData.supplierCode || '',
+      unitPrice: unitPrice,
+      totalPrice: totalPrice,
     };
 
     if (editingId) {
@@ -305,6 +346,8 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       size: '',
       quantity: 0,
       uom: 'm',
+      unitPrice: undefined,
+      totalPrice: undefined,
       supplier: '',
       comments: '',
       materialComposition: '',
@@ -418,7 +461,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       return;
     }
     
-    const csvContent = exportToCSV(bom);
+    const csvContent = exportToCSV(bom, canViewPrice);
     downloadCSV(csvContent, `bom_export_${new Date().toISOString().split('T')[0]}.csv`);
     showSuccess('BOM exported successfully');
   };
@@ -440,7 +483,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
         comments: 'Sample comment'
       }
     ];
-    const csvContent = exportToCSV(sampleData);
+    const csvContent = exportToCSV(sampleData, canViewPrice);
     downloadCSV(csvContent, 'bom_sample.csv');
     showSuccess('Sample CSV downloaded');
   };
@@ -463,7 +506,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       
       // Auto-detect column mapping
       const autoMapping: Record<string, keyof BomItem | ''> = {};
-      const bomFields: (keyof BomItem)[] = ['part', 'materialName', 'placement', 'size', 'quantity', 'uom', 'supplier', 'supplierCode', 'colorCode', 'materialComposition', 'comments'];
+      const bomFields: (keyof BomItem)[] = ['part', 'materialName', 'placement', 'size', 'quantity', 'uom', 'supplier', 'supplierCode', 'colorCode', 'materialComposition', 'comments', 'unitPrice', 'totalPrice'];
       
       headers.forEach(header => {
         const lowerHeader = header.toLowerCase().trim();
@@ -474,11 +517,13 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
         else if (lowerHeader.includes('placement')) autoMapping[header] = 'placement';
         else if (lowerHeader.includes('size')) autoMapping[header] = 'size';
         else if (lowerHeader.includes('quantity') || lowerHeader.includes('qty')) autoMapping[header] = 'quantity';
-        else if (lowerHeader.includes('uom') || lowerHeader.includes('unit')) autoMapping[header] = 'uom';
+        else if (lowerHeader.includes('uom') || lowerHeader.includes('unit') && !lowerHeader.includes('price')) autoMapping[header] = 'uom';
         else if (lowerHeader.includes('supplier') && !lowerHeader.includes('code')) autoMapping[header] = 'supplier';
         else if (lowerHeader.includes('color')) autoMapping[header] = 'colorCode';
         else if (lowerHeader.includes('composition')) autoMapping[header] = 'materialComposition';
         else if (lowerHeader.includes('comment') || lowerHeader.includes('note')) autoMapping[header] = 'comments';
+        else if (lowerHeader.includes('unitprice') || (lowerHeader.includes('unit') && lowerHeader.includes('price'))) autoMapping[header] = 'unitPrice';
+        else if (lowerHeader.includes('totalprice') || (lowerHeader.includes('total') && lowerHeader.includes('price'))) autoMapping[header] = 'totalPrice';
         else autoMapping[header] = '';
       });
       
@@ -502,6 +547,8 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             item[bomField] = parseFloat(value || '0') || 0;
           } else if (bomField === 'uom') {
             item[bomField] = (value || 'm') as any;
+          } else if (bomField === 'unitPrice' || bomField === 'totalPrice') {
+            item[bomField] = value ? parseFloat(value) : undefined;
           } else {
             item[bomField] = value || '';
           }
@@ -535,19 +582,25 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     importPreview.forEach((item, idx) => {
       const validation = validateBomItem(item);
       if (validation.isValid) {
+        const quantity = Number(item.quantity) || 0;
+        const unitPrice = item.unitPrice ? Number(item.unitPrice) : undefined;
+        const totalPrice = item.totalPrice ?? (quantity > 0 && unitPrice ? quantity * unitPrice : undefined);
+        
         const bomItem: BomItem = {
           id: generateUUID(),
           part: item.part!,
           materialName: item.materialName!,
           placement: item.placement || '',
           size: item.size || '',
-          quantity: Number(item.quantity) || 0,
+          quantity: quantity,
           uom: (item.uom || 'm') as any,
           supplier: item.supplier || '',
           supplierCode: item.supplierCode || '',
           colorCode: item.colorCode || '',
           materialComposition: item.materialComposition || '',
           comments: item.comments || '',
+          unitPrice: unitPrice,
+          totalPrice: totalPrice,
         };
         addBomItem(bomItem);
         successCount++;
@@ -593,8 +646,42 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     validateAll: validateAllBomItems
   }), [validateAllBomItems]);
 
+  // Check if user can view price columns (Admin or role > viewer)
+  const canViewPrice = useMemo(() => {
+    if (!user) return false;
+    
+    // Global Admin can always view
+    if (user.role?.toLowerCase() === 'admin') return true;
+    
+    // If no techpack (e.g., create mode), allow admin/designer to view prices
+    if (!techpack) {
+      return user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'designer';
+    }
+    
+    // Check if user is owner
+    const createdByRaw: any = (techpack as any).createdBy;
+    const createdById = createdByRaw && typeof createdByRaw === 'object' ? createdByRaw._id : createdByRaw;
+    if (createdById && String(createdById) === String(user._id)) return true;
+    
+    // Check shared access role
+    const sharedWith = (techpack as any).sharedWith || [];
+    const sharedAccess = sharedWith.find((share: any) => {
+      const shareUserId = share.userId?._id || share.userId;
+      return String(shareUserId) === String(user._id);
+    });
+    
+    if (sharedAccess) {
+      const role = sharedAccess.role;
+      // Only Viewer cannot see prices, all other roles can
+      return role !== TechPackRole.Viewer;
+    }
+    
+    return false;
+  }, [user, techpack]);
+
   // Table columns configuration with error highlighting
-  const columns = useMemo<ColumnType[]>(() => [
+  const columns = useMemo<ColumnType[]>(() => {
+    const baseColumns: ColumnType[] = [
     {
       key: 'part' as keyof BomItem,
       header: 'Part',
@@ -643,7 +730,31 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
         </span>
       ),
     },
-  ], []);
+    ];
+    
+    // Add price columns if user has permission
+    if (canViewPrice) {
+      baseColumns.push(
+        {
+          key: 'unitPrice' as keyof BomItem,
+          header: 'Unit Price',
+          width: '10%',
+          render: (value: number) => value ? value.toLocaleString('vi-VN') : '-',
+        },
+        {
+          key: 'totalPrice' as keyof BomItem,
+          header: 'Total Price',
+          width: '10%',
+          render: (value: number) => {
+            // totalPrice is already calculated in tableDataWithErrors
+            return value ? value.toLocaleString('vi-VN') : '-';
+          },
+        }
+      );
+    }
+    
+    return baseColumns;
+  }, [canViewPrice]);
 
   // Pagination
   const paginatedBom = useMemo(() => {
@@ -658,8 +769,12 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   const tableDataWithErrors = useMemo(() => {
     return paginatedBom.map((item) => {
       const hasErrors = validationErrors[item.id] && Object.keys(validationErrors[item.id]).length > 0;
+      // Auto-calculate totalPrice if not set
+      const calculatedTotalPrice = item.totalPrice ?? 
+        (item.quantity && item.unitPrice ? item.quantity * item.unitPrice : undefined);
       return {
         ...item,
+        totalPrice: calculatedTotalPrice,
         _hasErrors: hasErrors,
         _errors: validationErrors[item.id] || {}
       };
@@ -902,6 +1017,32 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               helperText={validation.getFieldProps('uom').helperText}
               data-error={validation.getFieldProps('uom').error ? 'true' : 'false'}
             />
+            
+            {canViewPrice && (
+              <>
+                <Input
+                  label="Unit Price"
+                  value={formData.unitPrice || ''}
+                  onChange={handleInputChange('unitPrice')}
+                  onBlur={() => validation.setFieldTouched('unitPrice')}
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  placeholder="e.g., 100000"
+                  error={validation.getFieldProps('unitPrice').error}
+                  helperText={validation.getFieldProps('unitPrice').helperText}
+                />
+                
+                <Input
+                  label="Total Price"
+                  value={formData.totalPrice || ''}
+                  type="number"
+                  disabled
+                  placeholder="Auto-calculated"
+                  helperText="Quantity × Unit Price"
+                />
+              </>
+            )}
             
             <Input
               label="Supplier"

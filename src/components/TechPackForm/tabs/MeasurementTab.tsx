@@ -1,27 +1,22 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useTechPack } from '../../../contexts/TechPackContext';
-import { MeasurementPoint, SIZE_RANGES } from '../../../types/techpack';
+import {
+  MeasurementPoint,
+  MeasurementSampleRound,
+  MeasurementSampleEntry,
+  MeasurementSampleValueMap,
+  MeasurementRequestedSource,
+  SIZE_RANGES,
+} from '../../../types/techpack';
 import { useFormValidation } from '../../../hooks/useFormValidation';
 import { measurementValidationSchema } from '../../../utils/validationSchemas';
 import Input from '../shared/Input';
-import { Plus, Upload, Download, Ruler, AlertTriangle, Info, AlertCircle, X } from 'lucide-react';
+import { Plus, Upload, Download, Ruler, AlertTriangle, Info, AlertCircle, X, Save, CheckCircle } from 'lucide-react';
 import { showSuccess, showWarning, showError } from '../../../lib/toast';
 import { validateFields } from '../../../utils/validation';
-
-// Helper to parse tolerance from string format (for backward compatibility)
-const parseTolerance = (value: string | number | undefined): number => {
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string') {
-    const match = value.match(/[\d.]+/);
-    return match ? parseFloat(match[0]) : 1.0;
-  }
-  return 1.0; // Default tolerance
-};
-
-// Helper to format tolerance for display
-const formatTolerance = (value: number): string => {
-  return `±${value.toFixed(1)}cm`;
-};
+import SampleMeasurementsTable from './SampleMeasurementsTable';
+import { SampleMeasurementRow } from '../../../types/measurements';
+import { parseTolerance, formatTolerance } from './measurementHelpers';
 
 // Progression validation result
 interface ProgressionValidation {
@@ -32,13 +27,31 @@ interface ProgressionValidation {
 
 const MeasurementTab: React.FC = () => {
   const context = useTechPack();
-  const { state, addMeasurement, updateMeasurement, deleteMeasurement } = context ?? {};
-  const { measurements = [], articleInfo } = state?.techpack ?? {};
+  const {
+    state,
+    addMeasurement,
+    updateMeasurement,
+    deleteMeasurement,
+    addSampleMeasurementRound,
+    updateSampleMeasurementRound,
+    deleteSampleMeasurementRound,
+    updateSampleMeasurementEntry,
+    saveTechPack,
+  } = context ?? {};
+  const { measurements = [], articleInfo, sampleMeasurementRounds = [] } = state?.techpack ?? {};
+  const hasUnsavedChanges = state?.hasUnsavedChanges ?? false;
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [progressionMode, setProgressionMode] = useState<'strict' | 'warn'>('strict'); // strict = block, warn = allow with warning
+  const [showRoundModal, setShowRoundModal] = useState(false);
+  const [roundForm, setRoundForm] = useState<RoundModalFormState>(() => ({
+    name: '',
+    date: new Date().toISOString().slice(0, 10),
+    reviewer: '',
+    requestedSource: 'original',
+  }));
 
   // Initialize validation for the form
   const validation = useFormValidation(measurementValidationSchema);
@@ -53,6 +66,353 @@ const MeasurementTab: React.FC = () => {
     measurementMethod: '',
     isActive: true,
   });
+
+type MeasurementRow = SampleMeasurementRow;
+
+type RoundModalFormState = {
+  name: string;
+  date: string;
+  reviewer: string;
+  requestedSource: MeasurementRequestedSource;
+};
+
+  const measurementRows = useMemo<MeasurementRow[]>(() => {
+    if (measurements.length > 0) {
+      return measurements.map(measurement => ({
+        key: measurement.id || measurement.pomCode,
+        measurement,
+        pomCode: measurement.pomCode,
+        pomName: measurement.pomName,
+      }));
+    }
+
+    const fallbackMap = new Map<string, MeasurementSampleEntry>();
+    sampleMeasurementRounds.forEach(round => {
+      round.measurements.forEach(entry => {
+        const entryKey = entry.measurementId || entry.id || `${entry.pomCode}-${entry.point}`;
+        if (entryKey && !fallbackMap.has(entryKey)) {
+          fallbackMap.set(entryKey, entry);
+        }
+      });
+    });
+
+    return Array.from(fallbackMap.entries()).map(([key, entry]) => ({
+      key,
+      pomCode: entry.pomCode,
+      pomName: entry.pomName || entry.point,
+      fallbackEntryId: entry.id,
+    }));
+  }, [measurements, sampleMeasurementRounds]);
+
+  const requestedSourceLabels: Record<MeasurementRequestedSource, string> = {
+    original: 'Original Spec',
+    previous: 'From Previous Round',
+  };
+
+  const getRequestedKeys = useCallback((entry: MeasurementSampleEntry): string[] => {
+    if (!entry?.requested) return [];
+    return Object.entries(entry.requested)
+      .filter(([, value]) => value !== undefined && value !== null && value !== '')
+      .map(([size]) => size);
+  }, []);
+
+  const isEntryComplete = useCallback((entry: MeasurementSampleEntry): boolean => {
+    const requestedKeys = getRequestedKeys(entry);
+    if (requestedKeys.length === 0) return false;
+    return requestedKeys.every(sizeKey => {
+      const measuredValue = entry.measured?.[sizeKey];
+      return measuredValue !== undefined && measuredValue !== null && measuredValue !== '';
+    });
+  }, [getRequestedKeys]);
+
+  const isRoundComplete = useCallback((round?: MeasurementSampleRound): boolean => {
+    if (!round || !round.measurements || round.measurements.length === 0) return false;
+    return round.measurements.every(isEntryComplete);
+  }, [isEntryComplete]);
+
+  const lastRound = sampleMeasurementRounds.length > 0 ? sampleMeasurementRounds[sampleMeasurementRounds.length - 1] : undefined;
+  const lastRoundComplete = useMemo(() => isRoundComplete(lastRound), [isRoundComplete, lastRound]);
+  // Cho phép add round mới bất cứ lúc nào - không yêu cầu round trước phải complete
+  // User có thể save progress và tạo round mới mà không cần hoàn thành hết
+  const canAddNewRound = true; // Luôn cho phép add round mới
+  const hasPreviousRound = sampleMeasurementRounds.length > 0;
+  const latestRoundId = useMemo(
+    () => sampleMeasurementRounds[sampleMeasurementRounds.length - 1]?.id,
+    [sampleMeasurementRounds]
+  );
+  const previousRoundEditWarning = 'Bạn không thể chỉnh sửa round trước đó vì sẽ ảnh hưởng đến các round tiếp theo.';
+
+  const isEditableRound = useCallback(
+    (roundId?: string) => {
+      if (!roundId) return true;
+      return roundId === latestRoundId;
+    },
+    [latestRoundId]
+  );
+
+  const getEntryForRound = useCallback((round: MeasurementSampleRound, row: MeasurementRow): MeasurementSampleEntry | undefined => {
+    if (!round?.measurements) return undefined;
+    
+    // Ưu tiên tìm bằng measurementId (chính xác nhất)
+    if (row.measurement?.id) {
+      const byId = round.measurements.find(entry => entry.measurementId === row.measurement!.id);
+      if (byId) return byId;
+    }
+    
+    // Fallback: tìm bằng entryId
+    if (row.fallbackEntryId) {
+      const byEntryId = round.measurements.find(entry => entry.id === row.fallbackEntryId);
+      if (byEntryId) return byEntryId;
+    }
+    
+    // Fallback: tìm bằng pomCode (có thể có nhiều entries cùng pomCode nếu có vấn đề)
+    if (row.pomCode) {
+      const byCode = round.measurements.find(entry => entry.pomCode === row.pomCode);
+      if (byCode) return byCode;
+    }
+    
+    // Nếu không tìm thấy entry, có thể entry chưa được tạo
+    // Trả về undefined - entry sẽ được tạo tự động khi user nhập dữ liệu
+    return undefined;
+  }, []);
+
+  const handleRoundFieldChange = useCallback(
+    (roundId: string, field: keyof MeasurementSampleRound, value: string) => {
+      if (!isEditableRound(roundId)) {
+        showWarning(previousRoundEditWarning);
+        return;
+      }
+      updateSampleMeasurementRound?.(roundId, { [field]: value } as Partial<MeasurementSampleRound>);
+    },
+    [isEditableRound, previousRoundEditWarning, showWarning, updateSampleMeasurementRound]
+  );
+
+  const handleRoundFormFieldChange = useCallback((field: keyof RoundModalFormState, value: string) => {
+    setRoundForm(prev => ({
+      ...prev,
+      [field]: field === 'requestedSource' ? (value as MeasurementRequestedSource) : value,
+    }));
+  }, []);
+
+  const handleOpenRoundModal = useCallback(() => {
+    if (sampleMeasurementRounds.length > 0 && hasUnsavedChanges) {
+      window.alert('Vui lòng lưu sample round hiện tại trước khi tạo round mới.');
+      return;
+    }
+
+    if (!canAddNewRound) {
+      showWarning('Please complete the previous round before creating a new one.');
+      return;
+    }
+    setRoundForm({
+      name: `Sample Round ${sampleMeasurementRounds.length + 1}`,
+      date: new Date().toISOString().slice(0, 10),
+      reviewer: '',
+      requestedSource: hasPreviousRound ? 'previous' : 'original',
+    });
+    setShowRoundModal(true);
+  }, [canAddNewRound, hasPreviousRound, hasUnsavedChanges, sampleMeasurementRounds.length]);
+
+  const handleCloseRoundModal = useCallback(() => {
+    setShowRoundModal(false);
+  }, []);
+
+  const handleCreateRound = useCallback(() => {
+    if (!addSampleMeasurementRound) return;
+    const parsedDate = roundForm.date ? new Date(roundForm.date) : new Date();
+    const isoDate = Number.isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString();
+
+    addSampleMeasurementRound({
+      name: roundForm.name.trim() || `Sample Round ${sampleMeasurementRounds.length + 1}`,
+      date: isoDate,
+      reviewer: roundForm.reviewer.trim(),
+      requestedSource: roundForm.requestedSource,
+      overallComments: '',
+    });
+    setShowRoundModal(false);
+  }, [addSampleMeasurementRound, roundForm, sampleMeasurementRounds.length]);
+
+  type EditableSampleField = 'measured' | 'diff' | 'revised' | 'comments';
+
+  const handleEntrySizeValueChange = useCallback(
+    (
+      roundId: string,
+      entryId: string,
+      field: EditableSampleField,
+      sizeKey: string,
+      rawValue: string,
+      measurementId?: string,
+      pomCode?: string
+    ) => {
+      if (!updateSampleMeasurementEntry) return;
+
+      const round = sampleMeasurementRounds.find(r => r.id === roundId);
+      if (!round) return;
+      if (!isEditableRound(roundId)) {
+        showWarning(previousRoundEditWarning);
+        return;
+      }
+
+      // Tìm entry bằng entryId trước (chính xác nhất)
+      let entry = entryId ? round.measurements.find(m => m.id === entryId) : undefined;
+      
+      // Nếu không tìm thấy bằng entryId, tìm bằng measurementId (chính xác hơn pomCode)
+      // Đảm bảo chỉ tìm entry có measurementId khớp chính xác
+      if (!entry && measurementId) {
+        entry = round.measurements.find(m => m.measurementId === measurementId);
+      }
+      
+      // Fallback: tìm bằng pomCode (ít chính xác hơn, có thể có nhiều entries cùng pomCode)
+      // Chỉ dùng nếu không có measurementId
+      if (!entry && pomCode && !measurementId) {
+        entry = round.measurements.find(m => m.pomCode === pomCode);
+      }
+      
+      // Nếu không tìm thấy entry, tạo entry mới cho measurement point này
+      if (!entry && (measurementId || pomCode)) {
+        const measurement = measurements.find(m => 
+          (measurementId && m.id === measurementId) || 
+          (pomCode && m.pomCode === pomCode)
+        );
+        
+        if (measurement && updateSampleMeasurementRound) {
+          // Tạo entry mới
+          const newEntry: MeasurementSampleEntry = {
+            id: `sample-entry_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            measurementId: measurement.id,
+            pomCode: measurement.pomCode,
+            pomName: measurement.pomName,
+            requested: measurement.sizes ? Object.fromEntries(
+              Object.entries(measurement.sizes).map(([size, value]) => [size, String(value)])
+            ) : {},
+            measured: {},
+            diff: {},
+            revised: {},
+            comments: {},
+          };
+          
+          // Thêm entry mới vào round
+          updateSampleMeasurementRound(roundId, {
+            measurements: [...round.measurements, newEntry]
+          });
+          
+          entry = newEntry;
+        } else {
+          console.warn(`Cannot create entry: measurement not found for measurementId: ${measurementId}, pomCode: ${pomCode}`);
+          return;
+        }
+      }
+      
+      if (!entry) {
+        console.warn(`Entry not found and cannot be created for measurementId: ${measurementId}, pomCode: ${pomCode}, entryId: ${entryId}`);
+        return;
+      }
+      
+      // Đảm bảo entry này thuộc đúng measurement point
+      // Nếu entry.measurementId không khớp với measurementId được truyền vào, có thể có vấn đề
+      if (measurementId && entry.measurementId && entry.measurementId !== measurementId) {
+        console.warn(`Entry measurementId mismatch: entry.measurementId=${entry.measurementId}, expected=${measurementId}. This may cause incorrect updates.`);
+        // Không return để vẫn có thể update, nhưng có thể gây ra vấn đề
+      }
+
+      // Tìm measurement point tương ứng với entry này để lấy requested value chính xác
+      // Ưu tiên dùng measurementId/pomCode được truyền vào (từ row) thay vì từ entry
+      // để đảm bảo lấy đúng measurement point
+      const measurement = measurementId 
+        ? measurements.find(m => m.id === measurementId)
+        : pomCode
+          ? measurements.find(m => m.pomCode === pomCode)
+          : measurements.find(m => 
+              m.id === entry.measurementId || 
+              m.pomCode === entry.pomCode
+            );
+
+      // Lấy requested value từ measurement point (ưu tiên) hoặc từ entry.requested (fallback)
+      const requestedValueFromMeasurement = measurement?.sizes?.[sizeKey];
+      const requestedValue = 
+        requestedValueFromMeasurement !== undefined && requestedValueFromMeasurement !== null
+          ? String(requestedValueFromMeasurement)
+          : entry.requested?.[sizeKey];
+
+      const existingMap = (entry[field] as MeasurementSampleValueMap) || {};
+      const nextMap: MeasurementSampleValueMap = { ...existingMap };
+      const normalizedValue =
+        field === 'comments' ? rawValue : rawValue.replace(',', '.');
+      const shouldDelete = normalizedValue.trim().length === 0;
+      const storedValue = field === 'comments' ? normalizedValue : normalizedValue.trim();
+
+      if (shouldDelete) {
+        delete nextMap[sizeKey];
+      } else {
+        nextMap[sizeKey] = storedValue;
+      }
+
+      const payload: Partial<MeasurementSampleEntry> = {
+        [field]: nextMap,
+      } as Partial<MeasurementSampleEntry>;
+
+      if (field === 'measured') {
+        const measuredNumber = parseFloat(storedValue);
+        const requestedNumber =
+          requestedValue !== undefined && requestedValue !== ''
+            ? parseFloat(String(requestedValue).replace(',', '.'))
+            : undefined;
+
+        if (!Number.isNaN(measuredNumber) && requestedNumber !== undefined && !Number.isNaN(requestedNumber)) {
+          const nextDiff = { ...(entry.diff || {}) };
+          nextDiff[sizeKey] = (measuredNumber - requestedNumber).toFixed(1);
+          payload.diff = nextDiff;
+        } else if (entry.diff?.[sizeKey]) {
+          const nextDiff = { ...(entry.diff || {}) };
+          delete nextDiff[sizeKey];
+          payload.diff = nextDiff;
+        }
+      }
+
+      updateSampleMeasurementEntry(roundId, entryId, payload);
+    },
+    [
+      isEditableRound,
+      measurements,
+      previousRoundEditWarning,
+      sampleMeasurementRounds,
+      showWarning,
+      updateSampleMeasurementEntry,
+      updateSampleMeasurementRound
+    ]
+  );
+
+  const handleDeleteSampleRound = useCallback((roundId: string) => {
+    if (!deleteSampleMeasurementRound) return;
+    if (window.confirm('Are you sure you want to remove this sample round?')) {
+      deleteSampleMeasurementRound(roundId);
+    }
+  }, [deleteSampleMeasurementRound]);
+
+  const handleSaveSampleRound = useCallback(async (roundId: string) => {
+    if (!saveTechPack) return;
+    
+    try {
+      // Lưu toàn bộ TechPack (bao gồm sample measurement rounds)
+      // Logic hiện tại đã đảm bảo: các sizes không được điền sẽ giữ nguyên giá trị requested
+      await saveTechPack();
+      showSuccess('Sample measurement round saved successfully');
+    } catch (error: any) {
+      showError(error.message || 'Failed to save sample measurement round');
+    }
+  }, [saveTechPack]);
+
+  const getDateInputValue = useCallback((value?: string) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toISOString().slice(0, 10);
+  }, []);
+
+  const handleAddSampleRound = useCallback(() => {
+    handleOpenRoundModal();
+  }, [handleOpenRoundModal]);
+
 
   // Get size range based on gender
   const availableSizes = useMemo(() => {
@@ -786,6 +1146,224 @@ const MeasurementTab: React.FC = () => {
         </div>
       </div>
 
+      {/* Sample Measurement Rounds */}
+      <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Sample Measurement Rounds</h3>
+            <p className="text-sm text-gray-500">Record requested vs measured values for each prototype round</p>
+            {!canAddNewRound && sampleMeasurementRounds.length > 0 && (
+              <p className="text-xs text-amber-600 mt-1">
+                Please complete the current round before creating another.
+              </p>
+            )}
+          </div>
+          <button
+            onClick={handleAddSampleRound}
+            disabled={!canAddNewRound}
+            className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
+              canAddNewRound
+                ? 'text-white bg-indigo-600 hover:bg-indigo-700'
+                : 'text-gray-400 bg-gray-200 cursor-not-allowed'
+            }`}
+            title={!canAddNewRound ? 'Please complete the previous round before creating a new one.' : ''}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Sample Round
+          </button>
+        </div>
+        {sampleMeasurementRounds.length > 0 && (
+          <div className="grid gap-4 md:grid-cols-2 mb-6">
+            {sampleMeasurementRounds.map(round => (
+              <div key={`${round.id}-meta`} className="border border-gray-200 rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <input
+                    className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={round.name}
+                    onChange={(e) => handleRoundFieldChange(round.id, 'name', e.target.value)}
+                    placeholder="Round name"
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleSaveSampleRound(round.id)}
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors"
+                      title="Save this round. Unfilled sizes will keep their original requested values."
+                    >
+                      <Save className="w-3 h-3 mr-1.5" />
+                      Save
+                    </button>
+                    <button
+                      className="text-red-500 hover:text-red-600 text-xs font-medium"
+                      onClick={() => handleDeleteSampleRound(round.id)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
+                    <input
+                      type="date"
+                      value={getDateInputValue(round.date)}
+                      onChange={(e) => handleRoundFieldChange(round.id, 'date', e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Reviewer</label>
+                    <input
+                      value={round.reviewer || ''}
+                      onChange={(e) => handleRoundFieldChange(round.id, 'reviewer', e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Name"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Requested Source: {requestedSourceLabels[round.requestedSource || 'original']}
+                  </p>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Overall Comments</label>
+                  <textarea
+                    rows={2}
+                    value={round.overallComments || ''}
+                    onChange={(e) => handleRoundFieldChange(round.id, 'overallComments', e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Summary of findings..."
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {measurementRows.length === 0 ? (
+          <div className="text-sm text-gray-500">
+            Add measurement points to start tracking sample rounds.
+          </div>
+        ) : sampleMeasurementRounds.length === 0 ? (
+          <div className="text-sm text-gray-500">
+            No sample rounds yet. Click &ldquo;Add Sample Round&rdquo; to create the first round.
+          </div>
+        ) : (
+          <SampleMeasurementsTable
+            measurementRows={measurementRows}
+            sampleRounds={sampleMeasurementRounds}
+            availableSizes={availableSizes}
+            getEntryForRound={getEntryForRound}
+            onEntrySizeValueChange={handleEntrySizeValueChange}
+            onDeleteRound={handleDeleteSampleRound}
+            requestedSourceLabels={requestedSourceLabels}
+          />
+        )}
+      </div>
+
+      {/* Add Round Modal */}
+      {showRoundModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Create New Sample Round</h3>
+              <button
+                onClick={handleCloseRoundModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Round Name
+                </label>
+                <input
+                  type="text"
+                  value={roundForm.name}
+                  onChange={(e) => handleRoundFormFieldChange('name', e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., 1st Proto, 2nd Proto"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={roundForm.date}
+                  onChange={(e) => handleRoundFormFieldChange('date', e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Reviewer
+                </label>
+                <input
+                  type="text"
+                  value={roundForm.reviewer}
+                  onChange={(e) => handleRoundFormFieldChange('reviewer', e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Reviewer name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Requested Source
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="requestedSource"
+                      value="original"
+                      checked={roundForm.requestedSource === 'original'}
+                      onChange={(e) => handleRoundFormFieldChange('requestedSource', e.target.value)}
+                      className="mr-2"
+                    />
+                    <span className="text-sm text-gray-700">Original Spec (from Measurement Chart)</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="requestedSource"
+                      value="previous"
+                      checked={roundForm.requestedSource === 'previous'}
+                      onChange={(e) => handleRoundFormFieldChange('requestedSource', e.target.value)}
+                      disabled={!hasPreviousRound}
+                      className="mr-2 disabled:opacity-50"
+                    />
+                    <span className={`text-sm ${hasPreviousRound ? 'text-gray-700' : 'text-gray-400'}`}>
+                      From Previous Round (use Revised values from last round)
+                    </span>
+                  </label>
+                </div>
+                {!hasPreviousRound && (
+                  <p className="text-xs text-gray-500 mt-1 ml-6">
+                    Available after creating the first round
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <button
+                onClick={handleCloseRoundModal}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateRound}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+              >
+                Create Round
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Info Panel */}
       <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-start">
@@ -798,6 +1376,7 @@ const MeasurementTab: React.FC = () => {
               <li>Tolerance values are in centimeters (e.g., 1.0 means ±1.0cm)</li>
               <li>Use consistent tolerance values across similar measurement points</li>
               <li>Zero values are preserved - use empty field to indicate "not measured"</li>
+              <li>Complete all measurements in a round before creating a new round</li>
             </ul>
           </div>
         </div>

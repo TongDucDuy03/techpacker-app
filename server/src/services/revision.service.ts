@@ -52,7 +52,7 @@ class RevisionService {
         return changes;
       }
 
-      const trackedArraySections: (keyof ITechPack)[] = ['bom', 'measurements', 'colorways', 'howToMeasure'];
+      const trackedArraySections: (keyof ITechPack)[] = ['bom', 'measurements', 'colorways', 'howToMeasure', 'sampleMeasurementRounds'];
 
       // Array sections: mark added/removed/modified counts
       // Use ID-based comparison for better accuracy
@@ -818,6 +818,11 @@ class RevisionService {
         if (item.pomCode) keyFields.pomCode = item.pomCode;
         if (item.stepNumber !== undefined) keyFields.stepNumber = item.stepNumber;
         break;
+      case 'sampleMeasurementRounds':
+        if (item.name) keyFields.name = item.name;
+        if (item.order !== undefined) keyFields.order = item.order;
+        if (item.measurementDate) keyFields.measurementDate = item.measurementDate;
+        break;
       default:
         // Fallback: use first non-ID field
         const keys = Object.keys(item).filter(k => k !== '_id' && k !== 'id' && k !== '__v').slice(0, 1);
@@ -855,6 +860,12 @@ class RevisionService {
         if (item.pomCode) keyFields.pomCode = item.pomCode;
         if (item.pomName) keyFields.pomName = item.pomName;
         if (item.stepNumber !== undefined) keyFields.stepNumber = item.stepNumber;
+        break;
+      case 'sampleMeasurementRounds':
+        if (item.name) keyFields.name = item.name;
+        if (item.order !== undefined) keyFields.order = item.order;
+        if (item.measurementDate) keyFields.measurementDate = item.measurementDate;
+        if (item.reviewer) keyFields.reviewer = item.reviewer;
         break;
       default:
         // Fallback: include first few non-ID fields

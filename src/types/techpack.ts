@@ -58,6 +58,8 @@ export interface BomItem {
   shrinkage?: string;
   careInstructions?: string;
   testingRequirements?: string;
+  unitPrice?: number; // Giá vật tư NPL (chỉ Admin hoặc role > viewer mới thấy)
+  totalPrice?: number; // Thành tiền = quantity * unitPrice (chỉ Admin hoặc role > viewer mới thấy)
 }
 
 export interface MeasurementPoint {
@@ -70,6 +72,33 @@ export interface MeasurementPoint {
   notes?: string;
   measurementMethod?: string;
   isActive: boolean;
+}
+
+export type MeasurementSampleValueMap = Record<string, string>;
+
+export type MeasurementRequestedSource = 'original' | 'previous';
+
+export interface MeasurementSampleEntry {
+  id: string;
+  measurementId?: string;
+  point: string;
+  requested: MeasurementSampleValueMap;
+  measured: MeasurementSampleValueMap;
+  diff: MeasurementSampleValueMap;
+  revised: MeasurementSampleValueMap;
+  comments: MeasurementSampleValueMap;
+  pomCode?: string;
+  pomName?: string;
+}
+
+export interface MeasurementSampleRound {
+  id: string;
+  name: string;
+  date: string;
+  reviewer: string;
+  requestedSource: MeasurementRequestedSource;
+  measurements: MeasurementSampleEntry[];
+  overallComments?: string;
 }
 
 export interface HowToMeasure {
@@ -239,6 +268,7 @@ export interface ApiTechPack {
   revisions: any[];
   materials: any[];
   measurements: any[];
+  sampleMeasurementRounds?: MeasurementSampleRound[];
   colorways: any[];
   createdAt: string;
   updatedAt: string;
@@ -251,6 +281,7 @@ export interface TechPack {
   articleInfo: ArticleInfo;
   bom: BomItem[];
   measurements: MeasurementPoint[];
+  sampleMeasurementRounds: MeasurementSampleRound[];
   howToMeasures: HowToMeasure[];
   colorways: Colorway[];
   revisionHistory: RevisionEntry[];
@@ -321,6 +352,7 @@ export interface CreateTechPackInput {
   articleInfo: Partial<ArticleInfo>;
   bom?: BomItem[];
   measurements?: MeasurementPoint[];
+  sampleMeasurementRounds?: MeasurementSampleRound[];
   colorways?: Colorway[];
   howToMeasures?: HowToMeasure[];
   status?: TechPack['status'];

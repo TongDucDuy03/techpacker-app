@@ -161,6 +161,19 @@ const translations: Record<LanguageCode, TranslationDict> = {
     'colormgmt.btn.create': 'Create colorway',
     'colormgmt.btn.update': 'Update colorway',
     'colormgmt.empty': 'No colorways yet.',
+
+    // Sample measurement rounds
+    'sample.requestedSource': 'Requested Source',
+    'sample.originalSpec': 'Original Spec',
+    'sample.fromPrevious': 'From Previous Round',
+    'sample.round': 'Sample Round',
+    'sample.date': 'Date',
+    'sample.reviewer': 'Reviewer',
+    'sample.requested': 'Requested',
+    'sample.measured': 'Measured',
+    'sample.diff': 'Diff',
+    'sample.revised': 'Revised',
+    'sample.comments': 'Comments',
   },
   vi: {
     'nav.dashboard': 'Bảng điều khiển',
@@ -318,6 +331,19 @@ const translations: Record<LanguageCode, TranslationDict> = {
     'colormgmt.btn.create': 'Tạo phối màu',
     'colormgmt.btn.update': 'Cập nhật phối màu',
     'colormgmt.empty': 'Chưa có phối màu.',
+
+    // Sample measurement rounds
+    'sample.requestedSource': 'Nguồn Requested',
+    'sample.originalSpec': 'Theo thông số gốc',
+    'sample.fromPrevious': 'Theo vòng trước',
+    'sample.round': 'Vòng mẫu',
+    'sample.date': 'Ngày',
+    'sample.reviewer': 'Người review',
+    'sample.requested': 'Requested',
+    'sample.measured': 'Measured',
+    'sample.diff': 'Sai lệch',
+    'sample.revised': 'Revised',
+    'sample.comments': 'Ghi chú',
   }
 };
 

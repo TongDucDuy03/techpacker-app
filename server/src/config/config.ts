@@ -20,6 +20,7 @@ export const config = {
 
   // Security
   bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || '10', 10),
+  twoFactorEnabled: process.env.ENABLE_TWO_FACTOR !== 'false',
 
   // Redis (for caching)
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -46,8 +47,8 @@ export const config = {
   
   // Email (for 2FA and notifications)
   emailService: process.env.EMAIL_SERVICE || 'gmail',
-  emailUser: process.env.EMAIL_USER || 'tongducduy4@gmail.com',
-  emailPass: process.env.EMAIL_PASS || 'pmlt ikfa tsli yruq',
+  emailUser: process.env.EMAIL_USER || 'garmentibc@gmail.com',
+  emailPass: process.env.EMAIL_PASS || 'vnfq nken fpsm bfxy',
 
   // Pagination defaults
   defaultPageSize: parseInt(process.env.DEFAULT_PAGE_SIZE || '20', 10),

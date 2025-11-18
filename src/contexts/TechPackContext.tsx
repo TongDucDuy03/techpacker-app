@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from './AuthContext';
-import { ApiTechPack, CreateTechPackInput, TechPackListResponse, TechPackFormState, MeasurementPoint, HowToMeasure, BomItem, Colorway, ColorwayPart } from '../types/techpack';
+import { ApiTechPack, CreateTechPackInput, TechPackListResponse, TechPackFormState, MeasurementPoint, HowToMeasure, BomItem, Colorway, ColorwayPart, MeasurementSampleRound, MeasurementSampleEntry, MeasurementSampleValueMap, MeasurementRequestedSource } from '../types/techpack';
 import { api } from '../lib/api';
 import { showPromise, showError } from '../lib/toast';
 import { exportTechPackToPDF as clientExportToPDF } from '../utils/pdfExport';
@@ -28,6 +28,10 @@ interface TechPackContextType {
   addMeasurement: (measurement: MeasurementPoint) => void;
   updateMeasurement: (index: number, measurement: MeasurementPoint) => void;
   deleteMeasurement: (index: number) => void;
+  addSampleMeasurementRound: (round?: Partial<MeasurementSampleRound>) => void;
+  updateSampleMeasurementRound: (roundId: string, updates: Partial<MeasurementSampleRound>) => void;
+  deleteSampleMeasurementRound: (roundId: string) => void;
+  updateSampleMeasurementEntry: (roundId: string, entryId: string, updates: Partial<MeasurementSampleEntry>) => void;
   addHowToMeasure: (howToMeasure: HowToMeasure) => void;
   updateHowToMeasure: (index: number, howToMeasure: HowToMeasure) => void;
   updateHowToMeasureById: (id: string, howToMeasure: HowToMeasure) => void;
@@ -170,6 +174,382 @@ const sanitizeColorwayList = (colorways?: Array<PartialColorway>): Colorway[] =>
   return colorways.map((colorway, index) => sanitizeColorway(colorway, index));
 };
 
+const generateClientId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+const DEFAULT_SAMPLE_ROUND_NAME = '1st Proto';
+
+const buildPointLabel = (entry: Partial<MeasurementSampleEntry>, measurement?: MeasurementPoint): string => {
+  const code = measurement?.pomCode || entry.pomCode || '';
+  const name = measurement?.pomName || entry.pomName || '';
+  if (code && name) return `${code} - ${name}`;
+  return name || code || entry.point || 'Measurement Point';
+};
+
+type SampleEntryFieldValue = MeasurementSampleValueMap | Record<string, any> | string | number | null | undefined;
+
+const isPlainRecord = (value: any): value is Record<string, any> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Map);
+
+const convertMapToRecord = (value: SampleEntryFieldValue): Record<string, any> | undefined => {
+  if (!value) return undefined;
+
+  if (value instanceof Map) {
+    const obj: Record<string, any> = {};
+    value.forEach((mapValue, key) => {
+      obj[String(key)] = mapValue;
+    });
+    return obj;
+  }
+
+  if (isPlainRecord(value)) {
+    return value;
+  }
+
+  return undefined;
+};
+
+const coerceToSampleString = (value: any): string =>
+  value === null || value === undefined ? '' : String(value);
+
+const collectKeysFromValue = (value?: SampleEntryFieldValue): string[] => {
+  if (!isPlainRecord(value)) return [];
+  return Object.keys(value);
+};
+
+const collectEntrySizeKeys = (entry?: Partial<MeasurementSampleEntry>): string[] => {
+  if (!entry) return [];
+  const keySet = new Set<string>();
+  const addFromValue = (value?: SampleEntryFieldValue) => {
+    collectKeysFromValue(value).forEach(key => keySet.add(key));
+  };
+
+  addFromValue(entry.requested);
+  addFromValue(entry.measured);
+  addFromValue(entry.diff);
+  addFromValue(entry.revised);
+  addFromValue(entry.comments);
+
+  return Array.from(keySet);
+};
+
+const resolveSizeKeys = (measurement?: MeasurementPoint, entry?: Partial<MeasurementSampleEntry>): string[] => {
+  const keys: string[] = [];
+  const push = (key?: string) => {
+    if (key && !keys.includes(key)) {
+      keys.push(key);
+    }
+  };
+
+  if (measurement?.sizes) {
+    Object.keys(measurement.sizes).forEach(push);
+  }
+
+  collectEntrySizeKeys(entry).forEach(push);
+
+  return keys;
+};
+
+const normalizeValueMap = (
+  sizeKeys: string[],
+  source?: SampleEntryFieldValue,
+  defaults: MeasurementSampleValueMap = {}
+): MeasurementSampleValueMap => {
+  const normalized: MeasurementSampleValueMap = { ...defaults };
+
+  sizeKeys.forEach(size => {
+    if (!(size in normalized)) {
+      normalized[size] = '';
+    }
+  });
+
+  const sourceRecord = convertMapToRecord(source);
+  if (sourceRecord) {
+    Object.entries(sourceRecord).forEach(([size, value]) => {
+      normalized[size] = coerceToSampleString(value);
+    });
+  } else if (source !== null && source !== undefined && source !== '') {
+    const fallbackKey = sizeKeys[0] || 'ALL';
+    normalized[fallbackKey] = coerceToSampleString(source);
+  }
+
+  return normalized;
+};
+
+const buildRequestedValueMap = (
+  measurement?: MeasurementPoint,
+  sizeKeys: string[] = [],
+  fallback?: SampleEntryFieldValue
+): MeasurementSampleValueMap => {
+  const measurementValues =
+    measurement?.sizes && Object.keys(measurement.sizes).length > 0
+      ? Object.entries(measurement.sizes).reduce<MeasurementSampleValueMap>((acc, [size, value]) => {
+          acc[size] = value === null || value === undefined ? '' : String(value);
+          return acc;
+        }, {})
+      : undefined;
+
+  const fallbackValues = convertMapToRecord(fallback);
+  const combinedKeys = Array.from(
+    new Set([
+      ...sizeKeys,
+      ...(measurementValues ? Object.keys(measurementValues) : []),
+      ...(fallbackValues ? Object.keys(fallbackValues) : []),
+    ])
+  );
+
+  // Nếu có fallback values (từ round trước), merge với measurement values (original spec)
+  // Các size có trong fallback sẽ dùng giá trị từ fallback, các size không có sẽ dùng từ measurement
+  // Điều này đảm bảo các giá trị không thay đổi giữ nguyên giá trị ban đầu
+  if (fallbackValues && Object.keys(fallbackValues).length > 0) {
+    // Check if fallback has any non-empty values
+    const hasNonEmptyValues = Object.values(fallbackValues).some(v => v && String(v).trim() !== '');
+    if (hasNonEmptyValues) {
+      // Merge: fallback values (ưu tiên) + measurement values (cho các size không có trong fallback)
+      return normalizeValueMap(combinedKeys.length ? combinedKeys : Object.keys(fallbackValues), fallbackValues, measurementValues ?? {});
+    }
+  }
+
+  // Luôn ưu tiên measurement values (original spec) khi có
+  if (measurementValues) {
+    return normalizeValueMap(combinedKeys.length ? combinedKeys : Object.keys(measurementValues), undefined, measurementValues);
+  }
+
+  return normalizeValueMap(sizeKeys, fallback);
+};
+
+const cloneValueMap = (values?: MeasurementSampleValueMap): MeasurementSampleValueMap | undefined => {
+  if (!values) return undefined;
+  const sourceRecord = convertMapToRecord(values) ?? values;
+
+  const entries = Object.entries(sourceRecord).filter(([, value]) => value !== undefined && value !== null && value !== '');
+  if (entries.length === 0) return undefined;
+  return entries.reduce<MeasurementSampleValueMap>((acc, [size, value]) => {
+    acc[size] = typeof value === 'string' ? value : String(value);
+    return acc;
+  }, {});
+};
+
+const pickRequestedFromPreviousEntry = (entry?: MeasurementSampleEntry): MeasurementSampleValueMap | undefined => {
+  if (!entry) return undefined;
+  // Ưu tiên lấy từ revised của round trước
+  // Nếu không có revised, không lấy từ measured (sẽ dùng original spec)
+  // Điều này đảm bảo: nếu có revised thì dùng revised, nếu không thì dùng original spec
+  return cloneValueMap(entry.revised);
+};
+
+const findEntryMatchingMeasurement = (
+  round: MeasurementSampleRound | undefined,
+  measurement: MeasurementPoint | undefined
+): MeasurementSampleEntry | undefined => {
+  if (!round || !measurement) return undefined;
+  if (measurement.id) {
+    const byId = round.measurements.find(entry => entry.measurementId === measurement.id);
+    if (byId) return byId;
+  }
+  if (measurement.pomCode) {
+    const byCode = round.measurements.find(entry => entry.pomCode === measurement.pomCode);
+    if (byCode) return byCode;
+  }
+  return undefined;
+};
+
+const generateEntriesForRequestedSource = (
+  measurements: MeasurementPoint[],
+  requestedSource: MeasurementRequestedSource,
+  previousRound?: MeasurementSampleRound
+): MeasurementSampleEntry[] => {
+  if (!Array.isArray(measurements) || measurements.length === 0) return [];
+
+  const buildRequestedOverrides = (measurement: MeasurementPoint, fallback?: MeasurementSampleValueMap): MeasurementSampleValueMap | undefined => {
+    if (!fallback || Object.keys(fallback).length === 0) {
+      return undefined;
+    }
+
+    const merged: MeasurementSampleValueMap = {};
+    const sizeSet = new Set<string>();
+
+    Object.keys(measurement?.sizes || {}).forEach(size => sizeSet.add(size));
+    Object.keys(fallback).forEach(size => sizeSet.add(size));
+
+    sizeSet.forEach(size => {
+      if (fallback[size] !== undefined) {
+        merged[size] = fallback[size];
+      } else if (measurement?.sizes && measurement.sizes[size] !== undefined) {
+        merged[size] = String(measurement.sizes[size]);
+      } else {
+        merged[size] = '';
+      }
+    });
+
+    return merged;
+  };
+
+  return measurements.map(measurement => {
+    const fallbackRequested =
+      requestedSource === 'previous'
+        ? pickRequestedFromPreviousEntry(findEntryMatchingMeasurement(previousRound, measurement))
+        : undefined;
+    const requested = buildRequestedOverrides(measurement, fallbackRequested);
+
+    return createSampleEntryFromMeasurement(measurement, {
+      requested,
+      measured: {},
+      diff: {},
+      revised: {},
+      comments: {},
+    });
+  });
+};
+
+const normalizeSampleEntry = (
+  entry: Partial<MeasurementSampleEntry>,
+  measurement?: MeasurementPoint
+): MeasurementSampleEntry => {
+  const sizeKeys = resolveSizeKeys(measurement, entry);
+  const requested = buildRequestedValueMap(measurement, sizeKeys, entry.requested);
+  const measured = normalizeValueMap(sizeKeys, entry.measured);
+  const diff = normalizeValueMap(sizeKeys, entry.diff);
+  const revised = normalizeValueMap(sizeKeys, entry.revised);
+  const comments = normalizeValueMap(sizeKeys, entry.comments);
+
+  return {
+    id: entry.id || generateClientId('sample-entry'),
+    measurementId: entry.measurementId || measurement?.id,
+    point: entry.point || buildPointLabel(entry, measurement),
+    requested,
+    measured,
+    diff,
+    revised,
+    comments,
+    pomCode: measurement?.pomCode || entry.pomCode,
+    pomName: measurement?.pomName || entry.pomName,
+  };
+};
+
+const createSampleEntryFromMeasurement = (
+  measurement: MeasurementPoint,
+  overrides?: Partial<MeasurementSampleEntry>
+): MeasurementSampleEntry =>
+  normalizeSampleEntry(
+    {
+      measurementId: measurement.id,
+      pomCode: measurement.pomCode,
+      pomName: measurement.pomName,
+      ...overrides,
+    },
+    measurement
+  );
+
+const normalizeSampleRound = (round: Partial<MeasurementSampleRound>): MeasurementSampleRound => {
+  // Khi load từ server, có thể có _id thay vì id
+  const roundId = round.id || (round as any)._id?.toString() || generateClientId('sample-round');
+  // Khi load từ server, date có thể là measurementDate
+  const roundDate = round.date || (round as any).measurementDate || new Date().toISOString();
+  // Đảm bảo reviewer được map đúng từ API response
+  const reviewer = round.reviewer || (round as any).reviewerName || '';
+  
+  return {
+    id: roundId,
+    name: round.name || DEFAULT_SAMPLE_ROUND_NAME,
+    date: typeof roundDate === 'string' ? roundDate : new Date(roundDate).toISOString(),
+    reviewer: reviewer,
+    requestedSource: round.requestedSource || 'original',
+    overallComments: round.overallComments ?? '',
+    measurements: Array.isArray(round.measurements)
+      ? round.measurements.map(entry => normalizeSampleEntry(entry))
+      : [],
+  };
+};
+
+const syncRoundWithMeasurements = (
+  round: MeasurementSampleRound,
+  measurements: MeasurementPoint[]
+): MeasurementSampleRound => {
+  if (!measurements || measurements.length === 0) {
+    return {
+      ...round,
+      measurements: round.measurements.map(entry => normalizeSampleEntry(entry)),
+    };
+  }
+
+  const measurementMap = new Map(measurements.map(measurement => [measurement.id, measurement]));
+
+  const filteredEntries = round.measurements
+    .filter(entry => !entry.measurementId || measurementMap.has(entry.measurementId))
+    .map(entry => {
+      const measurement = entry.measurementId ? measurementMap.get(entry.measurementId) : undefined;
+      return normalizeSampleEntry(entry, measurement);
+    });
+
+  measurementMap.forEach(measurement => {
+    const hasEntry = filteredEntries.some(entry => entry.measurementId === measurement.id);
+    if (!hasEntry) {
+      filteredEntries.push(createSampleEntryFromMeasurement(measurement));
+    }
+  });
+
+  return {
+    ...round,
+    measurements: filteredEntries,
+  };
+};
+
+const normalizeSampleRounds = (
+  rounds: MeasurementSampleRound[] | undefined,
+  measurements: MeasurementPoint[]
+): MeasurementSampleRound[] => {
+  const normalizedRounds = Array.isArray(rounds) && rounds.length > 0
+    ? rounds.map(round => normalizeSampleRound(round))
+    : [];
+
+  const baseRounds =
+    normalizedRounds.length > 0
+      ? normalizedRounds
+      : measurements.length > 0
+        ? [
+            normalizeSampleRound({
+              name: DEFAULT_SAMPLE_ROUND_NAME,
+              measurements: measurements.map(measurement => createSampleEntryFromMeasurement(measurement)),
+            }),
+          ]
+        : [];
+
+  return baseRounds.map(round => syncRoundWithMeasurements(round, measurements));
+};
+
+const parseNumericValue = (value: string | number | null | undefined): number | undefined => {
+  if (value === null || value === undefined || value === '') return undefined;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : undefined;
+  }
+  const parsed = parseFloat(value);
+  return Number.isNaN(parsed) ? undefined : parsed;
+};
+
+const prepareValueMapForSave = (
+  values?: MeasurementSampleValueMap,
+  options: { keepEmpty?: boolean; preserveWhitespace?: boolean } = {}
+): Record<string, string> | undefined => {
+  if (!values) {
+    return options.keepEmpty ? {} : undefined;
+  }
+
+  const result: Record<string, string> = {};
+
+  Object.entries(values).forEach(([size, value]) => {
+    const raw = value === null || value === undefined ? '' : String(value);
+    const normalized = options.preserveWhitespace ? raw : raw.trim();
+    if (normalized || options.keepEmpty) {
+      result[size] = normalized;
+    }
+  });
+
+  if (Object.keys(result).length === 0) {
+    return options.keepEmpty ? {} : undefined;
+  }
+
+  return result;
+};
+
 const createEmptyTechpack = (): TechPackFormState['techpack'] => ({
   id: '',
   articleInfo: {
@@ -191,6 +571,7 @@ const createEmptyTechpack = (): TechPackFormState['techpack'] => ({
   },
   bom: [],
   measurements: [],
+  sampleMeasurementRounds: [],
   howToMeasures: [],
   colorways: [],
   revisionHistory: [],
@@ -243,6 +624,7 @@ const mergeDraftWithState = (base: TechPackFormState, draft?: Partial<TechPackFo
     },
     bom: (draft.techpack as any).bom ?? base.techpack.bom,
     measurements: (draft.techpack as any).measurements ?? base.techpack.measurements,
+    sampleMeasurementRounds: (draft.techpack as any).sampleMeasurementRounds ?? base.techpack.sampleMeasurementRounds,
     howToMeasures: (draft.techpack as any).howToMeasures ?? base.techpack.howToMeasures,
     colorways: sanitizeColorwayList((draft.techpack as any).colorways ?? []),
   } as TechPackFormState['techpack'];
@@ -501,13 +883,28 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         ? (Array.isArray(incomingMeasurements) ? incomingMeasurements : [])
         : prev.techpack.measurements;
 
+      const incomingSampleRounds = (updates as any).sampleMeasurementRounds;
+      const nextSampleRoundsRaw = incomingSampleRounds !== undefined
+        ? (Array.isArray(incomingSampleRounds) ? incomingSampleRounds : [])
+        : prev.techpack.sampleMeasurementRounds;
+
+      const normalizedSampleRounds = normalizeSampleRounds(nextSampleRoundsRaw, nextMeasurements);
+
       const incomingHowToMeasures = (updates as any).howToMeasures;
       const nextHowToMeasures = incomingHowToMeasures !== undefined 
         ? (Array.isArray(incomingHowToMeasures) ? incomingHowToMeasures : [])
         : prev.techpack.howToMeasures;
 
       // Tách riêng các field cần xử lý đặc biệt để tránh bị ghi đè
-      const { bom: _bom, measurements: _measurements, howToMeasures: _howToMeasures, colorways: _colorways, articleInfo: _articleInfo, ...restUpdates } = updates as any;
+      const {
+        bom: _bom,
+        measurements: _measurements,
+        sampleMeasurementRounds: _sampleRounds,
+        howToMeasures: _howToMeasures,
+        colorways: _colorways,
+        articleInfo: _articleInfo,
+        ...restUpdates
+      } = updates as any;
 
       const newState = {
         ...prev,
@@ -517,6 +914,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           // Đảm bảo các mảng được merge đúng cách - đặt sau để không bị ghi đè
           bom: nextBom,
           measurements: nextMeasurements,
+          sampleMeasurementRounds: normalizedSampleRounds,
           howToMeasures: nextHowToMeasures,
           colorways: nextColorways,
           articleInfo: {
@@ -528,7 +926,6 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         // Nếu skipUnsavedFlag = false (user edit), set hasUnsavedChanges = true
         hasUnsavedChanges: skipUnsavedFlag ? false : true
       };
-
 
       return newState;
     });
@@ -576,6 +973,46 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
       ]));
 
       const objectIdPattern = /^[0-9a-fA-F]{24}$/;
+      const resolveObjectId = (value: any) => (typeof value === 'string' && objectIdPattern.test(value) ? value : undefined);
+
+      const sampleMeasurementRoundsPayload = (techpackData.sampleMeasurementRounds || []).map((round, index) => {
+        const measurementDate = round.date ? new Date(round.date) : undefined;
+        const normalizedDate = measurementDate && !Number.isNaN(measurementDate.getTime()) ? measurementDate.toISOString() : undefined;
+
+        const mappedEntries = (round.measurements || []).map(entry => {
+          const requestedValues = prepareValueMapForSave(entry.requested, { keepEmpty: true }) ?? {};
+          const measuredValues = prepareValueMapForSave(entry.measured);
+          const diffValues = prepareValueMapForSave(entry.diff);
+          const revisedValues = prepareValueMapForSave(entry.revised);
+          const commentValues = prepareValueMapForSave(entry.comments, { preserveWhitespace: true });
+
+          const mappedEntry: any = {
+            ...(resolveObjectId((entry as any)._id) ? { _id: resolveObjectId((entry as any)._id) } : {}),
+            measurementId: resolveObjectId((entry as any).measurementId || entry.measurementId),
+            pomCode: entry.pomCode || '',
+            pomName: entry.pomName || '',
+            requested: requestedValues,
+          };
+
+          if (measuredValues) mappedEntry.measured = measuredValues;
+          if (diffValues) mappedEntry.diff = diffValues;
+          if (revisedValues) mappedEntry.revised = revisedValues;
+          if (commentValues) mappedEntry.comments = commentValues;
+
+          return mappedEntry;
+        });
+
+        return {
+          ...(resolveObjectId((round as any)._id) ? { _id: resolveObjectId((round as any)._id) } : {}),
+          name: round.name?.trim() || `Sample Round ${index + 1}`,
+          order: index + 1,
+          measurementDate: normalizedDate,
+          reviewer: round.reviewer || '',
+          overallComments: round.overallComments || '',
+          requestedSource: round.requestedSource || 'original',
+          measurements: mappedEntries,
+        };
+      });
 
       const howToMeasuresPayload = (techpackData.howToMeasures || []).map((howToMeasure: any, index: number) => {
         const steps = Array.isArray(howToMeasure?.steps) && howToMeasure.steps.length > 0
@@ -669,77 +1106,23 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           measurements: measurementsPayload,
           colorways: colorwaysPayload,
           howToMeasure: howToMeasuresPayload,
+          sampleMeasurementRounds: sampleMeasurementRoundsPayload,
         };
         const updatedTP = await updateTechPack(techpackData.id, updatePayload);
 
-        // After a successful save, reload the revisions and refresh current form state from server
+        // After a successful save, reload the revisions
         if (updatedTP) {
           await loadRevisions(techpackData.id);
 
-          // Fetch latest detail to avoid stale local state and ensure Product Class is shown
-          try {
-            const fresh = await getTechPack(techpackData.id);
-            if (fresh) {
-              const resolvedProductClass =
-                (fresh as any).productClass ??
-                (fresh as any).articleInfo?.productClass ??
-                (fresh as any).category ??
-                (fresh as any).metadata?.category ?? '';
-
-              const freshMeasurementNameMap = new Map(
-                (((fresh as any).measurements) || []).map((measurement: any) => [
-                  measurement?.pomCode,
-                  measurement?.pomName || '',
-                ])
-              );
-
-              const freshHowToMeasures = (((fresh as any).howToMeasure || []) as any[]).map((htm: any, index: number) => {
-                const steps = Array.isArray(htm.steps) && htm.steps.length > 0 ? htm.steps : (htm.instructions || []);
-                return {
-                  id: htm._id || htm.id || `htm_${index}`,
-                  pomCode: htm.pomCode || '',
-                  pomName: htm.pomName || freshMeasurementNameMap.get(htm.pomCode) || '',
-                  description: htm.description || '',
-                  imageUrl: htm.imageUrl || '',
-                  steps,
-                  instructions: steps,
-                  videoUrl: htm.videoUrl || '',
-                  language: htm.language || 'en-US',
-                  stepNumber: typeof htm.stepNumber === 'number' ? htm.stepNumber : index + 1,
-                  tips: htm.tips || [],
-                  commonMistakes: htm.commonMistakes || [],
-                  relatedMeasurements: htm.relatedMeasurements || [],
-                };
-              });
-
-              // Refresh data từ server - không set hasUnsavedChanges
-              updateFormState({
-                id: (fresh as any)._id || techpackData.id,
-                articleInfo: {
-                  ...(state.techpack.articleInfo as any),
-                  productClass: resolvedProductClass,
-                  supplier: (fresh as any).supplier ?? state.techpack.articleInfo.supplier,
-                  season: (fresh as any).season ?? state.techpack.articleInfo.season,
-                  fabricDescription: (fresh as any).fabricDescription ?? state.techpack.articleInfo.fabricDescription,
-                  productDescription: (fresh as any).productDescription ?? state.techpack.articleInfo.productDescription,
-                  designSketchUrl: (fresh as any).designSketchUrl ?? state.techpack.articleInfo.designSketchUrl,
-                  gender: (fresh as any).gender ?? state.techpack.articleInfo.gender,
-                  lifecycleStage: (fresh as any).lifecycleStage ?? state.techpack.articleInfo.lifecycleStage,
-                  brand: (fresh as any).brand ?? state.techpack.articleInfo.brand,
-                  collection: (fresh as any).collectionName ?? (fresh as any).collection ?? state.techpack.articleInfo.collection,
-                  targetMarket: (fresh as any).targetMarket ?? state.techpack.articleInfo.targetMarket,
-                  pricePoint: (fresh as any).pricePoint ?? state.techpack.articleInfo.pricePoint,
-                  currency: (fresh as any).currency ?? state.techpack.articleInfo.currency,
-                  retailPrice: (fresh as any).retailPrice ?? state.techpack.articleInfo.retailPrice,
-                  status: (fresh as any).status ?? (state.techpack as any).status,
-                } as any,
-                status: (fresh as any).status ?? (state.techpack as any).status,
-                howToMeasures: freshHowToMeasures,
-              } as any, true);
-            }
-          } catch (e) {
-            // Silently handle refresh error
-          }
+          // KHÔNG reload lại toàn bộ data từ server sau khi save để tránh mất dữ liệu
+          // Chỉ cập nhật trạng thái saved và giữ nguyên dữ liệu hiện tại
+          // Dữ liệu đã được lưu lên server, state hiện tại đã đúng
+          setState(prev => ({
+            ...prev,
+            isSaving: false,
+            hasUnsavedChanges: false,
+            lastSaved: new Date().toISOString(),
+          }));
         }
       } else {
         // For create, send nested articleInfo to satisfy route validation
@@ -766,6 +1149,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           measurements: measurementsPayload,
           colorways: colorwaysPayload,
           howToMeasures: howToMeasuresPayload,
+          sampleMeasurementRounds: sampleMeasurementRoundsPayload,
           status: techpackData.status as any,
         } as unknown as CreateTechPackInput;
 
@@ -850,36 +1234,175 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addMeasurement = (measurement: MeasurementPoint) => {
-    setState(prev => ({
-      ...prev,
-      techpack: {
-        ...prev.techpack,
-        measurements: [...prev.techpack.measurements, measurement]
-      },
-      hasUnsavedChanges: true
-    }));
+    setState(prev => {
+      const nextMeasurements = [...prev.techpack.measurements, measurement];
+      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
+      return {
+        ...prev,
+        techpack: {
+          ...prev.techpack,
+          measurements: nextMeasurements,
+          sampleMeasurementRounds: nextSampleRounds,
+        },
+        hasUnsavedChanges: true,
+      };
+    });
   };
 
   const updateMeasurement = (index: number, measurement: MeasurementPoint) => {
-    setState(prev => ({
-      ...prev,
-      techpack: {
-        ...prev.techpack,
-        measurements: prev.techpack.measurements.map((m, i) => i === index ? measurement : m)
-      },
-      hasUnsavedChanges: true
-    }));
+    setState(prev => {
+      const nextMeasurements = prev.techpack.measurements.map((m, i) => (i === index ? measurement : m));
+      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
+      return {
+        ...prev,
+        techpack: {
+          ...prev.techpack,
+          measurements: nextMeasurements,
+          sampleMeasurementRounds: nextSampleRounds,
+        },
+        hasUnsavedChanges: true,
+      };
+    });
   };
 
   const deleteMeasurement = (index: number) => {
-    setState(prev => ({
-      ...prev,
-      techpack: {
-        ...prev.techpack,
-        measurements: prev.techpack.measurements.filter((_, i) => i !== index)
-      },
-      hasUnsavedChanges: true
-    }));
+    setState(prev => {
+      const nextMeasurements = prev.techpack.measurements.filter((_, i) => i !== index);
+      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
+      return {
+        ...prev,
+        techpack: {
+          ...prev.techpack,
+          measurements: nextMeasurements,
+          sampleMeasurementRounds: nextSampleRounds,
+        },
+        hasUnsavedChanges: true,
+      };
+    });
+  };
+
+  const addSampleMeasurementRound = (round?: Partial<MeasurementSampleRound>) => {
+    setState(prev => {
+      const requestedSource = round?.requestedSource || 'original';
+      const existingRounds = prev.techpack.sampleMeasurementRounds || [];
+      const previousRound = existingRounds[existingRounds.length - 1];
+      const shouldGenerateMeasurements = !(round?.measurements && round.measurements.length > 0);
+
+      const draftMeasurements = shouldGenerateMeasurements
+        ? generateEntriesForRequestedSource(prev.techpack.measurements, requestedSource, previousRound)
+        : (round?.measurements as MeasurementSampleEntry[]);
+      const normalizedDraftMeasurements = draftMeasurements && draftMeasurements.length > 0 ? draftMeasurements : [];
+
+      const baseRound = normalizeSampleRound(
+        round && Object.keys(round).length > 0
+          ? { ...round, measurements: normalizedDraftMeasurements, requestedSource }
+          : {
+              name: `Sample Round ${existingRounds.length + 1}`,
+              reviewer: '',
+              requestedSource,
+              measurements: normalizedDraftMeasurements,
+            }
+      );
+
+      const syncedRound = syncRoundWithMeasurements(baseRound, prev.techpack.measurements);
+      return {
+        ...prev,
+        techpack: {
+          ...prev.techpack,
+          sampleMeasurementRounds: [...existingRounds, syncedRound],
+        },
+        hasUnsavedChanges: true,
+      };
+    });
+  };
+
+  const updateSampleMeasurementRound = (roundId: string, updates: Partial<MeasurementSampleRound>) => {
+    setState(prev => {
+      const nextRounds = (prev.techpack.sampleMeasurementRounds || []).map(round => {
+        if (round.id !== roundId) return round;
+        const mergedRound = normalizeSampleRound({
+          ...round,
+          ...updates,
+          measurements: (updates as any)?.measurements ?? round.measurements,
+        });
+        return syncRoundWithMeasurements(mergedRound, prev.techpack.measurements);
+      });
+      return {
+        ...prev,
+        techpack: {
+          ...prev.techpack,
+          sampleMeasurementRounds: nextRounds,
+        },
+        hasUnsavedChanges: true,
+      };
+    });
+  };
+
+  const deleteSampleMeasurementRound = (roundId: string) => {
+    setState(prev => {
+      const filtered = (prev.techpack.sampleMeasurementRounds || []).filter(round => round.id !== roundId);
+      const normalized =
+        filtered.length > 0
+          ? filtered.map(round => syncRoundWithMeasurements(round, prev.techpack.measurements))
+          : normalizeSampleRounds(undefined, prev.techpack.measurements);
+      return {
+        ...prev,
+        techpack: {
+          ...prev.techpack,
+          sampleMeasurementRounds: normalized,
+        },
+        hasUnsavedChanges: true,
+      };
+    });
+  };
+
+  const updateSampleMeasurementEntry = (roundId: string, entryId: string, updates: Partial<MeasurementSampleEntry>) => {
+    setState(prev => {
+      const nextRounds = (prev.techpack.sampleMeasurementRounds || []).map(round => {
+        if (round.id !== roundId) return round;
+        const updatedRound = {
+          ...round,
+          measurements: round.measurements.map(entry => {
+            if (entry.id !== entryId) return entry;
+            
+            // Merge updates một cách cẩn thận để tránh ghi đè toàn bộ object
+            // Lưu ý: Khi updates có value map (measured, diff, revised, comments), dùng trực tiếp
+            // vì nó đã được xử lý đúng (đã delete key nếu cần xóa)
+            const mergedEntry: MeasurementSampleEntry = {
+              ...entry,
+              ...updates,
+              // Dùng trực tiếp value maps từ updates (đã được xử lý đúng trong handleEntrySizeValueChange)
+              // Không merge để đảm bảo việc xóa giá trị hoạt động đúng
+              measured: updates.measured !== undefined 
+                ? updates.measured
+                : entry.measured,
+              diff: updates.diff !== undefined
+                ? updates.diff
+                : entry.diff,
+              revised: updates.revised !== undefined
+                ? updates.revised
+                : entry.revised,
+              comments: updates.comments !== undefined
+                ? updates.comments
+                : entry.comments,
+            };
+            
+            return mergedEntry;
+          }),
+        };
+        // Không gọi syncRoundWithMeasurements sau mỗi lần update để tránh normalize lại và làm mất dữ liệu
+        // Chỉ normalize khi thực sự cần (ví dụ: khi thêm measurement mới)
+        return updatedRound;
+      });
+      return {
+        ...prev,
+        techpack: {
+          ...prev.techpack,
+          sampleMeasurementRounds: nextRounds,
+        },
+        hasUnsavedChanges: true,
+      };
+    });
   };
 
   const addHowToMeasure = (howToMeasure: HowToMeasure) => {
@@ -1178,6 +1701,10 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     addMeasurement,
     updateMeasurement,
     deleteMeasurement,
+    addSampleMeasurementRound,
+    updateSampleMeasurementRound,
+    deleteSampleMeasurementRound,
+    updateSampleMeasurementEntry,
     addHowToMeasure,
     updateHowToMeasure,
     updateHowToMeasureById,
@@ -1218,6 +1745,10 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     addMeasurement,
     updateMeasurement,
     deleteMeasurement,
+    addSampleMeasurementRound,
+    updateSampleMeasurementRound,
+    deleteSampleMeasurementRound,
+    updateSampleMeasurementEntry,
     addHowToMeasure,
     updateHowToMeasure,
     updateHowToMeasureById,

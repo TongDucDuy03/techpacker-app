@@ -53,6 +53,33 @@ export interface IMeasurement {
   category?: string;
 }
 
+export interface ISampleMeasurementEntry {
+  _id?: Types.ObjectId;
+  measurementId?: Types.ObjectId;
+  pomCode: string;
+  pomName: string;
+  toleranceMinus?: number;
+  tolerancePlus?: number;
+  requested?: Record<string, string>;
+  measured?: Record<string, string>;
+  diff?: Record<string, string>;
+  revised?: Record<string, string>;
+  comments?: Record<string, string>;
+}
+
+export interface ISampleMeasurementRound {
+  _id?: Types.ObjectId;
+  name: string;
+  order?: number;
+  measurementDate?: Date;
+  createdBy?: Types.ObjectId;
+  createdAt?: Date;
+  updatedAt?: Date;
+  overallComments?: string;
+  requestedSource?: 'original' | 'previous';
+  measurements: ISampleMeasurementEntry[];
+}
+
 export interface IColorway {
   _id?: Types.ObjectId;
   name: string;
@@ -140,6 +167,7 @@ export interface ITechPack extends Document {
   notes?: string;
   bom: IBOMItem[];
   measurements: IMeasurement[];
+  sampleMeasurementRounds?: ISampleMeasurementRound[];
   colorways: IColorway[];
   howToMeasure: IHowToMeasure[];
   createdBy: Types.ObjectId;
@@ -192,6 +220,31 @@ const MeasurementSchema = new Schema<IMeasurement>({
   critical: { type: Boolean, default: false },
   measurementType: { type: String, enum: ['Body', 'Garment', 'Finished'] },
   category: { type: String }
+});
+
+const SampleMeasurementEntrySchema = new Schema<ISampleMeasurementEntry>({
+  measurementId: { type: Schema.Types.ObjectId },
+  pomCode: { type: String, required: true },
+  pomName: { type: String, required: true },
+  toleranceMinus: { type: Number },
+  tolerancePlus: { type: Number },
+  requested: { type: Map, of: String, default: {} },
+  measured: { type: Map, of: String, default: {} },
+  diff: { type: Map, of: String, default: {} },
+  revised: { type: Map, of: String, default: {} },
+  comments: { type: Map, of: String, default: {} }
+});
+
+const SampleMeasurementRoundSchema = new Schema<ISampleMeasurementRound>({
+  name: { type: String, required: true },
+  order: { type: Number, default: 1 },
+  measurementDate: { type: Date },
+  createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  requestedSource: { type: String, enum: ['original', 'previous'], default: 'original' },
+  overallComments: { type: String },
+  measurements: { type: [SampleMeasurementEntrySchema], default: [] }
+}, {
+  timestamps: { createdAt: 'createdAt', updatedAt: 'updatedAt' }
 });
 
 const ColorwaySchema = new Schema<IColorway>({
@@ -318,6 +371,10 @@ const TechPackSchema = new Schema<ITechPack>(
     notes: { type: String, trim: true },
     bom: [BOMItemSchema],
     measurements: [MeasurementSchema],
+    sampleMeasurementRounds: {
+      type: [SampleMeasurementRoundSchema],
+      default: []
+    },
     colorways: [ColorwaySchema],
     howToMeasure: [HowToMeasureSchema],
     createdBy: {
