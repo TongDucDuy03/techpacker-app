@@ -119,6 +119,7 @@ export interface HowToMeasure {
 
 export interface ColorwayPart {
   id: string;
+  bomItemId?: string;
   partName: string;
   colorName: string;
   pantoneCode?: string;

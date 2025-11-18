@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, memo, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useTechPack } from '../../../contexts/TechPackContext';
-import { BomItem, UNITS_OF_MEASURE, COMMON_MATERIALS, COMMON_PLACEMENTS, TechPackRole } from '../../../types/techpack';
+import { BomItem, Colorway, ColorwayPart, UNITS_OF_MEASURE, COMMON_MATERIALS, COMMON_PLACEMENTS, TechPackRole } from '../../../types/techpack';
 import { useFormValidation } from '../../../hooks/useFormValidation';
 import { bomItemValidationSchema } from '../../../utils/validationSchemas';
 import { useDebounce } from '../../../hooks/useDebounce';
@@ -137,9 +137,21 @@ interface ColumnMapping {
 
 const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   const context = useTechPack();
-  const { state, addBomItem, updateBomItem, updateBomItemById, deleteBomItem, deleteBomItemById, insertBomItemAt, updateFormState } = context ?? {};
+  const {
+    state,
+    addBomItem,
+    updateBomItem,
+    updateBomItemById,
+    deleteBomItem,
+    deleteBomItemById,
+    insertBomItemAt,
+    updateFormState,
+    assignColorwayToBomItem,
+    removeColorwayAssignment
+  } = context ?? {};
   const techpack = state?.techpack;
   const bom = techpack?.bom ?? [];
+  const colorways = techpack?.colorways ?? [];
   const { user } = useAuth();
 
   const [showModal, setShowModal] = useState(false);
@@ -158,6 +170,92 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   const [validationErrors, setValidationErrors] = useState<Record<string, Record<string, string>>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [visibleColorwayIds, setVisibleColorwayIds] = useState<string[]>(() =>
+    colorways.map(colorway => colorway.id).filter((id): id is string => Boolean(id))
+  );
+  const [colorAssignmentModal, setColorAssignmentModal] = useState<{
+    colorway: Colorway;
+    bomItem: BomItem;
+    bomItemId: string;
+  } | null>(null);
+  const [assignmentMode, setAssignmentMode] = useState<'existing' | 'new'>('existing');
+  const [selectedPartId, setSelectedPartId] = useState<string>('');
+  const [newAssignmentForm, setNewAssignmentForm] = useState<{
+    colorName: string;
+    hexCode: string;
+    pantoneCode: string;
+    colorType: ColorwayPart['colorType'];
+  }>({
+    colorName: '',
+    hexCode: '#000000',
+    pantoneCode: '',
+    colorType: 'Solid',
+  });
+  const colorTypeOptions = [
+    { value: 'Solid', label: 'Solid' },
+    { value: 'Print', label: 'Print' },
+    { value: 'Embroidery', label: 'Embroidery' },
+    { value: 'Applique', label: 'Applique' },
+  ];
+
+  const resolveBomItemIdentifiers = useCallback((item: BomItem): string[] => {
+    const ids: string[] = [];
+    if ((item as any)?.id) ids.push(String((item as any).id));
+    if ((item as any)?._id) ids.push(String((item as any)._id));
+    return ids;
+  }, []);
+
+  const findAssignmentForBom = useCallback((colorway: Colorway, item: BomItem): ColorwayPart | undefined => {
+    if (!colorway?.parts || colorway.parts.length === 0) return undefined;
+    const candidateIds = resolveBomItemIdentifiers(item);
+    const byId = colorway.parts.find(part => part.bomItemId && candidateIds.includes(part.bomItemId));
+    if (byId) return byId;
+    const normalizedPart = (item.part || '').trim().toLowerCase();
+    if (!normalizedPart) return undefined;
+    return colorway.parts.find(part => (part.partName || '').trim().toLowerCase() === normalizedPart);
+  }, [resolveBomItemIdentifiers]);
+
+  useEffect(() => {
+    if (!colorways.length) {
+      setVisibleColorwayIds([]);
+      return;
+    }
+    setVisibleColorwayIds(prev => {
+      if (!prev.length) {
+        return colorways.map(colorway => colorway.id).filter((id): id is string => Boolean(id));
+      }
+      const currentSet = new Set(prev);
+      const next = colorways
+        .map(colorway => colorway.id)
+        .filter((id): id is string => Boolean(id))
+        .filter(id => currentSet.has(id));
+      return next.length
+        ? next
+        : colorways.map(colorway => colorway.id).filter((id): id is string => Boolean(id));
+    });
+  }, [colorways]);
+
+  useEffect(() => {
+    if (!colorAssignmentModal) return;
+    const assignment = findAssignmentForBom(colorAssignmentModal.colorway, colorAssignmentModal.bomItem);
+    const hasExistingParts = (colorAssignmentModal.colorway.parts || []).length > 0;
+    if (assignment) {
+      setAssignmentMode('existing');
+      setSelectedPartId(assignment.id);
+    } else if (hasExistingParts) {
+      setAssignmentMode('existing');
+      setSelectedPartId(colorAssignmentModal.colorway.parts?.[0]?.id || '');
+    } else {
+      setAssignmentMode('new');
+      setSelectedPartId('');
+    }
+    setNewAssignmentForm({
+      colorName: assignment?.colorName || colorAssignmentModal.bomItem.materialName || colorAssignmentModal.bomItem.part || '',
+      hexCode: assignment?.hexCode || colorAssignmentModal.colorway.hexColor || '#000000',
+      pantoneCode: assignment?.pantoneCode || colorAssignmentModal.colorway.pantoneCode || '',
+      colorType: assignment?.colorType || 'Solid',
+    });
+  }, [colorAssignmentModal, findAssignmentForBom]);
   
   const firstErrorFieldRef = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
@@ -198,6 +296,69 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       return matchesSearch && matchesFilter;
     });
   }, [bom, debouncedSearchTerm, filterByPart]);
+
+  const toggleColorwayVisibility = useCallback((colorwayId: string) => {
+    setVisibleColorwayIds(prev => {
+      if (prev.includes(colorwayId)) {
+        return prev.filter(id => id !== colorwayId);
+      }
+      return [...prev, colorwayId];
+    });
+  }, []);
+
+  const openColorAssignment = useCallback((colorway: Colorway, item: BomItem) => {
+    const bomId = (item as any)?.id || (item as any)?._id;
+    if (!bomId) {
+      showWarning('Please save this BOM item before assigning colors.');
+      return;
+    }
+    setColorAssignmentModal({ colorway, bomItem: item, bomItemId: String(bomId) });
+  }, []);
+
+  const renderColorwayCell = useCallback((colorway: Colorway, item: BomItem) => {
+    const assignment = findAssignmentForBom(colorway, item);
+    const swatchColor = assignment?.hexCode || colorway.hexColor || '#f3f4f6';
+    return (
+      <button
+        type="button"
+        onClick={() => openColorAssignment(colorway, item)}
+        className={`w-full text-left px-3 py-2 rounded-lg border transition ${
+          assignment ? 'border-gray-200 hover:border-blue-400' : 'border-dashed border-gray-300 text-gray-400 hover:text-blue-600'
+        }`}
+      >
+        {assignment ? (
+          <>
+            <div className="flex items-center space-x-2">
+              <span className="w-4 h-4 rounded border border-gray-200" style={{ backgroundColor: swatchColor }} />
+              <span className="text-sm font-medium text-gray-900 truncate">{assignment.colorName || 'Unnamed'}</span>
+            </div>
+            <div className="text-xs text-gray-500 flex items-center justify-between mt-1">
+              <span>{assignment.pantoneCode || 'No Pantone'}</span>
+              <span>{assignment.colorType || 'Solid'}</span>
+            </div>
+          </>
+        ) : (
+          <div className="text-xs font-medium">Assign color</div>
+        )}
+      </button>
+    );
+  }, [findAssignmentForBom, openColorAssignment]);
+
+  const activeAssignment = colorAssignmentModal
+    ? findAssignmentForBom(colorAssignmentModal.colorway, colorAssignmentModal.bomItem)
+    : undefined;
+
+  const countColorwayAssignments = useCallback((item: BomItem) => {
+    if (!colorways.length) return 0;
+    const ids = resolveBomItemIdentifiers(item);
+    let count = 0;
+    colorways.forEach(colorway => {
+      if (colorway.parts?.some(part => part.bomItemId && ids.includes(part.bomItemId))) {
+        count += 1;
+      }
+    });
+    return count;
+  }, [colorways, resolveBomItemIdentifiers]);
 
   // Get unique parts for filter
   const uniqueParts = useMemo(() => {
@@ -368,8 +529,68 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     setShowModal(true);
   };
 
+  const handleDuplicateBomItem = (item: BomItem, index: number) => {
+    const duplicated: BomItem = {
+      ...item,
+      id: generateUUID(),
+      supplierCode: item.supplierCode ? `${item.supplierCode}-COPY` : item.supplierCode,
+    };
+    if (insertBomItemAt) {
+      insertBomItemAt(index + 1, duplicated);
+    } else {
+      addBomItem(duplicated);
+    }
+    showSuccess(`Duplicated "${item.part} - ${item.materialName}"`);
+  };
+
+  const closeColorAssignmentModal = () => {
+    setColorAssignmentModal(null);
+    setSelectedPartId('');
+  };
+
+  const handleSaveColorAssignment = () => {
+    if (!colorAssignmentModal || !assignColorwayToBomItem) return;
+    const { colorway, bomItemId, bomItem } = colorAssignmentModal;
+    if (assignmentMode === 'existing') {
+      const targetPart = colorway.parts?.find(part => part.id === selectedPartId);
+      if (!targetPart) {
+        showError('Please select an existing colorway part.');
+        return;
+      }
+      assignColorwayToBomItem(colorway.id, bomItemId, {
+        ...targetPart,
+        partName: targetPart.partName || bomItem.part || 'Unnamed Part',
+      });
+    } else {
+      if (!newAssignmentForm.colorName.trim() || !newAssignmentForm.hexCode.trim()) {
+        showError('Color name and hex code are required.');
+        return;
+      }
+      assignColorwayToBomItem(colorway.id, bomItemId, {
+        partName: bomItem.part || newAssignmentForm.colorName,
+        colorName: newAssignmentForm.colorName.trim(),
+        hexCode: newAssignmentForm.hexCode.trim(),
+        pantoneCode: newAssignmentForm.pantoneCode.trim() || undefined,
+        colorType: newAssignmentForm.colorType,
+      });
+    }
+    showSuccess('Color assignment saved.');
+    closeColorAssignmentModal();
+  };
+
+  const handleClearAssignment = () => {
+    if (!colorAssignmentModal || !removeColorwayAssignment) return;
+    removeColorwayAssignment(colorAssignmentModal.colorway.id, colorAssignmentModal.bomItemId);
+    showSuccess('Color assignment removed.');
+    closeColorAssignmentModal();
+  };
+
   const handleDelete = (item: BomItem, index: number) => {
-    if (window.confirm(`Are you sure you want to delete "${item.part} - ${item.materialName}"?`)) {
+    const impactedColorways = countColorwayAssignments(item);
+    const confirmationMessage = impactedColorways > 0
+      ? `Material "${item.part} - ${item.materialName}" is linked to ${impactedColorways} colorway${impactedColorways > 1 ? 's' : ''}. Deleting it will remove those color assignments. Continue?`
+      : `Are you sure you want to delete "${item.part} - ${item.materialName}"?`;
+    if (window.confirm(confirmationMessage)) {
       // Clear previous undo timeout if exists
       if (deletedItem?.timeoutId) {
         clearTimeout(deletedItem.timeoutId);
@@ -381,6 +602,16 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       } else {
         // Fallback to index-based for backward compatibility
         deleteBomItem(index);
+      }
+
+      const resolvedBomItemId = (item as any)?.id || (item as any)?._id;
+      if (resolvedBomItemId && removeColorwayAssignment && impactedColorways > 0) {
+        colorways.forEach(colorway => {
+          const hasAssignment = colorway.parts?.some(part => part.bomItemId === resolvedBomItemId);
+          if (hasAssignment) {
+            removeColorwayAssignment(colorway.id, resolvedBomItemId);
+          }
+        });
       }
       
       // Set up undo with timeout
@@ -753,8 +984,17 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       );
     }
     
-    return baseColumns;
-  }, [canViewPrice]);
+    const colorwayColumns = colorways
+      .filter(colorway => visibleColorwayIds.includes(colorway.id))
+      .map(colorway => ({
+        key: `colorway_${colorway.id}` as keyof BomItem,
+        header: `${colorway.name} (${colorway.code})`,
+        width: '220px',
+        render: (_value: any, item: BomItem) => renderColorwayCell(colorway, item),
+      }));
+    
+    return [...baseColumns, ...colorwayColumns];
+  }, [canViewPrice, colorways, visibleColorwayIds, renderColorwayCell]);
 
   // Pagination
   const paginatedBom = useMemo(() => {
@@ -916,6 +1156,51 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             </button>
           </div>
         </div>
+
+        {colorways.length > 0 && (
+          <div className="mt-6 border-t border-gray-100 pt-4">
+            <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+              <div>
+                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Colorway Columns</p>
+                <p className="text-xs text-gray-500">Toggle which colorways appear in the BOM grid for quick color checks.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setVisibleColorwayIds(colorways.map(cw => cw.id).filter((id): id is string => Boolean(id)))
+                  }
+                  className="px-3 py-1 text-xs border border-gray-300 rounded-full text-gray-600 hover:bg-gray-50"
+                >
+                  Show all
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVisibleColorwayIds([])}
+                  className="px-3 py-1 text-xs border border-gray-300 rounded-full text-gray-600 hover:bg-gray-50"
+                >
+                  Hide all
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {colorways.map(colorway => (
+                <button
+                  key={colorway.id}
+                  type="button"
+                  onClick={() => toggleColorwayVisibility(colorway.id)}
+                  className={`px-3 py-1 rounded-full text-xs transition border ${
+                    visibleColorwayIds.includes(colorway.id)
+                      ? 'bg-blue-50 border-blue-300 text-blue-700'
+                      : 'bg-white border-gray-300 text-gray-500'
+                  }`}
+                >
+                  {colorway.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Add/Edit Modal */}
@@ -1133,6 +1418,171 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
         </div>
       </Modal>
 
+      {colorAssignmentModal && (
+        <Modal
+          isOpen={!!colorAssignmentModal}
+          onClose={closeColorAssignmentModal}
+          title={`Assign Color • ${colorAssignmentModal.bomItem.part}`}
+          size="lg"
+          footer={
+            <>
+              {activeAssignment && (
+                <button
+                  type="button"
+                  onClick={handleClearAssignment}
+                  className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700"
+                >
+                  Clear
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={closeColorAssignmentModal}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveColorAssignment}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+              >
+                Save
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <div className="bg-gray-50 rounded-md p-4 text-sm flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-gray-900">{colorAssignmentModal.bomItem.part}</p>
+                <p className="text-gray-500">{colorAssignmentModal.bomItem.materialName}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs uppercase text-gray-500">Colorway</p>
+                <p className="text-sm font-semibold text-gray-800">{colorAssignmentModal.colorway.name}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <label className="inline-flex items-center space-x-2 text-sm text-gray-700">
+                <input
+                  type="radio"
+                  className="rounded text-blue-600"
+                  value="existing"
+                  checked={assignmentMode === 'existing'}
+                  onChange={() => setAssignmentMode('existing')}
+                  disabled={!colorAssignmentModal.colorway.parts || colorAssignmentModal.colorway.parts.length === 0}
+                />
+                <span>Use existing color</span>
+              </label>
+              <label className="inline-flex items-center space-x-2 text-sm text-gray-700">
+                <input
+                  type="radio"
+                  className="rounded text-blue-600"
+                  value="new"
+                  checked={assignmentMode === 'new'}
+                  onChange={() => setAssignmentMode('new')}
+                />
+                <span>Create new color</span>
+              </label>
+            </div>
+
+            {assignmentMode === 'existing' ? (
+              colorAssignmentModal.colorway.parts && colorAssignmentModal.colorway.parts.length > 0 ? (
+                <div className="space-y-3">
+                  <Select
+                    label="Colorway Parts"
+                    value={selectedPartId}
+                    onChange={setSelectedPartId}
+                    options={colorAssignmentModal.colorway.parts.map(part => ({
+                      value: part.id,
+                      label: `${part.partName} • ${part.colorName}`,
+                    }))}
+                    placeholder="Select a colorway part..."
+                  />
+                  {selectedPartId && (
+                    <div className="p-3 border border-gray-200 rounded-md text-sm flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <span
+                          className="w-6 h-6 rounded border border-gray-200"
+                          style={{
+                            backgroundColor:
+                              colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.hexCode ||
+                              colorAssignmentModal.colorway.hexColor ||
+                              '#f3f4f6',
+                          }}
+                        />
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.colorName}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Pantone:{' '}
+                            {colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.pantoneCode ||
+                              '—'}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-xs text-gray-500 uppercase">
+                        {colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.colorType || 'Solid'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">
+                  No colorway parts available. Switch to “Create new color” to define one for this BOM item.
+                </p>
+              )
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    label="Color Name"
+                    value={newAssignmentForm.colorName}
+                    onChange={(value) => setNewAssignmentForm(prev => ({ ...prev, colorName: String(value) }))}
+                    placeholder="e.g., Navy Blazer"
+                  />
+                  <Input
+                    label="Pantone Code"
+                    value={newAssignmentForm.pantoneCode}
+                    onChange={(value) => setNewAssignmentForm(prev => ({ ...prev, pantoneCode: String(value) }))}
+                    placeholder="19-4052 TPX"
+                  />
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Hex Color</label>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <input
+                        type="color"
+                        value={newAssignmentForm.hexCode}
+                        onChange={(e) => setNewAssignmentForm(prev => ({ ...prev, hexCode: e.target.value }))}
+                        className="w-12 h-10 border rounded cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={newAssignmentForm.hexCode}
+                        onChange={(e) => setNewAssignmentForm(prev => ({ ...prev, hexCode: e.target.value }))}
+                        className="flex-1 px-3 py-2 border rounded-md text-sm font-mono"
+                        placeholder="#000000"
+                      />
+                    </div>
+                  </div>
+                  <Select
+                    label="Color Type"
+                    value={newAssignmentForm.colorType}
+                    onChange={(value) =>
+                      setNewAssignmentForm(prev => ({ ...prev, colorType: value as ColorwayPart['colorType'] }))
+                    }
+                    options={colorTypeOptions}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
       {/* Import Preview Modal */}
       <Modal
         isOpen={showImportModal}
@@ -1289,7 +1739,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                             }`}
                             title={hasErrors && errors[column.key as string] ? errors[column.key as string] : undefined}
                           >
-                            {column.render ? column.render(value) : (value || '-')}
+                            {column.render ? column.render(value, item, mapIndex) : (value || '-')}
                             {hasErrors && errors[column.key as string] && (
                               <div className="mt-1">
                                 <AlertCircle className="w-4 h-4 text-red-400 inline" />
@@ -1307,6 +1757,13 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                             title="Edit"
                           >
                             <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDuplicateBomItem(item, originalIndex)}
+                            className="text-gray-600 hover:text-gray-900"
+                            title="Duplicate"
+                          >
+                            <Copy className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(item, originalIndex)}

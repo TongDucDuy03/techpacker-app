@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useTechPack } from '../../../contexts/TechPackContext';
-import { Colorway, ColorwayPart } from '../../../types/techpack';
+import { BomItem, Colorway, ColorwayPart } from '../../../types/techpack';
 import { useFormValidation } from '../../../hooks/useFormValidation';
 import { colorwayFormValidationSchema, colorwayPartValidationSchema } from '../../../utils/validationSchemas';
 import Input from '../shared/Input';
@@ -41,6 +41,7 @@ const ColorwayTab: React.FC = () => {
   });
 
   const [partFormData, setPartFormData] = useState<Partial<ColorwayPart>>({
+    bomItemId: undefined,
     partName: '',
     colorName: '',
     pantoneCode: '',
@@ -49,12 +50,29 @@ const ColorwayTab: React.FC = () => {
     colorType: 'Solid',
   });
 
-  // Get unique parts from BOM for colorway parts
-  const availableParts = useMemo(() => {
-    const bomParts = bom.map(item => item.part);
-    const uniqueParts = Array.from(new Set(bomParts));
-    return uniqueParts.map(part => ({ value: part, label: part }));
+  const bomSelectionData = useMemo(() => {
+    const map = new Map<string, BomItem>();
+    const options = bom.map((item, index) => {
+      const primaryId = (item as any)?.id || (item as any)?._id || `bom-${index}`;
+      const candidates = [
+        (item as any)?.id,
+        (item as any)?._id,
+        primaryId
+      ];
+      candidates
+        .filter(Boolean)
+        .forEach(id => map.set(String(id), item));
+      const labelParts = [item.part, item.materialName].filter(Boolean);
+      return {
+        value: primaryId,
+        label: labelParts.length ? labelParts.join(' • ') : item.part || `BOM Item ${index + 1}`,
+      };
+    });
+    return { map, options };
   }, [bom]);
+
+  const bomById = bomSelectionData.map;
+  const bomOptions = bomSelectionData.options;
 
   // Color type options
   const colorTypeOptions = [
@@ -127,6 +145,22 @@ const ColorwayTab: React.FC = () => {
     }
   };
 
+  const handleBomSelection = (value: string) => {
+    if (!value) {
+      setPartFormData(prev => ({ ...prev, bomItemId: undefined }));
+      return;
+    }
+    const selectedBom = bomById.get(value);
+    setPartFormData(prev => ({
+      ...prev,
+      bomItemId: value,
+      partName: selectedBom?.part || prev.partName || '',
+      colorName: prev.colorName || selectedBom?.materialName || prev.colorName || '',
+      supplier: prev.supplier || selectedBom?.supplier || '',
+    }));
+    partValidation.setFieldTouched('partName', true);
+  };
+
   const handleAddPart = () => {
     const { isValid } = partValidation.validateForm(partFormData as Record<string, any>);
     if (!isValid) {
@@ -138,6 +172,7 @@ const ColorwayTab: React.FC = () => {
 
     const newPart: ColorwayPart = {
       id: `part_${Date.now()}`,
+      bomItemId: partFormData.bomItemId,
       partName: partFormData.partName!,
       colorName: partFormData.colorName!,
       pantoneCode: partFormData.pantoneCode || '',
@@ -153,6 +188,7 @@ const ColorwayTab: React.FC = () => {
 
     // Reset part form
     setPartFormData({
+      bomItemId: undefined,
       partName: '',
       colorName: '',
       pantoneCode: '',
@@ -247,6 +283,7 @@ const ColorwayTab: React.FC = () => {
       notes: '',
     });
     setPartFormData({
+      bomItemId: undefined,
       partName: '',
       colorName: '',
       pantoneCode: '',
@@ -313,6 +350,26 @@ const ColorwayTab: React.FC = () => {
 
   // Table columns for colorway parts
   const partColumns = [
+    {
+      key: 'bomItemId' as keyof ColorwayPart,
+      header: 'Linked BOM',
+      width: '25%',
+      render: (_: any, item: ColorwayPart) => {
+        if (!item.bomItemId) {
+          return <span className="text-xs text-gray-400">Legacy / Custom</span>;
+        }
+        const linked = bomById.get(item.bomItemId);
+        if (!linked) {
+          return <span className="text-xs text-yellow-600">Missing BOM</span>;
+        }
+        return (
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-gray-900">{linked.part}</span>
+            <span className="text-xs text-gray-500 truncate">{linked.materialName}</span>
+          </div>
+        );
+      }
+    },
     {
       key: 'partName' as keyof ColorwayPart,
       header: 'Part',
@@ -590,12 +647,26 @@ const ColorwayTab: React.FC = () => {
             <div className="bg-gray-50 rounded-lg p-4 mb-4">
               <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
                 <Select
-                  label="Part"
+                  label="BOM Item"
+                  value={partFormData.bomItemId || ''}
+                  onChange={handleBomSelection}
+                  onBlur={() => partValidation.setFieldTouched('partName')}
+                  options={bomOptions}
+                  placeholder={bomOptions.length ? 'Select BOM item…' : 'No BOM items yet'}
+                  disabled={!bomOptions.length}
+                  helperText={
+                    bomOptions.length
+                      ? 'Liên kết dòng BOM để áp màu chính xác từng vật tư'
+                      : 'Thêm BOM ở tab BOM để liên kết màu sắc từng dòng.'
+                  }
+                />
+
+                <Input
+                  label="Part Label"
                   value={partFormData.partName || ''}
                   onChange={handlePartInputChange('partName')}
                   onBlur={() => partValidation.setFieldTouched('partName')}
-                  options={availableParts}
-                  placeholder="Select part..."
+                  placeholder="Custom part label"
                   error={partValidation.getFieldProps('partName').error}
                   helperText={partValidation.getFieldProps('partName').helperText}
                 />

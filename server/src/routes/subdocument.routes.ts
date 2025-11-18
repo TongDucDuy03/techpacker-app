@@ -57,7 +57,12 @@ const colorwayValidation = [
   body('rgbColor.g').optional().isInt({ min: 0, max: 255 }).withMessage('RGB green must be 0-255'),
   body('rgbColor.b').optional().isInt({ min: 0, max: 255 }).withMessage('RGB blue must be 0-255'),
   body('approved').optional().isBoolean().withMessage('Approved must be boolean'),
-  body('isDefault').optional().isBoolean().withMessage('IsDefault must be boolean')
+  body('isDefault').optional().isBoolean().withMessage('IsDefault must be boolean'),
+  body('parts').optional().isArray().withMessage('Parts must be an array'),
+  body('parts.*.partName').optional().notEmpty().withMessage('Part name is required'),
+  body('parts.*.colorName').optional().notEmpty().withMessage('Color name is required'),
+  body('parts.*.hexCode').optional().matches(/^#[0-9A-F]{6}$/i).withMessage('Invalid part hex color format'),
+  body('parts.*.colorType').optional().isIn(['Solid', 'Print', 'Embroidery', 'Applique']).withMessage('Invalid part color type')
 ];
 
 // BOM Routes

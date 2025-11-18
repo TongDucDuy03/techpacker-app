@@ -49,6 +49,8 @@ interface TechPackContextType {
   updateColorwayById: (id: string, colorway: Colorway) => void;
   deleteColorway: (index: number) => void;
   deleteColorwayById: (id: string) => void;
+  assignColorwayToBomItem: (colorwayId: string, bomItemId: string, data?: Partial<ColorwayPart>) => void;
+  removeColorwayAssignment: (colorwayId: string, bomItemId: string) => void;
 }
 
 const TechPackContext = createContext<TechPackContextType | undefined>(undefined);
@@ -84,32 +86,106 @@ const hexToRgb = (hex: string | undefined) => {
 
 const allowedColorTypes: ColorwayPart['colorType'][] = ['Solid', 'Print', 'Embroidery', 'Applique'];
 
+type BomLookup = {
+  byId: Map<string, BomItem>;
+  byPartName: Map<string, BomItem[]>;
+};
+
+const buildBomLookup = (bomItems?: BomItem[]): BomLookup => {
+  const byId = new Map<string, BomItem>();
+  const byPartName = new Map<string, BomItem[]>();
+
+  (bomItems || []).forEach(item => {
+    const rawIds = [
+      safeString((item as any)?.id),
+      safeString((item as any)?._id),
+    ].filter(Boolean) as string[];
+
+    rawIds.forEach(id => {
+      byId.set(id, item);
+      byId.set(id.toLowerCase(), item);
+    });
+
+    const partKey = safeString(item.part).toLowerCase();
+    if (partKey) {
+      if (!byPartName.has(partKey)) {
+        byPartName.set(partKey, []);
+      }
+      byPartName.get(partKey)!.push(item);
+    }
+  });
+
+  return { byId, byPartName };
+};
+
+const resolveBomItem = (lookup: BomLookup | undefined, bomItemId?: string, partName?: string): BomItem | undefined => {
+  if (!lookup) return undefined;
+
+  const normalizedId = safeString(bomItemId);
+  if (normalizedId) {
+    const directMatch = lookup.byId.get(normalizedId) || lookup.byId.get(normalizedId.toLowerCase());
+    if (directMatch) {
+      return directMatch;
+    }
+  }
+
+  const normalizedPart = safeString(partName).toLowerCase();
+  if (normalizedPart) {
+    const partMatches = lookup.byPartName.get(normalizedPart);
+    if (partMatches && partMatches.length > 0) {
+      return partMatches[0];
+    }
+  }
+
+  return undefined;
+};
+
 const sanitizeColorwayPart = (
   part: Partial<ColorwayPart> | undefined,
   colorwayIndex: number,
   partIndex: number,
   fallbackColorName: string,
-  fallbackHex: string
+  fallbackHex: string,
+  bomLookup?: BomLookup
 ): ColorwayPart => {
   const resolvedHex = normalizeHexColor(part?.hexCode) || fallbackHex || '#000000';
   const resolvedColorType = allowedColorTypes.includes((part?.colorType as any))
     ? (part?.colorType as ColorwayPart['colorType'])
     : 'Solid';
 
+  const linkedBom = resolveBomItem(bomLookup, (part as any)?.bomItemId || part?.bomItemId, part?.partName);
+  const resolvedBomItemId =
+    safeString(part?.bomItemId) ||
+    safeString((part as any)?.bomItemId) ||
+    safeString((linkedBom as any)?._id) ||
+    safeString((linkedBom as any)?.id);
+
+  const resolvedPartName =
+    safeString(part?.partName) ||
+    linkedBom?.part ||
+    `Part ${partIndex + 1}`;
+
+  const resolvedColorName =
+    safeString(part?.colorName) ||
+    fallbackColorName ||
+    linkedBom?.materialName ||
+    `Color ${partIndex + 1}`;
+
   return {
     id: safeString((part as any)?.id) || safeString((part as any)?._id) || `part_${colorwayIndex}_${partIndex}`,
-    partName: safeString(part?.partName) || `Part ${partIndex + 1}`,
-    colorName: safeString(part?.colorName) || fallbackColorName || `Color ${partIndex + 1}`,
-    pantoneCode: safeString(part?.pantoneCode) || undefined,
+    bomItemId: resolvedBomItemId || undefined,
+    partName: resolvedPartName,
+    colorName: resolvedColorName,
+    pantoneCode: safeString(part?.pantoneCode) || linkedBom?.pantoneCode || undefined,
     hexCode: resolvedHex,
     rgbCode: safeString(part?.rgbCode) || undefined,
     imageUrl: safeString((part as any)?.imageUrl) || undefined,
-    supplier: safeString(part?.supplier) || undefined,
+    supplier: safeString(part?.supplier) || linkedBom?.supplier || undefined,
     colorType: resolvedColorType,
   } as ColorwayPart;
 };
 
-const sanitizeColorway = (rawColorway: PartialColorway, index: number): Colorway => {
+const sanitizeColorway = (rawColorway: PartialColorway, index: number, bomLookup?: BomLookup): Colorway => {
   const rawName = safeString(rawColorway.name) || safeString((rawColorway as any).colorwayName);
   const rawCode = safeString(rawColorway.code) || safeString((rawColorway as any).colorwayCode);
   const sanitizedName = rawName || rawCode || `Colorway ${index + 1}`;
@@ -135,7 +211,7 @@ const sanitizeColorway = (rawColorway: PartialColorway, index: number): Colorway
 
   const sanitizedParts: ColorwayPart[] = Array.isArray(rawColorway.parts)
     ? rawColorway.parts.map((part, partIndex) =>
-        sanitizeColorwayPart(part, index, partIndex, sanitizedName, normalizedHex)
+        sanitizeColorwayPart(part, index, partIndex, sanitizedName, normalizedHex, bomLookup)
       )
     : [];
 
@@ -169,9 +245,34 @@ const sanitizeColorway = (rawColorway: PartialColorway, index: number): Colorway
   };
 };
 
-const sanitizeColorwayList = (colorways?: Array<PartialColorway>): Colorway[] => {
+const sanitizeColorwayList = (
+  colorways?: Array<PartialColorway | Colorway>,
+  bomItems?: BomItem[],
+  options: { bestEffort?: boolean } = {}
+): Colorway[] => {
   if (!Array.isArray(colorways)) return [];
-  return colorways.map((colorway, index) => sanitizeColorway(colorway, index));
+  const lookup = buildBomLookup(bomItems);
+  return colorways.map((colorway, index) => {
+    try {
+      return sanitizeColorway(colorway, index, lookup);
+    } catch (error) {
+      console.warn('Failed to sanitize colorway', colorway, error);
+      if (options.bestEffort) {
+        return {
+          id: `colorway_${Date.now()}_${index}`,
+          name: safeString((colorway as any)?.name) || `Colorway ${index + 1}`,
+          code: safeString((colorway as any)?.code) || `CW-${index + 1}`,
+          placement: safeString((colorway as any)?.placement) || 'Main Body',
+          materialType: safeString((colorway as any)?.materialType) || 'General',
+          parts: [],
+          approvalStatus: 'Pending',
+          productionStatus: 'Lab Dip',
+          isDefault: false,
+        } as Colorway;
+      }
+      throw error;
+    }
+  });
 };
 
 const generateClientId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -615,6 +716,8 @@ const loadDraftFromStorage = (techpackId?: string): Partial<TechPackFormState> |
 const mergeDraftWithState = (base: TechPackFormState, draft?: Partial<TechPackFormState> | null): TechPackFormState => {
   if (!draft || !draft.techpack) return base;
 
+  const mergedBom = (draft.techpack as any)?.bom ?? base.techpack.bom;
+
   const mergedTechpack = {
     ...base.techpack,
     ...draft.techpack,
@@ -622,11 +725,11 @@ const mergeDraftWithState = (base: TechPackFormState, draft?: Partial<TechPackFo
       ...base.techpack.articleInfo,
       ...(draft.techpack as any).articleInfo,
     },
-    bom: (draft.techpack as any).bom ?? base.techpack.bom,
+    bom: mergedBom,
     measurements: (draft.techpack as any).measurements ?? base.techpack.measurements,
     sampleMeasurementRounds: (draft.techpack as any).sampleMeasurementRounds ?? base.techpack.sampleMeasurementRounds,
     howToMeasures: (draft.techpack as any).howToMeasures ?? base.techpack.howToMeasures,
-    colorways: sanitizeColorwayList((draft.techpack as any).colorways ?? []),
+    colorways: sanitizeColorwayList((draft.techpack as any).colorways ?? [], mergedBom, { bestEffort: true }),
   } as TechPackFormState['techpack'];
 
   return {
@@ -867,11 +970,6 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
   const updateFormState = useCallback((updates: Partial<ApiTechPack>, skipUnsavedFlag = false) => {
     setState(prev => {
       // Xử lý colorways đặc biệt
-      const incomingColorways = (updates as any).colorways;
-      const nextColorways = incomingColorways !== undefined
-        ? sanitizeColorwayList(incomingColorways as Array<PartialColorway>)
-        : prev.techpack.colorways;
-
       // Xử lý các mảng khác: chỉ ghi đè nếu updates có giá trị (không phải undefined)
       // Nếu updates có field (kể cả mảng rỗng []), thì dùng giá trị đó
       // Nếu updates không có field (undefined), thì giữ giá trị cũ
@@ -894,6 +992,14 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
       const nextHowToMeasures = incomingHowToMeasures !== undefined 
         ? (Array.isArray(incomingHowToMeasures) ? incomingHowToMeasures : [])
         : prev.techpack.howToMeasures;
+
+      const incomingColorways = (updates as any).colorways;
+      let nextColorways = prev.techpack.colorways;
+      if (incomingColorways !== undefined) {
+        nextColorways = sanitizeColorwayList(incomingColorways as Array<PartialColorway>, nextBom);
+      } else if (incomingBom !== undefined) {
+        nextColorways = sanitizeColorwayList(prev.techpack.colorways, nextBom);
+      }
 
       // Tách riêng các field cần xử lý đặc biệt để tránh bị ghi đè
       const {
@@ -1041,7 +1147,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         return mapped;
       });
 
-      const colorwaysForSave = sanitizeColorwayList(techpackData.colorways as Array<PartialColorway>);
+      const colorwaysForSave = sanitizeColorwayList(techpackData.colorways as Array<PartialColorway>, techpackData.bom);
 
       if (JSON.stringify(colorwaysForSave) !== JSON.stringify(techpackData.colorways)) {
         setState(prev => ({
@@ -1053,22 +1159,55 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         }));
       }
 
-      const colorwaysPayload = colorwaysForSave.map(colorway => ({
-        ...(colorway?._id && typeof colorway._id === 'string' && objectIdPattern.test(colorway._id) ? { _id: colorway._id } : {}),
-        name: colorway.name.trim(),
-        code: colorway.code.trim(),
-        placement: colorway.placement.trim(),
-        materialType: colorway.materialType.trim(),
-        pantoneCode: colorway.pantoneCode?.trim() || undefined,
-        hexColor: colorway.hexColor?.trim() || undefined,
-        rgbColor: hexToRgb(colorway.hexColor),
-        supplier: colorway.supplier?.trim() || undefined,
-        notes: colorway.notes?.trim() || undefined,
-        season: colorway.season?.trim() || undefined,
-        collectionName: colorway.collectionName?.trim() || undefined,
-        approved: colorway.approvalStatus === 'Approved',
-        isDefault: !!colorway.isDefault,
-      }));
+      const colorwaysPayload = colorwaysForSave.map(colorway => {
+        const partsPayload = (colorway.parts || []).map(part => {
+          const normalizedHex = part.hexCode?.trim();
+          const payload: any = {
+            partName: part.partName.trim(),
+            colorName: part.colorName.trim(),
+            colorType: part.colorType,
+          };
+
+          const partObjectId =
+            (part as any)?._id && typeof (part as any)._id === 'string' && objectIdPattern.test((part as any)._id)
+              ? (part as any)._id
+              : undefined;
+          const partIdIsObjectId = typeof part.id === 'string' && objectIdPattern.test(part.id);
+
+          if (partIdIsObjectId) {
+            payload._id = part.id;
+          } else if (partObjectId) {
+            payload._id = partObjectId;
+          }
+
+          if (part.bomItemId) payload.bomItemId = part.bomItemId;
+          if (part.pantoneCode) payload.pantoneCode = part.pantoneCode.trim();
+          if (normalizedHex) payload.hexCode = normalizedHex;
+          if (part.rgbCode) payload.rgbCode = part.rgbCode.trim();
+          if (part.supplier) payload.supplier = part.supplier.trim();
+          if (part.imageUrl) payload.imageUrl = part.imageUrl.trim();
+
+          return payload;
+        });
+
+        return {
+          ...(colorway?._id && typeof colorway._id === 'string' && objectIdPattern.test(colorway._id) ? { _id: colorway._id } : {}),
+          name: colorway.name.trim(),
+          code: colorway.code.trim(),
+          placement: colorway.placement.trim(),
+          materialType: colorway.materialType.trim(),
+          pantoneCode: colorway.pantoneCode?.trim() || undefined,
+          hexColor: colorway.hexColor?.trim() || undefined,
+          rgbColor: hexToRgb(colorway.hexColor),
+          supplier: colorway.supplier?.trim() || undefined,
+          notes: colorway.notes?.trim() || undefined,
+          season: colorway.season?.trim() || undefined,
+          collectionName: colorway.collectionName?.trim() || undefined,
+          approved: colorway.approvalStatus === 'Approved',
+          isDefault: !!colorway.isDefault,
+          parts: partsPayload,
+        };
+      });
 
       const incompleteColorway = colorwaysPayload.find(cw => !cw.name || !cw.code || !cw.placement || !cw.materialType);
       if (incompleteColorway) {
@@ -1549,7 +1688,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
 
   const addColorway = (colorway: Colorway) => {
     setState(prev => {
-      const nextColorways = sanitizeColorwayList([...prev.techpack.colorways, colorway]);
+      const nextColorways = sanitizeColorwayList([...prev.techpack.colorways, colorway], prev.techpack.bom);
       return {
         ...prev,
         techpack: {
@@ -1569,7 +1708,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         ...prev,
         techpack: {
           ...prev.techpack,
-          colorways: sanitizeColorwayList(updatedColorways),
+          colorways: sanitizeColorwayList(updatedColorways, prev.techpack.bom),
         },
         hasUnsavedChanges: true,
       };
@@ -1583,7 +1722,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         ...prev,
         techpack: {
           ...prev.techpack,
-          colorways: sanitizeColorwayList(updatedColorways),
+          colorways: sanitizeColorwayList(updatedColorways, prev.techpack.bom),
         },
         hasUnsavedChanges: true,
       };
@@ -1598,7 +1737,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         ...prev,
         techpack: {
           ...prev.techpack,
-          colorways: sanitizeColorwayList(filtered),
+          colorways: sanitizeColorwayList(filtered, prev.techpack.bom),
         },
         hasUnsavedChanges: true,
       };
@@ -1612,12 +1751,102 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         ...prev,
         techpack: {
           ...prev.techpack,
-          colorways: sanitizeColorwayList(filtered),
+          colorways: sanitizeColorwayList(filtered, prev.techpack.bom),
         },
         hasUnsavedChanges: true,
       };
     });
   };
+
+  const assignColorwayToBomItem = useCallback((
+    colorwayId: string,
+    bomItemId: string,
+    partData: Partial<ColorwayPart> = {}
+  ) => {
+    if (!colorwayId || !bomItemId) return;
+    setState(prev => {
+      const bomLookup = buildBomLookup(prev.techpack.bom);
+      const nextColorways = prev.techpack.colorways.map(colorway => {
+        if (colorway.id !== colorwayId) return colorway;
+
+        const parts = colorway.parts || [];
+        const existingIndex = parts.findIndex(part => part.bomItemId === bomItemId);
+        const existingPart = existingIndex >= 0 ? parts[existingIndex] : undefined;
+        const linkedBom = resolveBomItem(bomLookup, bomItemId, partData.partName || existingPart?.partName);
+
+        const resolvedPartName =
+          partData.partName ||
+          existingPart?.partName ||
+          linkedBom?.part ||
+          `Part ${parts.length + 1}`;
+
+        const resolvedColorName =
+          partData.colorName ||
+          existingPart?.colorName ||
+          linkedBom?.materialName ||
+          resolvedPartName;
+
+        const resolvedHex =
+          partData.hexCode ||
+          existingPart?.hexCode ||
+          linkedBom?.colorCode ||
+          colorway.hexColor ||
+          '#000000';
+
+        const updatedPart: ColorwayPart = {
+          ...existingPart,
+          ...partData,
+          id: existingPart?.id || generateClientId('colorway-part'),
+          bomItemId,
+          partName: resolvedPartName,
+          colorName: resolvedColorName,
+          hexCode: resolvedHex,
+          colorType: (partData.colorType as ColorwayPart['colorType']) || existingPart?.colorType || 'Solid',
+        };
+
+        const nextParts =
+          existingIndex >= 0
+            ? parts.map((part, idx) => (idx === existingIndex ? updatedPart : part))
+            : [...parts, updatedPart];
+
+        return {
+          ...colorway,
+          parts: nextParts,
+        };
+      });
+
+      return {
+        ...prev,
+        techpack: {
+          ...prev.techpack,
+          colorways: sanitizeColorwayList(nextColorways, prev.techpack.bom),
+        },
+        hasUnsavedChanges: true,
+      };
+    });
+  }, []);
+
+  const removeColorwayAssignment = useCallback((colorwayId: string, bomItemId: string) => {
+    if (!colorwayId || !bomItemId) return;
+    setState(prev => {
+      const nextColorways = prev.techpack.colorways.map(colorway => {
+        if (colorway.id !== colorwayId) return colorway;
+        return {
+          ...colorway,
+          parts: (colorway.parts || []).filter(part => part.bomItemId !== bomItemId),
+        };
+      });
+
+      return {
+        ...prev,
+        techpack: {
+          ...prev.techpack,
+          colorways: sanitizeColorwayList(nextColorways, prev.techpack.bom),
+        },
+        hasUnsavedChanges: true,
+      };
+    });
+  }, []);
 
   // Revision management functions
   const loadRevisions = useCallback(async (techPackId: string, params = {}) => {
@@ -1722,6 +1951,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     updateColorwayById,
     deleteColorway,
     deleteColorwayById,
+    assignColorwayToBomItem,
+    removeColorwayAssignment,
   }), [
     techPacks,
     loading,
@@ -1766,6 +1997,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     updateColorwayById,
     deleteColorway,
     deleteColorwayById,
+    assignColorwayToBomItem,
+    removeColorwayAssignment,
   ]);
 
   return <TechPackContext.Provider value={value}>{children}</TechPackContext.Provider>;

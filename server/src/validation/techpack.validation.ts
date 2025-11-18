@@ -47,6 +47,17 @@ const measurementSpecSchema = z.object({
   category: z.string().optional()
 });
 
+const colorwayPartSpecSchema = z.object({
+  bomItemId: z.string().optional(),
+  partName: z.string().min(1, 'Part name is required'),
+  colorName: z.string().min(1, 'Color name is required'),
+  pantoneCode: z.string().optional(),
+  hexCode: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color format').optional(),
+  rgbCode: z.string().optional(),
+  supplier: z.string().optional(),
+  colorType: z.enum(['Solid', 'Print', 'Embroidery', 'Applique']).optional()
+});
+
 // Colorway specification schema
 const colorwaySpecSchema = z.object({
   name: z.string().min(1, 'Colorway name is required'),
@@ -65,7 +76,8 @@ const colorwaySpecSchema = z.object({
   isDefault: z.boolean().optional(),
   season: z.string().optional(),
   collection: z.string().optional(),
-  notes: z.string().optional()
+  notes: z.string().optional(),
+  parts: z.array(colorwayPartSpecSchema).optional()
 });
 
 // Create tech pack schema

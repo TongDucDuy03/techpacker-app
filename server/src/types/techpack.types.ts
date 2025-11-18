@@ -89,6 +89,19 @@ export interface HowToMeasureItem {
   relatedMeasurements?: string[];
 }
 
+export interface ColorwayPart {
+  _id?: string;
+  bomItemId?: string;
+  partName: string;
+  colorName: string;
+  pantoneCode?: string;
+  hexCode?: string;
+  rgbCode?: string;
+  imageUrl?: string;
+  supplier?: string;
+  colorType?: 'Solid' | 'Print' | 'Embroidery' | 'Applique';
+}
+
 export interface Colorway {
   _id?: string;
   name: string;
@@ -114,6 +127,7 @@ export interface Colorway {
   season?: string;
   collection?: string;
   notes?: string;
+  parts?: ColorwayPart[];
 }
 
 export interface WatermarkConfig {

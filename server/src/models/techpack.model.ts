@@ -99,6 +99,20 @@ export interface IColorway {
   season?: string;
   collectionName?: string;
   notes?: string;
+  parts?: IColorwayPart[];
+}
+
+export interface IColorwayPart {
+  _id?: Types.ObjectId;
+  bomItemId?: string;
+  partName: string;
+  colorName: string;
+  pantoneCode?: string;
+  hexCode?: string;
+  rgbCode?: string;
+  imageUrl?: string;
+  supplier?: string;
+  colorType?: 'Solid' | 'Print' | 'Embroidery' | 'Applique';
 }
 
 export interface IHowToMeasure {
@@ -247,6 +261,18 @@ const SampleMeasurementRoundSchema = new Schema<ISampleMeasurementRound>({
   timestamps: { createdAt: 'createdAt', updatedAt: 'updatedAt' }
 });
 
+const ColorwayPartSchema = new Schema<IColorwayPart>({
+  bomItemId: { type: String, trim: true },
+  partName: { type: String, required: true },
+  colorName: { type: String, required: true },
+  pantoneCode: { type: String },
+  hexCode: { type: String },
+  rgbCode: { type: String },
+  imageUrl: { type: String },
+  supplier: { type: String },
+  colorType: { type: String, enum: ['Solid', 'Print', 'Embroidery', 'Applique'], default: 'Solid' },
+}, { _id: true });
+
 const ColorwaySchema = new Schema<IColorway>({
   name: { type: String, required: true },
   code: { type: String, required: true },
@@ -264,7 +290,8 @@ const ColorwaySchema = new Schema<IColorway>({
   isDefault: { type: Boolean, default: false },
   season: { type: String },
   collectionName: { type: String },
-  notes: { type: String }
+  notes: { type: String },
+  parts: { type: [ColorwayPartSchema], default: [] }
 });
 
 const HowToMeasureSchema = new Schema<IHowToMeasure>({

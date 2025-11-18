@@ -174,7 +174,26 @@ const options = {
             isDefault: { type: 'boolean', default: false },
             season: { type: 'string' },
             collection: { type: 'string' },
-            notes: { type: 'string' }
+            notes: { type: 'string' },
+            parts: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/ColorwayPart' },
+              default: []
+            }
+          }
+        },
+        ColorwayPart: {
+          type: 'object',
+          required: ['partName', 'colorName'],
+          properties: {
+            bomItemId: { type: 'string' },
+            partName: { type: 'string' },
+            colorName: { type: 'string' },
+            pantoneCode: { type: 'string' },
+            hexCode: { type: 'string', pattern: '^#[0-9A-F]{6}$' },
+            rgbCode: { type: 'string' },
+            supplier: { type: 'string' },
+            colorType: { type: 'string', enum: ['Solid', 'Print', 'Embroidery', 'Applique'] }
           }
         },
         Revision: {
