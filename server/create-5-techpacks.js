@@ -31,9 +31,20 @@ let technicalDesignerId = '';
 // Template function để tạo techpack data
 function createTechPackData(template) {
   const timestamp = Date.now().toString().slice(-6);
+  // Convert productClass to category, collection to collectionName
+  const articleInfo = { ...template.articleInfo };
+  if (articleInfo.productClass) {
+    articleInfo.category = articleInfo.productClass;
+    delete articleInfo.productClass;
+  }
+  if (articleInfo.collection) {
+    articleInfo.collectionName = articleInfo.collection;
+    delete articleInfo.collection;
+  }
+  
   return {
     articleInfo: {
-      ...template.articleInfo,
+      ...articleInfo,
       articleCode: `${template.articleInfo.articleCode}-${timestamp}`,
       technicalDesignerId: technicalDesignerId
     },
@@ -41,7 +52,7 @@ function createTechPackData(template) {
     measurements: template.measurements,
     colorways: template.colorways,
     howToMeasures: template.howToMeasures,
-    status: template.status || 'draft'
+    status: template.status || 'Draft'
   };
 }
 
@@ -50,18 +61,18 @@ const poloShirtTemplate = {
   articleInfo: {
     productName: 'Classic Cotton Polo Shirt',
     articleCode: 'POLO',
-    version: 1,
+    version: 'V1',
     supplier: 'Vietnam Textile Manufacturing Co., Ltd.',
     season: 'SS25',
     fabricDescription: '100% Premium Cotton, 180 GSM, Single Jersey Knit, Pre-shrunk, Soft Touch Finish',
     productDescription: 'Classic fit polo shirt with ribbed collar and cuffs. Three-button placket with reinforced stitching. Side vents for comfort. Perfect for casual and business casual wear.',
     designSketchUrl: '',
-    productClass: 'Polo Shirts',
+    category: 'Polo Shirts',
     gender: 'Men',
     technicalDesignerId: '',
     lifecycleStage: 'Development',
     brand: 'Fashion Forward',
-    collection: 'Spring Essentials 2025',
+    collectionName: 'Spring Essentials 2025',
     targetMarket: 'Global - North America, Europe, Asia Pacific',
     pricePoint: 'Mid-range',
     retailPrice: 45.99,
@@ -72,56 +83,92 @@ const poloShirtTemplate = {
     {
       part: 'Main Fabric',
       materialName: 'Premium Cotton Single Jersey',
+      materialCode: 'VTM-COT-180-SJ',
       placement: 'Front Body, Back Body, Sleeves',
       size: 'All Sizes',
       quantity: 1.2,
       uom: 'm',
       supplier: 'Vietnam Textile Manufacturing Co., Ltd.',
       supplierCode: 'VTM-COT-180-SJ',
+      color: 'As per colorway',
       colorCode: 'As per colorway',
       materialComposition: '100% Cotton',
       weight: '180 GSM',
       width: '150 cm',
       shrinkage: 'Max 3%',
       careInstructions: 'Machine wash cold, tumble dry low, do not bleach',
+      unitPrice: 8.50,
+      totalPrice: 10.20,
+      leadTime: 14,
+      minimumOrder: 100,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-15'),
       comments: 'Pre-approved fabric. Color matching required for each colorway.'
     },
     {
       part: 'Ribbed Collar',
       materialName: 'Cotton Rib Knit',
+      materialCode: 'VTM-COT-RIB-200',
       placement: 'Collar',
       size: 'All Sizes',
       quantity: 0.15,
       uom: 'm',
       supplier: 'Vietnam Textile Manufacturing Co., Ltd.',
       supplierCode: 'VTM-COT-RIB-200',
+      color: 'As per colorway',
       materialComposition: '100% Cotton',
       weight: '200 GSM',
       width: '10 cm',
+      unitPrice: 9.00,
+      totalPrice: 1.35,
+      leadTime: 14,
+      minimumOrder: 50,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-15'),
       comments: 'Must match main fabric color. Pre-shrunk required.'
     },
     {
       part: 'Button',
       materialName: 'Plastic 4-Hole Button',
+      materialCode: 'BWM-PLA-18-4H',
       placement: 'Placket',
       size: '18mm',
       quantity: 3,
       uom: 'pcs',
       supplier: 'Button World Manufacturing',
       supplierCode: 'BWM-PLA-18-4H',
+      color: 'As per colorway',
       colorCode: 'As per colorway',
+      unitPrice: 0.15,
+      totalPrice: 0.45,
+      leadTime: 7,
+      minimumOrder: 1000,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-15'),
       comments: 'Color to match fabric. Must pass pull test (min 50N).'
     },
     {
       part: 'Thread',
       materialName: 'Polyester Core-Spun Thread',
+      materialCode: 'GTS-PES-40-2-WH',
       placement: 'All Seams',
       size: '40/2',
       quantity: 150,
       uom: 'm',
       supplier: 'Global Thread Solutions',
       supplierCode: 'GTS-PES-40-2-WH',
+      color: 'White',
       colorCode: 'White #FFFFFF',
+      unitPrice: 0.05,
+      totalPrice: 7.50,
+      leadTime: 5,
+      minimumOrder: 500,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-15'),
       comments: 'Color to match fabric. High strength for durability.'
     }
   ],
@@ -133,6 +180,9 @@ const poloShirtTemplate = {
       tolerancePlus: 1.5,
       sizes: { S: 98, M: 104, L: 110, XL: 116, XXL: 122 },
       notes: 'Measure 2.5cm below armhole, across chest. Garment laid flat.',
+      critical: true,
+      measurementType: 'Garment',
+      category: 'Body',
       isActive: true
     },
     {
@@ -142,6 +192,9 @@ const poloShirtTemplate = {
       tolerancePlus: 1.5,
       sizes: { S: 70, M: 72, L: 74, XL: 76, XXL: 78 },
       notes: 'Measure from highest point of shoulder to bottom hem.',
+      critical: true,
+      measurementType: 'Garment',
+      category: 'Body',
       isActive: true
     },
     {
@@ -151,6 +204,9 @@ const poloShirtTemplate = {
       tolerancePlus: 1.0,
       sizes: { S: 22, M: 23, L: 24, XL: 25, XXL: 26 },
       notes: 'Measure from shoulder seam to cuff edge.',
+      critical: false,
+      measurementType: 'Garment',
+      category: 'Sleeve',
       isActive: true
     }
   ],
@@ -162,6 +218,7 @@ const poloShirtTemplate = {
       materialType: 'Fabric',
       season: 'SS25',
       isDefault: true,
+      approved: true,
       approvalStatus: 'Approved',
       productionStatus: 'Bulk Fabric',
       pantoneCode: 'PANTONE 19-3832 TCX',
@@ -170,13 +227,16 @@ const poloShirtTemplate = {
       supplier: 'Vietnam Textile Manufacturing Co., Ltd.',
       notes: 'Approved color. Bulk fabric ordered.',
       collectionName: 'Spring Essentials 2025',
+      imageUrl: '',
       parts: [
         {
           partName: 'Main Body',
           colorName: 'Navy Blue',
           pantoneCode: 'PANTONE 19-3832 TCX',
           hexCode: '#1B365D',
-          colorType: 'Solid'
+          rgbCode: 'rgb(27, 54, 93)',
+          colorType: 'Solid',
+          imageUrl: ''
         }
       ]
     },
@@ -187,6 +247,7 @@ const poloShirtTemplate = {
       materialType: 'Fabric',
       season: 'SS25',
       isDefault: false,
+      approved: true,
       approvalStatus: 'Approved',
       productionStatus: 'Bulk Fabric',
       pantoneCode: 'PANTONE 11-0601 TCX',
@@ -195,13 +256,16 @@ const poloShirtTemplate = {
       supplier: 'Vietnam Textile Manufacturing Co., Ltd.',
       notes: 'Approved color. Bulk fabric ready.',
       collectionName: 'Spring Essentials 2025',
+      imageUrl: '',
       parts: [
         {
           partName: 'Main Body',
           colorName: 'Classic White',
           pantoneCode: 'PANTONE 11-0601 TCX',
           hexCode: '#FFFFFF',
-          colorType: 'Solid'
+          rgbCode: 'rgb(255, 255, 255)',
+          colorType: 'Solid',
+          imageUrl: ''
         }
       ]
     }
@@ -212,6 +276,7 @@ const poloShirtTemplate = {
       pomName: 'Chest Width',
       description: 'Measure the chest width of the garment',
       stepNumber: 1,
+      imageUrl: '',
       instructions: [
         'Lay the garment flat on a smooth surface',
         'Smooth out any wrinkles or folds',
@@ -231,7 +296,7 @@ const poloShirtTemplate = {
       relatedMeasurements: ['WAIST', 'SHOULDER']
     }
   ],
-  status: 'draft'
+  status: 'Draft'
 };
 
 // 2. Slim Fit Denim Jeans
@@ -239,18 +304,18 @@ const denimJeansTemplate = {
   articleInfo: {
     productName: 'Slim Fit Denim Jeans',
     articleCode: 'JEANS',
-    version: 1,
+    version: 'V1',
     supplier: 'Denim Works Vietnam',
     season: 'AW25',
     fabricDescription: '98% Cotton, 2% Elastane, 12oz Denim, Stretch, Pre-washed, Stone Washed Finish',
     productDescription: 'Slim fit denim jeans with 5-pocket styling. Mid-rise waist. Tapered leg. Pre-washed for comfort. Perfect for casual everyday wear.',
     designSketchUrl: '',
-    productClass: 'Jeans',
+    category: 'Jeans',
     gender: 'Men',
     technicalDesignerId: '',
     lifecycleStage: 'Pre-production',
     brand: 'Urban Denim',
-    collection: 'Autumn Winter 2025',
+    collectionName: 'Autumn Winter 2025',
     targetMarket: 'Global - North America, Europe',
     pricePoint: 'Mid-range',
     retailPrice: 79.99,
@@ -261,53 +326,89 @@ const denimJeansTemplate = {
     {
       part: 'Main Denim Fabric',
       materialName: 'Stretch Denim 12oz',
+      materialCode: 'DWV-DEN-12-ST',
       placement: 'Front Legs, Back Legs, Waistband',
       size: 'All Sizes',
       quantity: 1.8,
       uom: 'm',
       supplier: 'Denim Works Vietnam',
       supplierCode: 'DWV-DEN-12-ST',
+      color: 'As per colorway',
       colorCode: 'As per colorway',
       materialComposition: '98% Cotton, 2% Elastane',
       weight: '12oz',
       width: '150 cm',
       shrinkage: 'Max 5%',
       careInstructions: 'Machine wash cold, hang dry, do not bleach',
+      unitPrice: 12.00,
+      totalPrice: 21.60,
+      leadTime: 21,
+      minimumOrder: 200,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-20'),
       comments: 'Pre-washed denim. Color consistency critical.'
     },
     {
       part: 'Zipper',
       materialName: 'YKK Metal Zipper',
+      materialCode: 'YKK-MET-7-BR',
       placement: 'Fly',
       size: '7 inch',
       quantity: 1,
       uom: 'pcs',
       supplier: 'YKK Vietnam',
       supplierCode: 'YKK-MET-7-BR',
+      color: 'Brass',
       colorCode: 'Brass',
+      unitPrice: 2.50,
+      totalPrice: 2.50,
+      leadTime: 10,
+      minimumOrder: 500,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-20'),
       comments: 'Heavy duty zipper. Must pass durability test.'
     },
     {
       part: 'Rivets',
       materialName: 'Copper Rivets',
+      materialCode: 'HSC-CU-RIV-STD',
       placement: 'Pockets',
       size: 'Standard',
       quantity: 6,
       uom: 'pcs',
       supplier: 'Hardware Solutions Co.',
       supplierCode: 'HSC-CU-RIV-STD',
+      color: 'Copper',
+      unitPrice: 0.25,
+      totalPrice: 1.50,
+      leadTime: 7,
+      minimumOrder: 1000,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-20'),
       comments: 'Copper finish. Must match design specification.'
     },
     {
       part: 'Thread',
       materialName: 'Polyester Thread',
+      materialCode: 'GTS-PES-40-3-BL',
       placement: 'All Seams',
       size: '40/3',
       quantity: 200,
       uom: 'm',
       supplier: 'Global Thread Solutions',
       supplierCode: 'GTS-PES-40-3-BL',
+      color: 'Blue',
       colorCode: 'Blue #003366',
+      unitPrice: 0.06,
+      totalPrice: 12.00,
+      leadTime: 5,
+      minimumOrder: 500,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-20'),
       comments: 'Color to match denim. High strength required.'
     }
   ],
@@ -319,6 +420,9 @@ const denimJeansTemplate = {
       tolerancePlus: 2.0,
       sizes: { S: 76, M: 80, L: 84, XL: 88, XXL: 92 },
       notes: 'Measure around waistband when laid flat, multiply by 2.',
+      critical: true,
+      measurementType: 'Garment',
+      category: 'Waist',
       isActive: true
     },
     {
@@ -328,6 +432,9 @@ const denimJeansTemplate = {
       tolerancePlus: 1.5,
       sizes: { S: 76, M: 78, L: 80, XL: 82, XXL: 84 },
       notes: 'Measure from crotch seam to hem along inside leg.',
+      critical: true,
+      measurementType: 'Garment',
+      category: 'Length',
       isActive: true
     },
     {
@@ -337,6 +444,9 @@ const denimJeansTemplate = {
       tolerancePlus: 1.5,
       sizes: { S: 102, M: 104, L: 106, XL: 108, XXL: 110 },
       notes: 'Measure from waistband to hem along outside leg.',
+      critical: false,
+      measurementType: 'Garment',
+      category: 'Length',
       isActive: true
     },
     {
@@ -346,6 +456,9 @@ const denimJeansTemplate = {
       tolerancePlus: 1.5,
       sizes: { S: 56, M: 58, L: 60, XL: 62, XXL: 64 },
       notes: 'Measure across thigh at widest point, garment laid flat.',
+      critical: false,
+      measurementType: 'Garment',
+      category: 'Body',
       isActive: true
     }
   ],
@@ -357,6 +470,7 @@ const denimJeansTemplate = {
       materialType: 'Fabric',
       season: 'AW25',
       isDefault: true,
+      approved: true,
       approvalStatus: 'Approved',
       productionStatus: 'Bulk Fabric',
       pantoneCode: 'PANTONE 19-4034 TCX',
@@ -365,13 +479,16 @@ const denimJeansTemplate = {
       supplier: 'Denim Works Vietnam',
       notes: 'Classic indigo blue. Pre-washed finish.',
       collectionName: 'Autumn Winter 2025',
+      imageUrl: '',
       parts: [
         {
           partName: 'Main Body',
           colorName: 'Classic Blue',
           pantoneCode: 'PANTONE 19-4034 TCX',
           hexCode: '#2C3E50',
-          colorType: 'Solid'
+          rgbCode: 'rgb(44, 62, 80)',
+          colorType: 'Solid',
+          imageUrl: ''
         }
       ]
     },
@@ -382,6 +499,7 @@ const denimJeansTemplate = {
       materialType: 'Fabric',
       season: 'AW25',
       isDefault: false,
+      approved: true,
       approvalStatus: 'Approved',
       productionStatus: 'Bulk Fabric',
       pantoneCode: 'PANTONE 19-0303 TCX',
@@ -390,13 +508,16 @@ const denimJeansTemplate = {
       supplier: 'Denim Works Vietnam',
       notes: 'Deep black denim. Pre-washed.',
       collectionName: 'Autumn Winter 2025',
+      imageUrl: '',
       parts: [
         {
           partName: 'Main Body',
           colorName: 'Black',
           pantoneCode: 'PANTONE 19-0303 TCX',
           hexCode: '#000000',
-          colorType: 'Solid'
+          rgbCode: 'rgb(0, 0, 0)',
+          colorType: 'Solid',
+          imageUrl: ''
         }
       ]
     }
@@ -407,6 +528,7 @@ const denimJeansTemplate = {
       pomName: 'Waist Circumference',
       description: 'Measure the waist circumference of the jeans',
       stepNumber: 1,
+      imageUrl: '',
       instructions: [
         'Lay the jeans flat on a smooth surface',
         'Locate the waistband',
@@ -425,7 +547,7 @@ const denimJeansTemplate = {
       relatedMeasurements: ['THIGH', 'OUTSEAM']
     }
   ],
-  status: 'draft'
+  status: 'Draft'
 };
 
 // 3. Premium Cotton T-Shirt
@@ -433,18 +555,18 @@ const tShirtTemplate = {
   articleInfo: {
     productName: 'Premium Cotton T-Shirt',
     articleCode: 'TSHIRT',
-    version: 1,
+    version: 'V1',
     supplier: 'Textile Excellence Co.',
     season: 'SS25',
     fabricDescription: '100% Organic Cotton, 160 GSM, Single Jersey, Ring Spun, Pre-shrunk, Soft Touch',
     productDescription: 'Classic crew neck t-shirt with short sleeves. Relaxed fit. Side seams. Double-needle hem. Perfect for everyday casual wear.',
     designSketchUrl: '',
-    productClass: 'T-Shirts',
+    category: 'T-Shirts',
     gender: 'Unisex',
     technicalDesignerId: '',
     lifecycleStage: 'Development',
     brand: 'Eco Fashion',
-    collection: 'Sustainable Spring 2025',
+    collectionName: 'Sustainable Spring 2025',
     targetMarket: 'Global - Eco-conscious markets',
     pricePoint: 'Mid-range',
     retailPrice: 29.99,
@@ -455,44 +577,71 @@ const tShirtTemplate = {
     {
       part: 'Main Fabric',
       materialName: 'Organic Cotton Single Jersey',
+      materialCode: 'TEC-ORG-COT-160',
       placement: 'Front Body, Back Body, Sleeves',
       size: 'All Sizes',
       quantity: 1.0,
       uom: 'm',
       supplier: 'Textile Excellence Co.',
       supplierCode: 'TEC-ORG-COT-160',
+      color: 'As per colorway',
       colorCode: 'As per colorway',
       materialComposition: '100% Organic Cotton',
       weight: '160 GSM',
       width: '150 cm',
       shrinkage: 'Max 3%',
       careInstructions: 'Machine wash cold, tumble dry low, do not bleach',
+      unitPrice: 7.50,
+      totalPrice: 7.50,
+      leadTime: 14,
+      minimumOrder: 100,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-18'),
       comments: 'GOTS certified organic cotton. Pre-shrunk.'
     },
     {
       part: 'Neck Rib',
       materialName: 'Cotton Rib Knit',
+      materialCode: 'TEC-COT-RIB-180',
       placement: 'Neckline',
       size: 'All Sizes',
       quantity: 0.12,
       uom: 'm',
       supplier: 'Textile Excellence Co.',
       supplierCode: 'TEC-COT-RIB-180',
+      color: 'As per colorway',
       materialComposition: '100% Organic Cotton',
       weight: '180 GSM',
       width: '5 cm',
+      unitPrice: 8.50,
+      totalPrice: 1.02,
+      leadTime: 14,
+      minimumOrder: 50,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-18'),
       comments: 'Must match main fabric color.'
     },
     {
       part: 'Thread',
       materialName: 'Cotton Thread',
+      materialCode: 'ETS-COT-40-2',
       placement: 'All Seams',
       size: '40/2',
       quantity: 120,
       uom: 'm',
       supplier: 'Eco Thread Solutions',
       supplierCode: 'ETS-COT-40-2',
+      color: 'As per colorway',
       colorCode: 'As per colorway',
+      unitPrice: 0.04,
+      totalPrice: 4.80,
+      leadTime: 5,
+      minimumOrder: 500,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-18'),
       comments: '100% cotton thread. Color to match fabric.'
     }
   ],
@@ -504,6 +653,9 @@ const tShirtTemplate = {
       tolerancePlus: 1.5,
       sizes: { XS: 92, S: 96, M: 100, L: 104, XL: 108, XXL: 112 },
       notes: 'Measure 2cm below armhole, across chest. Garment laid flat.',
+      critical: true,
+      measurementType: 'Garment',
+      category: 'Body',
       isActive: true
     },
     {
@@ -513,6 +665,9 @@ const tShirtTemplate = {
       tolerancePlus: 1.5,
       sizes: { XS: 66, S: 68, M: 70, L: 72, XL: 74, XXL: 76 },
       notes: 'Measure from highest point of shoulder to bottom hem.',
+      critical: true,
+      measurementType: 'Garment',
+      category: 'Body',
       isActive: true
     },
     {
@@ -522,6 +677,9 @@ const tShirtTemplate = {
       tolerancePlus: 1.0,
       sizes: { XS: 18, S: 19, M: 20, L: 21, XL: 22, XXL: 23 },
       notes: 'Measure from shoulder seam to sleeve hem.',
+      critical: false,
+      measurementType: 'Garment',
+      category: 'Sleeve',
       isActive: true
     },
     {
@@ -531,6 +689,9 @@ const tShirtTemplate = {
       tolerancePlus: 1.0,
       sizes: { XS: 40, S: 42, M: 44, L: 46, XL: 48, XXL: 50 },
       notes: 'Measure from shoulder seam to shoulder seam.',
+      critical: false,
+      measurementType: 'Garment',
+      category: 'Shoulder',
       isActive: true
     }
   ],
@@ -542,6 +703,7 @@ const tShirtTemplate = {
       materialType: 'Fabric',
       season: 'SS25',
       isDefault: true,
+      approved: true,
       approvalStatus: 'Approved',
       productionStatus: 'Bulk Fabric',
       pantoneCode: 'PANTONE 11-0601 TCX',
@@ -550,13 +712,16 @@ const tShirtTemplate = {
       supplier: 'Textile Excellence Co.',
       notes: 'Natural unbleached white. GOTS certified.',
       collectionName: 'Sustainable Spring 2025',
+      imageUrl: '',
       parts: [
         {
           partName: 'Main Body',
           colorName: 'Natural White',
           pantoneCode: 'PANTONE 11-0601 TCX',
           hexCode: '#F5F5DC',
-          colorType: 'Solid'
+          rgbCode: 'rgb(245, 245, 220)',
+          colorType: 'Solid',
+          imageUrl: ''
         }
       ]
     },
@@ -567,6 +732,7 @@ const tShirtTemplate = {
       materialType: 'Fabric',
       season: 'SS25',
       isDefault: false,
+      approved: true,
       approvalStatus: 'Approved',
       productionStatus: 'Bulk Fabric',
       pantoneCode: 'PANTONE 18-5335 TCX',
@@ -575,13 +741,16 @@ const tShirtTemplate = {
       supplier: 'Textile Excellence Co.',
       notes: 'Deep forest green. Eco-friendly dye.',
       collectionName: 'Sustainable Spring 2025',
+      imageUrl: '',
       parts: [
         {
           partName: 'Main Body',
           colorName: 'Forest Green',
           pantoneCode: 'PANTONE 18-5335 TCX',
           hexCode: '#2D5016',
-          colorType: 'Solid'
+          rgbCode: 'rgb(45, 80, 22)',
+          colorType: 'Solid',
+          imageUrl: ''
         }
       ]
     },
@@ -592,6 +761,7 @@ const tShirtTemplate = {
       materialType: 'Fabric',
       season: 'SS25',
       isDefault: false,
+      approved: false,
       approvalStatus: 'Pending',
       productionStatus: 'Lab Dip',
       pantoneCode: 'PANTONE 17-4730 TCX',
@@ -600,13 +770,16 @@ const tShirtTemplate = {
       supplier: 'Textile Excellence Co.',
       notes: 'Lab dip submitted. Awaiting approval.',
       collectionName: 'Sustainable Spring 2025',
+      imageUrl: '',
       parts: [
         {
           partName: 'Main Body',
           colorName: 'Ocean Blue',
           pantoneCode: 'PANTONE 17-4730 TCX',
           hexCode: '#006994',
-          colorType: 'Solid'
+          rgbCode: 'rgb(0, 105, 148)',
+          colorType: 'Solid',
+          imageUrl: ''
         }
       ]
     }
@@ -617,6 +790,7 @@ const tShirtTemplate = {
       pomName: 'Chest Width',
       description: 'Measure the chest width of the t-shirt',
       stepNumber: 1,
+      imageUrl: '',
       instructions: [
         'Lay the t-shirt flat on a smooth surface',
         'Smooth out any wrinkles',
@@ -636,7 +810,7 @@ const tShirtTemplate = {
       relatedMeasurements: ['SHOULDER', 'LENGTH']
     }
   ],
-  status: 'draft'
+  status: 'Draft'
 };
 
 // 4. Winter Puffer Jacket
@@ -644,18 +818,18 @@ const winterJacketTemplate = {
   articleInfo: {
     productName: 'Winter Puffer Jacket',
     articleCode: 'JACKET',
-    version: 1,
+    version: 'V1',
     supplier: 'Outdoor Gear Manufacturing',
     season: 'AW25',
     fabricDescription: '100% Nylon Ripstop Outer Shell, 100% Polyester Insulation, Waterproof Coating, DWR Finish',
     productDescription: 'Warm winter puffer jacket with quilted construction. Full zip closure. Stand-up collar with hood. Zippered pockets. Perfect for cold weather activities.',
     designSketchUrl: '',
-    productClass: 'Jackets',
+    category: 'Jackets',
     gender: 'Unisex',
     technicalDesignerId: '',
     lifecycleStage: 'Pre-production',
     brand: 'Outdoor Pro',
-    collection: 'Winter Collection 2025',
+    collectionName: 'Winter Collection 2025',
     targetMarket: 'Global - Cold climate regions',
     pricePoint: 'Premium',
     retailPrice: 149.99,
@@ -666,64 +840,107 @@ const winterJacketTemplate = {
     {
       part: 'Outer Shell',
       materialName: 'Nylon Ripstop Waterproof',
+      materialCode: 'OGM-NYL-RIP-5000',
       placement: 'Front, Back, Sleeves, Hood',
       size: 'All Sizes',
       quantity: 2.5,
       uom: 'm',
       supplier: 'Outdoor Gear Manufacturing',
       supplierCode: 'OGM-NYL-RIP-5000',
+      color: 'As per colorway',
       colorCode: 'As per colorway',
       materialComposition: '100% Nylon',
       weight: '120 GSM',
       width: '150 cm',
       waterproofRating: '5000mm',
       breathability: '3000g/m²/24h',
+      unitPrice: 15.00,
+      totalPrice: 37.50,
+      leadTime: 21,
+      minimumOrder: 150,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-22'),
       comments: 'Waterproof and breathable. DWR finish applied.'
     },
     {
       part: 'Insulation',
       materialName: 'Polyester Fill',
+      materialCode: 'ISI-PES-FILL-150',
       placement: 'Front, Back, Sleeves',
       size: 'All Sizes',
       quantity: 150,
       uom: 'g',
       supplier: 'Insulation Solutions Inc.',
       supplierCode: 'ISI-PES-FILL-150',
+      unitPrice: 0.12,
+      totalPrice: 18.00,
+      leadTime: 14,
+      minimumOrder: 100,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-22'),
       comments: '150g fill weight. Temperature rating: -10°C.'
     },
     {
       part: 'Lining',
       materialName: 'Polyester Taffeta',
+      materialCode: 'OGM-PES-TAF-001',
       placement: 'Front, Back, Sleeves',
       size: 'All Sizes',
       quantity: 2.0,
       uom: 'm',
       supplier: 'Outdoor Gear Manufacturing',
       supplierCode: 'OGM-PES-TAF-001',
+      unitPrice: 4.50,
+      totalPrice: 9.00,
+      leadTime: 14,
+      minimumOrder: 100,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-22'),
       comments: 'Smooth lining for comfort.'
     },
     {
       part: 'Zipper',
       materialName: 'YKK Waterproof Zipper',
+      materialCode: 'YKK-WP-8-BL',
       placement: 'Front',
       size: '8 inch',
       quantity: 1,
       uom: 'pcs',
       supplier: 'YKK Vietnam',
       supplierCode: 'YKK-WP-8-BL',
+      color: 'Black',
       colorCode: 'Black',
+      unitPrice: 3.50,
+      totalPrice: 3.50,
+      leadTime: 10,
+      minimumOrder: 300,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-22'),
       comments: 'Waterproof zipper. Heavy duty.'
     },
     {
       part: 'Thread',
       materialName: 'Polyester Thread',
+      materialCode: 'GTS-PES-40-3',
       placement: 'All Seams',
       size: '40/3',
       quantity: 300,
       uom: 'm',
       supplier: 'Global Thread Solutions',
       supplierCode: 'GTS-PES-40-3',
+      color: 'As per colorway',
       colorCode: 'As per colorway',
+      unitPrice: 0.07,
+      totalPrice: 21.00,
+      leadTime: 5,
+      minimumOrder: 500,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-22'),
       comments: 'High strength thread for outdoor use.'
     }
   ],
@@ -735,6 +952,9 @@ const winterJacketTemplate = {
       tolerancePlus: 2.0,
       sizes: { S: 108, M: 112, L: 116, XL: 120, XXL: 124 },
       notes: 'Measure across chest at fullest point. Garment laid flat.',
+      critical: true,
+      measurementType: 'Garment',
+      category: 'Body',
       isActive: true
     },
     {
@@ -744,6 +964,9 @@ const winterJacketTemplate = {
       tolerancePlus: 1.5,
       sizes: { S: 68, M: 70, L: 72, XL: 74, XXL: 76 },
       notes: 'Measure from shoulder seam to bottom hem.',
+      critical: true,
+      measurementType: 'Garment',
+      category: 'Body',
       isActive: true
     },
     {
@@ -753,6 +976,9 @@ const winterJacketTemplate = {
       tolerancePlus: 1.5,
       sizes: { S: 62, M: 64, L: 66, XL: 68, XXL: 70 },
       notes: 'Measure from shoulder seam to cuff edge.',
+      critical: false,
+      measurementType: 'Garment',
+      category: 'Sleeve',
       isActive: true
     },
     {
@@ -762,6 +988,9 @@ const winterJacketTemplate = {
       tolerancePlus: 1.0,
       sizes: { S: 32, M: 33, L: 34, XL: 35, XXL: 36 },
       notes: 'Measure from collar base to top of hood.',
+      critical: false,
+      measurementType: 'Garment',
+      category: 'Hood',
       isActive: true
     }
   ],
@@ -773,6 +1002,7 @@ const winterJacketTemplate = {
       materialType: 'Fabric',
       season: 'AW25',
       isDefault: true,
+      approved: true,
       approvalStatus: 'Approved',
       productionStatus: 'Bulk Fabric',
       pantoneCode: 'PANTONE 19-0303 TCX',
@@ -781,13 +1011,16 @@ const winterJacketTemplate = {
       supplier: 'Outdoor Gear Manufacturing',
       notes: 'Classic black. High demand color.',
       collectionName: 'Winter Collection 2025',
+      imageUrl: '',
       parts: [
         {
           partName: 'Outer Shell',
           colorName: 'Black',
           pantoneCode: 'PANTONE 19-0303 TCX',
           hexCode: '#000000',
-          colorType: 'Solid'
+          rgbCode: 'rgb(0, 0, 0)',
+          colorType: 'Solid',
+          imageUrl: ''
         }
       ]
     },
@@ -798,6 +1031,7 @@ const winterJacketTemplate = {
       materialType: 'Fabric',
       season: 'AW25',
       isDefault: false,
+      approved: true,
       approvalStatus: 'Approved',
       productionStatus: 'Bulk Fabric',
       pantoneCode: 'PANTONE 19-3832 TCX',
@@ -806,13 +1040,16 @@ const winterJacketTemplate = {
       supplier: 'Outdoor Gear Manufacturing',
       notes: 'Navy blue. Popular color for winter.',
       collectionName: 'Winter Collection 2025',
+      imageUrl: '',
       parts: [
         {
           partName: 'Outer Shell',
           colorName: 'Navy Blue',
           pantoneCode: 'PANTONE 19-3832 TCX',
           hexCode: '#1B365D',
-          colorType: 'Solid'
+          rgbCode: 'rgb(27, 54, 93)',
+          colorType: 'Solid',
+          imageUrl: ''
         }
       ]
     }
@@ -823,6 +1060,7 @@ const winterJacketTemplate = {
       pomName: 'Chest Width',
       description: 'Measure the chest width of the jacket',
       stepNumber: 1,
+      imageUrl: '',
       instructions: [
         'Lay the jacket flat on a smooth surface',
         'Zip up the front zipper',
@@ -843,7 +1081,7 @@ const winterJacketTemplate = {
       relatedMeasurements: ['LENGTH', 'SLEEVE']
     }
   ],
-  status: 'draft'
+  status: 'Draft'
 };
 
 // 5. Floral Summer Dress
@@ -851,18 +1089,18 @@ const summerDressTemplate = {
   articleInfo: {
     productName: 'Floral Summer Dress',
     articleCode: 'DRESS',
-    version: 1,
+    version: 'V1',
     supplier: 'Fashion Textiles Ltd.',
     season: 'SS25',
     fabricDescription: '100% Viscose, 120 GSM, Lightweight, Flowing, Breathable, Floral Print',
     productDescription: 'Beautiful floral print summer dress with A-line silhouette. V-neckline. Short sleeves. Elasticated waist. Perfect for warm weather occasions.',
     designSketchUrl: '',
-    productClass: 'Dresses',
+    category: 'Dresses',
     gender: 'Women',
     technicalDesignerId: '',
     lifecycleStage: 'Development',
     brand: 'Garden Collection',
-    collection: 'Summer Blooms 2025',
+    collectionName: 'Summer Blooms 2025',
     targetMarket: 'Global - Warm climate regions',
     pricePoint: 'Mid-range',
     retailPrice: 59.99,
@@ -873,52 +1111,86 @@ const summerDressTemplate = {
     {
       part: 'Main Fabric',
       materialName: 'Viscose Floral Print',
+      materialCode: 'FTL-VIS-FLOR-120',
       placement: 'Front, Back, Sleeves',
       size: 'All Sizes',
       quantity: 2.2,
       uom: 'm',
       supplier: 'Fashion Textiles Ltd.',
       supplierCode: 'FTL-VIS-FLOR-120',
+      color: 'As per colorway',
       colorCode: 'As per colorway',
       materialComposition: '100% Viscose',
       weight: '120 GSM',
       width: '140 cm',
       shrinkage: 'Max 5%',
       careInstructions: 'Hand wash cold or gentle cycle, hang dry, do not bleach',
+      unitPrice: 6.50,
+      totalPrice: 14.30,
+      leadTime: 14,
+      minimumOrder: 100,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-25'),
       comments: 'Lightweight and flowing. Print must match design exactly.'
     },
     {
       part: 'Elastic',
       materialName: 'Cotton Elastic',
+      materialCode: 'ESC-COT-EL-2CM',
       placement: 'Waist',
       size: '2cm width',
       quantity: 0.5,
       uom: 'm',
       supplier: 'Elastic Solutions Co.',
       supplierCode: 'ESC-COT-EL-2CM',
+      unitPrice: 2.00,
+      totalPrice: 1.00,
+      leadTime: 7,
+      minimumOrder: 50,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-25'),
       comments: 'Soft elastic for comfortable waistband.'
     },
     {
       part: 'Thread',
       materialName: 'Polyester Thread',
+      materialCode: 'GTS-PES-40-2',
       placement: 'All Seams',
       size: '40/2',
       quantity: 180,
       uom: 'm',
       supplier: 'Global Thread Solutions',
       supplierCode: 'GTS-PES-40-2',
+      color: 'As per colorway',
       colorCode: 'As per colorway',
+      unitPrice: 0.05,
+      totalPrice: 9.00,
+      leadTime: 5,
+      minimumOrder: 500,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-25'),
       comments: 'Color to match fabric print.'
     },
     {
       part: 'Bias Tape',
       materialName: 'Cotton Bias Tape',
+      materialCode: 'FTL-COT-BIAS-1CM',
       placement: 'Armholes, Neckline',
       size: '1cm width',
       quantity: 1.5,
       uom: 'm',
       supplier: 'Fashion Textiles Ltd.',
       supplierCode: 'FTL-COT-BIAS-1CM',
+      unitPrice: 1.50,
+      totalPrice: 2.25,
+      leadTime: 7,
+      minimumOrder: 50,
+      approved: true,
+      approvedBy: 'Quality Team',
+      approvedDate: new Date('2025-01-25'),
       comments: 'For finishing armholes and neckline.'
     }
   ],
@@ -930,6 +1202,9 @@ const summerDressTemplate = {
       tolerancePlus: 2.0,
       sizes: { XS: 84, S: 88, M: 92, L: 96, XL: 100, XXL: 104 },
       notes: 'Measure across bust at fullest point. Garment laid flat.',
+      critical: true,
+      measurementType: 'Garment',
+      category: 'Body',
       isActive: true
     },
     {
@@ -939,6 +1214,9 @@ const summerDressTemplate = {
       tolerancePlus: 2.0,
       sizes: { XS: 68, S: 72, M: 76, L: 80, XL: 84, XXL: 88 },
       notes: 'Measure at waist level. Garment laid flat.',
+      critical: true,
+      measurementType: 'Garment',
+      category: 'Body',
       isActive: true
     },
     {
@@ -948,6 +1226,9 @@ const summerDressTemplate = {
       tolerancePlus: 2.0,
       sizes: { XS: 95, S: 97, M: 99, L: 101, XL: 103, XXL: 105 },
       notes: 'Measure from shoulder seam to hem.',
+      critical: true,
+      measurementType: 'Garment',
+      category: 'Length',
       isActive: true
     },
     {
@@ -957,6 +1238,9 @@ const summerDressTemplate = {
       tolerancePlus: 1.0,
       sizes: { XS: 15, S: 16, M: 17, L: 18, XL: 19, XXL: 20 },
       notes: 'Measure from shoulder seam to sleeve hem.',
+      critical: false,
+      measurementType: 'Garment',
+      category: 'Sleeve',
       isActive: true
     },
     {
@@ -966,6 +1250,9 @@ const summerDressTemplate = {
       tolerancePlus: 1.0,
       sizes: { XS: 36, S: 38, M: 40, L: 42, XL: 44, XXL: 46 },
       notes: 'Measure from shoulder seam to shoulder seam.',
+      critical: false,
+      measurementType: 'Garment',
+      category: 'Shoulder',
       isActive: true
     }
   ],
@@ -977,6 +1264,7 @@ const summerDressTemplate = {
       materialType: 'Fabric',
       season: 'SS25',
       isDefault: true,
+      approved: true,
       approvalStatus: 'Approved',
       productionStatus: 'Bulk Fabric',
       pantoneCode: 'PANTONE 18-1755 TCX',
@@ -985,13 +1273,16 @@ const summerDressTemplate = {
       supplier: 'Fashion Textiles Ltd.',
       notes: 'Beautiful rose floral print. Print approved.',
       collectionName: 'Summer Blooms 2025',
+      imageUrl: '',
       parts: [
         {
           partName: 'Main Body',
           colorName: 'Rose Garden',
           pantoneCode: 'PANTONE 18-1755 TCX',
           hexCode: '#E91E63',
-          colorType: 'Print'
+          rgbCode: 'rgb(233, 30, 99)',
+          colorType: 'Print',
+          imageUrl: ''
         }
       ]
     },
@@ -1002,6 +1293,7 @@ const summerDressTemplate = {
       materialType: 'Fabric',
       season: 'SS25',
       isDefault: false,
+      approved: true,
       approvalStatus: 'Approved',
       productionStatus: 'Bulk Fabric',
       pantoneCode: 'PANTONE 15-3418 TCX',
@@ -1010,13 +1302,16 @@ const summerDressTemplate = {
       supplier: 'Fashion Textiles Ltd.',
       notes: 'Lavender floral print. Print approved.',
       collectionName: 'Summer Blooms 2025',
+      imageUrl: '',
       parts: [
         {
           partName: 'Main Body',
           colorName: 'Lavender Fields',
           pantoneCode: 'PANTONE 15-3418 TCX',
           hexCode: '#B19CD9',
-          colorType: 'Print'
+          rgbCode: 'rgb(177, 156, 217)',
+          colorType: 'Print',
+          imageUrl: ''
         }
       ]
     },
@@ -1027,6 +1322,7 @@ const summerDressTemplate = {
       materialType: 'Fabric',
       season: 'SS25',
       isDefault: false,
+      approved: false,
       approvalStatus: 'Pending',
       productionStatus: 'Lab Dip',
       pantoneCode: 'PANTONE 13-0755 TCX',
@@ -1035,13 +1331,16 @@ const summerDressTemplate = {
       supplier: 'Fashion Textiles Ltd.',
       notes: 'Sunflower print. Lab dip submitted. Awaiting approval.',
       collectionName: 'Summer Blooms 2025',
+      imageUrl: '',
       parts: [
         {
           partName: 'Main Body',
           colorName: 'Sunflower Yellow',
           pantoneCode: 'PANTONE 13-0755 TCX',
           hexCode: '#F4D03F',
-          colorType: 'Print'
+          rgbCode: 'rgb(244, 208, 63)',
+          colorType: 'Print',
+          imageUrl: ''
         }
       ]
     }
@@ -1052,6 +1351,7 @@ const summerDressTemplate = {
       pomName: 'Bust Width',
       description: 'Measure the bust width of the dress',
       stepNumber: 1,
+      imageUrl: '',
       instructions: [
         'Lay the dress flat on a smooth surface',
         'Smooth out any wrinkles',
@@ -1075,6 +1375,7 @@ const summerDressTemplate = {
       pomName: 'Dress Length',
       description: 'Measure the total length of the dress',
       stepNumber: 2,
+      imageUrl: '',
       instructions: [
         'Lay the dress flat',
         'Locate the highest point of the shoulder seam',
@@ -1094,7 +1395,7 @@ const summerDressTemplate = {
       relatedMeasurements: ['BUST', 'WAIST']
     }
   ],
-  status: 'draft'
+  status: 'Draft'
 };
 
 // Array of all templates
