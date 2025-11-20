@@ -11,7 +11,7 @@
     }
 
     body {
-      font-family: 'Roboto', Arial, sans-serif;
+      font-family: 'Roboto', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif;
       font-size: 10px;
       line-height: 1.45;
       color: #1f2933;
@@ -19,6 +19,13 @@
       print-color-adjust: exact;
       margin: 0;
       padding: 0;
+    }
+    
+    @font-face {
+      font-family: 'Roboto';
+      font-style: normal;
+      font-weight: 400;
+      src: local('Roboto'), local('Roboto-Regular');
     }
 
     .cover-header {
@@ -55,10 +62,12 @@
 
     .cover-image {
       width: 100%;
-      height: 220px;
+      height: 280px;
       object-fit: cover;
       border: 1px solid #cbd5e1;
       border-radius: 6px;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
     }
 
     .no-image {
@@ -206,9 +215,9 @@
     </div>
     <div style="flex:1;" class="cover-image-container">
       <% if (images && images.coverImage) { %>
-        <img src="<%= images.coverImage %>" alt="Cover image" class="cover-image" />
+        <img src="<%= images.coverImage %>" alt="Product Design Sketch" class="cover-image" style="max-width: 100%; height: auto;" />
       <% } else { %>
-        <div class="no-image">No cover image</div>
+        <div class="no-image">No product image available</div>
       <% } %>
     </div>
   </div>
@@ -241,6 +250,18 @@
       <p>Care Symbols: <strong><%= summary.careSymbolCount %></strong></p>
       <p>Last Export: <strong><%= summary.lastExport || '—' %></strong></p>
     </div>
+
+    <% if (summary.colorwaysCount > 0 || summary.sampleRoundsCount > 0) { %>
+    <div class="summary-card">
+      <h4>Additional Info</h4>
+      <% if (summary.colorwaysCount > 0) { %>
+        <p>Colorways: <strong><%= summary.colorwaysCount %></strong></p>
+      <% } %>
+      <% if (summary.sampleRoundsCount > 0) { %>
+        <p>Sample Rounds: <strong><%= summary.sampleRoundsCount %></strong></p>
+      <% } %>
+    </div>
+    <% } %>
   </div>
 </body>
 </html>

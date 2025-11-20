@@ -108,7 +108,7 @@ export class TechPackController {
 
   async getTechPacks(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { page = 1, limit = config.defaultPageSize, q = '', status, season, brand, sortBy = 'updatedAt', sortOrder = 'desc' } = req.query;
+      const { page = 1, limit = config.defaultPageSize, q = '', status, season, brand, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
       const user = req.user!;
       const pageNum = Math.max(1, parseInt(page as string));
       const limitNum = Math.min(config.maxPageSize, Math.max(1, parseInt(limit as string)));
@@ -677,25 +677,6 @@ export class TechPackController {
           }
         }
       });
-
-      // Map lifecycleStage to status if sent
-      const lifecycleStage = (req.body as any).lifecycleStage;
-      if (lifecycleStage) {
-        switch (lifecycleStage) {
-          case 'Concept':
-          case 'Design':
-            updateData.status = TechPackStatus.Draft;
-            break;
-          case 'Development':
-          case 'Pre-production':
-            updateData.status = TechPackStatus.InReview;
-            break;
-          case 'Production':
-          case 'Shipped':
-            updateData.status = TechPackStatus.Approved;
-            break;
-        }
-      }
 
       // Keep a snapshot of the old techpack for revision comparison
       const oldTechPack = techpack.toObject({ virtuals: true }) as ITechPack;

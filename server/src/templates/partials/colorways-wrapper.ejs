@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Colorways</title>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 15mm 20mm;
+    }
+
+    body {
+      font-family: 'Roboto', 'Arial', 'Helvetica', sans-serif;
+      font-size: 9px;
+      line-height: 1.4;
+      color: #1f2933;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      margin: 0;
+      padding: 0;
+    }
+
+    .section-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      border-bottom: 2px solid #111827;
+      padding-bottom: 6px;
+      margin: 0 0 12px 0;
+      page-break-after: avoid;
+    }
+
+    .colorway-card {
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 12px;
+      page-break-inside: avoid;
+      background: #ffffff;
+    }
+
+    .colorway-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .colorway-name {
+      font-size: 11px;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .colorway-code {
+      font-size: 9px;
+      color: #475569;
+    }
+
+    .colorway-badges {
+      display: flex;
+      gap: 6px;
+    }
+
+    .badge {
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 7px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .badge-default {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .badge-approved {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .badge-pending {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .badge-rejected {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+
+    .colorway-info {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 10px;
+      font-size: 8px;
+    }
+
+    .info-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .info-label {
+      color: #64748b;
+      font-size: 7px;
+      margin-bottom: 2px;
+    }
+
+    .info-value {
+      color: #0f172a;
+      font-weight: 500;
+    }
+
+    .color-swatch {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 1px solid #cbd5e1;
+      border-radius: 3px;
+      vertical-align: middle;
+      margin-right: 4px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 8px;
+    }
+
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 6px 4px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f1f5f9;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 7px;
+      color: #0f172a;
+    }
+
+    tr:nth-child(even) td {
+      background: #f9fafb;
+    }
+
+    .parts-table {
+      margin-top: 8px;
+    }
+
+    .text-center {
+      text-align: center;
+    }
+
+    .text-muted {
+      color: #64748b;
+      font-size: 7px;
+    }
+  </style>
+</head>
+<body>
+  <div class="section-title"><%= strings.colorwaysTitle %></div>
+
+  <% if (colorways && colorways.length > 0) { %>
+    <% colorways.forEach((colorway) => { %>
+      <div class="colorway-card">
+        <div class="colorway-header">
+          <div>
+            <div class="colorway-name"><%= colorway.name %></div>
+            <div class="colorway-code">Code: <%= colorway.code %></div>
+          </div>
+          <div class="colorway-badges">
+            <% if (colorway.isDefault) { %>
+              <span class="badge badge-default">DEFAULT</span>
+            <% } %>
+            <% if (colorway.approvalStatus === 'Approved') { %>
+              <span class="badge badge-approved">APPROVED</span>
+            <% } else if (colorway.approvalStatus === 'Pending') { %>
+              <span class="badge badge-pending">PENDING</span>
+            <% } else if (colorway.approvalStatus === 'Rejected') { %>
+              <span class="badge badge-rejected">REJECTED</span>
+            <% } %>
+          </div>
+        </div>
+
+        <div class="colorway-info">
+          <div class="info-item">
+            <span class="info-label">Placement</span>
+            <span class="info-value"><%= colorway.placement %></span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Material Type</span>
+            <span class="info-value"><%= colorway.materialType %></span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Production Status</span>
+            <span class="info-value"><%= colorway.productionStatus %></span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Supplier</span>
+            <span class="info-value"><%= colorway.supplier %></span>
+          </div>
+        </div>
+
+        <div class="colorway-info">
+          <div class="info-item">
+            <span class="info-label">Pantone Code</span>
+            <span class="info-value">
+              <% if (colorway.hexColor) { %>
+                <span class="color-swatch" style="background-color: <%= colorway.hexColor %>;"></span>
+              <% } %>
+              <%= colorway.pantoneCode %>
+            </span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Hex Color</span>
+            <span class="info-value"><%= colorway.hexColor %></span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Season</span>
+            <span class="info-value"><%= colorway.season %></span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Collection</span>
+            <span class="info-value"><%= colorway.collectionName %></span>
+          </div>
+        </div>
+
+        <% if (colorway.notes && colorway.notes !== '—') { %>
+          <div style="margin-top: 8px; padding: 6px; background: #f8fafc; border-radius: 4px; font-size: 8px;">
+            <strong>Notes:</strong> <%= colorway.notes %>
+          </div>
+        <% } %>
+
+        <% if (colorway.parts && colorway.parts.length > 0) { %>
+          <table class="parts-table">
+            <thead>
+              <tr>
+                <th style="width:15%;">Part Name</th>
+                <th style="width:15%;">Color Name</th>
+                <th style="width:12%;">Pantone</th>
+                <th style="width:10%;">Hex Code</th>
+                <th style="width:10%;">Color Type</th>
+                <th style="width:15%;">Supplier</th>
+                <th style="width:13%;">BOM Item ID</th>
+                <th style="width:10%;">Image</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% colorway.parts.forEach((part) => { %>
+                <tr>
+                  <td><%= part.partName %></td>
+                  <td><%= part.colorName %></td>
+                  <td><%= part.pantoneCode %></td>
+                  <td>
+                    <span class="color-swatch" style="background-color: <%= part.hexCode %>;"></span>
+                    <%= part.hexCode %>
+                  </td>
+                  <td><%= part.colorType %></td>
+                  <td><%= part.supplier %></td>
+                  <td class="text-muted"><%= part.bomItemId %></td>
+                  <td class="text-center">
+                    <% if (part.image) { %>
+                      <img src="<%= part.image %>" alt="Part image" style="max-width: 40px; max-height: 40px; object-fit: contain;" />
+                    <% } else { %>
+                      —
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    <% }) %>
+  <% } else { %>
+    <div style="padding: 32px; text-align: center; color: #94a3b8;">
+      <%= strings.emptyColorways %>
+    </div>
+  <% } %>
+</body>
+</html>
+

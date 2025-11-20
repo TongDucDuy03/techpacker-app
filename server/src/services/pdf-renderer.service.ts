@@ -37,6 +37,9 @@ interface TechPackDocumentLean {
   care?: any[];
   sharedWith?: any[];
   lastExportedAt?: Date;
+  colorways?: any[];
+  sampleMeasurementRounds?: any[];
+  revisions?: any[];
 }
 
 const DEFAULT_STRINGS = {
@@ -60,6 +63,12 @@ const DEFAULT_STRINGS = {
   emptyNotes: 'No additional notes recorded.',
   careSymbolsTitle: 'Care Symbols',
   emptyCareSymbols: 'Care instructions not provided.',
+  colorwaysTitle: 'Colorways',
+  emptyColorways: 'No colorways defined for this TechPack.',
+  sampleRoundsTitle: 'Sample Measurement Rounds',
+  emptySampleRounds: 'No sample measurement rounds recorded.',
+  revisionsTitle: 'Revision History',
+  emptyRevisions: 'No revision history available.',
 };
 
 function formatDate(date?: Date, format = 'MMM D, YYYY HH:mm') {
@@ -130,21 +139,37 @@ async function buildBomSection(techpack: TechPackDocumentLean) {
           ? { label: 'PENDING', background: '#fef3c7', color: '#92400e' }
           : null;
 
+      // Extract color information - support both backend and frontend field names
+      const colorValue = material.color || material.colorCode || '';
+      const pantoneValue = material.pantoneCode || '';
+      const hexCode = material.hexCode || (colorValue && colorValue.startsWith('#') ? colorValue : null);
+      const rgbCode = material.rgbCode || '';
+
       return {
         lineNumber: material.lineNumber || index + 1,
         part: material.part,
         materialName: material.materialName || 'Unnamed material',
         materialCode: material.materialCode,
+        materialComposition: material.materialComposition || '',
         placement: material.placement,
         size: material.size,
         quantity: material.quantity ? Number(material.quantity).toString() : undefined,
         uom: material.uom,
         supplier: material.supplier,
+        supplierCode: material.supplierCode,
         comments: material.comments,
-        color: material.color,
-        pantone: material.pantoneCode,
+        color: colorValue,
+        colorCode: material.colorCode || colorValue,
+        pantone: pantoneValue,
+        hexCode: hexCode,
+        rgbCode: rgbCode,
         leadTime: material.leadTime,
         moq: material.minimumOrder,
+        weight: material.weight || '',
+        width: material.width || '',
+        shrinkage: material.shrinkage || '',
+        careInstructions: material.careInstructions || '',
+        testingRequirements: material.testingRequirements || '',
         unitPrice: material.unitPrice ? currencyFormat(material.unitPrice, techpack.currency) : undefined,
         totalPrice: material.totalPrice ? currencyFormat(material.totalPrice, techpack.currency) : undefined,
         updatedAt: material.updatedAt ? formatDate(material.updatedAt) : undefined,
@@ -345,6 +370,158 @@ async function buildCareSymbols(techpack: TechPackDocumentLean) {
   );
 }
 
+async function buildColorwaysSection(techpack: TechPackDocumentLean) {
+  const colorways = Array.isArray(techpack.colorways) ? techpack.colorways : [];
+
+  return Promise.all(
+    colorways.map(async (colorway: any) => {
+      const parts = Array.isArray(colorway.parts) ? colorway.parts : [];
+      
+      const partsData = await Promise.all(
+        parts.map(async (part: any) => {
+          const partImage = part.imageUrl
+            ? await getImageData(part.imageUrl, { width: 80, height: 80 })
+            : null;
+
+          return {
+            partName: part.partName || '—',
+            colorName: part.colorName || '—',
+            pantoneCode: part.pantoneCode || '—',
+            hexCode: part.hexCode || '#000000',
+            rgbCode: part.rgbCode || '—',
+            colorType: part.colorType || 'Solid',
+            supplier: part.supplier || '—',
+            bomItemId: part.bomItemId || '—',
+            image: partImage,
+          };
+        })
+      );
+
+      return {
+        name: colorway.name || 'Unnamed Colorway',
+        code: colorway.code || '—',
+        isDefault: Boolean(colorway.isDefault),
+        approvalStatus: colorway.approvalStatus || (colorway.approved ? 'Approved' : 'Pending'),
+        productionStatus: colorway.productionStatus || 'Lab Dip',
+        placement: colorway.placement || '—',
+        materialType: colorway.materialType || '—',
+        supplier: colorway.supplier || '—',
+        pantoneCode: colorway.pantoneCode || '—',
+        hexColor: colorway.hexColor || '#000000',
+        rgbColor: colorway.rgbColor || null,
+        season: colorway.season || '—',
+        collectionName: colorway.collectionName || '—',
+        notes: colorway.notes || '—',
+        parts: partsData,
+      };
+    })
+  );
+}
+
+async function buildSampleMeasurementRoundsSection(techpack: TechPackDocumentLean) {
+  const rounds = Array.isArray(techpack.sampleMeasurementRounds) ? techpack.sampleMeasurementRounds : [];
+  const measurements = Array.isArray(techpack.measurements) ? techpack.measurements : [];
+
+  // Collect all sizes from measurements
+  const allSizes = new Set<string>();
+  measurements.forEach((m: any) => {
+    if (m.sizes) {
+      Object.keys(m.sizes).forEach((size) => allSizes.add(size));
+    }
+  });
+
+  // Also collect from sample rounds
+  rounds.forEach((round: any) => {
+    if (round.measurements) {
+      round.measurements.forEach((entry: any) => {
+        ['requested', 'measured', 'diff', 'revised'].forEach((field) => {
+          if (entry[field] && typeof entry[field] === 'object') {
+            Object.keys(entry[field]).forEach((size) => allSizes.add(size));
+          }
+        });
+      });
+    }
+  });
+
+  const ORDER = ['XXXS', 'XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', '4XL', '5XL', '6XL'];
+  const sortedSizes = Array.from(allSizes).sort((a, b) => {
+    const upperA = a.toUpperCase();
+    const upperB = b.toUpperCase();
+    const indexA = ORDER.indexOf(upperA);
+    const indexB = ORDER.indexOf(upperB);
+    if (indexA === -1 && indexB === -1) return upperA.localeCompare(upperB);
+    if (indexA === -1) return 1;
+    if (indexB === -1) return -1;
+    return indexA - indexB;
+  });
+
+  const roundsData = rounds.map((round: any, roundIndex: number) => {
+    const entries = Array.isArray(round.measurements) ? round.measurements : [];
+    
+    const entriesData = entries.map((entry: any) => {
+      const requested = entry.requested || {};
+      const measured = entry.measured || {};
+      const diff = entry.diff || {};
+      const revised = entry.revised || {};
+      const comments = entry.comments || {};
+
+      const sizeData: Record<string, any> = {};
+      sortedSizes.forEach((size) => {
+        sizeData[size] = {
+          requested: requested[size] || '—',
+          measured: measured[size] || '—',
+          diff: diff[size] || '—',
+          revised: revised[size] || '—',
+          comments: comments[size] || '—',
+        };
+      });
+
+      return {
+        pomCode: entry.pomCode || entry.point || '—',
+        pomName: entry.pomName || entry.point || '—',
+        measurementId: entry.measurementId || '—',
+        sizes: sizeData,
+      };
+    });
+
+    return {
+      name: round.name || `Round ${roundIndex + 1}`,
+      date: round.measurementDate ? formatDate(new Date(round.measurementDate)) : (round.date ? formatDate(new Date(round.date)) : '—'),
+      reviewer: round.reviewer || '—',
+      overallComments: round.overallComments || '—',
+      requestedSource: round.requestedSource || 'original',
+      order: round.order || roundIndex + 1,
+      entries: entriesData,
+    };
+  });
+
+  return {
+    rounds: roundsData,
+    sizes: sortedSizes,
+    stats: {
+      totalRounds: roundsData.length,
+      totalEntries: roundsData.reduce((sum, r) => sum + r.entries.length, 0),
+    },
+  };
+}
+
+function buildRevisionSection(techpack: TechPackDocumentLean) {
+  const revisions = Array.isArray(techpack.revisions) ? techpack.revisions : [];
+
+  return revisions.map((rev: any, index: number) => {
+    return {
+      revisionNumber: rev.revisionNumber || index + 1,
+      version: rev.version || '—',
+      createdAt: rev.createdAt ? formatDate(new Date(rev.createdAt)) : '—',
+      createdBy: rev.createdBy || '—',
+      createdByName: rev.createdByName || '—',
+      description: rev.description || rev.changeDescription || '—',
+      changes: rev.changes || [],
+      status: rev.status || '—',
+    };
+  });
+}
+
 export async function buildRenderModel(
   techpack: any,
   options: RenderModelOptions
@@ -364,6 +541,9 @@ export async function buildRenderModel(
   const howToMeasure = await buildHowToMeasureSection(techpack);
   const notes = summarizeNotes(techpack);
   const careSymbols = await buildCareSymbols(techpack);
+  const colorways = await buildColorwaysSection(techpack);
+  const sampleRounds = await buildSampleMeasurementRoundsSection(techpack);
+  const revisions = buildRevisionSection(techpack);
 
   const summary = {
     bomCount: bom.rows.length,
@@ -377,12 +557,15 @@ export async function buildRenderModel(
     howToMeasureTips: howToMeasure.reduce((acc, item) => acc + (item.tips?.length || 0), 0),
     notesCount: notes.length,
     careSymbolCount: careSymbols.length,
+    colorwaysCount: colorways.length,
+    sampleRoundsCount: sampleRounds.rounds.length,
+    revisionsCount: revisions.length,
     lastExport: formatDate(techpack.lastExportedAt),
   };
 
   const coverImage =
     techpack.designSketchUrl
-      ? await getImageData(techpack.designSketchUrl, { width: 600, height: 400, fit: (sharp as any).fit.cover })
+      ? await getImageData(techpack.designSketchUrl, { width: 800, height: 600, fit: (sharp as any).fit.cover })
       : null;
 
   const meta = {
@@ -418,6 +601,9 @@ export async function buildRenderModel(
     howToMeasure,
     notes,
     careSymbols,
+    colorways,
+    sampleRounds,
+    revisions,
     images: {
       coverImage,
     },

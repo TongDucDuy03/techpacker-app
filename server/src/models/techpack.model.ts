@@ -99,6 +99,7 @@ export interface IColorway {
   season?: string;
   collectionName?: string;
   notes?: string;
+  imageUrl?: string;
   parts?: IColorwayPart[];
 }
 
@@ -291,6 +292,7 @@ const ColorwaySchema = new Schema<IColorway>({
   season: { type: String },
   collectionName: { type: String },
   notes: { type: String },
+  imageUrl: { type: String },
   parts: { type: [ColorwayPartSchema], default: [] }
 });
 

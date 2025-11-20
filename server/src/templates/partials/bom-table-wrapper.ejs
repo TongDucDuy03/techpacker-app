@@ -11,7 +11,7 @@
     }
 
     body {
-      font-family: 'Roboto', Arial, sans-serif;
+      font-family: 'Roboto', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif;
       font-size: 10px;
       line-height: 1.45;
       color: #1f2933;
@@ -67,6 +67,16 @@
     .text-muted { color: #6b7280; }
     .avoid-break { page-break-inside: avoid; break-inside: avoid; }
 
+    .color-swatch {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 1px solid #cbd5e1;
+      border-radius: 3px;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+
     .thumb {
       width: 60px;
       height: 60px;
@@ -110,14 +120,15 @@
     <table class="bom-table">
     <thead>
       <tr>
-        <th style="width:6%;">#</th>
-        <th style="width:18%;">ITEM DETAILS</th>
-        <th style="width:16%;">Details</th>
-        <th style="width:12%;">PLACEMENT</th>
-        <th style="width:8%;" class="text-center">QTY</th>
-        <th style="width:8%;" class="text-center">UOM</th>
-        <th style="width:14%;">SUPPLIER</th>
-        <th style="width:18%;">NOTES</th>
+        <th style="width:5%;">#</th>
+        <th style="width:16%;">ITEM DETAILS</th>
+        <th style="width:14%;">Details</th>
+        <th style="width:11%;">PLACEMENT</th>
+        <th style="width:7%;" class="text-center">QTY</th>
+        <th style="width:7%;" class="text-center">UOM</th>
+        <th style="width:12%;">COLOR INFO</th>
+        <th style="width:12%;">SUPPLIER</th>
+        <th style="width:16%;">NOTES</th>
       </tr>
     </thead>
       <tbody>
@@ -133,12 +144,6 @@
                 <% if (row.materialCode) { %>
                   <div class="text-muted">Code: <%= row.materialCode %></div>
                 <% } %>
-                <% if (row.color) { %>
-                  <div class="text-muted">Color: <%= row.color %></div>
-                <% } %>
-                <% if (row.pantone) { %>
-                  <div class="text-muted">Pantone: <%= row.pantone %></div>
-                <% } %>
               </div>
             </td>
             <td>
@@ -149,20 +154,63 @@
               <% if (row.size) { %>
                 <div><strong>Size:</strong> <%= row.size %></div>
               <% } %>
+              <% if (row.materialComposition) { %>
+                <div style="font-size: 8px; margin-top: 4px;">
+                  <strong>Composition:</strong> <%= row.materialComposition %>
+                </div>
+              <% } %>
+              <% if (row.weight) { %>
+                <div style="font-size: 8px;"><strong>Weight:</strong> <%= row.weight %></div>
+              <% } %>
+              <% if (row.width) { %>
+                <div style="font-size: 8px;"><strong>Width:</strong> <%= row.width %></div>
+              <% } %>
+              <% if (row.shrinkage) { %>
+                <div style="font-size: 8px;"><strong>Shrinkage:</strong> <%= row.shrinkage %></div>
+              <% } %>
               <% if (row.unitPrice) { %>
-                <div><strong>Unit Price:</strong> <%= row.unitPrice %></div>
+                <div style="font-size: 8px; margin-top: 4px;"><strong>Unit Price:</strong> <%= row.unitPrice %></div>
               <% } %>
             </td>
             <td><%= row.placement || '—' %></td>
             <td class="text-center"><%= row.quantity || '—' %></td>
             <td class="text-center"><%= row.uom || '—' %></td>
             <td>
+              <% if (row.hexCode) { %>
+                <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
+                  <span class="color-swatch" style="background-color: <%= row.hexCode %>; width: 16px; height: 16px; border: 1px solid #cbd5e1; border-radius: 3px; display: inline-block; flex-shrink: 0;"></span>
+                  <span style="font-size: 8px; font-weight: 600;"><%= row.hexCode %></span>
+                </div>
+              <% } %>
+              <% if (row.color || row.colorCode) { %>
+                <div class="text-muted" style="font-size: 8px;">
+                  <strong>Color:</strong> <%= row.colorCode || row.color || '—' %>
+                </div>
+              <% } %>
+              <% if (row.pantone) { %>
+                <div class="text-muted" style="font-size: 8px;">
+                  <strong>Pantone:</strong> <%= row.pantone %>
+                </div>
+              <% } %>
+              <% if (row.rgbCode) { %>
+                <div class="text-muted" style="font-size: 8px;">
+                  <strong>RGB:</strong> <%= row.rgbCode %>
+                </div>
+              <% } %>
+              <% if (!row.hexCode && !row.color && !row.colorCode && !row.pantone && !row.rgbCode) { %>
+                <div class="text-muted" style="font-size: 8px;">—</div>
+              <% } %>
+            </td>
+            <td>
               <div><%= row.supplier || '—' %></div>
+              <% if (row.supplierCode) { %>
+                <div class="text-muted" style="font-size: 8px;">Code: <%= row.supplierCode %></div>
+              <% } %>
               <% if (row.leadTime) { %>
-                <div class="text-muted">Lead: <%= row.leadTime %> days</div>
+                <div class="text-muted" style="font-size: 8px;">Lead: <%= row.leadTime %> days</div>
               <% } %>
               <% if (row.moq) { %>
-                <div class="text-muted">MOQ: <%= row.moq %></div>
+                <div class="text-muted" style="font-size: 8px;">MOQ: <%= row.moq %></div>
               <% } %>
               <% if (row.statusBadge) { %>
                 <div style="margin-top:4px;">
@@ -174,11 +222,21 @@
             </td>
             <td>
               <div><%= row.comments || '—' %></div>
+              <% if (row.careInstructions) { %>
+                <div class="text-muted" style="font-size: 8px; margin-top: 4px;">
+                  <strong>Care:</strong> <%= row.careInstructions %>
+                </div>
+              <% } %>
+              <% if (row.testingRequirements) { %>
+                <div class="text-muted" style="font-size: 8px; margin-top: 4px;">
+                  <strong>Testing:</strong> <%= row.testingRequirements %>
+                </div>
+              <% } %>
               <% if (row.totalPrice) { %>
-                <div class="text-muted">Total: <%= row.totalPrice %></div>
+                <div class="text-muted" style="font-size: 8px; margin-top: 4px;">Total: <%= row.totalPrice %></div>
               <% } %>
               <% if (row.updatedAt) { %>
-                <div class="text-muted">Updated: <%= row.updatedAt %></div>
+                <div class="text-muted" style="font-size: 7px; margin-top: 4px;">Updated: <%= row.updatedAt %></div>
               <% } %>
             </td>
           </tr>

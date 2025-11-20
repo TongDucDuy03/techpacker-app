@@ -455,7 +455,7 @@ router.post(
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded.' });
     }
-    // The backend serves static files from /uploads, so the URL is relative to that.
+    // The backend serves static files from /uploads at root level
     const fileUrl = `/uploads/${req.file.filename}`;
     return res.status(200).json({ success: true, message: 'File uploaded successfully', data: { url: fileUrl } });
   }

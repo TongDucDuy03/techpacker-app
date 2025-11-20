@@ -148,11 +148,11 @@ app.use(morgan(config.nodeEnv === 'production' ? 'combined' : 'dev'));
 // Setup Swagger documentation
 setupSwagger(app);
 
+// Static file serving for uploads (mounted at root level for easier access)
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // API Versioning
 const v1Router = express.Router();
-
-// Static file serving for uploads
-v1Router.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // API Routes
 v1Router.use('/auth', authRoutes);

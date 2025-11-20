@@ -23,9 +23,9 @@ const readFile = promisify(fs.readFile);
 
 const TEMPLATE_DIR = path.join(__dirname, '../templates');
 const TMP_DIR = process.env.PDF_TMP_DIR || path.join(os.tmpdir(), 'techpack-pdf');
-const PDF_TIMEOUT = Number(process.env.PDF_TIMEOUT || 120_000); // Increased for multi-section
+const PDF_TIMEOUT = Number(process.env.PDF_TIMEOUT || 300_000); // 5 minutes for multi-section with many sections
 const PDF_CACHE_TTL = Number(process.env.PDF_CACHE_TTL || 21_600);
-const PDF_CONCURRENCY = Number(process.env.PDF_CONCURRENCY || 2); // Reduced for stability
+const PDF_CONCURRENCY = Number(process.env.PDF_CONCURRENCY || 1); // Reduced to 1 for stability with complex PDFs
 
 interface GenerateOptions {
   techpack: any;
@@ -81,7 +81,10 @@ export class PDFMultiSectionService {
           '--disable-gpu',
           '--no-zygote',
           '--single-process',
+          '--disable-web-security',
+          '--disable-features=IsolateOrigins,site-per-process',
         ],
+        timeout: 60000, // 60 seconds to launch browser
       });
     }
     return this.browserPromise;
@@ -122,25 +125,80 @@ export class PDFMultiSectionService {
     footerTemplate: string,
     outputPath: string
   ): Promise<void> {
-    await page.setContent(html, {
-      waitUntil: ['networkidle0', 'domcontentloaded'],
-    });
+    try {
+      // Verify page is still open before setting content
+      if (page.isClosed()) {
+        throw new Error('Page was closed before setting content');
+      }
 
-    // Đảm bảo landscape được áp dụng đúng
-    const pdfOptions: any = {
-      path: outputPath,
-      format: 'A4',
-      landscape: landscape, // Explicitly set landscape
-      printBackground: true,
-      displayHeaderFooter: true,
-      headerTemplate,
-      footerTemplate,
-      margin: { top: '20mm', bottom: '20mm', left: '15mm', right: '15mm' },
-    };
+      // Set timeout for content loading
+      // Use a more lenient wait strategy to avoid timeouts
+      try {
+        await page.setContent(html, {
+          waitUntil: ['domcontentloaded'], // Use domcontentloaded for faster loading
+          timeout: 30000, // 30 seconds timeout
+        });
+      } catch (contentError: any) {
+        // Check if page was closed during content loading
+        if (page.isClosed() || 
+            (contentError.message && (
+              contentError.message.includes('closed') || 
+              contentError.message.includes('Connection closed')
+            ))) {
+          throw new Error('Page was closed during content loading');
+        }
+        
+        // If timeout, try with shorter wait
+        if (contentError.message && contentError.message.includes('timeout')) {
+          console.warn(`[PDF] Content loading timeout, retrying with shorter wait`);
+          if (!page.isClosed()) {
+            await page.setContent(html, {
+              waitUntil: ['load'], // Even shorter wait
+              timeout: 20000,
+            });
+          }
+        } else {
+          throw contentError;
+        }
+      }
 
-    console.log(`[PDF] Generating PDF with landscape=${landscape} for ${outputPath}`);
-    
-    await page.pdf(pdfOptions);
+      // Wait a bit for any dynamic content to render
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Verify page is still open before generating PDF
+      if (page.isClosed()) {
+        throw new Error('Page was closed before generating PDF');
+      }
+
+      // Đảm bảo landscape được áp dụng đúng
+      const pdfOptions: any = {
+        path: outputPath,
+        format: 'A4',
+        landscape: landscape, // Explicitly set landscape
+        printBackground: true,
+        displayHeaderFooter: true,
+        headerTemplate,
+        footerTemplate,
+        margin: { top: '20mm', bottom: '20mm', left: '15mm', right: '15mm' },
+        timeout: 60000, // 60 seconds timeout for PDF generation
+      };
+
+      console.log(`[PDF] Generating PDF with landscape=${landscape} for ${outputPath}`);
+      
+      // Generate PDF with error handling
+      try {
+        await page.pdf(pdfOptions);
+      } catch (pdfError: any) {
+        // Check if page was closed
+        if (pdfError.message && (pdfError.message.includes('closed') || pdfError.message.includes('Connection closed'))) {
+          throw new Error(`Page was closed during PDF generation. This may indicate the page crashed or timed out.`);
+        }
+        throw pdfError;
+      }
+    } catch (error) {
+      console.error(`[PDF] Error rendering section to PDF:`, error);
+      throw error;
+    }
   }
 
   private getSections(): SectionConfig[] {
@@ -166,14 +224,26 @@ export class PDFMultiSectionService {
       {
         name: 'measurement-table',
         template: path.join(TEMPLATE_DIR, 'partials', 'measurement-table-landscape.ejs'),
-        landscape: true, // 👈 LANDSCAPE
+        landscape: true, // LANDSCAPE
         condition: (d) => d.measurements && d.measurements.rows && d.measurements.rows.length > 0,
+      },
+      {
+        name: 'sample-measurement-rounds',
+        template: path.join(TEMPLATE_DIR, 'partials', 'sample-measurement-rounds-wrapper.ejs'),
+        landscape: true, // LANDSCAPE
+        condition: (d) => d.sampleRounds && d.sampleRounds.rounds && d.sampleRounds.rounds.length > 0,
       },
       {
         name: 'how-to-measure',
         template: path.join(TEMPLATE_DIR, 'partials', 'how-to-measure-wrapper.ejs'),
         landscape: false,
         condition: (d) => d.howToMeasure && d.howToMeasure.length > 0,
+      },
+      {
+        name: 'colorways',
+        template: path.join(TEMPLATE_DIR, 'partials', 'colorways-wrapper.ejs'),
+        landscape: true, // LANDSCAPE
+        condition: (d) => d.colorways && d.colorways.length > 0,
       },
       {
         name: 'notes-care',
@@ -222,7 +292,7 @@ export class PDFMultiSectionService {
     );
 
     const browser = await this.getBrowser();
-    const page = await browser.newPage();
+    let page: Page | null = null;
 
     const tempPdfPaths: string[] = [];
 
@@ -232,6 +302,41 @@ export class PDFMultiSectionService {
         const section = sections[i];
         const tempPath = path.join(TMP_DIR, `section-${i}-${Date.now()}.pdf`);
 
+        // Create new page for each section to avoid connection issues
+        // Reuse page if it's still open, otherwise create new one
+        let pageNeedsCreation = false;
+        if (!page) {
+          pageNeedsCreation = true;
+        } else {
+          try {
+            // Check if page is closed by trying to access a property
+            const isClosed = page.isClosed();
+            if (isClosed) {
+              pageNeedsCreation = true;
+            }
+          } catch (e) {
+            // Page might be in invalid state, create new one
+            pageNeedsCreation = true;
+            page = null;
+          }
+        }
+
+        if (pageNeedsCreation) {
+          if (page) {
+            try {
+              await page.close();
+            } catch (e) {
+              // Ignore if already closed
+            }
+          }
+          page = await browser.newPage();
+          // Set viewport to ensure consistent rendering
+          await page.setViewport({ width: 1920, height: 1080 });
+          // Set default timeout
+          page.setDefaultTimeout(60000);
+          page.setDefaultNavigationTimeout(60000);
+        }
+
         // Render section HTML with proper context
         const sectionContext = {
           ...htmlPayload,
@@ -240,7 +345,9 @@ export class PDFMultiSectionService {
           bom: htmlPayload.bom,
           bomImages: htmlPayload.bomImages,
           measurements: htmlPayload.measurements,
+          sampleRounds: htmlPayload.sampleRounds,
           howToMeasure: htmlPayload.howToMeasure,
+          colorways: htmlPayload.colorways,
           notes: htmlPayload.notes,
           careSymbols: htmlPayload.careSymbols,
           meta: htmlPayload.meta,
@@ -255,21 +362,53 @@ export class PDFMultiSectionService {
         // Ensure it's a full HTML document
         const fullHtml = sectionHtml.includes('<!DOCTYPE') 
           ? sectionHtml 
-          : `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>${sectionHtml}</body></html>`;
+          : `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body>${sectionHtml}</body></html>`;
 
         // Log để debug
         console.log(`[PDF] Rendering section: ${section.name}, landscape: ${section.landscape}`);
         
-        await this.renderSectionAsPDF(
-          page,
-          fullHtml,
-          section.landscape,
-          headerTemplate,
-          footerTemplate,
-          tempPath
-        );
+        try {
+          // Verify page is still valid before rendering
+          if (!page || page.isClosed()) {
+            throw new Error(`Page is closed or invalid before rendering section ${section.name}`);
+          }
 
-        tempPdfPaths.push(tempPath);
+          await this.renderSectionAsPDF(
+            page,
+            fullHtml,
+            section.landscape,
+            headerTemplate,
+            footerTemplate,
+            tempPath
+          );
+
+          tempPdfPaths.push(tempPath);
+        } catch (sectionError: any) {
+          console.error(`[PDF] Error rendering section ${section.name}:`, sectionError);
+          
+          // If page was closed or crashed, mark it for recreation
+          if (page && (
+            page.isClosed() || 
+            (sectionError.message && (
+              sectionError.message.includes('closed') || 
+              sectionError.message.includes('Connection closed') ||
+              sectionError.message.includes('Target closed')
+            ))
+          )) {
+            console.warn(`[PDF] Page was closed/crashed, will recreate for next section`);
+            try {
+              if (!page.isClosed()) {
+                await page.close();
+              }
+            } catch (e) {
+              // Ignore close errors
+            }
+            page = null; // Force recreation on next iteration
+          }
+          
+          // Re-throw to stop processing
+          throw sectionError;
+        }
       }
 
       // Merge all PDFs into one
@@ -318,7 +457,25 @@ export class PDFMultiSectionService {
       }
       throw error;
     } finally {
-      await page.close();
+      // Safely close page if it exists and is not closed
+      if (page) {
+        try {
+          // Check if page is closed before attempting to close
+          const isClosed = page.isClosed();
+          if (!isClosed) {
+            await page.close();
+          }
+        } catch (error: any) {
+          // Ignore errors when closing page (might already be closed or in invalid state)
+          // Only log if it's not a "closed" error
+          if (error && error.message && 
+              !error.message.includes('closed') && 
+              !error.message.includes('Connection closed') &&
+              !error.message.includes('Target closed')) {
+            console.warn('[PDF] Error closing page (ignored):', error.message);
+          }
+        }
+      }
     }
 
     const { size, pages } = await this.inspectPdf(filePath);

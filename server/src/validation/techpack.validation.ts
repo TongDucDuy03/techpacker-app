@@ -77,6 +77,7 @@ const colorwaySpecSchema = z.object({
   season: z.string().optional(),
   collection: z.string().optional(),
   notes: z.string().optional(),
+  imageUrl: z.string().url().optional().or(z.literal('')),
   parts: z.array(colorwayPartSpecSchema).optional()
 });
 

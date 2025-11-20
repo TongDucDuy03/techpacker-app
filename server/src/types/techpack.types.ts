@@ -127,6 +127,7 @@ export interface Colorway {
   season?: string;
   collection?: string;
   notes?: string;
+  imageUrl?: string;
   parts?: ColorwayPart[];
 }
 

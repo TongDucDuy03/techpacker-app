@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sample Measurement Rounds</title>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 15mm 20mm;
+    }
+
+    body {
+      font-family: 'Roboto', 'Arial', 'Helvetica', sans-serif;
+      font-size: 9px;
+      line-height: 1.4;
+      color: #1f2933;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      margin: 0;
+      padding: 0;
+    }
+
+    .section-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      border-bottom: 2px solid #111827;
+      padding-bottom: 6px;
+      margin: 0 0 12px 0;
+      page-break-after: avoid;
+    }
+
+    .round-card {
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 16px;
+      page-break-inside: avoid;
+      background: #ffffff;
+    }
+
+    .round-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    .round-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: #0f172a;
+      text-transform: uppercase;
+    }
+
+    .round-meta {
+      display: flex;
+      gap: 16px;
+      font-size: 8px;
+      color: #475569;
+    }
+
+    .round-comments {
+      margin-top: 8px;
+      padding: 6px;
+      background: #f8fafc;
+      border-radius: 4px;
+      font-size: 8px;
+      border-left: 3px solid #3b82f6;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 7px;
+      background: #ffffff;
+    }
+
+    thead {
+      display: table-header-group;
+    }
+
+    tbody {
+      display: table-row-group;
+    }
+
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 4px 3px;
+      text-align: center;
+      vertical-align: middle;
+      word-break: break-word;
+    }
+
+    th {
+      background: #f1f5f9;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 6px;
+      letter-spacing: 0.3px;
+      color: #0f172a;
+      position: sticky;
+      top: 0;
+    }
+
+    tr:nth-child(even) td {
+      background: #f9fafb;
+    }
+
+    .pom-col {
+      text-align: left;
+      font-weight: 600;
+      background: #f8fafc !important;
+      min-width: 80px;
+    }
+
+    .size-col {
+      min-width: 35px;
+      font-weight: 500;
+    }
+
+    .value-requested {
+      color: #1e40af;
+    }
+
+    .value-measured {
+      color: #059669;
+    }
+
+    .value-diff {
+      color: #dc2626;
+      font-weight: 600;
+    }
+
+    .value-diff-zero {
+      color: #6b7280;
+    }
+
+    .value-revised {
+      color: #7c3aed;
+      font-weight: 600;
+    }
+
+    .value-comments {
+      font-size: 6px;
+      color: #475569;
+      text-align: left;
+      max-width: 100px;
+    }
+
+    .summary-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+      padding-top: 8px;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .stat-item {
+      text-align: center;
+      font-size: 8px;
+    }
+
+    .stat-label {
+      color: #64748b;
+      font-size: 7px;
+      margin-bottom: 2px;
+    }
+
+    .stat-value {
+      color: #0f172a;
+      font-weight: 600;
+      font-size: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="section-title"><%= strings.sampleRoundsTitle %></div>
+
+  <% if (sampleRounds && sampleRounds.rounds && sampleRounds.rounds.length > 0) { %>
+    <% sampleRounds.rounds.forEach((round) => { %>
+      <div class="round-card">
+        <div class="round-header">
+          <div class="round-name"><%= round.name %></div>
+          <div class="round-meta">
+            <span><strong>Date:</strong> <%= round.date %></span>
+            <span><strong>Reviewer:</strong> <%= round.reviewer %></span>
+            <span><strong>Source:</strong> <%= round.requestedSource %></span>
+          </div>
+        </div>
+
+        <% if (round.overallComments && round.overallComments !== '—') { %>
+          <div class="round-comments">
+            <strong>Overall Comments:</strong> <%= round.overallComments %>
+          </div>
+        <% } %>
+
+        <% if (round.entries && round.entries.length > 0) { %>
+          <% const sizes = sampleRounds.sizes || []; %>
+          <table>
+            <thead>
+              <tr>
+                <th class="pom-col" style="width:10%;">POM Code</th>
+                <th class="pom-col" style="width:12%;">POM Name</th>
+                <% sizes.forEach((size) => { %>
+                  <th class="size-col" colspan="5" style="background: #e2e8f0; font-size: 7px;">
+                    <%= size %>
+                  </th>
+                <% }) %>
+              </tr>
+              <tr>
+                <th class="pom-col"></th>
+                <th class="pom-col"></th>
+                <% sizes.forEach(() => { %>
+                  <th style="font-size: 6px; padding: 2px;">Req</th>
+                  <th style="font-size: 6px; padding: 2px;">Meas</th>
+                  <th style="font-size: 6px; padding: 2px;">Diff</th>
+                  <th style="font-size: 6px; padding: 2px;">Rev</th>
+                  <th style="font-size: 6px; padding: 2px;">Note</th>
+                <% }) %>
+              </tr>
+            </thead>
+            <tbody>
+              <% round.entries.forEach((entry) => { %>
+                <tr>
+                  <td class="pom-col"><%= entry.pomCode %></td>
+                  <td class="pom-col"><%= entry.pomName %></td>
+                  <% sizes.forEach((size) => { %>
+                    <% const sizeData = entry.sizes[size] || {}; %>
+                    <td class="value-requested"><%= sizeData.requested || '—' %></td>
+                    <td class="value-measured"><%= sizeData.measured || '—' %></td>
+                    <td class="<%= sizeData.diff && sizeData.diff !== '—' && parseFloat(sizeData.diff) !== 0 ? 'value-diff' : 'value-diff-zero' %>">
+                      <%= sizeData.diff || '—' %>
+                    </td>
+                    <td class="value-revised"><%= sizeData.revised || '—' %></td>
+                    <td class="value-comments"><%= sizeData.comments || '—' %></td>
+                  <% }) %>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+
+          <div class="summary-stats">
+            <div class="stat-item">
+              <div class="stat-label">Total Entries</div>
+              <div class="stat-value"><%= round.entries.length %></div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Size Coverage</div>
+              <div class="stat-value"><%= sizes.length %> sizes</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Round Order</div>
+              <div class="stat-value">#<%= round.order %></div>
+            </div>
+          </div>
+        <% } else { %>
+          <div style="padding: 16px; text-align: center; color: #94a3b8; font-size: 8px;">
+            No measurement entries for this round.
+          </div>
+        <% } %>
+      </div>
+    <% }) %>
+
+    <div class="summary-stats" style="margin-top: 16px; padding: 10px; background: #f8fafc; border-radius: 6px;">
+      <div class="stat-item">
+        <div class="stat-label">Total Rounds</div>
+        <div class="stat-value"><%= sampleRounds.stats.totalRounds %></div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Total Entries</div>
+        <div class="stat-value"><%= sampleRounds.stats.totalEntries %></div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Size Range</div>
+        <div class="stat-value">
+          <%= sampleRounds.sizes && sampleRounds.sizes.length > 0 
+            ? `${sampleRounds.sizes[0]} - ${sampleRounds.sizes[sampleRounds.sizes.length - 1]}`
+            : 'N/A' %>
+        </div>
+      </div>
+    </div>
+  <% } else { %>
+    <div style="padding: 32px; text-align: center; color: #94a3b8;">
+      <%= strings.emptySampleRounds %>
+    </div>
+  <% } %>
+</body>
+</html>
+
