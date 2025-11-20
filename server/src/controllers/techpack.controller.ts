@@ -138,11 +138,8 @@ export class TechPackController {
 
       // Base query for access control - Updated logic per requirements
       if (user.role === UserRole.Admin) {
-        // Admins can see all TechPacks they own or are shared with
-        query.$or = [
-          { createdBy: user._id },
-          { 'sharedWith.userId': user._id }
-        ];
+        // Admins can view all TechPacks without restriction
+        query = {};
       } else if (user.role === UserRole.Designer) {
         // Designers can see TechPacks they created, are technical designer for, or are shared with
         query.$or = [
