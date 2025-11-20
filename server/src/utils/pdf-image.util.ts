@@ -8,6 +8,12 @@ export interface ImageOptions {
   height?: number;
   // sharp.fit typing can be strict across versions; accept any to avoid TS mismatches
   fit?: any;
+  background?: {
+    r: number;
+    g: number;
+    b: number;
+    alpha?: number;
+  };
   timeoutMs?: number;
   headers?: Record<string, string>;
   cacheKey?: string;
@@ -126,6 +132,7 @@ export async function getImageData(
         height: options.height,
         // Accept any fit from caller (caller may pass sharp.fit.* or a string)
         fit: (options?.fit as any) || (sharp as any).fit.cover,
+        background: options?.background,
         withoutEnlargement: true,
       } as any);
     }

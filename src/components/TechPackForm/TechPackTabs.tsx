@@ -125,6 +125,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
           supplier: (colorway?.supplier || '').trim(),
           notes: (colorway?.notes || '').trim(),
           collectionName: (colorway?.collectionName || '').trim(),
+          imageUrl: (colorway?.imageUrl || '').trim(),
           parts,
         };
       });
@@ -151,6 +152,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
           fabricDescription: (initialTechPack as any).fabricDescription || '',
           productDescription: (initialTechPack as any).productDescription || '',
           designSketchUrl: (initialTechPack as any).designSketchUrl || '',
+          companyLogoUrl: (initialTechPack as any).companyLogoUrl || '',
           season: (((initialTechPack as any).season || (initialTechPack as any).metadata?.season || 'SS25')) as any,
           brand: (initialTechPack as any).brand || '',
           collection: (initialTechPack as any).collectionName || (initialTechPack as any).collection || '',
@@ -409,7 +411,9 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
     // Validate Measurements if on Measurements tab (tab 2) or if Measurements has items
     if (techpack.measurements && techpack.measurements.length > 0) {
       const { validateMeasurementsForSave } = await import('./tabs/MeasurementTab');
-      const measurementsValidation = validateMeasurementsForSave(techpack.measurements);
+      const measurementsValidation = validateMeasurementsForSave(techpack.measurements, {
+        defaultBaseSize: techpack.measurementBaseSize,
+      });
       
       if (!measurementsValidation.isValid) {
         // Get first error field from first error item
@@ -702,14 +706,6 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
           </div>
         </div>
       )}
-
-      {/* Keyboard Shortcuts Help */}
-      <div className="fixed bottom-4 left-4 z-40">
-        <div className="bg-gray-800 text-white text-xs px-3 py-2 rounded-lg shadow-lg">
-          <div className="font-medium mb-1">Keyboard Shortcuts:</div>
-          <div>Ctrl+S: Save • Ctrl+E: Export • Tab: Next field</div>
-        </div>
-      </div>
     </div>
   );
 };

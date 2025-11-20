@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { ApiTechPack, CreateTechPackInput, TechPackListResponse, TechPackFormState, MeasurementPoint, HowToMeasure, BomItem, Colorway, ColorwayPart, MeasurementSampleRound, MeasurementSampleEntry, MeasurementSampleValueMap, MeasurementRequestedSource, SIZE_RANGES } from '../types/techpack';
+import { normalizeMeasurementBaseSizes } from '../utils/measurements';
 import { api } from '../lib/api';
 import { showPromise, showError } from '../lib/toast';
 import { exportTechPackToPDF as clientExportToPDF } from '../utils/pdfExport';
@@ -695,6 +696,7 @@ const createEmptyTechpack = (): TechPackFormState['techpack'] => ({
     fabricDescription: '',
     productDescription: '',
     designSketchUrl: '',
+    companyLogoUrl: '',
     season: 'SS25',
     lifecycleStage: 'Concept',
     createdDate: new Date().toISOString(),
@@ -1145,8 +1147,12 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     setState(prev => ({ ...prev, isSaving: true }));
     try {
       const techpackData = state.techpack;
+      const { normalized: measurementsWithBase } = normalizeMeasurementBaseSizes(
+        techpackData.measurements || [],
+        techpackData.measurementBaseSize
+      );
 
-      const measurementsPayload = (techpackData.measurements || []).map((measurement: any) => {
+      const measurementsPayload = measurementsWithBase.map((measurement: any) => {
         const {
           minusTolerance,
           plusTolerance,
@@ -1165,7 +1171,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         };
       });
 
-      const measurementNameMap = new Map((techpackData.measurements || []).map((measurement: any) => [
+      const measurementNameMap = new Map(measurementsWithBase.map((measurement: any) => [
         measurement?.pomCode,
         measurement?.pomName || '',
       ]));
@@ -1321,6 +1327,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           fabricDescription: techpackData.articleInfo.fabricDescription || '',
           productDescription: (techpackData.articleInfo as any).productDescription || '',
           designSketchUrl: (techpackData.articleInfo as any).designSketchUrl || '',
+          companyLogoUrl: (techpackData.articleInfo as any).companyLogoUrl || '',
           status: techpackData.status,
           category: techpackData.articleInfo.productClass,
           gender: techpackData.articleInfo.gender,
@@ -1373,6 +1380,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
             fabricDescription: techpackData.articleInfo.fabricDescription || '',
             productDescription: (techpackData.articleInfo as any).productDescription || '',
             designSketchUrl: (techpackData.articleInfo as any).designSketchUrl || '',
+          companyLogoUrl: (techpackData.articleInfo as any).companyLogoUrl || '',
             productClass: techpackData.articleInfo.productClass,
             gender: techpackData.articleInfo.gender,
             technicalDesignerId: techpackData.articleInfo.technicalDesignerId,

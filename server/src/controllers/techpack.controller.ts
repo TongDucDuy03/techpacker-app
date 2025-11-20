@@ -108,7 +108,7 @@ export class TechPackController {
 
   async getTechPacks(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { page = 1, limit = config.defaultPageSize, q = '', status, season, brand, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+      const { page = 1, limit = config.defaultPageSize, q = '', status, season, brand, sortBy = 'updatedAt', sortOrder = 'desc' } = req.query;
       const user = req.user!;
       const pageNum = Math.max(1, parseInt(page as string));
       const limitNum = Math.min(config.maxPageSize, Math.max(1, parseInt(limit as string)));
@@ -193,7 +193,7 @@ export class TechPackController {
           .sort(sortOptions)
           .skip(skip)
           .limit(limitNum)
-          .select('articleCode productName brand season status category createdAt updatedAt technicalDesignerId createdBy sharedWith supplier lifecycleStage gender currency version fabricDescription productDescription designSketchUrl')
+          .select('articleCode productName brand season status category createdAt updatedAt technicalDesignerId createdBy sharedWith supplier lifecycleStage gender currency version fabricDescription productDescription designSketchUrl companyLogoUrl')
           .lean(),
         TechPack.countDocuments(query)
       ]);
@@ -287,62 +287,6 @@ export class TechPackController {
         return sendError(res, 'Access denied', 403, 'FORBIDDEN');
       }
 
-      // Bootstrap sample measurement rounds if missing (backward compatibility)
-      const needsSampleRoundBootstrap =
-        (!Array.isArray((techpack as any).sampleMeasurementRounds) || (techpack as any).sampleMeasurementRounds.length === 0) &&
-        Array.isArray(techpack.measurements) &&
-        techpack.measurements.length > 0;
-
-      if (needsSampleRoundBootstrap) {
-        const bootstrapRoundId = new Types.ObjectId();
-        const bootstrapEntries = techpack.measurements.map(measurement => {
-          const sizeEntries = (measurement as any)?.sizes || {};
-          const requestedMap: Record<string, string> = {};
-
-          Object.entries(sizeEntries).forEach(([size, value]) => {
-            if (value !== undefined && value !== null && value !== '') {
-              requestedMap[size] = String(value);
-            }
-          });
-
-          return {
-            _id: new Types.ObjectId(),
-            measurementId: (measurement as any)?._id || (measurement as any)?.id || undefined,
-            pomCode: (measurement as any)?.pomCode || '',
-            pomName: (measurement as any)?.pomName || '',
-            requested: requestedMap,
-            measured: {},
-            diff: {},
-            revised: {},
-            comments: {},
-          };
-        });
-
-        const bootstrapRound = {
-          _id: bootstrapRoundId,
-          name: 'Initial Sample',
-          order: 1,
-          measurementDate: techpack.updatedAt || techpack.createdAt || new Date(),
-          reviewer: (techpack as any).updatedByName || (techpack as any).createdByName || '',
-          requestedSource: 'original',
-          overallComments: '',
-          measurements: bootstrapEntries,
-        };
-
-        (techpack as any).sampleMeasurementRounds = [bootstrapRound];
-
-        // Persist bootstrap asynchronously; failures shouldn't block response
-        TechPack.updateOne(
-          { _id: techpack._id },
-          { $set: { sampleMeasurementRounds: (techpack as any).sampleMeasurementRounds } }
-        ).catch(error => {
-          console.warn('Failed to persist bootstrap sample round', {
-            techpackId: techpack._id,
-            error: error?.message || error,
-          });
-        });
-      }
-
       // Lưu vào cache với TTL trung bình (30 phút)
       await cacheService.set(cacheKey, techpack, CacheTTL.MEDIUM);
 
@@ -393,6 +337,7 @@ export class TechPackController {
             fabricDescription: sourceTechPack.fabricDescription,
             productDescription: sourceTechPack.productDescription,
             designSketchUrl: sourceTechPack.designSketchUrl,
+            companyLogoUrl: sourceTechPack.companyLogoUrl,
             category: sourceTechPack.category,
             gender: sourceTechPack.gender,
             brand: sourceTechPack.brand,
@@ -450,7 +395,7 @@ export class TechPackController {
 
       } else {
         // --- CREATE FROM SCRATCH LOGIC (existing logic) ---
-      const { articleInfo, bom, measurements, colorways, howToMeasures, sampleMeasurementRounds } = restOfBody;
+        const { articleInfo, bom, measurements, colorways, howToMeasures } = restOfBody;
 
         const productName = articleInfo?.productName || req.body.productName;
         const articleCode = articleInfo?.articleCode || req.body.articleCode;
@@ -467,6 +412,7 @@ export class TechPackController {
           fabricDescription: articleInfo?.fabricDescription || req.body.fabricDescription,
           productDescription: articleInfo?.productDescription || req.body.productDescription,
           designSketchUrl: articleInfo?.designSketchUrl || req.body.designSketchUrl,
+          companyLogoUrl: articleInfo?.companyLogoUrl || req.body.companyLogoUrl,
           technicalDesignerId: articleInfo?.technicalDesignerId || req.body.technicalDesignerId || user._id,
           status: TechPackStatus.Draft,
           // Additional fields from articleInfo
@@ -489,7 +435,6 @@ export class TechPackController {
           measurements: measurements || [],
           colorways: colorways || [],
           howToMeasure: howToMeasures || [],
-          sampleMeasurementRounds: sampleMeasurementRounds || [],
           sharedWith: [],
           auditLogs: [],
         };
@@ -583,10 +528,10 @@ export class TechPackController {
       // Define whitelist of updatable fields to prevent schema validation errors
       const allowedFields = [
         'productName', 'articleCode', 'version', 'supplier', 'season',
-        'fabricDescription', 'productDescription', 'designSketchUrl', 'status', 'category', 'gender', 'brand',
+        'fabricDescription', 'productDescription', 'designSketchUrl', 'companyLogoUrl', 'status', 'category', 'gender', 'brand',
         'technicalDesignerId', 'lifecycleStage', 'collectionName', 'targetMarket', 'pricePoint',
         'retailPrice', 'currency', 'description', 'notes', 'bom',
-        'measurements', 'colorways', 'howToMeasure', 'sampleMeasurementRounds'
+        'measurements', 'colorways', 'howToMeasure'
       ];
 
       // Safely update only whitelisted fields that exist in request body
@@ -596,7 +541,7 @@ export class TechPackController {
       };
 
       // Array fields that need special merging logic
-      const arrayFields = ['bom', 'measurements', 'colorways', 'howToMeasure', 'sampleMeasurementRounds'];
+      const arrayFields = ['bom', 'measurements', 'colorways', 'howToMeasure'];
 
       allowedFields.forEach(field => {
         if (req.body.hasOwnProperty(field)) {
@@ -678,6 +623,25 @@ export class TechPackController {
         }
       });
 
+      // Map lifecycleStage to status if sent
+      const lifecycleStage = (req.body as any).lifecycleStage;
+      if (lifecycleStage) {
+        switch (lifecycleStage) {
+          case 'Concept':
+          case 'Design':
+            updateData.status = TechPackStatus.Draft;
+            break;
+          case 'Development':
+          case 'Pre-production':
+            updateData.status = TechPackStatus.InReview;
+            break;
+          case 'Production':
+          case 'Shipped':
+            updateData.status = TechPackStatus.Approved;
+            break;
+        }
+      }
+
       // Keep a snapshot of the old techpack for revision comparison
       const oldTechPack = techpack.toObject({ virtuals: true }) as ITechPack;
 
@@ -703,6 +667,9 @@ export class TechPackController {
 
       // Save the TechPack document once, with both user updates and the new version
       const updatedTechPack = await techpack.save();
+
+      // Invalidate caches so subsequent fetches return the latest data (including logo updates)
+      await CacheInvalidationUtil.invalidateTechPackCache(id);
 
       // Try to create the revision log separately
       let revisionCreated = null;
@@ -747,15 +714,6 @@ export class TechPackController {
           techPackId: updatedTechPack._id,
           userId: user._id
         });
-      }
-
-      // Invalidate caches so subsequent fetches get fresh data
-      const updatedTechPackId =
-        typeof updatedTechPack._id === 'string'
-          ? updatedTechPack._id
-          : (updatedTechPack._id as Types.ObjectId)?.toString();
-      if (updatedTechPackId) {
-        await CacheInvalidationUtil.invalidateTechPackCache(updatedTechPackId);
       }
 
       // Build response payload per spec

@@ -6,6 +6,7 @@ import { RevertModal } from './RevertModal';
 import { CommentsSection } from './CommentsSection';
 import { useRevert } from '../hooks/useRevert';
 import { useRevision } from '../hooks/useRevision';
+import ZoomableImage from '../../../components/common/ZoomableImage';
 
 interface RevisionDetailProps {
   revision: Revision | null;
@@ -186,13 +187,16 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
       const src = getImageUrl(s);
       return (
         <div className="flex items-center space-x-2">
-          <img
+          <ZoomableImage
             src={src}
             alt="Changed"
-            className="w-12 h-12 object-cover rounded border border-gray-200"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-            }}
+            containerClassName="w-12 h-12 rounded border border-gray-200 bg-white"
+            className="w-12 h-12"
+            fallback={
+              <div className="flex items-center justify-center text-gray-400 text-xs w-full h-full">
+                Không hiển thị
+              </div>
+            }
           />
           <span className="text-xs text-gray-600 break-all">{s}</span>
         </div>

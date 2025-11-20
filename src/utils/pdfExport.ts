@@ -371,7 +371,7 @@ startxref
             <div style="margin-bottom: 20px; border: 1px solid #ddd; padding: 15px; border-radius: 5px;">
                 ${imageUrl ? `
                     <div style="width: 100%; height: 180px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #f3f4f6; margin-bottom: 15px; overflow: hidden;">
-                        <img src="${imageUrl}" alt="${colorway.name}" style="width: 100%; height: 100%; object-fit: cover; object-position: center;" onerror="this.parentElement.innerHTML='<div style=\\'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 14px;\\'>No Image</div>';" />
+                        <img src="${imageUrl}" alt="${colorway.name}" style="width: 100%; height: 100%; object-fit: contain; object-position: center;" onerror="this.parentElement.innerHTML='<div style=\\'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 14px;\\'>No Image</div>';" />
                     </div>
                 ` : `
                     <div style="width: 100%; height: 180px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #f3f4f6; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 14px;">

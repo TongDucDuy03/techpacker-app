@@ -30,6 +30,7 @@ export interface ArticleInfo {
   currency?: string;
   description?: string;
   notes?: string;
+  companyLogoUrl?: string;
 }
 
 export interface Material {

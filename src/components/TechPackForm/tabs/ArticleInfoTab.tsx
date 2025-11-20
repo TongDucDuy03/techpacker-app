@@ -4,13 +4,16 @@ import { articleInfoValidationSchema } from '../../../utils/validationSchemas';
 import { api } from '../../../lib/api';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { showError, showWarning } from '../../../lib/toast';
+import { useSeasonSuggestions } from '../../../hooks/useSeasonSuggestions';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001/api/v1';
+const API_UPLOAD_BASE = API_BASE_URL.replace(/\/api\/v1$/, '');
 import { TechPack, PRODUCT_CLASSES, ArticleInfo, TechPackStatus } from '../../../types/techpack';
 import Input from '../shared/Input';
 import Select from '../shared/Select';
 import Textarea from '../shared/Textarea';
 import { Save, RotateCcw, ArrowRight, Calendar, User, UploadCloud, XCircle, CheckCircle, AlertCircle, Lock } from 'lucide-react';
+import ZoomableImage from '../../common/ZoomableImage';
 
 interface ArticleInfoTabProps {
   techPack?: TechPack;
@@ -31,6 +34,8 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
   const [loadingDesigners, setLoadingDesigners] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
   const [isDuplicate, setIsDuplicate] = useState(false);
 
@@ -47,6 +52,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
     fabricDescription: '',
     productDescription: '',
     designSketchUrl: '',
+    companyLogoUrl: '',
     season: 'SS25',
     lifecycleStage: 'Concept',
     createdDate: new Date().toISOString(),
@@ -136,17 +142,16 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
     { value: 'Oversized', label: 'Oversized' }
   ];
 
-  // Season options
-  const seasonOptions = [
-    { value: 'Spring', label: 'Spring' },
-    { value: 'Summer', label: 'Summer' },
-    { value: 'Autumn', label: 'Autumn' },
-    { value: 'Winter', label: 'Winter' },
-    { value: 'SS25', label: 'Spring/Summer 2025' },
-    { value: 'FW25', label: 'Fall/Winter 2025' },
-    { value: 'SS26', label: 'Spring/Summer 2026' },
-    { value: 'FW26', label: 'Fall/Winter 2026' }
-  ];
+  const { seasonSuggestions, addSeasonSuggestion } = useSeasonSuggestions();
+  useEffect(() => {
+    if (safeArticleInfo.season) {
+      addSeasonSuggestion(safeArticleInfo.season);
+    }
+  }, [safeArticleInfo.season, addSeasonSuggestion]);
+  const seasonDatalistOptions = useMemo(
+    () => seasonSuggestions.map((season) => ({ value: season, label: season })),
+    [seasonSuggestions]
+  );
 
   // Lifecycle stage options
   const lifecycleOptions = [
@@ -197,21 +202,30 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
     validation.validateField(field, value);
   };
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleSeasonChange = (value: string | number) => {
+    const nextValue = typeof value === 'number' ? String(value) : value;
+    handleInputChange('season')(nextValue);
+    addSeasonSuggestion(nextValue);
+  };
 
-    // Validate file type
+  const validateImageFile = (file: File): string | null => {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/svg+xml'];
     if (!allowedTypes.includes(file.type)) {
-      setUploadError('Invalid file type. Please upload JPEG, PNG, GIF, or SVG image.');
-      return;
+      return 'Invalid file type. Please upload JPEG, PNG, GIF, or SVG image.';
     }
 
-    // Validate file size (5MB limit)
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
-      setUploadError('File size exceeds 5MB limit. Please upload a smaller image.');
+      return 'File size exceeds 5MB limit. Please upload a smaller image.';
+    }
+
+    return null;
+  };
+
+  const uploadDesignSketchFile = async (file: File) => {
+    const validationMessage = validateImageFile(file);
+    if (validationMessage) {
+      setUploadError(validationMessage);
       return;
     }
 
@@ -245,8 +259,15 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
     }
   };
 
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await uploadDesignSketchFile(file);
+  };
+
   // Handle drag and drop for design sketch
   const [isDragging, setIsDragging] = useState(false);
+  const [isLogoDragging, setIsLogoDragging] = useState(false);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -264,29 +285,24 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
 
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
+    await uploadDesignSketchFile(file);
+  };
 
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/svg+xml'];
-    if (!allowedTypes.includes(file.type)) {
-      setUploadError('Invalid file type. Please upload JPEG, PNG, GIF, or SVG image.');
+  const uploadCompanyLogoFile = async (file: File) => {
+    const validationMessage = validateImageFile(file);
+    if (validationMessage) {
+      setLogoUploadError(validationMessage);
       return;
     }
 
-    // Validate file size (5MB limit)
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
-      setUploadError('File size exceeds 5MB limit. Please upload a smaller image.');
-      return;
-    }
-
-    setUploading(true);
-    setUploadError(null);
+    setLogoUploading(true);
+    setLogoUploadError(null);
 
     const formData = new FormData();
-    formData.append('designSketch', file);
+    formData.append('companyLogo', file);
 
     try {
-      const response = await api.post('/techpacks/upload-sketch', formData, {
+      const response = await api.post('/techpacks/upload-company-logo', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -294,19 +310,44 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
 
       if (response.data.success) {
         const imageUrl = response.data.data.url;
-        handleInputChange('designSketchUrl')(imageUrl);
-        validation.validateField('designSketchUrl', imageUrl);
-        setUploadError(null);
+        handleInputChange('companyLogoUrl')(imageUrl);
+        validation.validateField('companyLogoUrl', imageUrl);
+        setLogoUploadError(null);
       } else {
-        setUploadError(response.data.message || 'Failed to upload image.');
+        setLogoUploadError(response.data.message || 'Failed to upload logo.');
       }
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || error.message || 'An unexpected error occurred.';
-      setUploadError(errorMessage);
+      setLogoUploadError(errorMessage);
       showError(errorMessage);
     } finally {
-      setUploading(false);
+      setLogoUploading(false);
     }
+  };
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await uploadCompanyLogoFile(file);
+  };
+
+  const handleLogoDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsLogoDragging(true);
+  };
+
+  const handleLogoDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsLogoDragging(false);
+  };
+
+  const handleLogoDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsLogoDragging(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    await uploadCompanyLogoFile(file);
   };
 
   // Helper to get image URL - handles both relative and absolute URLs
@@ -318,10 +359,10 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
     }
     // If URL starts with /, it's already a path, just prepend API base
     if (url.startsWith('/')) {
-      return `${API_BASE_URL}${url}`;
+      return `${API_UPLOAD_BASE}${url}`;
     }
     // Otherwise, assume it's a relative path
-    return `${API_BASE_URL}/${url}`;
+    return `${API_UPLOAD_BASE}/${url}`;
   };
 
   const handleReset = () => {
@@ -341,6 +382,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
           fabricDescription: '',
           productDescription: '',
           designSketchUrl: '',
+          companyLogoUrl: '',
           season: 'Spring',
           lifecycleStage: 'Concept',
           brand: '',
@@ -403,7 +445,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
     // Shallow compare relevant fields of Article Info and status
     const fieldsToCompare = [
       'articleCode','productName','version','gender','productClass','fitType','supplier','technicalDesignerId',
-      'fabricDescription','productDescription','designSketchUrl','season','lifecycleStage','brand','collection',
+      'fabricDescription','productDescription','designSketchUrl','companyLogoUrl','season','lifecycleStage','brand','collection',
       'targetMarket','pricePoint','currency','retailPrice','notes'
     ];
     for (const key of fieldsToCompare) {
@@ -759,16 +801,18 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
                 helperText={validation.getFieldProps('technicalDesignerId').helperText}
               />
 
-              <Select
+              <Input
                 label="Season"
                 value={safeArticleInfo.season}
-                onChange={handleInputChange('season')}
+                onChange={handleSeasonChange}
                 onBlur={() => validation.setFieldTouched('season')}
-                options={seasonOptions}
+                placeholder="e.g., SS25, FW26, Holiday 2026"
                 required
                 disabled={mode === 'view'}
                 error={validation.getFieldProps('season').error}
                 helperText={validation.getFieldProps('season').helperText}
+                datalistOptions={seasonDatalistOptions}
+                listId="article-season-options"
               />
 
               <Select
@@ -937,15 +981,18 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
                     <div className="space-y-2 text-center w-full">
                       {safeArticleInfo.designSketchUrl ? (
                         <>
-                          <div className="relative inline-block">
-                            <img
+                          <div className="relative inline-block w-full">
+                            <ZoomableImage
                               src={getImageUrl(safeArticleInfo.designSketchUrl)}
                               alt="Design Sketch Preview"
-                              className="max-w-full h-auto max-h-48 rounded-lg shadow-sm border border-gray-200"
-                              onError={(e) => {
-                                // Fallback if image fails to load
-                                (e.target as HTMLImageElement).style.display = 'none';
-                              }}
+                              containerClassName="max-w-full h-auto max-h-48 rounded-lg shadow-sm border border-gray-200 bg-white"
+                              className="max-h-48"
+                              fallback={
+                                <div className="flex flex-col items-center justify-center text-gray-400 py-10">
+                                  <UploadCloud className="w-10 h-10 mb-2" />
+                                  <p className="text-sm">Không thể hiển thị ảnh</p>
+                                </div>
+                              }
                             />
                             <button
                               onClick={() => {
@@ -1022,14 +1069,12 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
                 {/* Image Preview for view mode */}
                 {mode === 'view' && safeArticleInfo.designSketchUrl && (
                   <div className="mt-4 relative">
-                    <img
+                    <ZoomableImage
                       src={getImageUrl(safeArticleInfo.designSketchUrl)}
                       alt="Design Sketch"
-                      className="max-w-full h-auto max-h-64 rounded-lg shadow-sm border border-gray-200"
-                      onError={(e) => {
-                        // Fallback if image fails to load
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
+                      containerClassName="w-full h-auto max-h-64 rounded-lg shadow-sm border border-gray-200 bg-white"
+                      className="max-h-64"
+                      fallback={null}
                     />
                   </div>
                 )}
@@ -1046,6 +1091,131 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
                     {validation.getFieldProps('designSketchUrl').helperText || 'Upload a design sketch image (required)'}
                   </p>
                 )}
+              </div>
+
+              {/* Company Logo Upload */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Company Logo
+                  <span className="text-gray-400 text-xs ml-2">(Optional • used on every PDF page)</span>
+                </label>
+
+                {mode !== 'view' && (
+                  <div
+                    className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md transition-colors ${
+                      isLogoDragging
+                        ? 'border-blue-500 bg-blue-50'
+                        : safeArticleInfo.companyLogoUrl
+                          ? 'border-green-300 bg-green-50'
+                          : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                    onDragOver={handleLogoDragOver}
+                    onDragLeave={handleLogoDragLeave}
+                    onDrop={handleLogoDrop}
+                  >
+                    <div className="space-y-2 text-center w-full">
+                      {safeArticleInfo.companyLogoUrl ? (
+                        <>
+                          <div className="relative inline-block w-full">
+                            <ZoomableImage
+                              src={getImageUrl(safeArticleInfo.companyLogoUrl)}
+                              alt="Company Logo Preview"
+                              containerClassName="max-w-full h-32 rounded-lg shadow-sm border border-gray-200 bg-white flex items-center justify-center"
+                              className="max-h-16 object-contain"
+                              fallback={
+                                <div className="flex flex-col items-center justify-center text-gray-400 py-8">
+                                  <UploadCloud className="w-8 h-8 mb-2" />
+                                  <p className="text-sm">Không thể hiển thị logo</p>
+                                </div>
+                              }
+                            />
+                            <button
+                              onClick={() => {
+                                handleInputChange('companyLogoUrl')('');
+                                validation.validateField('companyLogoUrl', '');
+                              }}
+                              className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                              title="Remove logo"
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <p className="text-xs text-green-600 flex items-center justify-center">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Logo uploaded successfully
+                          </p>
+                          <label
+                            htmlFor="company-logo-upload"
+                            className="text-sm text-blue-600 hover:text-blue-500 cursor-pointer underline"
+                          >
+                            Replace logo
+                          </label>
+                          <input
+                            id="company-logo-upload"
+                            name="company-logo-upload"
+                            type="file"
+                            className="sr-only"
+                            accept="image/jpeg,image/jpg,image/png,image/gif,image/svg+xml"
+                            onChange={handleLogoUpload}
+                            disabled={logoUploading}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <UploadCloud className={`mx-auto h-10 w-10 ${isLogoDragging ? 'text-blue-500' : 'text-gray-400'}`} />
+                          <div className="flex text-sm text-gray-600 justify-center">
+                            <label
+                              htmlFor="company-logo-upload"
+                              className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
+                            >
+                              <span>Upload a company logo</span>
+                              <input
+                                id="company-logo-upload"
+                                name="company-logo-upload"
+                                type="file"
+                                className="sr-only"
+                                accept="image/jpeg,image/jpg,image/png,image/gif,image/svg+xml"
+                                onChange={handleLogoUpload}
+                                disabled={logoUploading}
+                              />
+                            </label>
+                            <p className="pl-1">or drag and drop</p>
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            PNG, JPG, GIF, SVG up to 5MB. We’ll auto-resize to fit PDF headers.
+                          </p>
+                        </>
+                      )}
+
+                      {logoUploading && (
+                        <div className="flex items-center justify-center text-xs text-blue-600">
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-2"></div>
+                          Uploading logo...
+                        </div>
+                      )}
+                      {logoUploadError && (
+                        <p className="text-xs text-red-600 flex items-center justify-center">
+                          <AlertCircle className="w-3 h-3 mr-1" />
+                          {logoUploadError}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {mode === 'view' && safeArticleInfo.companyLogoUrl && (
+                  <div className="mt-4 flex items-center justify-center rounded-lg border border-gray-200 bg-white p-4">
+                    <img
+                      src={getImageUrl(safeArticleInfo.companyLogoUrl)}
+                      alt="Company Logo"
+                      className="max-h-16 object-contain"
+                    />
+                  </div>
+                )}
+
+                <p className="mt-1 text-xs text-gray-500">
+                  Recommended: horizontal logo with transparent background. Logo will appear on the cover and every PDF page.
+                </p>
               </div>
 
               <div className="md:col-span-2">
@@ -1214,15 +1384,26 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
               {safeArticleInfo.designSketchUrl && (
                 <div className="pt-4 border-t border-gray-200">
                   <h5 className="text-sm font-medium text-gray-700 mb-2">Design Sketch</h5>
-                  <img
+                  <ZoomableImage
                     src={getImageUrl(safeArticleInfo.designSketchUrl)}
                     alt="Design Sketch Preview"
-                    className="w-full h-auto max-h-32 rounded border border-gray-200 object-cover"
-                    onError={(e) => {
-                      // Fallback if image fails to load
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
+                    containerClassName="w-full h-auto max-h-32 rounded border border-gray-200 bg-white"
+                    className="max-h-32"
+                    fallback={null}
                   />
+                </div>
+              )}
+
+              {safeArticleInfo.companyLogoUrl && (
+                <div className="pt-4 border-t border-gray-200">
+                  <h5 className="text-sm font-medium text-gray-700 mb-2">Company Logo</h5>
+                  <div className="w-full h-20 flex items-center justify-center border border-gray-200 bg-white rounded">
+                    <img
+                      src={getImageUrl(safeArticleInfo.companyLogoUrl)}
+                      alt="Company Logo Preview"
+                      className="max-h-16 object-contain"
+                    />
+                  </div>
                 </div>
               )}
 

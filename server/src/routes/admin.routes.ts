@@ -42,7 +42,10 @@ router.post(
   [
     body('firstName').notEmpty().withMessage('First name is required').trim(),
     body('lastName').notEmpty().withMessage('Last name is required').trim(),
-    body('email').isEmail().withMessage('Please provide a valid email address').normalizeEmail(),
+    body('email')
+      .isEmail()
+      .withMessage('Please provide a valid email address')
+      .normalizeEmail({ gmail_remove_dots: false, gmail_remove_subaddress: false }),
     body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters long'),
     body('role').optional().isIn(Object.values(UserRole)).withMessage('Invalid role provided'),
   ],
@@ -56,7 +59,11 @@ router.put(
     param('id').isMongoId().withMessage('Invalid user ID'),
     body('firstName').optional().notEmpty().withMessage('First name cannot be empty').trim(),
     body('lastName').optional().notEmpty().withMessage('Last name cannot be empty').trim(),
-    body('email').optional().isEmail().withMessage('Please provide a valid email address').normalizeEmail(),
+    body('email')
+      .optional()
+      .isEmail()
+      .withMessage('Please provide a valid email address')
+      .normalizeEmail({ gmail_remove_dots: false, gmail_remove_subaddress: false }),
     body('role').optional().isIn(Object.values(UserRole)).withMessage('Invalid role provided'),
   ],
   adminController.updateUser

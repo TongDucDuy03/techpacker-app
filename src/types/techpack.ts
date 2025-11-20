@@ -17,7 +17,8 @@ export interface ArticleInfo {
   fabricDescription: string;
   productDescription: string;
   designSketchUrl?: string;
-  season: 'Spring' | 'Summer' | 'Autumn' | 'Winter' | 'SS25' | 'FW25' | 'SS26' | 'FW26';
+  companyLogoUrl?: string;
+  season: string;
   lifecycleStage: 'Concept' | 'Design' | 'Development' | 'Pre-production' | 'Production' | 'Shipped';
   status?: TechPackStatus; // Backend status field
   category?: string; // Backend field name (maps to productClass)
@@ -400,6 +401,9 @@ export interface InputProps {
   min?: number;
   max?: number;
   step?: number | string;
+  inputMode?: 'text' | 'decimal' | 'numeric' | 'tel';
+  datalistOptions?: Array<{ value: string; label?: string }> | string[];
+  listId?: string;
 }
 
 export interface SelectProps {

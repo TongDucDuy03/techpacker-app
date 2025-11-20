@@ -369,15 +369,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   const totals = useMemo(() => {
     const totalItems = bom.length;
     const uniqueSuppliers = new Set(bom.map(item => item.supplier)).size;
-    
-    // Group by unit
-    const totalsByUnit: Record<string, number> = {};
-    bom.forEach(item => {
-      const unit = item.uom || 'unknown';
-      totalsByUnit[unit] = (totalsByUnit[unit] || 0) + (item.quantity || 0);
-    });
-    
-    return { totalItems, uniqueSuppliers, totalsByUnit };
+    return { totalItems, uniqueSuppliers };
   }, [bom]);
 
   // Check for duplicates
@@ -394,8 +386,8 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     
     // Auto-calculate totalPrice when quantity or unitPrice changes
     if (field === 'quantity' || field === 'unitPrice') {
-      const quantity = field === 'quantity' ? Number(value) : Number(updatedFormData.quantity || 0);
-      const unitPrice = field === 'unitPrice' ? Number(value) : Number(updatedFormData.unitPrice || 0);
+      const quantity = field === 'quantity' ? Number(value) : Number(updatedFormData.quantity ?? 0);
+      const unitPrice = field === 'unitPrice' ? Number(value) : Number(updatedFormData.unitPrice ?? 0);
       if (quantity > 0 && unitPrice > 0) {
         updatedFormData.totalPrice = quantity * unitPrice;
       } else {
@@ -463,8 +455,9 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
 
     // Calculate totalPrice if quantity and unitPrice are provided
     const quantity = Number(formData.quantity) || 0;
-    const unitPrice = formData.unitPrice ? Number(formData.unitPrice) : undefined;
-    const totalPrice = quantity > 0 && unitPrice ? quantity * unitPrice : undefined;
+    const hasUnitPrice = formData.unitPrice !== undefined && formData.unitPrice !== null && formData.unitPrice !== '';
+    const unitPrice = hasUnitPrice ? Number(formData.unitPrice) : undefined;
+    const totalPrice = quantity > 0 && unitPrice !== undefined ? quantity * unitPrice : undefined;
     
     const bomItem: BomItem = {
       id: editingIndex !== null ? bom[editingIndex].id : generateUUID(),
@@ -814,8 +807,9 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       const validation = validateBomItem(item);
       if (validation.isValid) {
         const quantity = Number(item.quantity) || 0;
-        const unitPrice = item.unitPrice ? Number(item.unitPrice) : undefined;
-        const totalPrice = item.totalPrice ?? (quantity > 0 && unitPrice ? quantity * unitPrice : undefined);
+        const hasUnitPrice = item.unitPrice !== undefined && item.unitPrice !== null && item.unitPrice !== '';
+        const unitPrice = hasUnitPrice ? Number(item.unitPrice) : undefined;
+        const totalPrice = item.totalPrice ?? (quantity > 0 && unitPrice !== undefined ? quantity * unitPrice : undefined);
         
         const bomItem: BomItem = {
           id: generateUUID(),
@@ -970,7 +964,10 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
           key: 'unitPrice' as keyof BomItem,
           header: 'Unit Price',
           width: '10%',
-          render: (value: number) => value ? value.toLocaleString('vi-VN') : '-',
+          render: (value: number) =>
+            value !== undefined && value !== null
+              ? Number(value).toLocaleString('vi-VN')
+              : '-',
         },
         {
           key: 'totalPrice' as keyof BomItem,
@@ -978,7 +975,9 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
           width: '10%',
           render: (value: number) => {
             // totalPrice is already calculated in tableDataWithErrors
-            return value ? value.toLocaleString('vi-VN') : '-';
+            return value !== undefined && value !== null
+              ? Number(value).toLocaleString('vi-VN')
+              : '-';
           },
         }
       );
@@ -1009,9 +1008,11 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   const tableDataWithErrors = useMemo(() => {
     return paginatedBom.map((item) => {
       const hasErrors = validationErrors[item.id] && Object.keys(validationErrors[item.id]).length > 0;
-      // Auto-calculate totalPrice if not set
-      const calculatedTotalPrice = item.totalPrice ?? 
-        (item.quantity && item.unitPrice ? item.quantity * item.unitPrice : undefined);
+      const quantity = Number(item.quantity) || 0;
+      const hasUnitPrice = item.unitPrice !== undefined && item.unitPrice !== null && item.unitPrice !== '';
+      const normalizedUnitPrice = hasUnitPrice ? Number(item.unitPrice) : undefined;
+      const calculatedTotalPrice = item.totalPrice ??
+        (quantity > 0 && normalizedUnitPrice !== undefined ? quantity * normalizedUnitPrice : undefined);
       return {
         ...item,
         totalPrice: calculatedTotalPrice,
@@ -1020,6 +1021,23 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       };
     });
   }, [paginatedBom, validationErrors]);
+
+  const totalMaterialCost = useMemo(() => {
+    if (!canViewPrice) return 0;
+    return filteredBom.reduce((sum, item) => {
+      const quantity = Number(item.quantity) || 0;
+      const hasUnitPrice = item.unitPrice !== undefined && item.unitPrice !== null && item.unitPrice !== '';
+      const unitPrice = hasUnitPrice ? Number(item.unitPrice) : undefined;
+      const explicitTotal =
+        item.totalPrice !== undefined && item.totalPrice !== null && item.totalPrice !== ''
+          ? Number(item.totalPrice)
+          : undefined;
+      const rowTotal =
+        explicitTotal ??
+        (quantity > 0 && unitPrice !== undefined ? quantity * unitPrice : 0);
+      return sum + (rowTotal || 0);
+    }, 0);
+  }, [filteredBom, canViewPrice]);
 
   return (
     <div className="max-w-7xl mx-auto p-6">
@@ -1042,14 +1060,6 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">{totals.uniqueSuppliers}</div>
               <div className="text-gray-500">Suppliers</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
-                {Object.entries(totals.totalsByUnit).map(([unit, qty]) => (
-                  <div key={unit}>{qty.toFixed(1)} {unit}</div>
-                ))}
-              </div>
-              <div className="text-gray-500">Total Qty</div>
             </div>
           </div>
         </div>
@@ -1307,7 +1317,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               <>
                 <Input
                   label="Unit Price"
-                  value={formData.unitPrice || ''}
+                  value={formData.unitPrice ?? ''}
                   onChange={handleInputChange('unitPrice')}
                   onBlur={() => validation.setFieldTouched('unitPrice')}
                   type="number"
@@ -1320,7 +1330,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                 
                 <Input
                   label="Total Price"
-                  value={formData.totalPrice || ''}
+                  value={formData.totalPrice ?? ''}
                   type="number"
                   disabled
                   placeholder="Auto-calculated"
@@ -1779,6 +1789,30 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                 })
               )}
             </tbody>
+            {canViewPrice && filteredBom.length > 0 && (
+              <tfoot className="bg-gray-50">
+                <tr>
+                  {columns.map((column) => {
+                    const isTotalPriceColumn = column.key === ('totalPrice' as keyof BomItem);
+                    return (
+                      <td
+                        key={`total-row-${column.key as string}`}
+                        className="px-6 py-3 text-sm font-semibold text-gray-900 text-right"
+                        style={{ width: column.width }}
+                      >
+                        {isTotalPriceColumn
+                          ? totalMaterialCost.toLocaleString('vi-VN', {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 2,
+                            })
+                          : ''}
+                      </td>
+                    );
+                  })}
+                  <td className="px-6 py-3" />
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
 

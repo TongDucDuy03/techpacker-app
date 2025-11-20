@@ -8,6 +8,7 @@ import Select from '../shared/Select';
 import Textarea from '../shared/Textarea';
 import Modal from '../shared/Modal';
 import { Plus, Upload, Download, Search, Filter, Package, AlertCircle, X, Copy, RotateCcw, Edit, ChevronLeft, ChevronRight, Save, CheckCircle, Eye, Trash2, FileText } from 'lucide-react';
+import ZoomableImage from '../../common/ZoomableImage';
 import { showSuccess, showError, showWarning, showUndoToast } from '../../../lib/toast';
 import { api } from '../../../lib/api';
 
@@ -406,10 +407,10 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
 
     // Upload to server
     const formDataObj = new FormData();
-    formDataObj.append('designSketch', file);
+    formDataObj.append('constructionImage', file);
 
     try {
-      const response = await api.post('/techpacks/upload-sketch', formDataObj, {
+      const response = await api.post('/techpacks/upload-construction-image', formDataObj, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -1057,10 +1058,17 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
                 {imagePreview ? (
                   <>
                     <div className="relative inline-block">
-                      <img
+                      <ZoomableImage
                         src={imagePreview}
                         alt="Preview"
-                        className="max-w-full h-auto max-h-48 rounded-lg shadow-sm border border-gray-200"
+                        containerClassName="max-w-full h-auto max-h-48 rounded-lg shadow-sm border border-gray-200 bg-white"
+                        className="max-h-48"
+                        fallback={
+                          <div className="flex flex-col items-center justify-center text-gray-400 py-12">
+                            <Upload className="w-10 h-10 mb-2" />
+                            <p className="text-sm">Không thể hiển thị ảnh</p>
+                          </div>
+                        }
                       />
                       <button
                         onClick={() => {

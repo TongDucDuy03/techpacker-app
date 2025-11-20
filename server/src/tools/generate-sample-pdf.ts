@@ -100,7 +100,8 @@ async function main() {
       colorways: [
         { name: 'Black', code: 'BLK', hexColor: '#000000', placement: 'All Over', materialType: 'Jersey' }
       ],
-      logoUrl: ''
+      logoUrl: '',
+      companyLogoUrl: ''
     };
 
   console.log('Generating sample PDF (this may take a few seconds)...');

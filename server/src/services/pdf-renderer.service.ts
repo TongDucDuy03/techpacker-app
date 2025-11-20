@@ -65,8 +65,8 @@ const DEFAULT_STRINGS = {
   emptyCareSymbols: 'Care instructions not provided.',
   colorwaysTitle: 'Colorways',
   emptyColorways: 'No colorways defined for this TechPack.',
-  sampleRoundsTitle: 'Sample Measurement Rounds',
-  emptySampleRounds: 'No sample measurement rounds recorded.',
+  sampleRoundsTitle: 'Sample Rounds',
+  emptySampleRounds: 'No sample rounds recorded.',
   revisionsTitle: 'Revision History',
   emptyRevisions: 'No revision history available.',
 };
@@ -568,6 +568,16 @@ export async function buildRenderModel(
       ? await getImageData(techpack.designSketchUrl, { width: 800, height: 600, fit: (sharp as any).fit.cover })
       : null;
 
+  const companyLogo =
+    techpack.companyLogoUrl
+      ? await getImageData(techpack.companyLogoUrl, {
+          width: 600,
+          height: 220,
+          fit: (sharp as any).fit.contain,
+          background: { r: 255, g: 255, b: 255, alpha: 0 },
+        })
+      : null;
+
   const meta = {
     productName: techpack.productName,
     articleCode: techpack.articleCode,
@@ -589,6 +599,8 @@ export async function buildRenderModel(
     updatedAt: techpack.updatedAt,
     createdAtFormatted: formatDate(techpack.createdAt),
     updatedAtFormatted: formatDate(techpack.updatedAt),
+    companyLogo,
+    companyLogoUrl: techpack.companyLogoUrl,
   };
 
   return {
@@ -606,6 +618,7 @@ export async function buildRenderModel(
     revisions,
     images: {
       coverImage,
+      companyLogo,
     },
     strings: DEFAULT_STRINGS,
     printedBy: options.printedBy,

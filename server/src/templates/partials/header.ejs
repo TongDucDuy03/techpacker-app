@@ -10,20 +10,38 @@
     justify-content: space-between;
     align-items: center;
   }
+  .pdf-header__brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
   .pdf-header__title {
     font-weight: 600;
     color: #0f172a;
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
+  .pdf-header__logo img {
+    max-height: 28px;
+    max-width: 140px;
+    object-fit: contain;
+    display: block;
+  }
   .pdf-header__meta {
     text-align: right;
   }
 </style>
 <div class="pdf-header">
-  <div>
-    <div class="pdf-header__title"><%= meta.articleCode %> — <%= meta.productName %></div>
-    <div>Season: <%= meta.season || 'N/A' %> · Version: <%= meta.version %></div>
+  <div class="pdf-header__brand">
+    <% if (meta?.companyLogo) { %>
+      <div class="pdf-header__logo">
+        <img src="<%= meta.companyLogo %>" alt="Company Logo" />
+      </div>
+    <% } %>
+    <div>
+      <div class="pdf-header__title"><%= meta.articleCode %> — <%= meta.productName %></div>
+      <div>Season: <%= meta.season || 'N/A' %> · Version: <%= meta.version %></div>
+    </div>
   </div>
   <div class="pdf-header__meta">
     <div>Printed by: <%= printedBy %></div>

@@ -5,6 +5,7 @@ import Input from '../shared/Input';
 import Select from '../shared/Select';
 import Textarea from '../shared/Textarea';
 import { Plus, Upload, Image, Video, Eye, Edit, Trash2, Globe } from 'lucide-react';
+import ZoomableImage from '../../common/ZoomableImage';
 
 const HowToMeasureTab: React.FC = () => {
   const context = useTechPack();
@@ -446,10 +447,12 @@ const HowToMeasureTab: React.FC = () => {
 
                 {formData.imageUrl && (
                   <div className="text-center">
-                    <img
+                    <ZoomableImage
                       src={formData.imageUrl}
                       alt="Measurement illustration"
-                      className="max-w-full h-48 object-contain mx-auto rounded-lg border border-gray-200"
+                      containerClassName="max-w-full h-48 mx-auto rounded-lg border border-gray-200 bg-white"
+                      className="h-48"
+                      fallback={null}
                     />
                   </div>
                 )}
@@ -516,10 +519,17 @@ const HowToMeasureTab: React.FC = () => {
 
                 {howTo.imageUrl && (
                   <div className="mb-3">
-                    <img
+                    <ZoomableImage
                       src={howTo.imageUrl}
                       alt={`${howTo.pomCode} measurement`}
-                      className="w-full h-32 object-cover rounded-md border border-gray-200"
+                      containerClassName="w-full h-32 rounded-md border border-gray-200 bg-white"
+                      className="h-32"
+                      fallback={
+                        <div className="flex flex-col items-center justify-center text-gray-400 h-full">
+                          <Image className="w-8 h-8 mb-1" />
+                          <p className="text-xs">Không có ảnh</p>
+                        </div>
+                      }
                     />
                   </div>
                 )}

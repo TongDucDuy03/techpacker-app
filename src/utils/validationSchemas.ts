@@ -70,6 +70,20 @@ export const articleInfoValidationSchema: FormValidationConfig = {
       return null;
     }
   },
+  season: {
+    required: true,
+    minLength: 2,
+    maxLength: 50,
+    custom: (value: string) => {
+      if (!value || value.trim().length === 0) return 'Season is required';
+      if (value.trim().length < 2) return 'Season must be at least 2 characters long';
+      const normalized = value.trim();
+      if (!/^[A-Za-z0-9\s\-_/]+$/.test(normalized)) {
+        return 'Season can only contain letters, numbers, spaces, "-", "_" or "/"';
+      }
+      return null;
+    }
+  },
   notes: { maxLength: 500 }
 };
 
@@ -286,11 +300,14 @@ export const colorwayFormValidationSchema: FormValidationConfig = {
   },
   season: {
     custom: (value: string) => {
-      if (value && value.trim().length > 0) {
-        const validSeasons = ['Spring', 'Summer', 'Autumn', 'Winter', 'SS25', 'FW25', 'SS26', 'FW26'];
-        if (!validSeasons.includes(value)) {
-          return 'Please select a valid season';
-        }
+      if (!value || value.trim().length === 0) {
+        return null;
+      }
+      if (value.trim().length < 2) {
+        return 'Season must be at least 2 characters long';
+      }
+      if (!/^[A-Za-z0-9\s\-_/]+$/.test(value.trim())) {
+        return 'Season can only contain letters, numbers, spaces, "-", "_" or "/"';
       }
       return null;
     }

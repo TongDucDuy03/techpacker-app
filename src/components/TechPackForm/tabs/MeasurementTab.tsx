@@ -19,6 +19,7 @@ import { parseTolerance, formatTolerance, parseStepValue, formatStepValue, forma
 import { SIZE_PRESET_OPTIONS, getPresetById } from '../../../constants/sizePresets';
 import ConfirmationDialog from '../../ConfirmationDialog';
 import { DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR, DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR } from '../../../constants/measurementDisplay';
+import { normalizeMeasurementBaseSizes } from '../../../utils/measurements';
 
 // Progression validation result
 interface ProgressionValidation {
@@ -1619,7 +1620,7 @@ type RoundModalFormState = {
       <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Sample Measurement Rounds</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Sample Rounds</h3>
             <p className="text-sm text-gray-500">Record requested vs measured values for each prototype round</p>
             {!canAddNewRound && sampleMeasurementRounds.length > 0 && (
               <p className="text-xs text-amber-600 mt-1">
@@ -1867,13 +1868,17 @@ type RoundModalFormState = {
 
 // Export validate function for use in parent component
 // Only validate fields that are actually displayed on the UI form
-export const validateMeasurementsForSave = (measurements: MeasurementPoint[]): { isValid: boolean; errors: Array<{ id: string; item: MeasurementPoint; errors: Record<string, string> }> } => {
+export const validateMeasurementsForSave = (
+  measurements: MeasurementPoint[],
+  options?: { defaultBaseSize?: string }
+): { isValid: boolean; errors: Array<{ id: string; item: MeasurementPoint; errors: Record<string, string> }> } => {
   const errors: Array<{ id: string; item: MeasurementPoint; errors: Record<string, string> }> = [];
+  const { normalized } = normalizeMeasurementBaseSizes(measurements, options?.defaultBaseSize);
   
   // Only validate fields that exist on the UI form
   const visibleFields = ['pomCode', 'pomName', 'minusTolerance', 'plusTolerance'];
   
-  measurements.forEach((item) => {
+  normalized.forEach((item) => {
     const itemErrors: Record<string, string> = {};
     
     // Validate only visible fields from schema
@@ -1929,10 +1934,18 @@ export const validateMeasurementsForSave = (measurements: MeasurementPoint[]): {
       itemErrors.sizes = 'At least one size measurement must be greater than 0';
     }
 
-    if ((!item.baseSize || item.baseSize.trim().length === 0) && sizeValues.length > 0) {
-      itemErrors.baseSize = 'Base size is required';
-    } else if (item.baseSize && (!item.sizes || item.sizes[item.baseSize] === undefined)) {
-      itemErrors.baseSize = 'Base size measurement value is required';
+    const filledSizeKeys = Object.keys(item.sizes || {}).filter((size) => {
+      const value = item.sizes?.[size];
+      return value !== undefined && value !== null;
+    });
+
+    if (filledSizeKeys.length > 0) {
+      const trimmedBase = item.baseSize?.trim();
+      if (!trimmedBase) {
+        itemErrors.baseSize = 'Base size is required';
+      } else if (!item.sizes || item.sizes[trimmedBase] === undefined || item.sizes[trimmedBase] === null) {
+        itemErrors.baseSize = 'Base size measurement value is required';
+      }
     }
     
     if (Object.keys(itemErrors).length > 0) {

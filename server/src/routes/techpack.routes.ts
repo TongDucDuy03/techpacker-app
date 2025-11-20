@@ -443,7 +443,7 @@ router.get(
 
 /**
  * @route POST /api/techpacks/upload-sketch
- * @desc Upload a design sketch image
+ * @desc Upload a design sketch image (for Article Info)
  * @access Private (Admin and Designer only)
  */
 router.post(
@@ -451,6 +451,65 @@ router.post(
   requireAuth,
   requireRole([UserRole.Admin, UserRole.Designer]),
   upload.single('designSketch'),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded.' });
+    }
+    // The backend serves static files from /uploads at root level
+    const fileUrl = `/uploads/${req.file.filename}`;
+    return res.status(200).json({ success: true, message: 'File uploaded successfully', data: { url: fileUrl } });
+  }
+);
+
+/**
+ * @route POST /api/techpacks/upload-company-logo
+ * @desc Upload a company logo (used across PDFs)
+ * @access Private (Admin and Designer only)
+ */
+router.post(
+  '/upload-company-logo',
+  requireAuth,
+  requireRole([UserRole.Admin, UserRole.Designer]),
+  upload.single('companyLogo'),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded.' });
+    }
+    const fileUrl = `/uploads/${req.file.filename}`;
+    return res.status(200).json({ success: true, message: 'File uploaded successfully', data: { url: fileUrl } });
+  }
+);
+
+/**
+ * @route POST /api/techpacks/upload-colorway-image
+ * @desc Upload a colorway image
+ * @access Private (Admin and Designer only)
+ */
+router.post(
+  '/upload-colorway-image',
+  requireAuth,
+  requireRole([UserRole.Admin, UserRole.Designer]),
+  upload.single('colorwayImage'),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded.' });
+    }
+    // The backend serves static files from /uploads at root level
+    const fileUrl = `/uploads/${req.file.filename}`;
+    return res.status(200).json({ success: true, message: 'File uploaded successfully', data: { url: fileUrl } });
+  }
+);
+
+/**
+ * @route POST /api/techpacks/upload-construction-image
+ * @desc Upload a construction/how-to-measure image
+ * @access Private (Admin and Designer only)
+ */
+router.post(
+  '/upload-construction-image',
+  requireAuth,
+  requireRole([UserRole.Admin, UserRole.Designer]),
+  upload.single('constructionImage'),
   (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded.' });

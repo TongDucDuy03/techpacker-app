@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useTechPack } from '../../../contexts/TechPackContext';
 import { BomItem, Colorway, ColorwayPart } from '../../../types/techpack';
 import { useFormValidation } from '../../../hooks/useFormValidation';
@@ -9,7 +9,12 @@ import DataTable from '../shared/DataTable';
 import { Plus, Palette, Copy, Eye, Star, Upload, Download, AlertCircle, Image as ImageIcon, X, Trash2 } from 'lucide-react';
 import { validateFields } from '../../../utils/validation';
 import { showError, showSuccess } from '../../../lib/toast';
-import { api, isApiConfigured } from '../../../lib/api';
+import { api } from '../../../lib/api';
+import { useSeasonSuggestions } from '../../../hooks/useSeasonSuggestions';
+import ZoomableImage from '../../common/ZoomableImage';
+
+const API_UPLOAD_BASE =
+  (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001/api/v1').replace(/\/api\/v1$/, '');
 
 // Helper to resolve image URL (handles both absolute and relative paths)
 const resolveImageUrl = (url?: string | null): string | null => {
@@ -17,18 +22,10 @@ const resolveImageUrl = (url?: string | null): string | null => {
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
     return url;
   }
-  // If relative path, prepend API base URL
   if (url.startsWith('/')) {
-    const apiBase = isApiConfigured() ? (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-      ? 'http://localhost:4001' 
-      : `http://${window.location.hostname}:4001`) : '';
-    // Ensure URL starts with /api/v1 if it's an upload path
-    if (url.startsWith('/uploads/') && !url.startsWith('/api/v1')) {
-      return `${apiBase}/api/v1${url}`;
-    }
-    return `${apiBase}${url}`;
+    return `${API_UPLOAD_BASE}${url}`;
   }
-  return url;
+  return `${API_UPLOAD_BASE}/${url}`;
 };
 
 const ColorwayTab: React.FC = () => {
@@ -107,6 +104,14 @@ const ColorwayTab: React.FC = () => {
     { value: 'Applique', label: 'Applique' },
   ];
 
+  const renderImagePlaceholder = (subtitle = 'Upload an image to display') => (
+    <div className="flex flex-col items-center justify-center text-gray-400">
+      <ImageIcon className="w-12 h-12 mb-2" />
+      <p className="text-sm">No Image</p>
+      {subtitle && <p className="text-xs mt-1">{subtitle}</p>}
+    </div>
+  );
+
   // Approval status options
   const approvalStatusOptions = [
     { value: 'Pending', label: 'Pending' },
@@ -121,17 +126,17 @@ const ColorwayTab: React.FC = () => {
     { value: 'Finished', label: 'Finished' },
   ];
 
-  // Season options
-  const seasonOptions = [
-    { value: 'Spring', label: 'Spring' },
-    { value: 'Summer', label: 'Summer' },
-    { value: 'Autumn', label: 'Autumn' },
-    { value: 'Winter', label: 'Winter' },
-    { value: 'SS25', label: 'Spring/Summer 2025' },
-    { value: 'FW25', label: 'Fall/Winter 2025' },
-    { value: 'SS26', label: 'Spring/Summer 2026' },
-    { value: 'FW26', label: 'Fall/Winter 2026' }
-  ];
+  const { seasonSuggestions, addSeasonSuggestion } = useSeasonSuggestions();
+  useEffect(() => {
+    const uniqueSeasons = Array.from(
+      new Set(colorways.map((c) => c.season).filter((season): season is string => Boolean(season)))
+    );
+    uniqueSeasons.forEach((season) => addSeasonSuggestion(season));
+  }, [colorways, addSeasonSuggestion]);
+  const seasonDatalistOptions = useMemo(
+    () => seasonSuggestions.map((season) => ({ value: season, label: season })),
+    [seasonSuggestions]
+  );
 
   const handleInputChange = (field: keyof Colorway) => (value: string | boolean) => {
     let nextValue: string | boolean = value;
@@ -152,6 +157,12 @@ const ColorwayTab: React.FC = () => {
 
     // Validate the field in real-time
     validation.validateField(field, nextValue);
+  };
+
+  const handleSeasonChange = (value: string | number) => {
+    const nextValue = typeof value === 'number' ? String(value) : value;
+    handleInputChange('season')(nextValue);
+    addSeasonSuggestion(nextValue);
   };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -184,10 +195,10 @@ const ColorwayTab: React.FC = () => {
 
     // Upload to server
     const formDataObj = new FormData();
-    formDataObj.append('designSketch', file);
+    formDataObj.append('colorwayImage', file);
 
     try {
-      const response = await api.post('/techpacks/upload-sketch', formDataObj, {
+      const response = await api.post('/techpacks/upload-colorway-image', formDataObj, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -618,42 +629,13 @@ const ColorwayTab: React.FC = () => {
             <div className="relative">
               {/* Image Preview */}
               <div className="w-full h-[180px] rounded-xl border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center relative">
-                {(() => {
-                  const displayUrl = imagePreview || (formData.imageUrl ? resolveImageUrl(formData.imageUrl) : null);
-                  if (displayUrl) {
-                    return (
-                      <img
-                        key={formData.imageUrl || imagePreview || 'preview'}
-                        src={displayUrl}
-                        alt="Colorway preview"
-                        className="w-full h-full object-cover object-center"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent && !parent.querySelector('.image-placeholder')) {
-                            const placeholder = document.createElement('div');
-                            placeholder.className = 'image-placeholder flex flex-col items-center justify-center h-full text-gray-400';
-                            placeholder.innerHTML = `
-                              <svg class="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
-                              <p class="text-sm">No Image</p>
-                            `;
-                            parent.appendChild(placeholder);
-                          }
-                        }}
-                      />
-                    );
-                  }
-                  return (
-                    <div className="flex flex-col items-center justify-center text-gray-400">
-                      <ImageIcon className="w-12 h-12 mb-2" />
-                      <p className="text-sm">No Image</p>
-                      <p className="text-xs mt-1">Upload an image to display</p>
-                    </div>
-                  );
-                })()}
+                <ZoomableImage
+                  src={imagePreview || (formData.imageUrl ? resolveImageUrl(formData.imageUrl) : '')}
+                  alt="Colorway preview"
+                  containerClassName="w-full h-full"
+                  className="bg-white"
+                  fallback={renderImagePlaceholder()}
+                />
               </div>
               
               {/* Upload Button */}
@@ -722,14 +704,16 @@ const ColorwayTab: React.FC = () => {
               helperText={validation.getFieldProps('code').helperText}
             />
 
-            <Select
+            <Input
               label="Season"
               value={formData.season || ''}
-              onChange={handleInputChange('season')}
+              onChange={handleSeasonChange}
               onBlur={() => validation.setFieldTouched('season')}
-              options={seasonOptions}
+              placeholder="e.g., SS25, FW26, Resort 2026"
               error={validation.getFieldProps('season').error}
               helperText={validation.getFieldProps('season').helperText}
+              datalistOptions={seasonDatalistOptions}
+              listId="colorway-season-options"
             />
 
             <Input
@@ -1016,37 +1000,13 @@ const ColorwayTab: React.FC = () => {
             <div key={colorway.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
               {/* Image Section */}
               <div className="w-full h-[180px] sm:h-[200px] md:h-[180px] rounded-t-lg border-b border-gray-200 bg-gray-50 overflow-hidden relative group">
-                {colorway.imageUrl ? (
-                  <>
-                    <img
-                      src={resolveImageUrl(colorway.imageUrl) || ''}
-                      alt={colorway.name}
-                      className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105 group-hover:shadow-lg"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                        const parent = target.parentElement;
-                        if (parent && !parent.querySelector('.image-placeholder')) {
-                          const placeholder = document.createElement('div');
-                          placeholder.className = 'image-placeholder flex flex-col items-center justify-center h-full text-gray-400';
-                          placeholder.innerHTML = `
-                            <svg class="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <p class="text-sm">No Image</p>
-                          `;
-                          parent.appendChild(placeholder);
-                        }
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity duration-300" />
-                  </>
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
-                    <ImageIcon className="w-12 h-12 mb-2" />
-                    <p className="text-sm">No Image</p>
-                  </div>
-                )}
+                <ZoomableImage
+                  src={colorway.imageUrl ? resolveImageUrl(colorway.imageUrl) : ''}
+                  alt={colorway.name}
+                  containerClassName="w-full h-full bg-white"
+                  fallback={renderImagePlaceholder('No image')}
+                />
+                <div className="absolute inset-0 pointer-events-none bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity duration-300" />
               </div>
               
               <div className="p-4">
@@ -1097,13 +1057,37 @@ const ColorwayTab: React.FC = () => {
                       </span>
                     </div>
                   )}
-                  <div className="flex items-center justify-between mt-1">
-                    <span>Status: <span className={`font-medium ${
-                      colorway.approvalStatus === 'Approved' ? 'text-green-600' :
-                      colorway.approvalStatus === 'Rejected' ? 'text-red-600' : 'text-yellow-600'
-                    }`}>{colorway.approvalStatus}</span></span>
-                    <span className="text-xs text-gray-500">{colorway.productionStatus}</span>
-                  </div>
+                  {(colorway.approvalStatus !== 'Pending' || colorway.productionStatus) && (
+                    <div
+                      className={`flex items-center mt-1 ${
+                        colorway.approvalStatus !== 'Pending' && colorway.productionStatus
+                          ? 'justify-between'
+                          : colorway.approvalStatus !== 'Pending'
+                            ? 'justify-start'
+                            : 'justify-end'
+                      }`}
+                    >
+                      {colorway.approvalStatus !== 'Pending' && (
+                        <span>
+                          Status:{' '}
+                          <span
+                            className={`font-medium ${
+                              colorway.approvalStatus === 'Approved'
+                                ? 'text-green-600'
+                                : colorway.approvalStatus === 'Rejected'
+                                  ? 'text-red-600'
+                                  : 'text-yellow-600'
+                            }`}
+                          >
+                            {colorway.approvalStatus}
+                          </span>
+                        </span>
+                      )}
+                      {colorway.productionStatus && (
+                        <span className="text-xs text-gray-500">{colorway.productionStatus}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Color Swatches */}

@@ -17,13 +17,41 @@ const Input: React.FC<InputProps> = ({
   min,
   max,
   step,
+  inputMode,
+  datalistOptions,
+  listId,
 }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value;
-    onChange(newValue);
+    if (type === 'number') {
+      const raw = e.target.value;
+      const transitionalStates = ['', '-', '.', '-.', raw.endsWith('.') ? raw : null].filter(
+        (state): state is string => state !== null && state !== undefined
+      );
+      if (transitionalStates.includes(raw)) {
+        onChange(raw);
+        return;
+      }
+
+      const parsed = Number(raw);
+      if (Number.isNaN(parsed)) {
+        onChange('');
+      } else {
+        onChange(parsed);
+      }
+      return;
+    }
+
+    onChange(e.target.value);
   };
 
   const inputId = `input-${label.toLowerCase().replace(/\s+/g, '-')}`;
+  const normalizedDatalist =
+    datalistOptions?.map((option) =>
+      typeof option === 'string'
+        ? { value: option, label: option }
+        : { value: option.value, label: option.label ?? option.value }
+    ) ?? [];
+  const resolvedListId = normalizedDatalist.length > 0 ? listId ?? `${inputId}-list` : undefined;
 
   return (
     <div className={`flex flex-col space-y-1 ${className}`}>
@@ -48,6 +76,8 @@ const Input: React.FC<InputProps> = ({
         min={min}
         max={max}
         step={step}
+        inputMode={inputMode}
+        list={resolvedListId}
         className={`
           px-3 py-2 border rounded-md shadow-sm text-sm
           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
@@ -58,6 +88,15 @@ const Input: React.FC<InputProps> = ({
           }
         `}
       />
+      {resolvedListId && (
+        <datalist id={resolvedListId}>
+          {normalizedDatalist.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </datalist>
+      )}
       
       {error && <span className="text-xs text-red-600 mt-1">{error}</span>}
       {!error && helperText && <span className="text-xs text-gray-500 mt-1">{helperText}</span>}

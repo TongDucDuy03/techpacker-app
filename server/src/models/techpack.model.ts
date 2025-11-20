@@ -168,6 +168,7 @@ export interface ITechPack extends Document {
   fabricDescription: string;
   productDescription: string;
   designSketchUrl?: string;
+  companyLogoUrl?: string;
   status: TechPackStatus;
   lifecycleStage?: 'Concept' | 'Design' | 'Development' | 'Pre-production' | 'Production' | 'Shipped';
   category?: string;
@@ -381,6 +382,10 @@ const TechPackSchema = new Schema<ITechPack>(
       required: function(this: ITechPack) {
         return ['Concept', 'Design'].includes(this.lifecycleStage || '');
       }
+    },
+    companyLogoUrl: {
+      type: String,
+      trim: true
     },
     status: {
       type: String,
