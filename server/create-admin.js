@@ -1,106 +1,127 @@
-const axios = require('axios');
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+require('dotenv').config();
 
-const API_BASE_URL = 'http://localhost:4001/api/v1';
+// Import User model - we need to define it here since we're using JS not TS
+const UserSchema = new mongoose.Schema(
+  {
+    firstName: { type: String, required: true, trim: true },
+    lastName: { type: String, required: true, trim: true },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    password: { type: String, required: true, select: false },
+    role: { type: String, enum: ['designer', 'merchandiser', 'admin', 'viewer'], default: 'designer' },
+    customerId: { type: String, trim: true },
+    isActive: { type: Boolean, default: true },
+    lastLogin: { type: Date },
+    refreshTokens: [{ type: String }],
+    is2FAEnabled: { type: Boolean, default: true },
+    twoFactorCode: { type: String, select: false },
+    twoFactorCodeExpires: { type: Date },
+    twoFactorCodeAttempts: { type: Number, default: 0 },
+  },
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+  }
+);
+
+// Hash password before saving
+UserSchema.pre('save', async function (next) {
+  if (!this.isModified('password') || !this.password) {
+    return next();
+  }
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Virtual property for fullName
+UserSchema.virtual('fullName').get(function() {
+  return `${this.firstName} ${this.lastName}`;
+});
+
+const User = mongoose.models.User || mongoose.model('User', UserSchema);
+
+// Get MongoDB URI from config
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/techpacker';
 
 async function createAdminAccount() {
-  console.log('Tạo tài khoản admin...\n');
-
   try {
-    // Đăng ký tài khoản mới
-    console.log('1. Đăng ký tài khoản test@techpacker.com...');
-    const registerResponse = await axios.post(`${API_BASE_URL}/auth/register`, {
-      firstName: 'Admin',
-      lastName: 'User',
-      username: 'admin',
-      email: 'test@techpacker.com',
-      password: 'password123',
-      role: 'Admin' // Thử set role admin ngay từ đầu
+    console.log('🔌 Đang kết nối đến MongoDB...');
+    console.log('   MongoDB URI:', MONGO_URI.replace(/\/\/.*@/, '//***:***@')); // Hide credentials in log
+    
+    await mongoose.connect(MONGO_URI, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
     });
+    console.log('✅ Đã kết nối đến MongoDB\n');
 
-    console.log('✅ Đăng ký thành công:', registerResponse.data);
+    // Admin credentials
+    const adminEmail = 'duytongduc510@gmail.com';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'Admin123!';
+    const firstName = process.env.ADMIN_FIRST_NAME || 'Admin';
+    const lastName = process.env.ADMIN_LAST_NAME || 'User';
 
-    // Thử đăng nhập để kiểm tra
-    console.log('\n2. Kiểm tra đăng nhập...');
-    const loginResponse = await axios.post(`${API_BASE_URL}/auth/login`, {
-      email: 'test@techpacker.com',
-      password: 'password123'
-    });
-
-    console.log('✅ Đăng nhập thành công:', {
-      message: loginResponse.data.message,
-      user: loginResponse.data.data.user,
-      token: loginResponse.data.data.token ? 'Token có sẵn' : 'Không có token'
-    });
-
-  } catch (error) {
-    if (error.response) {
-      console.log('❌ Lỗi:', error.response.data);
-      console.log('Status:', error.response.status);
-      
-      // Nếu tài khoản đã tồn tại, thử đăng nhập
-      if (error.response.status === 400 && error.response.data.message?.includes('already exists')) {
-        console.log('\n3. Tài khoản đã tồn tại, thử đăng nhập...');
-        try {
-          const loginResponse = await axios.post(`${API_BASE_URL}/auth/login`, {
-            email: 'duytongduc510@gmail.com',
-            password: 'password123'
-          });
-          console.log('✅ Đăng nhập thành công với tài khoản hiện có:', {
-            message: loginResponse.data.message,
-            user: loginResponse.data.data.user
-          });
-        } catch (loginError) {
-          console.log('❌ Không thể đăng nhập:', loginError.response?.data || loginError.message);
-        }
-      }
-    } else {
-      console.log('❌ Lỗi kết nối:', error.message);
+    // Check if admin already exists
+    const existingAdmin = await User.findOne({ email: adminEmail });
+    if (existingAdmin) {
+      console.log(`⚠️  Tài khoản admin với email "${adminEmail}" đã tồn tại.`);
+      console.log(`   Role: ${existingAdmin.role}`);
+      console.log(`   Name: ${existingAdmin.firstName} ${existingAdmin.lastName}`);
+      console.log(`   Active: ${existingAdmin.isActive}`);
+      console.log('\n   Nếu muốn tạo lại, hãy xóa user này trước.');
+      await mongoose.disconnect();
+      return;
     }
+
+    // Check if any admin exists
+    const anyAdmin = await User.findOne({ role: 'admin' });
+    if (anyAdmin) {
+      console.log(`⚠️  Đã có admin user khác tồn tại (${anyAdmin.email}).`);
+      console.log('   Bạn vẫn có thể tạo admin mới với email khác.');
+    }
+
+    // Create admin user
+    console.log('👤 Đang tạo tài khoản admin...');
+    const adminUser = new User({
+      firstName,
+      lastName,
+      email: adminEmail,
+      password: adminPassword, // Will be hashed by pre-save hook
+      role: 'admin',
+      isActive: true,
+    });
+
+    await adminUser.save();
+    console.log('✅ Tạo tài khoản admin thành công!\n');
+    console.log('📋 Thông tin đăng nhập:');
+    console.log(`   Email: ${adminEmail}`);
+    console.log(`   Password: ${adminPassword}`);
+    console.log(`   Role: ${adminUser.role}`);
+    console.log(`   Name: ${adminUser.firstName} ${adminUser.lastName}`);
+    console.log('\n⚠️  QUAN TRỌNG: Đổi mật khẩu mặc định sau lần đăng nhập đầu tiên!');
+
+    await mongoose.disconnect();
+    console.log('\n✅ Hoàn tất!');
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Lỗi khi tạo admin:', error.message);
+    if (error.code === 11000) {
+      console.error('   Email đã tồn tại trong database.');
+    }
+    if (error.name === 'MongoServerError') {
+      console.error('   Lỗi kết nối MongoDB. Kiểm tra lại MONGO_URI trong file .env');
+    }
+    await mongoose.disconnect().catch(() => {});
+    process.exit(1);
   }
 }
 
-// Thêm function để kiểm tra validation chi tiết
-async function checkValidationDetails() {
-  console.log('\nKiểm tra validation requirements...\n');
-
-  try {
-    // Thử với thông tin tối thiểu trước
-    const response = await axios.post(`${API_BASE_URL}/auth/register`, {
-      email: 'duytongduc510@gmail.com',
-      password: 'password123'
-    });
-    console.log('✅ Đăng ký thành công với thông tin tối thiểu');
-  } catch (error) {
-    if (error.response) {
-      console.log('❌ Chi tiết lỗi validation:');
-      console.log('Status:', error.response.status);
-      console.log('Message:', error.response.data.message);
-      if (error.response.data.error && error.response.data.error.details) {
-        console.log('Details:', JSON.stringify(error.response.data.error.details, null, 2));
-      }
-
-      // Thử với đầy đủ thông tin required
-      console.log('\nThử với thông tin đầy đủ...');
-      try {
-        const fullResponse = await axios.post(`${API_BASE_URL}/auth/register`, {
-          firstName: 'Admin',
-          lastName: 'User',
-          email: 'duytongduc510@gmail.com',
-          password: 'password123',
-          username: 'adminuser'
-        });
-        console.log('✅ Đăng ký thành công với thông tin đầy đủ');
-      } catch (fullError) {
-        console.log('❌ Vẫn lỗi với thông tin đầy đủ:');
-        if (fullError.response?.data?.error?.details) {
-          console.log('Details:', JSON.stringify(fullError.response.data.error.details, null, 2));
-        }
-      }
-    } else {
-        console.log('❌ Lỗi không xác định:', error.message);
-    }
-  }
-}
-
-// Chạy function kiểm tra validation trước
-checkValidationDetails().catch(console.error);
+// Run the function
+createAdminAccount();
