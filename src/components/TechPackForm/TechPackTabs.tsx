@@ -353,8 +353,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       code: 'Colorway Code',
       placement: 'Placement',
       materialType: 'Material Type',
-      // Construction fields
-      pomCode: 'POM Code',
+      // Construction fields (pomCode already defined above for Measurements)
       description: 'Description',
       steps: 'Steps',
     };

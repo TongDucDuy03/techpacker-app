@@ -97,24 +97,20 @@ class AuthController {
         user.twoFactorCodeAttempts = 0;
         await user.save();
 
-        // Send code via email
-        const emailSent = await emailService.send2FACode(
+        // Generate temporary session token first (before email to avoid timeout)
+        const sessionToken = twoFactorService.generateSessionToken(user._id.toString());
+
+        // Send code via email (non-blocking - don't wait for email to complete)
+        emailService.send2FACode(
           user.email,
           code,
           `${user.firstName} ${user.lastName}`
-        );
+        ).catch((error) => {
+          console.error('Failed to send 2FA email:', error);
+          // Log error but don't block login flow
+        });
 
-        if (!emailSent) {
-          console.error('Failed to send 2FA email');
-          // Reset 2FA code on failure
-          await twoFactorService.reset2FACode(user);
-          return sendError(res, 'Failed to send verification code. Please try again.', 500, 'EMAIL_ERROR');
-        }
-
-        // Generate temporary session token
-        const sessionToken = twoFactorService.generateSessionToken(user._id.toString());
-
-        console.log('2FA code sent to:', email);
+        console.log('2FA code generated and email sending initiated for:', email);
         return sendSuccess(res, {
           requires2FA: true,
           sessionToken,
