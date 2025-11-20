@@ -21,7 +21,7 @@ const getApiUrl = () => {
 
 const BASE_URL = getApiUrl();
 const TEST_USER = {
-  email: process.env.TEST_EMAIL || 'admin@techpacker.com',
+  email: process.env.TEST_EMAIL || 'duytongduc510@gmail.com',
   password: process.env.TEST_PASSWORD || 'Admin123!'
 };
 
