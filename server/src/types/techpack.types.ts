@@ -7,6 +7,7 @@ export interface TechPackData {
   howToMeasure: HowToMeasureItem[];
   colorways: Colorway[];
   logoUrl?: string;
+  companyLogoUrl?: string;
   watermark?: WatermarkConfig;
 }
 
