@@ -87,7 +87,11 @@ class ApiClient {
 
     // Response interceptor for error handling and token refresh
     this.axiosInstance.interceptors.response.use(
-      (response: AxiosResponse<ApiResponse>) => {
+      (response: AxiosResponse<ApiResponse | Blob>) => {
+        // For blob responses (like PDF), return as-is without processing
+        if (response.config.responseType === 'blob' || response.data instanceof Blob) {
+          return response;
+        }
         return response;
       },
       async (error: AxiosError<ApiError>) => {

@@ -241,10 +241,12 @@ const getDiffToneClass = (value: string): string => {
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-100">
-          {measurementRows.map(row => {
+          {measurementRows.map((row, rowIndex) => {
             const sizeKeys = getSizeKeysForRow(row, sampleRounds, availableSizes, getEntryForRound);
             const tolerance = getToleranceDisplay(row);
             const measurementMethod = row.measurement?.measurementMethod;
+            const isEvenRow = rowIndex % 2 === 0;
+            const rowBgColor = isEvenRow ? '#ffffff' : '#f9fafb';
 
             return sizeKeys.map((size, index) => {
               const entryCells = sampleRounds.flatMap(round => {
@@ -271,7 +273,8 @@ const getDiffToneClass = (value: string): string => {
                     return (
                       <td
                         key={cellKey}
-                        className="border-r border-gray-200 px-2 py-2 align-top text-center text-sm text-gray-900 bg-gray-50"
+                        className="border-r border-gray-200 px-2 py-2 align-top text-center text-sm text-gray-900"
+                        style={{ backgroundColor: rowBgColor }}
                       >
                         {requestedValue || '—'}
                       </td>
@@ -288,6 +291,7 @@ const getDiffToneClass = (value: string): string => {
                         <td
                           key={cellKey}
                           className="border-r border-gray-200 px-2 py-2 text-center text-xs text-gray-400 bg-gray-50"
+                          style={{ backgroundColor: rowBgColor }}
                         >
                           —
                         </td>
@@ -301,6 +305,7 @@ const getDiffToneClass = (value: string): string => {
                         className={`border-r border-gray-200 px-2 py-1 align-top ${
                           fieldKey === 'measured' || fieldKey === 'revised' ? '' : ''
                         }`}
+                        style={{ backgroundColor: rowBgColor }}
                       >
                         {fieldKey === 'comments' ? (
                           <textarea
@@ -349,7 +354,11 @@ const getDiffToneClass = (value: string): string => {
 
                   if (fieldKey === 'comments') {
                     return (
-                      <td key={cellKey} className="border-r border-gray-200 px-2 py-1 align-top">
+                      <td 
+                        key={cellKey} 
+                        className="border-r border-gray-200 px-2 py-1 align-top"
+                        style={{ backgroundColor: rowBgColor }}
+                      >
                         <textarea
                           value={fieldValue}
                           onChange={event =>
@@ -395,6 +404,7 @@ const getDiffToneClass = (value: string): string => {
                       className={`border-r border-gray-200 px-2 py-1 align-top ${
                         outOfTolerance ? 'bg-red-50' : ''
                       }`}
+                      style={outOfTolerance ? undefined : { backgroundColor: rowBgColor }}
                     >
                       <input
                         type="number"
@@ -421,11 +431,15 @@ const getDiffToneClass = (value: string): string => {
               });
 
               return (
-                <tr key={`${row.key}-${size}`}>
+                <tr 
+                  key={`${row.key}-${size}`}
+                  style={{ backgroundColor: rowBgColor }}
+                >
                   {index === 0 && (
                     <td
                       rowSpan={sizeKeys.length}
-                      className="sticky left-0 bg-white border-r border-gray-200 px-4 py-3 align-top z-20 shadow-[4px_0_6px_-4px_rgba(0,0,0,0.1)] min-w-[220px]"
+                      className="sticky left-0 border-r border-gray-200 px-4 py-3 align-top z-20 shadow-[4px_0_6px_-4px_rgba(0,0,0,0.1)] min-w-[220px]"
+                      style={{ backgroundColor: rowBgColor }}
                     >
                       <div className="text-sm font-semibold text-gray-900">
                         {row.pomCode ? `${row.pomCode} - ${row.pomName || row.measurement?.pomName || ''}` : row.pomName || row.measurement?.pomName || 'Measurement'}
@@ -437,10 +451,16 @@ const getDiffToneClass = (value: string): string => {
                       )}
                     </td>
                   )}
-                  <td className="sticky left-[220px] bg-white border-r border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 z-10 min-w-[70px]">
+                  <td 
+                    className="sticky left-[220px] border-r border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 z-10 min-w-[70px]"
+                    style={{ backgroundColor: rowBgColor }}
+                  >
                     {size}
                   </td>
-                  <td className="sticky left-[290px] bg-white border-r border-gray-200 px-3 py-2 text-xs text-gray-600 z-10 min-w-[100px]">
+                  <td 
+                    className="sticky left-[290px] border-r border-gray-200 px-3 py-2 text-xs text-gray-600 z-10 min-w-[100px]"
+                    style={{ backgroundColor: rowBgColor }}
+                  >
                     {tolerance.label}
                   </td>
                   {entryCells}

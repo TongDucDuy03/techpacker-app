@@ -132,6 +132,7 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
       render: (status: string) => <Tag color={getStatusColor(status)} className="status-tag">{status.toUpperCase()}</Tag>
     },
     { title: 'Season', dataIndex: 'season', sorter: (a: any, b: any) => a.season.localeCompare(b.season), render: (s, r: any) => s || r.metadata?.season },
+    { title: 'Created Date', dataIndex: 'createdAt', sorter: (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(), render: (date: string) => new Date(date).toLocaleDateString() },
     { title: 'Last Updated', dataIndex: 'updatedAt', sorter: (a: any, b: any) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(), render: (date: string) => new Date(date).toLocaleDateString() },
     {
       title: 'Actions',

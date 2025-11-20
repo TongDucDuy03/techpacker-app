@@ -1,0 +1,3 @@
+export const DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR = '#dbeafe';
+export const DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR = '#f3f4f6';
+

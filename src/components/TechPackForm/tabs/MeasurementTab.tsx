@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useTechPack } from '../../../contexts/TechPackContext';
 import {
   MeasurementPoint,
@@ -11,12 +11,14 @@ import {
 import { useFormValidation } from '../../../hooks/useFormValidation';
 import { measurementValidationSchema } from '../../../utils/validationSchemas';
 import Input from '../shared/Input';
-import { Plus, Upload, Download, Ruler, AlertTriangle, Info, AlertCircle, X, Save, CheckCircle } from 'lucide-react';
+import { Plus, Upload, Download, Ruler, AlertTriangle, Info, AlertCircle, X, Save, CheckCircle, Copy } from 'lucide-react';
 import { showSuccess, showWarning, showError } from '../../../lib/toast';
-import { validateFields } from '../../../utils/validation';
 import SampleMeasurementsTable from './SampleMeasurementsTable';
 import { SampleMeasurementRow } from '../../../types/measurements';
-import { parseTolerance, formatTolerance } from './measurementHelpers';
+import { parseTolerance, formatTolerance, parseStepValue, formatStepValue, formatMeasurementValue } from './measurementHelpers';
+import { SIZE_PRESET_OPTIONS, getPresetById } from '../../../constants/sizePresets';
+import ConfirmationDialog from '../../ConfirmationDialog';
+import { DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR, DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR } from '../../../constants/measurementDisplay';
 
 // Progression validation result
 interface ProgressionValidation {
@@ -37,13 +39,15 @@ const MeasurementTab: React.FC = () => {
     deleteSampleMeasurementRound,
     updateSampleMeasurementEntry,
     saveTechPack,
+    updateMeasurementSizeRange,
+    updateMeasurementBaseSize,
+    updateMeasurementDisplaySettings,
   } = context ?? {};
   const { measurements = [], articleInfo, sampleMeasurementRounds = [] } = state?.techpack ?? {};
   const hasUnsavedChanges = state?.hasUnsavedChanges ?? false;
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [progressionMode, setProgressionMode] = useState<'strict' | 'warn'>('strict'); // strict = block, warn = allow with warning
   const [showRoundModal, setShowRoundModal] = useState(false);
   const [roundForm, setRoundForm] = useState<RoundModalFormState>(() => ({
@@ -62,10 +66,200 @@ const MeasurementTab: React.FC = () => {
     minusTolerance: 1.0, // Changed to number
     plusTolerance: 1.0, // Changed to number
     sizes: {},
+    baseSize: undefined,
     notes: '',
     measurementMethod: '',
     isActive: true,
   });
+  const [sizeAdjustments, setSizeAdjustments] = useState<Record<string, string>>({});
+  const [newSizeLabel, setNewSizeLabel] = useState('');
+  const [pendingPresetId, setPendingPresetId] = useState(() => SIZE_PRESET_OPTIONS[0]?.id || 'standard_us_alpha');
+  const [baseSizeSelectorValue, setBaseSizeSelectorValue] = useState('');
+  const [pendingBaseSize, setPendingBaseSize] = useState<string | null>(null);
+  const [showBaseSizeConfirm, setShowBaseSizeConfirm] = useState(false);
+
+  const configuredSizeRange = state?.techpack?.measurementSizeRange;
+  const defaultGenderSizes = useMemo(
+    () => SIZE_RANGES[articleInfo?.gender as keyof typeof SIZE_RANGES] || SIZE_RANGES['Unisex'],
+    [articleInfo?.gender]
+  );
+  const selectedSizes = configuredSizeRange && configuredSizeRange.length > 0
+    ? configuredSizeRange
+    : defaultGenderSizes;
+
+  const measurementBaseSize = useMemo(() => {
+    if (!selectedSizes.length) return undefined;
+    const configuredBase = state?.techpack?.measurementBaseSize;
+    if (configuredBase && selectedSizes.includes(configuredBase)) {
+      return configuredBase;
+    }
+    const measurementFallback = measurements.find(
+      measurement => measurement.baseSize && selectedSizes.includes(measurement.baseSize)
+    )?.baseSize;
+    return measurementFallback || selectedSizes[0];
+  }, [measurements, selectedSizes, state?.techpack?.measurementBaseSize]);
+
+  const baseHighlightColor = DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR; // Always use default color
+  const rowStripeColor = state?.techpack?.measurementRowStripeColor || DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR;
+
+  useEffect(() => {
+    if (!updateMeasurementSizeRange) return;
+    if (!configuredSizeRange || configuredSizeRange.length === 0) {
+      updateMeasurementSizeRange(defaultGenderSizes);
+    }
+  }, [configuredSizeRange, defaultGenderSizes, updateMeasurementSizeRange]);
+
+  useEffect(() => {
+    if (!selectedSizes.length) return;
+    setFormData(prev => {
+      let changed = false;
+      let nextBaseSize = measurementBaseSize && selectedSizes.includes(measurementBaseSize)
+        ? measurementBaseSize
+        : prev.baseSize;
+      if (!nextBaseSize || !selectedSizes.includes(nextBaseSize)) {
+        nextBaseSize = selectedSizes[0];
+      }
+      if (nextBaseSize !== prev.baseSize) {
+        changed = true;
+      }
+
+      const nextSizes = prev.sizes ? { ...prev.sizes } : {};
+      if (prev.sizes) {
+        Object.keys(prev.sizes).forEach(size => {
+          if (!selectedSizes.includes(size)) {
+            delete nextSizes[size];
+            changed = true;
+          }
+        });
+      }
+
+      if (!changed) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        baseSize: nextBaseSize,
+        sizes: nextSizes,
+      };
+    });
+  }, [measurementBaseSize, selectedSizes]);
+
+  useEffect(() => {
+    setBaseSizeSelectorValue(measurementBaseSize || '');
+  }, [measurementBaseSize]);
+
+  const baseValue = formData.baseSize && formData.sizes
+    ? formData.sizes[formData.baseSize]
+    : undefined;
+
+  const deriveAdjustmentsFromSizes = useCallback(
+    (sizes: Record<string, number> | undefined, baseSize?: string): Record<string, string> => {
+      if (!sizes || !baseSize || sizes[baseSize] === undefined) return {};
+      const base = sizes[baseSize];
+      const entries = Object.entries(sizes).reduce<Record<string, string>>((acc, [size, value]) => {
+        if (size === baseSize || value === undefined || value === null) return acc;
+        acc[size] = formatStepValue(value - base);
+        return acc;
+      }, {});
+      return entries;
+    },
+    []
+  );
+
+  const recalcSizesFromBase = useCallback(
+    (
+      activeBaseSize: string | undefined,
+      nextBaseValue: number | undefined,
+      adjustments: Record<string, string>,
+      sizeList: string[]
+    ): Record<string, number> => {
+      if (!activeBaseSize || nextBaseValue === undefined || Number.isNaN(nextBaseValue)) {
+        return {};
+      }
+
+      const nextSizes: Record<string, number> = {
+        [activeBaseSize]: nextBaseValue,
+      };
+
+      sizeList.forEach(size => {
+        if (size === activeBaseSize) return;
+        const delta = parseStepValue(adjustments[size]);
+        if (delta === undefined) return;
+        nextSizes[size] = parseFloat((nextBaseValue + delta).toFixed(4));
+      });
+
+      return nextSizes;
+    },
+    []
+  );
+
+  const buildAdjustmentMap = useCallback(
+    (sizes: Record<string, number> | undefined, baseSize: string | undefined, sizeList: string[]): Record<string, string> => {
+      if (!baseSize) return {};
+      const derived = deriveAdjustmentsFromSizes(sizes, baseSize);
+      return sizeList.reduce<Record<string, string>>((acc, size) => {
+        if (size === baseSize) return acc;
+        acc[size] = derived[size] || '';
+        return acc;
+      }, {});
+    },
+    [deriveAdjustmentsFromSizes]
+  );
+
+  const mergeRecalculatedSizes = useCallback(
+    (
+      prevSizes: Record<string, number> | undefined,
+      baseSize: string | undefined,
+      nextBaseValue: number | undefined,
+      adjustments: Record<string, string>,
+      sizeList: string[]
+    ): Record<string, number> => {
+      if (!baseSize) {
+        const sanitized = { ...(prevSizes || {}) };
+        sizeList.forEach(size => delete sanitized[size]);
+        return sanitized;
+      }
+      const recalculated = recalcSizesFromBase(baseSize, nextBaseValue, adjustments, sizeList);
+      const merged = { ...(prevSizes || {}) };
+      sizeList.forEach(size => {
+        if (recalculated[size] === undefined) {
+          delete merged[size];
+        } else {
+          merged[size] = recalculated[size];
+        }
+      });
+      return merged;
+    },
+    [recalcSizesFromBase]
+  );
+
+  const updateSizesWithBase = useCallback(
+    (options?: { baseValue?: number; adjustments?: Record<string, string> }) => {
+      setFormData(prev => {
+        const baseSize = prev.baseSize;
+        if (!baseSize) return prev;
+        const nextSizes = mergeRecalculatedSizes(
+          prev.sizes,
+          baseSize,
+          options?.baseValue !== undefined ? options.baseValue : prev.sizes?.[baseSize],
+          options?.adjustments || sizeAdjustments,
+          selectedSizes
+        );
+        const positiveValues = Object.values(nextSizes).filter(
+          value => value !== undefined && value !== null && value > 0
+        ) as number[];
+        if (positiveValues.length > 0) {
+          validation.validateField('measurement', Math.min(...positiveValues));
+        }
+        return {
+          ...prev,
+          sizes: nextSizes,
+        };
+      });
+    },
+    [mergeRecalculatedSizes, selectedSizes, sizeAdjustments, validation]
+  );
 
 type MeasurementRow = SampleMeasurementRow;
 
@@ -103,6 +297,8 @@ type RoundModalFormState = {
       fallbackEntryId: entry.id,
     }));
   }, [measurements, sampleMeasurementRounds]);
+
+  const highlightedColumn = measurementBaseSize;
 
   const requestedSourceLabels: Record<MeasurementRequestedSource, string> = {
     original: 'Original Spec',
@@ -414,17 +610,45 @@ type RoundModalFormState = {
   }, [handleOpenRoundModal]);
 
 
-  // Get size range based on gender
-  const availableSizes = useMemo(() => {
-    return SIZE_RANGES[articleInfo?.gender] || SIZE_RANGES['Unisex'];
-  }, [articleInfo?.gender]);
-
-  // Initialize selected sizes if empty
   React.useEffect(() => {
-    if (selectedSizes.length === 0 && availableSizes.length > 0) {
-      setSelectedSizes(availableSizes.slice(0, 6)); // Default to first 6 sizes
+    if (selectedSizes.length === 0) return;
+    if (!formData.baseSize || !selectedSizes.includes(formData.baseSize)) {
+      setFormData(prev => ({
+        ...prev,
+        baseSize: selectedSizes[0],
+      }));
     }
-  }, [availableSizes, selectedSizes.length]);
+  }, [formData.baseSize, selectedSizes]);
+
+  React.useEffect(() => {
+    if (!formData.baseSize) {
+      setSizeAdjustments({});
+      return;
+    }
+
+    setSizeAdjustments(prev => {
+      if (Object.keys(prev).length === 0 && Object.keys(formData.sizes || {}).length > 0) {
+        return buildAdjustmentMap(formData.sizes, formData.baseSize, selectedSizes);
+      }
+
+      const next = { ...prev };
+      selectedSizes.forEach(size => {
+        if (size === formData.baseSize) {
+          delete next[size];
+          return;
+        }
+        if (!(size in next)) {
+          next[size] = '';
+        }
+      });
+      Object.keys(next).forEach(key => {
+        if (!selectedSizes.includes(key) || key === formData.baseSize) {
+          delete next[key];
+        }
+      });
+      return next;
+    });
+  }, [buildAdjustmentMap, formData.baseSize, formData.sizes, selectedSizes]);
 
   const handleInputChange = (field: keyof MeasurementPoint) => (value: string | number | boolean) => {
     const updatedFormData = { ...formData, [field]: value };
@@ -434,49 +658,117 @@ type RoundModalFormState = {
     validation.validateField(field, value);
   };
 
-  // Fixed: Properly handle 0 vs empty for size values
-  const handleSizeValueChange = (size: string, value: string) => {
-    // Use null/undefined to represent empty, preserve 0 as valid value
-    const numValue = value === '' || value === null || value === undefined 
-      ? undefined 
-      : (isNaN(parseFloat(value)) ? undefined : parseFloat(value));
-    
-    const updatedSizes = { ...formData.sizes };
-    if (numValue === undefined) {
-      delete updatedSizes[size]; // Remove key if empty
-    } else {
-      updatedSizes[size] = numValue;
+  const handleBaseValueChange = (value: string) => {
+    const normalized = value.replace(',', '.');
+    if (normalized.trim() === '') {
+      updateSizesWithBase({ baseValue: undefined });
+      return;
     }
-    
-    const updatedFormData = {
-      ...formData,
-      sizes: updatedSizes
-    };
-    setFormData(updatedFormData);
-
-    // Validate if at least one size has a value
-    const hasAnyValue = Object.values(updatedSizes).some(v => v !== undefined && v !== null && v > 0);
-    if (hasAnyValue) {
-      const minValue = Math.min(...Object.values(updatedSizes).filter(v => v !== undefined && v !== null && v > 0) as number[]);
-      validation.validateField('measurement', minValue);
+    const parsed = parseFloat(normalized);
+    if (Number.isNaN(parsed)) {
+      return;
     }
+    updateSizesWithBase({ baseValue: parsed });
   };
 
-  const handleSizeToggle = (size: string) => {
-    setSelectedSizes(prev => {
-      if (prev.includes(size)) {
-        const newSizes = prev.filter(s => s !== size);
-        // Remove size from formData.sizes when unselected
-        const updatedSizes = { ...formData.sizes };
-        delete updatedSizes[size];
-        setFormData({ ...formData, sizes: updatedSizes });
-        return newSizes;
-      } else {
-        return [...prev, size].sort((a, b) => 
-          availableSizes.indexOf(a) - availableSizes.indexOf(b)
-        );
+  const handleSizeAdjustmentChange = (size: string, value: string) => {
+    const normalized = value.replace(',', '.');
+    const nextAdjustments = { ...sizeAdjustments };
+    if (!normalized.trim()) {
+      delete nextAdjustments[size];
+    } else {
+      nextAdjustments[size] = normalized;
+    }
+    setSizeAdjustments(nextAdjustments);
+    updateSizesWithBase({ adjustments: nextAdjustments });
+  };
+
+  const handleBaseSizeSelect = (size: string) => {
+    if (size === formData.baseSize) return;
+    const nextAdjustments = buildAdjustmentMap(formData.sizes, size, selectedSizes);
+    setFormData(prev => ({
+      ...prev,
+      baseSize: size,
+    }));
+    setSizeAdjustments(nextAdjustments);
+  };
+
+  const handleRemoveSize = (size: string) => {
+    if (!updateMeasurementSizeRange) return;
+    if (selectedSizes.length <= 1) {
+      showWarning('At least one size is required.');
+      return;
+    }
+    updateMeasurementSizeRange(selectedSizes.filter(item => item !== size));
+  };
+
+  const handleAddSize = () => {
+    if (!updateMeasurementSizeRange) return;
+    const trimmed = newSizeLabel.trim();
+    if (!trimmed) {
+      showWarning('Please provide a size label before adding.');
+      return;
+    }
+    const exists = selectedSizes.some(size => size.toLowerCase() === trimmed.toLowerCase());
+    if (exists) {
+      showWarning('Size already exists in this range.');
+      return;
+    }
+    updateMeasurementSizeRange([...selectedSizes, trimmed]);
+    setNewSizeLabel('');
+  };
+
+  const handleApplyPreset = () => {
+    if (!updateMeasurementSizeRange) return;
+    const preset = getPresetById(pendingPresetId);
+    if (!preset) return;
+    if (preset.sizes.length === 0) {
+      if (window.confirm('Apply an empty preset and clear all configured sizes?')) {
+        updateMeasurementSizeRange([]);
       }
-    });
+      return;
+    }
+    const shouldConfirm = measurements.length > 0;
+    if (shouldConfirm) {
+      const confirmed = window.confirm(
+        'Applying a preset will replace the current size range for this techpack. Continue?'
+      );
+      if (!confirmed) return;
+    }
+    updateMeasurementSizeRange([...preset.sizes]);
+  };
+
+  const handleBaseSizeSelectorChange = (size: string) => {
+    if (!size) {
+      setBaseSizeSelectorValue('');
+      return;
+    }
+    if (size === measurementBaseSize) {
+      setBaseSizeSelectorValue(size);
+      return;
+    }
+    setBaseSizeSelectorValue(size);
+    setPendingBaseSize(size);
+    setShowBaseSizeConfirm(true);
+  };
+
+  const handleConfirmBaseSizeChange = () => {
+    if (pendingBaseSize && updateMeasurementBaseSize) {
+      updateMeasurementBaseSize(pendingBaseSize);
+    }
+    setPendingBaseSize(null);
+    setShowBaseSizeConfirm(false);
+  };
+
+  const handleCancelBaseSizeChange = () => {
+    setPendingBaseSize(null);
+    setShowBaseSizeConfirm(false);
+    setBaseSizeSelectorValue(measurementBaseSize || '');
+  };
+
+  const handleRowStripeColorChange = (color: string) => {
+    if (!updateMeasurementDisplaySettings) return;
+    updateMeasurementDisplaySettings({ rowStripeColor: color });
   };
 
   // Enhanced progression validation
@@ -588,6 +880,12 @@ type RoundModalFormState = {
       }
     });
 
+    if (!formData.baseSize) {
+      validation.setFieldError('measurement', 'Please select a base size');
+      showError('Please select a base size for this measurement.');
+      return;
+    }
+
     // Validate that at least one size has a value > 0
     const sizeValues = Object.values(sizes);
     const hasValidMeasurements = sizeValues.some(v => v > 0);
@@ -595,6 +893,13 @@ type RoundModalFormState = {
     if (!hasValidMeasurements) {
       validation.setFieldError('measurement', 'At least one size measurement must be greater than 0');
       showError(formatValidationAlert('sizes'));
+      return;
+    }
+
+    const baseMeasurementValue = sizes[formData.baseSize];
+    if (baseMeasurementValue === undefined) {
+      validation.setFieldError('measurement', 'Enter the base measurement value');
+      showError('Base size measurement is required before saving.');
       return;
     }
 
@@ -622,6 +927,7 @@ type RoundModalFormState = {
       notes: formData.notes || '',
       measurementMethod: formData.measurementMethod || '',
       isActive: formData.isActive !== false,
+      baseSize: formData.baseSize,
     };
 
     if (editingIndex !== null) {
@@ -642,10 +948,12 @@ type RoundModalFormState = {
       minusTolerance: 1.0,
       plusTolerance: 1.0,
       sizes: {},
+      baseSize: selectedSizes[0],
       notes: '',
       measurementMethod: '',
       isActive: true,
     });
+    setSizeAdjustments({});
     setShowAddForm(false);
     setEditingIndex(null);
     validation.reset();
@@ -660,18 +968,30 @@ type RoundModalFormState = {
       ? parseTolerance(measurement.plusTolerance)
       : (measurement.plusTolerance ?? 1.0);
 
+    const measurementSizes = Object.keys(measurement.sizes);
+    const resolvedBaseSize =
+      measurement.baseSize ||
+      measurementSizes[0] ||
+      formData.baseSize ||
+      selectedSizes[0];
+
     setFormData({
       ...measurement,
       minusTolerance: minusTol,
       plusTolerance: plusTol,
+      baseSize: resolvedBaseSize,
     });
     setEditingIndex(index);
     setShowAddForm(true);
-    
+
+    setSizeAdjustments(buildAdjustmentMap(measurement.sizes, resolvedBaseSize, measurementSizes.length > 0 ? measurementSizes : selectedSizes));
+
     // Set selected sizes based on measurement data
-    const measurementSizes = Object.keys(measurement.sizes);
-    if (measurementSizes.length > 0) {
-      setSelectedSizes(measurementSizes);
+    if (measurementSizes.length > 0 && updateMeasurementSizeRange) {
+      const missing = measurementSizes.filter(size => !selectedSizes.includes(size));
+      if (missing.length > 0) {
+        updateMeasurementSizeRange([...selectedSizes, ...missing]);
+      }
     }
   };
 
@@ -682,9 +1002,23 @@ type RoundModalFormState = {
     }
   };
 
+  const handleDuplicateMeasurement = (measurement: MeasurementPoint) => {
+    if (!addMeasurement) return;
+    const duplicate: MeasurementPoint = {
+      ...measurement,
+      id: `measurement_${Date.now()}`,
+      pomCode: `${measurement.pomCode}_COPY`,
+      pomName: `${measurement.pomName} (Copy)`,
+      sizes: { ...measurement.sizes },
+    };
+    addMeasurement(duplicate);
+    showSuccess('Measurement duplicated');
+  };
+
   // Enhanced validation for display in table
   const validateMeasurement = (measurement: MeasurementPoint): ProgressionValidation => {
-    return validateProgression(measurement.sizes, selectedSizes);
+    const order = selectedSizes.length > 0 ? selectedSizes : Object.keys(measurement.sizes);
+    return validateProgression(measurement.sizes, order);
   };
 
   const addCommonMeasurements = () => {
@@ -713,6 +1047,7 @@ type RoundModalFormState = {
         measurementMethod: measurement.method,
         notes: '',
         isActive: true,
+        baseSize: measurementBaseSize || selectedSizes[0] || defaultGenderSizes[0],
       };
 
       addMeasurement(measurementPoint);
@@ -747,25 +1082,99 @@ type RoundModalFormState = {
 
       {/* Size Selection */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">Size Range Configuration</h3>
-          <span className="text-sm text-gray-500">Gender: {articleInfo?.gender || 'Unisex'}</span>
-        </div>
-        
-        <div className="flex flex-wrap gap-2">
-          {availableSizes.map(size => (
-            <button
-              key={size}
-              onClick={() => handleSizeToggle(size)}
-              className={`px-3 py-1 text-sm font-medium rounded-md border transition-colors ${
-                selectedSizes.includes(size)
-                  ? 'bg-blue-100 text-blue-800 border-blue-300'
-                  : 'bg-gray-50 text-gray-600 border-gray-300 hover:bg-gray-100'
-              }`}
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-800">Size Range Configuration</h3>
+              <p className="text-sm text-gray-500">
+                Manage custom sizes per techpack. Gender default: {articleInfo?.gender || 'Unisex'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600">Preset:</label>
+              <select
+                value={pendingPresetId}
+                onChange={(e) => setPendingPresetId(e.target.value)}
+                className="px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {SIZE_PRESET_OPTIONS.map(preset => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleApplyPreset}
+                className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {selectedSizes.length === 0 && (
+              <span className="text-sm text-gray-500">No sizes configured yet.</span>
+            )}
+            {selectedSizes.map(size => {
+              const isBase = measurementBaseSize === size;
+              return (
+                <span
+                  key={size}
+                  className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-sm font-medium ${
+                    isBase ? 'text-slate-900 font-semibold border-transparent shadow-sm' : 'border-gray-300 bg-gray-50 text-gray-700'
+                  }`}
+                  style={isBase ? { backgroundColor: baseHighlightColor } : undefined}
+                >
+                  {size}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveSize(size)}
+                    className="text-gray-500 hover:text-gray-700"
+                    aria-label={`Remove size ${size}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Base Size</label>
+            <select
+              value={baseSizeSelectorValue}
+              onChange={(e) => handleBaseSizeSelectorChange(e.target.value)}
+              disabled={selectedSizes.length === 0}
+              className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
             >
-              {size}
+              {selectedSizes.length === 0 && <option value="">Add at least one size</option>}
+              {selectedSizes.map(size => (
+                <option key={`base-select-${size}`} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-2">
+              Base size drives the highlighted column, measurement jumps, and PDF export. Changing it updates every measurement point.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              value={newSizeLabel}
+              onChange={(e) => setNewSizeLabel(e.target.value)}
+              placeholder="e.g., 2, 4, 6, 4XL"
+              className="flex-1 min-w-[200px] px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              type="button"
+              onClick={handleAddSize}
+              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+            >
+              Add Size
             </button>
-          ))}
+          </div>
         </div>
       </div>
 
@@ -781,18 +1190,6 @@ type RoundModalFormState = {
               Add Common Points
             </button>
             
-            {/* Progression Mode Toggle */}
-            <div className="flex items-center space-x-2">
-              <label className="text-sm text-gray-700">Progression:</label>
-              <select
-                value={progressionMode}
-                onChange={(e) => setProgressionMode(e.target.value as 'strict' | 'warn')}
-                className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="strict">Strict (Block errors)</option>
-                <option value="warn">Warn only</option>
-              </select>
-            </div>
           </div>
 
           <div className="flex items-center space-x-3">
@@ -889,37 +1286,83 @@ type RoundModalFormState = {
 
           {/* Size Measurements Grid */}
           <div className="mb-6">
-            <h4 className="text-md font-medium text-gray-800 mb-3">Size Measurements (cm)</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            <h4 className="text-md font-medium text-gray-800 mb-3">Base Size & Jump (cm)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Base Size</label>
+                <select
+                  value={formData.baseSize || ''}
+                  onChange={(e) => handleBaseSizeSelect(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100 cursor-not-allowed"
+                  disabled
+                >
+                  {selectedSizes.length === 0 && <option value="">Select at least one size</option>}
+                  {selectedSizes.map(size => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-2">Managed in Size Range Configuration. Base size controls the highlighted column and jump calculations.</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Base Measurement (cm)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={baseValue ?? ''}
+                  onChange={(e) => handleBaseValueChange(e.target.value)}
+                  onBlur={() => validation.setFieldTouched('measurement')}
+                  className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    validation.getFieldProps('measurement').error ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="e.g., 30"
+                />
+                <p className="text-xs text-gray-500 mt-2">Enter the actual measurement for the base size; other sizes will follow the jumps.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
               {selectedSizes.map(size => {
-                // Fixed: Properly handle 0 vs empty - use undefined for empty, preserve 0
-                const value = formData.sizes?.[size];
-                const displayValue = value === undefined || value === null ? '' : value.toString();
-                
+                const isBase = size === formData.baseSize;
+                const actualValue = formData.sizes?.[size];
+                if (isBase) {
+                  return (
+                    <div key={size} className="border border-blue-200 bg-blue-50 rounded-md p-3">
+                      <div className="text-xs uppercase font-semibold text-blue-600">Base</div>
+                      <div className="text-lg font-semibold text-blue-900">{size}</div>
+                      <div className="text-sm text-blue-800 mt-1">
+                        {baseValue !== undefined && !Number.isNaN(baseValue)
+                          ? `${formatMeasurementValue(baseValue)} cm`
+                          : 'Enter a base value'}
+                      </div>
+                    </div>
+                  );
+                }
+
+                const adjustmentValue = sizeAdjustments[size] || '';
+                const displayActual = formatMeasurementValue(actualValue);
+
                 return (
-                  <div key={size} className="flex flex-col">
-                    <label className="text-sm font-medium text-gray-700 mb-1">{size}</label>
+                  <div key={size} className="flex flex-col border rounded-md p-3">
+                    <label className="text-sm font-medium text-gray-700 mb-1">{size} Jump</label>
                     <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={displayValue}
-                      onChange={(e) => handleSizeValueChange(size, e.target.value)}
-                      onBlur={() => {
-                        const hasAnyValue = Object.values(formData.sizes || {}).some(v => v !== undefined && v !== null && v > 0);
-                        if (hasAnyValue) {
-                          validation.setFieldTouched('measurement');
-                        }
-                      }}
-                      className={`px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        validation.getFieldProps('measurement').error ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      placeholder="0.0"
+                      type="text"
+                      value={adjustmentValue}
+                      onChange={(e) => handleSizeAdjustmentChange(size, e.target.value)}
+                      onBlur={() => validation.setFieldTouched('measurement')}
+                      className="px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="+0.5 / +1/2 / -0.25"
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Actual: <span className="font-medium text-gray-700">{displayActual !== '-' ? `${displayActual} cm` : '--'}</span>
+                    </p>
                   </div>
                 );
               })}
             </div>
+
             {validation.getFieldProps('measurement').error && (
               <p className="mt-2 text-sm text-red-600">{validation.getFieldProps('measurement').error}</p>
             )}
@@ -1039,11 +1482,20 @@ type RoundModalFormState = {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Tolerance
                 </th>
-                {selectedSizes.map(size => (
-                  <th key={size} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {size}
-                  </th>
-                ))}
+                {selectedSizes.map(size => {
+                  const isBaseHeader = highlightedColumn === size;
+                  return (
+                    <th
+                      key={size}
+                      className={`px-4 py-3 text-center text-xs font-medium uppercase tracking-wider ${
+                        isBaseHeader ? 'text-slate-900 font-semibold' : 'text-gray-500'
+                      }`}
+                      style={isBaseHeader ? { backgroundColor: baseHighlightColor } : undefined}
+                    >
+                      {size}
+                    </th>
+                  );
+                })}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
@@ -1071,16 +1523,24 @@ type RoundModalFormState = {
                   const toleranceDisplay = minusTol === plusTol 
                     ? formatTolerance(minusTol)
                     : `-${minusTol.toFixed(1)}cm / +${plusTol.toFixed(1)}cm`;
+                  const rowBackgroundColor = validationResult.errors.length > 0
+                    ? '#fee2e2'
+                    : validationResult.warnings.length > 0
+                      ? '#fef3c7'
+                      : index % 2 === 0
+                        ? '#ffffff'
+                        : rowStripeColor;
                   
                   return (
                     <tr 
                       key={measurement.id || `measurement-${index}`} 
-                      className={`hover:bg-gray-50 ${
-                        validationResult.errors.length > 0 ? 'bg-red-50' : 
-                        validationResult.warnings.length > 0 ? 'bg-yellow-50' : ''
-                      }`}
+                      className="transition-colors duration-150 hover:brightness-95"
+                      style={{ backgroundColor: rowBackgroundColor }}
                     >
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white">
+                      <td
+                        className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0"
+                        style={{ backgroundColor: rowBackgroundColor }}
+                      >
                         <div className="flex items-center">
                           {measurement.pomCode}
                           {hasIssues && (
@@ -1106,6 +1566,8 @@ type RoundModalFormState = {
                       </td>
                       {selectedSizes.map(size => {
                         const value = measurement.sizes[size];
+                        const displayValue = formatMeasurementValue(value);
+                        const isBaseCell = highlightedColumn ? size === highlightedColumn : measurement.baseSize === size;
                         return (
                           <td 
                             key={size} 
@@ -1115,9 +1577,10 @@ type RoundModalFormState = {
                                 : value <= 0 
                                   ? 'text-red-600 font-medium' 
                                   : 'text-gray-700'
-                            }`}
+                            } ${isBaseCell ? 'text-slate-900 font-semibold' : ''}`}
+                            style={isBaseCell ? { backgroundColor: baseHighlightColor } : undefined}
                           >
-                            {value === undefined || value === null ? '-' : value.toFixed(1)}
+                            {value === undefined || value === null ? '-' : displayValue}
                           </td>
                         );
                       })}
@@ -1128,6 +1591,12 @@ type RoundModalFormState = {
                             className="text-blue-600 hover:text-blue-900"
                           >
                             Edit
+                          </button>
+                          <button
+                            onClick={() => handleDuplicateMeasurement(measurement)}
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            Duplicate
                           </button>
                           <button
                             onClick={() => handleDelete(measurement, index)}
@@ -1250,7 +1719,7 @@ type RoundModalFormState = {
           <SampleMeasurementsTable
             measurementRows={measurementRows}
             sampleRounds={sampleMeasurementRounds}
-            availableSizes={availableSizes}
+            availableSizes={selectedSizes}
             getEntryForRound={getEntryForRound}
             onEntrySizeValueChange={handleEntrySizeValueChange}
             onDeleteRound={handleDeleteSampleRound}
@@ -1381,6 +1850,17 @@ type RoundModalFormState = {
           </div>
         </div>
       </div>
+
+      <ConfirmationDialog
+        isOpen={showBaseSizeConfirm}
+        title="Change Base Size"
+        message={`Change base size to ${pendingBaseSize || 'this size'}? This will update all related measurements and PDF exports.`}
+        confirmText="Change Base Size"
+        cancelText="Keep Current"
+        onConfirm={handleConfirmBaseSizeChange}
+        onCancel={handleCancelBaseSizeChange}
+        type="warning"
+      />
     </div>
   );
 };
@@ -1447,6 +1927,12 @@ export const validateMeasurementsForSave = (measurements: MeasurementPoint[]): {
     const hasValidMeasurements = sizeValues.some(v => v !== undefined && v !== null && v > 0);
     if (!hasValidMeasurements) {
       itemErrors.sizes = 'At least one size measurement must be greater than 0';
+    }
+
+    if ((!item.baseSize || item.baseSize.trim().length === 0) && sizeValues.length > 0) {
+      itemErrors.baseSize = 'Base size is required';
+    } else if (item.baseSize && (!item.sizes || item.sizes[item.baseSize] === undefined)) {
+      itemErrors.baseSize = 'Base size measurement value is required';
     }
     
     if (Object.keys(itemErrors).length > 0) {

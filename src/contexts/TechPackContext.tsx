@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from './AuthContext';
-import { ApiTechPack, CreateTechPackInput, TechPackListResponse, TechPackFormState, MeasurementPoint, HowToMeasure, BomItem, Colorway, ColorwayPart, MeasurementSampleRound, MeasurementSampleEntry, MeasurementSampleValueMap, MeasurementRequestedSource } from '../types/techpack';
+import { ApiTechPack, CreateTechPackInput, TechPackListResponse, TechPackFormState, MeasurementPoint, HowToMeasure, BomItem, Colorway, ColorwayPart, MeasurementSampleRound, MeasurementSampleEntry, MeasurementSampleValueMap, MeasurementRequestedSource, SIZE_RANGES } from '../types/techpack';
 import { api } from '../lib/api';
 import { showPromise, showError } from '../lib/toast';
 import { exportTechPackToPDF as clientExportToPDF } from '../utils/pdfExport';
+import { DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR, DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR } from '../constants/measurementDisplay';
 
 interface TechPackContextType {
   techPacks: ApiTechPack[];
@@ -51,6 +52,9 @@ interface TechPackContextType {
   deleteColorwayById: (id: string) => void;
   assignColorwayToBomItem: (colorwayId: string, bomItemId: string, data?: Partial<ColorwayPart>) => void;
   removeColorwayAssignment: (colorwayId: string, bomItemId: string) => void;
+  updateMeasurementSizeRange: (sizes: string[]) => void;
+  updateMeasurementBaseSize: (baseSize: string) => void;
+  updateMeasurementDisplaySettings: (settings: { baseHighlightColor?: string; rowStripeColor?: string }) => void;
 }
 
 const TechPackContext = createContext<TechPackContextType | undefined>(undefined);
@@ -82,6 +86,28 @@ const hexToRgb = (hex: string | undefined) => {
   const g = parseInt(normalized.slice(3, 5), 16);
   const b = parseInt(normalized.slice(5, 7), 16);
   return { r, g, b };
+};
+
+const resolveMeasurementBaseSize = (
+  candidate: string | undefined,
+  sizeRange: string[],
+  measurements: MeasurementPoint[]
+): string => {
+  if (candidate && sizeRange.includes(candidate)) {
+    return candidate;
+  }
+  const measurementBase = measurements.find(
+    measurement => measurement.baseSize && sizeRange.includes(measurement.baseSize)
+  )?.baseSize;
+  if (measurementBase) {
+    return measurementBase;
+  }
+  return sizeRange[0] || '';
+};
+
+const resolveMeasurementColor = (value: string | undefined, fallback: string): string => {
+  const normalized = normalizeHexColor(value);
+  return normalized || fallback;
 };
 
 const allowedColorTypes: ColorwayPart['colorType'][] = ['Solid', 'Print', 'Embroidery', 'Applique'];
@@ -241,6 +267,10 @@ const sanitizeColorway = (rawColorway: PartialColorway, index: number, bomLookup
     supplier: safeString(rawColorway.supplier) || safeString((rawColorway as any).supplier) || undefined,
     notes: safeString(rawColorway.notes) || safeString((rawColorway as any).notes) || undefined,
     collectionName: safeString(rawColorway.collectionName) || safeString((rawColorway as any).collectionName) || undefined,
+    imageUrl: (() => {
+      const url = safeString(rawColorway.imageUrl) || safeString((rawColorway as any).imageUrl);
+      return url || undefined;
+    })(),
     parts: sanitizedParts,
   };
 };
@@ -677,6 +707,11 @@ const createEmptyTechpack = (): TechPackFormState['techpack'] => ({
   colorways: [],
   revisionHistory: [],
   status: 'Draft',
+  measurementSizeRange: [...SIZE_RANGES['Unisex']],
+  measurementBaseSize: SIZE_RANGES['Unisex'][0],
+  measurementBaseHighlightColor: DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR,
+  measurementRowStripeColor: DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR,
+  packingNotes: '',
   completeness: {
     isComplete: false,
     missingItems: [],
@@ -730,7 +765,38 @@ const mergeDraftWithState = (base: TechPackFormState, draft?: Partial<TechPackFo
     sampleMeasurementRounds: (draft.techpack as any).sampleMeasurementRounds ?? base.techpack.sampleMeasurementRounds,
     howToMeasures: (draft.techpack as any).howToMeasures ?? base.techpack.howToMeasures,
     colorways: sanitizeColorwayList((draft.techpack as any).colorways ?? [], mergedBom, { bestEffort: true }),
+    measurementSizeRange:
+      (draft.techpack as any).measurementSizeRange ??
+      base.techpack.measurementSizeRange ??
+      [...SIZE_RANGES['Unisex']],
+    packingNotes:
+      (draft.techpack as any).packingNotes ??
+      base.techpack.packingNotes ??
+      '',
   } as TechPackFormState['techpack'];
+
+  const normalizedSizeRange =
+    mergedTechpack.measurementSizeRange && mergedTechpack.measurementSizeRange.length > 0
+      ? mergedTechpack.measurementSizeRange
+      : [...SIZE_RANGES['Unisex']];
+  const normalizedBaseSize = resolveMeasurementBaseSize(
+    mergedTechpack.measurementBaseSize,
+    normalizedSizeRange,
+    mergedTechpack.measurements
+  );
+  const normalizedBaseHighlight = resolveMeasurementColor(
+    mergedTechpack.measurementBaseHighlightColor,
+    DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR
+  );
+  const normalizedRowStripe = resolveMeasurementColor(
+    mergedTechpack.measurementRowStripeColor,
+    DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR
+  );
+
+  mergedTechpack.measurementSizeRange = normalizedSizeRange;
+  mergedTechpack.measurementBaseSize = normalizedBaseSize;
+  mergedTechpack.measurementBaseHighlightColor = normalizedBaseHighlight;
+  mergedTechpack.measurementRowStripeColor = normalizedRowStripe;
 
   return {
     ...base,
@@ -1033,6 +1099,32 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         hasUnsavedChanges: skipUnsavedFlag ? false : true
       };
 
+      const normalizedSizeRange =
+        newState.techpack.measurementSizeRange && newState.techpack.measurementSizeRange.length > 0
+          ? newState.techpack.measurementSizeRange
+          : [...SIZE_RANGES['Unisex']];
+      const normalizedBaseSize = resolveMeasurementBaseSize(
+        newState.techpack.measurementBaseSize,
+        normalizedSizeRange,
+        newState.techpack.measurements
+      );
+      const normalizedBaseHighlight = resolveMeasurementColor(
+        newState.techpack.measurementBaseHighlightColor,
+        DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR
+      );
+      const normalizedRowStripe = resolveMeasurementColor(
+        newState.techpack.measurementRowStripeColor,
+        DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR
+      );
+
+      newState.techpack = {
+        ...newState.techpack,
+        measurementSizeRange: normalizedSizeRange,
+        measurementBaseSize: normalizedBaseSize,
+        measurementBaseHighlightColor: normalizedBaseHighlight,
+        measurementRowStripeColor: normalizedRowStripe,
+      };
+
       return newState;
     });
   }, []);
@@ -1203,6 +1295,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           notes: colorway.notes?.trim() || undefined,
           season: colorway.season?.trim() || undefined,
           collectionName: colorway.collectionName?.trim() || undefined,
+          imageUrl: colorway.imageUrl?.trim() || undefined,
           approved: colorway.approvalStatus === 'Approved',
           isDefault: !!colorway.isDefault,
           parts: partsPayload,
@@ -1246,6 +1339,11 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           colorways: colorwaysPayload,
           howToMeasure: howToMeasuresPayload,
           sampleMeasurementRounds: sampleMeasurementRoundsPayload,
+          measurementSizeRange: techpackData.measurementSizeRange || [],
+          measurementBaseSize: techpackData.measurementBaseSize || techpackData.measurementSizeRange?.[0] || '',
+          measurementBaseHighlightColor: techpackData.measurementBaseHighlightColor || DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR,
+          measurementRowStripeColor: techpackData.measurementRowStripeColor || DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR,
+          packingNotes: techpackData.packingNotes || '',
         };
         const updatedTP = await updateTechPack(techpackData.id, updatePayload);
 
@@ -1290,6 +1388,11 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           howToMeasures: howToMeasuresPayload,
           sampleMeasurementRounds: sampleMeasurementRoundsPayload,
           status: techpackData.status as any,
+          measurementSizeRange: techpackData.measurementSizeRange || [],
+          measurementBaseSize: techpackData.measurementBaseSize || techpackData.measurementSizeRange?.[0],
+          measurementBaseHighlightColor: techpackData.measurementBaseHighlightColor || DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR,
+          measurementRowStripeColor: techpackData.measurementRowStripeColor || DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR,
+          packingNotes: techpackData.packingNotes || '',
         } as unknown as CreateTechPackInput;
 
         const newTechPack = await createTechPack(createPayload);
@@ -1334,27 +1437,45 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
       const useLandscape = true;
       (async () => {
         try {
-          // Use api client to request binary PDF
-          const response = await api.get(`/techpacks/${techpackId}/pdf`, { responseType: 'arraybuffer', params: { landscape: useLandscape ? 'true' : 'false' } });
-          const arrayBuffer = response.data as ArrayBuffer;
-          const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+          // Show loading message
+          const loadingToast = showPromise(
+            api.get(`/techpacks/${techpackId}/pdf`, { 
+              responseType: 'blob', // Use blob for easier handling
+              params: { landscape: useLandscape ? 'true' : 'false' },
+              timeout: 300000, // 5 minutes timeout for large PDFs
+            }),
+            {
+              loading: 'Generating PDF...',
+              success: 'PDF generated successfully! Downloading...',
+              error: (err) => err.message || 'Failed to generate PDF',
+            }
+          );
+
+          const response = await loadingToast;
+          
+          // Create blob from response
+          const blob = response.data instanceof Blob 
+            ? response.data 
+            : new Blob([response.data], { type: 'application/pdf' });
+          
+          // Create download link and trigger download
           const url = window.URL.createObjectURL(blob);
-
-          // Open in new tab (user gesture already triggered by click) or download
-          const win = window.open(url, '_blank');
-          if (!win) {
-            // If popup blocked, trigger download instead
-            const link = document.createElement('a');
-            link.href = url;
-            const filename = `${state.techpack.articleInfo.articleCode || 'techpack'}_v${state.techpack.articleInfo.version || 1}.pdf`;
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
+          const link = document.createElement('a');
+          link.href = url;
+          const filename = `Techpack_${state.techpack.articleInfo.articleCode || 'techpack'}_v${state.techpack.articleInfo.version || 1}.pdf`;
+          link.download = filename;
+          link.style.display = 'none';
+          
+          // Append to body, click, then remove
+          document.body.appendChild(link);
+          link.click();
+          
+          // Cleanup
+          setTimeout(() => {
             document.body.removeChild(link);
-          }
-
-          // Revoke object URL after a short delay to allow browser to load it
-          setTimeout(() => window.URL.revokeObjectURL(url), 60 * 1000);
+            window.URL.revokeObjectURL(url);
+          }, 100);
+          
         } catch (err: any) {
           showError(err?.message || 'Failed to export PDF from server. Falling back to client export.');
           // Fallback to client-side export (HTML print)
@@ -1372,9 +1493,129 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     clientExportToPDF(state.techpack as any);
   };
 
+  const updateMeasurementSizeRange = (sizes: string[]) => {
+    setState(prev => {
+      const incoming = Array.isArray(sizes) ? sizes : [];
+      const seen = new Set<string>();
+      const normalizedSizes: string[] = [];
+      incoming.forEach(size => {
+        if (typeof size !== 'string') return;
+        const trimmed = size.trim();
+        if (!trimmed) return;
+        const key = trimmed.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          normalizedSizes.push(trimmed);
+        }
+      });
+
+      const fallbackSizes = normalizedSizes.length > 0 ? normalizedSizes : [...SIZE_RANGES['Unisex']];
+      const prevBaseSize = prev.techpack.measurementBaseSize;
+      const nextBaseSize = prevBaseSize && fallbackSizes.includes(prevBaseSize)
+        ? prevBaseSize
+        : fallbackSizes[0];
+
+      const nextMeasurements = prev.techpack.measurements.map(measurement => {
+        const nextSizes = fallbackSizes.reduce<Record<string, number>>((acc, size) => {
+          if (measurement.sizes[size] !== undefined) {
+            acc[size] = measurement.sizes[size];
+          }
+          return acc;
+        }, {});
+
+        return {
+          ...measurement,
+          baseSize: nextBaseSize,
+          sizes: nextSizes,
+        };
+      });
+
+      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
+
+      return {
+        ...prev,
+        techpack: {
+          ...prev.techpack,
+          measurementSizeRange: fallbackSizes,
+          measurementBaseSize: nextBaseSize,
+          measurements: nextMeasurements,
+          sampleMeasurementRounds: nextSampleRounds,
+        },
+        hasUnsavedChanges: true,
+      };
+    });
+  };
+
+  const updateMeasurementBaseSize = (baseSize: string) => {
+    setState(prev => {
+      const sizeRange =
+        prev.techpack.measurementSizeRange && prev.techpack.measurementSizeRange.length > 0
+          ? prev.techpack.measurementSizeRange
+          : [...SIZE_RANGES['Unisex']];
+      const normalizedBaseSize = sizeRange.includes(baseSize) ? baseSize : sizeRange[0];
+      if (!normalizedBaseSize || normalizedBaseSize === prev.techpack.measurementBaseSize) {
+        return prev;
+      }
+
+      const nextMeasurements = prev.techpack.measurements.map(measurement => ({
+        ...measurement,
+        baseSize: normalizedBaseSize,
+      }));
+      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
+
+      return {
+        ...prev,
+        techpack: {
+          ...prev.techpack,
+          measurementBaseSize: normalizedBaseSize,
+          measurements: nextMeasurements,
+          sampleMeasurementRounds: nextSampleRounds,
+        },
+        hasUnsavedChanges: true,
+      };
+    });
+  };
+
+  const updateMeasurementDisplaySettings = (settings: { baseHighlightColor?: string; rowStripeColor?: string }) => {
+    setState(prev => {
+      const currentBaseHighlight = prev.techpack.measurementBaseHighlightColor || DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR;
+      const currentRowStripe = prev.techpack.measurementRowStripeColor || DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR;
+      const nextBaseHighlight =
+        settings.baseHighlightColor === undefined
+          ? currentBaseHighlight
+          : resolveMeasurementColor(settings.baseHighlightColor, currentBaseHighlight);
+      const nextRowStripe =
+        settings.rowStripeColor === undefined
+          ? currentRowStripe
+          : resolveMeasurementColor(settings.rowStripeColor, currentRowStripe);
+
+      if (nextBaseHighlight === currentBaseHighlight && nextRowStripe === currentRowStripe) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        techpack: {
+          ...prev.techpack,
+          measurementBaseHighlightColor: nextBaseHighlight,
+          measurementRowStripeColor: nextRowStripe,
+        },
+        hasUnsavedChanges: true,
+      };
+    });
+  };
+
   const addMeasurement = (measurement: MeasurementPoint) => {
     setState(prev => {
-      const nextMeasurements = [...prev.techpack.measurements, measurement];
+      const baseSize =
+        prev.techpack.measurementBaseSize ||
+        (prev.techpack.measurementSizeRange && prev.techpack.measurementSizeRange[0]) ||
+        '';
+      const normalizedMeasurement =
+        baseSize && measurement.baseSize !== baseSize
+          ? { ...measurement, baseSize }
+          : measurement;
+      const nextMeasurements = [...prev.techpack.measurements, normalizedMeasurement];
       const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
       return {
         ...prev,
@@ -1390,7 +1631,15 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
 
   const updateMeasurement = (index: number, measurement: MeasurementPoint) => {
     setState(prev => {
-      const nextMeasurements = prev.techpack.measurements.map((m, i) => (i === index ? measurement : m));
+      const baseSize =
+        prev.techpack.measurementBaseSize ||
+        (prev.techpack.measurementSizeRange && prev.techpack.measurementSizeRange[0]) ||
+        '';
+      const normalizedMeasurement =
+        baseSize && measurement.baseSize !== baseSize
+          ? { ...measurement, baseSize }
+          : measurement;
+      const nextMeasurements = prev.techpack.measurements.map((m, i) => (i === index ? normalizedMeasurement : m));
       const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
       return {
         ...prev,
@@ -1953,6 +2202,9 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     deleteColorwayById,
     assignColorwayToBomItem,
     removeColorwayAssignment,
+    updateMeasurementSizeRange,
+    updateMeasurementBaseSize,
+    updateMeasurementDisplaySettings,
   }), [
     techPacks,
     loading,
@@ -1999,6 +2251,9 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     deleteColorwayById,
     assignColorwayToBomItem,
     removeColorwayAssignment,
+    updateMeasurementSizeRange,
+    updateMeasurementBaseSize,
+    updateMeasurementDisplaySettings,
   ]);
 
   return <TechPackContext.Provider value={value}>{children}</TechPackContext.Provider>;

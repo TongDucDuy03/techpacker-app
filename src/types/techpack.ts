@@ -69,6 +69,7 @@ export interface MeasurementPoint {
   minusTolerance: number; // Changed from string to number (in cm)
   plusTolerance: number; // Changed from string to number (in cm)
   sizes: Record<string, number>; // XS, S, M, L, XL, XXL, etc.
+  baseSize?: string;
   notes?: string;
   measurementMethod?: string;
   isActive: boolean;
@@ -151,6 +152,7 @@ export interface Colorway {
   supplier?: string;
   notes?: string;
   collectionName?: string;
+  imageUrl?: string;
   parts: ColorwayPart[];
 }
 
@@ -274,6 +276,11 @@ export interface ApiTechPack {
   createdAt: string;
   updatedAt: string;
   __v: number;
+  measurementSizeRange?: string[];
+  measurementBaseSize?: string;
+  measurementBaseHighlightColor?: string;
+  measurementRowStripeColor?: string;
+  packingNotes?: string;
 }
 
 // Frontend TechPack type (for form state)
@@ -297,6 +304,11 @@ export interface TechPack {
   updatedBy: string;
   createdAt: string;
   updatedAt: string;
+  measurementSizeRange?: string[];
+  measurementBaseSize?: string;
+  measurementBaseHighlightColor?: string;
+  measurementRowStripeColor?: string;
+  packingNotes?: string;
 }
 
 // Form state interfaces
@@ -357,6 +369,11 @@ export interface CreateTechPackInput {
   colorways?: Colorway[];
   howToMeasures?: HowToMeasure[];
   status?: TechPack['status'];
+  measurementSizeRange?: string[];
+  measurementBaseSize?: string;
+  measurementBaseHighlightColor?: string;
+  measurementRowStripeColor?: string;
+  packingNotes?: string;
 }
 
 export interface TechPackListResponse {

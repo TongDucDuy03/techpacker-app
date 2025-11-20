@@ -1,4 +1,6 @@
 import { TechPack } from '../types/techpack';
+import { formatMeasurementValue, formatTolerance } from '../components/TechPackForm/tabs/measurementHelpers';
+import { DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR, DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR } from '../constants/measurementDisplay';
 
 // PDF Export utility functions
 export class TechPackPDFExporter {
@@ -15,6 +17,7 @@ export class TechPackPDFExporter {
       articleInfo: this.generateArticleInfo(),
       bom: this.generateBOMTable(),
       measurements: this.generateMeasurementTable(),
+      packingNotes: this.techpack.packingNotes || '',
       colorways: this.generateColorwayTable(),
       howToMeasures: this.generateHowToMeasures(),
       footer: this.generateFooter(),
@@ -84,16 +87,53 @@ export class TechPackPDFExporter {
     });
     const sortedSizes = Array.from(allSizes).sort();
 
-    const headers = ['POM Code', 'POM Name', 'Tolerance', ...sortedSizes, 'Notes'];
-    const rows = this.techpack.measurements.map(measurement => [
-      measurement.pomCode,
-      measurement.pomName,
-      measurement.minusTolerance,
-      ...sortedSizes.map(size => measurement.sizes[size]?.toFixed(1) || '-'),
-      measurement.notes || '',
-    ]);
+    const configuredSizes = Array.isArray(this.techpack.measurementSizeRange) && this.techpack.measurementSizeRange.length > 0
+      ? [...this.techpack.measurementSizeRange]
+      : [];
+    const extras = sortedSizes.filter(size => !configuredSizes.includes(size));
+    const sizeOrder = configuredSizes.length > 0 ? [...configuredSizes, ...extras] : sortedSizes;
 
-    return { headers, rows, sizes: sortedSizes };
+    const headers = ['POM Code', 'POM Name', 'Tolerance', ...sizeOrder, 'Notes'];
+    const rows = this.techpack.measurements.map(measurement => {
+      const minus = typeof measurement.minusTolerance === 'number'
+        ? measurement.minusTolerance
+        : parseFloat(String(measurement.minusTolerance)) || 0;
+      const plus = typeof measurement.plusTolerance === 'number'
+        ? measurement.plusTolerance
+        : parseFloat(String(measurement.plusTolerance)) || 0;
+      const toleranceDisplay = Math.abs(minus - plus) < 1e-3
+        ? formatTolerance(minus)
+        : `-${minus.toFixed(1)}cm / +${plus.toFixed(1)}cm`;
+
+      return [
+        measurement.pomCode,
+        measurement.pomName,
+        toleranceDisplay,
+        ...sizeOrder.map(size => {
+          const value = measurement.sizes[size];
+          return value === undefined || value === null ? '-' : formatMeasurementValue(value);
+        }),
+        measurement.notes || '',
+      ];
+    });
+
+    const configuredBase = this.techpack.measurementBaseSize;
+    const baseSizeColumn = configuredBase && sizeOrder.includes(configuredBase)
+      ? configuredBase
+      : this.techpack.measurements.find(m => m.baseSize && sizeOrder.includes(m.baseSize))?.baseSize || sizeOrder[0];
+    const baseHighlightColor = DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR; // Always use default color
+    const rowStripeColor = this.techpack.measurementRowStripeColor || DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR;
+
+    return {
+      headers,
+      rows,
+      sizes: sizeOrder,
+      baseSizeColumn,
+      rowBaseSizes: this.techpack.measurements.map(m => m.baseSize || null),
+      sizeColumnStart: 3,
+      baseHighlightColor,
+      rowStripeColor,
+    };
   }
 
   private generateColorwayTable() {
@@ -107,6 +147,7 @@ export class TechPackPDFExporter {
       supplier: colorway.supplier,
       pantoneCode: colorway.pantoneCode,
       hexColor: colorway.hexColor,
+      imageUrl: colorway.imageUrl,
       parts: colorway.parts.map(part => ({
         partName: part.partName,
         colorName: part.colorName,
@@ -231,6 +272,12 @@ startxref
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #f5f5f5; font-weight: bold; }
         .colorway-part { display: inline-block; margin: 5px; padding: 5px 10px; border-radius: 4px; background-color: #f0f0f0; }
+        .measurement-table th.base-column { background-color: ${data.measurements.baseHighlightColor}; color: #0f172a; }
+        .measurement-table td.base-cell { background-color: ${data.measurements.baseHighlightColor}; font-weight: 600; color: #0f172a; }
+        .measurement-table tbody tr:nth-child(odd) { background-color: #ffffff; }
+        .measurement-table tbody tr:nth-child(even) { background-color: ${data.measurements.rowStripeColor}; }
+        .packing-content { border: 1px solid #e5e7eb; padding: 16px; border-radius: 6px; background-color: #fff; }
+        .packing-content img { max-width: 100%; height: auto; }
         @media print { body { margin: 0; } .no-print { display: none; } }
     </style>
 </head>
@@ -272,24 +319,65 @@ startxref
     ${data.measurements.headers.length > 0 ? `
     <div class="section">
         <h2>Measurement Chart</h2>
-        <table>
+        <table class="measurement-table">
             <thead>
-                <tr>${data.measurements.headers.map((header: string) => `<th>${header}</th>`).join('')}</tr>
+                <tr>
+                    ${data.measurements.headers.map((header: string, idx: number) => {
+                      const sizeIndex = idx - data.measurements.sizeColumnStart;
+                      const sizeLabel = data.measurements.sizes[sizeIndex];
+                      const isBaseHeader = sizeLabel && data.measurements.baseSizeColumn === sizeLabel;
+                      return `<th${isBaseHeader ? ' class="base-column"' : ''}>${header}</th>`;
+                    }).join('')}
+                </tr>
             </thead>
             <tbody>
-                ${data.measurements.rows.map((row: string[]) => `
-                    <tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>
+                ${data.measurements.rows.map((row: string[], rowIndex: number) => `
+                    <tr>
+                        ${row.map((cell, cellIndex) => {
+                          const sizeIndex = cellIndex - data.measurements.sizeColumnStart;
+                          const sizeLabel = data.measurements.sizes[sizeIndex];
+                          const rowBase = data.measurements.rowBaseSizes?.[rowIndex];
+                          const isBaseCell = sizeLabel && rowBase && sizeLabel === rowBase;
+                          return `<td${isBaseCell ? ' class="base-cell"' : ''}>${cell}</td>`;
+                        }).join('')}
+                    </tr>
                 `).join('')}
             </tbody>
         </table>
     </div>
     ` : ''}
 
+    ${data.packingNotes ? `
+    <div class="section">
+        <h2>Packing Instructions</h2>
+        <div class="packing-content">
+            ${data.packingNotes}
+        </div>
+    </div>
+    ` : ''}
+
     ${data.colorways.length > 0 ? `
     <div class="section">
         <h2>Colorways</h2>
-        ${data.colorways.map((colorway: any) => `
+        ${data.colorways.map((colorway: any) => {
+          // Resolve image URL for PDF (convert relative paths to absolute if needed)
+          let imageUrl = colorway.imageUrl || '';
+          if (imageUrl && imageUrl.startsWith('/') && !imageUrl.startsWith('http')) {
+            // For PDF export, we need absolute URL - this will be handled by the server when generating PDF
+            // For HTML preview, keep relative path
+            imageUrl = imageUrl;
+          }
+          return `
             <div style="margin-bottom: 20px; border: 1px solid #ddd; padding: 15px; border-radius: 5px;">
+                ${imageUrl ? `
+                    <div style="width: 100%; height: 180px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #f3f4f6; margin-bottom: 15px; overflow: hidden;">
+                        <img src="${imageUrl}" alt="${colorway.name}" style="width: 100%; height: 100%; object-fit: cover; object-position: center;" onerror="this.parentElement.innerHTML='<div style=\\'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 14px;\\'>No Image</div>';" />
+                    </div>
+                ` : `
+                    <div style="width: 100%; height: 180px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #f3f4f6; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 14px;">
+                        No Image
+                    </div>
+                `}
                 <h3>${colorway.name} (${colorway.code}) ${colorway.isDefault ? '- DEFAULT' : ''}</h3>
                 <p><strong>Status:</strong> ${colorway.approvalStatus}</p>
                 <div>
@@ -302,7 +390,8 @@ startxref
                     `).join('')}
                 </div>
             </div>
-        `).join('')}
+        `;
+        }).join('')}
     </div>
     ` : ''}
 

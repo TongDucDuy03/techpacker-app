@@ -7,6 +7,7 @@ import BomTab, { BomTabRef } from './tabs/BomTab';
 import MeasurementTab from './tabs/MeasurementTab';
 import HowToMeasureTab from './tabs/HowToMeasureTab';
 import ConstructionTab, { ConstructionTabRef } from './tabs/ConstructionTab';
+import PackingTab from './tabs/PackingTab';
 import ColorwayTab from './tabs/ColorwayTab';
 import RevisionTab from './tabs/RevisionTab';
 import SharingTab from './tabs/SharingTab';
@@ -24,7 +25,8 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
-  ArrowLeft
+  ArrowLeft,
+  Archive
 } from 'lucide-react';
 import { showError, showWarning } from '../../lib/toast';
 import { Modal } from 'antd';
@@ -207,6 +209,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
         colorways: mappedColorways,
         revisionHistory: (initialTechPack as any).revisions || [],
         status: (initialTechPack as any).status,
+        packingNotes: (initialTechPack as any).packingNotes || '',
         completeness: {
           isComplete: false,
           missingItems: [],
@@ -265,13 +268,20 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
     },
     {
       id: 5,
+      name: 'Packing',
+      icon: Archive,
+      component: PackingTab,
+      description: 'Packing & folding instructions',
+    },
+    {
+      id: 6,
       name: 'Revision History',
       icon: Clock,
       component: (props: any) => <RevisionTab onBackToList={onBackToList} {...props} />,
       description: 'Change tracking',
     },
     {
-      id: 6,
+      id: 7,
       name: 'Sharing',
       icon: Share2,
       component: SharingTab,
@@ -290,11 +300,13 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
         return techpack.bom.length > 0;
       case 2: // Measurements
         return techpack.measurements.length > 0;
-      case 3: // How to Measure
+      case 3: // Construction / How to Measure
         return techpack.howToMeasures.length > 0;
       case 4: // Colorways
         return techpack.colorways.length > 0;
-      case 5: // Revision History
+      case 5: // Packing
+        return !!(techpack.packingNotes && techpack.packingNotes.trim().length > 0);
+      case 6: // Revision History
         return true; // Always complete
       default:
         return false;
@@ -303,8 +315,9 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
 
   // Calculate overall progress
   const overallProgress = React.useMemo(() => {
-    const completedTabs = tabs.slice(0, 5).filter(tab => getTabCompletionStatus(tab.id)).length;
-    return Math.round((completedTabs / 5) * 100);
+    const trackedTabIds = [0, 1, 2, 3, 4, 5];
+    const completedTabs = trackedTabIds.filter(tabId => getTabCompletionStatus(tabId)).length;
+    return Math.round((completedTabs / trackedTabIds.length) * 100);
   }, [techpack]);
 
   // Show save notification

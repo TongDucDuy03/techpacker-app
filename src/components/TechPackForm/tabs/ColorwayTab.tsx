@@ -6,9 +6,30 @@ import { colorwayFormValidationSchema, colorwayPartValidationSchema } from '../.
 import Input from '../shared/Input';
 import Select from '../shared/Select';
 import DataTable from '../shared/DataTable';
-import { Plus, Palette, Copy, Eye, Star, Upload, Download, AlertCircle } from 'lucide-react';
+import { Plus, Palette, Copy, Eye, Star, Upload, Download, AlertCircle, Image as ImageIcon, X, Trash2 } from 'lucide-react';
 import { validateFields } from '../../../utils/validation';
-import { showError } from '../../../lib/toast';
+import { showError, showSuccess } from '../../../lib/toast';
+import { api, isApiConfigured } from '../../../lib/api';
+
+// Helper to resolve image URL (handles both absolute and relative paths)
+const resolveImageUrl = (url?: string | null): string | null => {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  // If relative path, prepend API base URL
+  if (url.startsWith('/')) {
+    const apiBase = isApiConfigured() ? (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+      ? 'http://localhost:4001' 
+      : `http://${window.location.hostname}:4001`) : '';
+    // Ensure URL starts with /api/v1 if it's an upload path
+    if (url.startsWith('/uploads/') && !url.startsWith('/api/v1')) {
+      return `${apiBase}/api/v1${url}`;
+    }
+    return `${apiBase}${url}`;
+  }
+  return url;
+};
 
 const ColorwayTab: React.FC = () => {
   const context = useTechPack();
@@ -19,6 +40,9 @@ const ColorwayTab: React.FC = () => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [selectedColorway, setSelectedColorway] = useState<string>('');
   const [showPreview, setShowPreview] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Initialize validation for the form
   const validation = useFormValidation(colorwayFormValidationSchema);
@@ -38,6 +62,7 @@ const ColorwayTab: React.FC = () => {
     pantoneCode: '',
     supplier: '',
     notes: '',
+    imageUrl: undefined,
   });
 
   const [partFormData, setPartFormData] = useState<Partial<ColorwayPart>>({
@@ -127,6 +152,85 @@ const ColorwayTab: React.FC = () => {
 
     // Validate the field in real-time
     validation.validateField(field, nextValue);
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/svg+xml', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      showError('Invalid file type. Please upload JPEG, PNG, GIF, SVG, or WebP image.');
+      return;
+    }
+
+    // Validate file size (5MB limit)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      showError('File size exceeds 5MB limit. Please upload a smaller image.');
+      return;
+    }
+
+    setUploading(true);
+
+    // Preview image locally first
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setImagePreview(dataUrl);
+    };
+    reader.readAsDataURL(file);
+
+    // Upload to server
+    const formDataObj = new FormData();
+    formDataObj.append('designSketch', file);
+
+    try {
+      const response = await api.post('/techpacks/upload-sketch', formDataObj, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (response.data.success) {
+        const imageUrl = response.data.data.url;
+        setFormData(prev => ({ ...prev, imageUrl: imageUrl || undefined }));
+        // Keep local preview for immediate display, will be replaced by server URL on next render
+        if (imageUrl) {
+          const resolvedUrl = resolveImageUrl(imageUrl);
+          // Use resolved URL for preview if available, otherwise keep local preview
+          if (resolvedUrl) {
+            setImagePreview(resolvedUrl);
+          }
+        }
+        showSuccess('Image uploaded successfully');
+      } else {
+        showError(response.data.message || 'Failed to upload image.');
+        setImagePreview(null);
+      }
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || 'An unexpected error occurred.';
+      showError(errorMessage);
+    } finally {
+      setUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setFormData(prev => ({ ...prev, imageUrl: undefined }));
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleChangeImage = () => {
+    fileInputRef.current?.click();
   };
 
   const handlePartInputChange = (field: keyof ColorwayPart) => (value: string) => {
@@ -253,6 +357,7 @@ const ColorwayTab: React.FC = () => {
       supplier: formData.supplier || '',
       notes: formData.notes || '',
       collectionName: formData.collectionName,
+      imageUrl: formData.imageUrl || undefined,
       parts: (formData.parts || []).map(part => ({ ...part })),
     };
 
@@ -281,6 +386,7 @@ const ColorwayTab: React.FC = () => {
       pantoneCode: '',
       supplier: '',
       notes: '',
+      imageUrl: undefined,
     });
     setPartFormData({
       bomItemId: undefined,
@@ -291,21 +397,34 @@ const ColorwayTab: React.FC = () => {
       rgbCode: '',
       colorType: 'Solid',
     });
+    setImagePreview(null);
     setShowAddForm(false);
     setEditingIndex(null);
     validation.reset();
     partValidation.reset();
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleEdit = (colorway: Colorway, index: number) => {
+    const imageUrl = colorway.imageUrl || undefined;
     setFormData({
       ...colorway,
       hexColor: colorway.hexColor || '#000000',
       pantoneCode: colorway.pantoneCode || '',
       supplier: colorway.supplier || '',
       notes: colorway.notes || '',
+      imageUrl: imageUrl,
       parts: (colorway.parts || []).map(part => ({ ...part })),
     });
+    // Set preview with resolved URL if imageUrl exists
+    if (imageUrl) {
+      const resolvedUrl = resolveImageUrl(imageUrl);
+      setImagePreview(resolvedUrl);
+    } else {
+      setImagePreview(null);
+    }
     setEditingIndex(index);
     setShowAddForm(true);
   };
@@ -324,6 +443,7 @@ const ColorwayTab: React.FC = () => {
       name: `${colorway.name} Copy`,
       code: `${colorway.code}_COPY`,
       isDefault: false,
+      imageUrl: colorway.imageUrl || '', // Preserve imageUrl when duplicating
       parts: colorway.parts.map(part => ({
         ...part,
         id: `part_${Date.now()}_${Math.random()}`
@@ -335,7 +455,11 @@ const ColorwayTab: React.FC = () => {
 
   const handleSetDefault = (index: number) => {
     colorways.forEach((colorway, i) => {
-      updateColorway(i, { ...colorway, isDefault: i === index });
+      updateColorway(i, { 
+        ...colorway, 
+        isDefault: i === index,
+        imageUrl: colorway.imageUrl || '', // Preserve imageUrl
+      });
     });
   };
 
@@ -488,6 +612,92 @@ const ColorwayTab: React.FC = () => {
             {editingIndex !== null ? 'Edit Colorway' : 'Add New Colorway'}
           </h3>
           
+          {/* Image Upload Section */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Colorway Image</label>
+            <div className="relative">
+              {/* Image Preview */}
+              <div className="w-full h-[180px] rounded-xl border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center relative">
+                {(() => {
+                  const displayUrl = imagePreview || (formData.imageUrl ? resolveImageUrl(formData.imageUrl) : null);
+                  if (displayUrl) {
+                    return (
+                      <img
+                        key={formData.imageUrl || imagePreview || 'preview'}
+                        src={displayUrl}
+                        alt="Colorway preview"
+                        className="w-full h-full object-cover object-center"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent && !parent.querySelector('.image-placeholder')) {
+                            const placeholder = document.createElement('div');
+                            placeholder.className = 'image-placeholder flex flex-col items-center justify-center h-full text-gray-400';
+                            placeholder.innerHTML = `
+                              <svg class="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <p class="text-sm">No Image</p>
+                            `;
+                            parent.appendChild(placeholder);
+                          }
+                        }}
+                      />
+                    );
+                  }
+                  return (
+                    <div className="flex flex-col items-center justify-center text-gray-400">
+                      <ImageIcon className="w-12 h-12 mb-2" />
+                      <p className="text-sm">No Image</p>
+                      <p className="text-xs mt-1">Upload an image to display</p>
+                    </div>
+                  );
+                })()}
+              </div>
+              
+              {/* Upload Button */}
+              <div className="mt-3 flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/svg+xml,image/webp"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  {uploading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      {formData.imageUrl || imagePreview ? 'Change Image' : 'Upload Image'}
+                    </>
+                  )}
+                </button>
+                {(formData.imageUrl || imagePreview) && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-md hover:bg-red-50 transition-colors flex items-center gap-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Remove
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Supported formats: JPEG, PNG, GIF, SVG, WebP (Max 5MB)</p>
+            </div>
+          </div>
+
           {/* Colorway Basic Info */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <Input
@@ -803,7 +1013,42 @@ const ColorwayTab: React.FC = () => {
           </div>
         ) : (
           colorways.map((colorway, index) => (
-            <div key={colorway.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div key={colorway.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+              {/* Image Section */}
+              <div className="w-full h-[180px] sm:h-[200px] md:h-[180px] rounded-t-lg border-b border-gray-200 bg-gray-50 overflow-hidden relative group">
+                {colorway.imageUrl ? (
+                  <>
+                    <img
+                      src={resolveImageUrl(colorway.imageUrl) || ''}
+                      alt={colorway.name}
+                      className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105 group-hover:shadow-lg"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent && !parent.querySelector('.image-placeholder')) {
+                          const placeholder = document.createElement('div');
+                          placeholder.className = 'image-placeholder flex flex-col items-center justify-center h-full text-gray-400';
+                          placeholder.innerHTML = `
+                            <svg class="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <p class="text-sm">No Image</p>
+                          `;
+                          parent.appendChild(placeholder);
+                        }
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity duration-300" />
+                  </>
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
+                    <ImageIcon className="w-12 h-12 mb-2" />
+                    <p className="text-sm">No Image</p>
+                  </div>
+                )}
+              </div>
+              
               <div className="p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-2">
