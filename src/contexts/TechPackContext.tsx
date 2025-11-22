@@ -6,6 +6,7 @@ import { api } from '../lib/api';
 import { showPromise, showError } from '../lib/toast';
 import { exportTechPackToPDF as clientExportToPDF } from '../utils/pdfExport';
 import { DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR, DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR } from '../constants/measurementDisplay';
+import { useDebouncedCallback } from '../hooks/useDebounce';
 
 interface TechPackContextType {
   techPacks: ApiTechPack[];
@@ -889,7 +890,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     draftKeyRef.current = getDraftStorageKey(state.techpack.id);
   }, [state.techpack.id]);
 
-  useEffect(() => {
+  // ✅ Debounced localStorage write to reduce I/O operations
+  const saveDraftToStorage = useDebouncedCallback(() => {
     if (typeof window === 'undefined') return;
 
     const payload = {
@@ -914,7 +916,11 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       // Failed to persist draft
     }
-  }, [state.techpack, state.currentTab, state.tabStates, state.hasUnsavedChanges, state.lastSaved]);
+  }, 1000, [state.techpack, state.currentTab, state.tabStates, state.hasUnsavedChanges, state.lastSaved]);
+
+  useEffect(() => {
+    saveDraftToStorage();
+  }, [state.techpack, state.currentTab, state.tabStates, state.hasUnsavedChanges, state.lastSaved, saveDraftToStorage]);
 
 
   const loadTechPacks = useCallback(async (params = {}) => {
@@ -943,14 +949,22 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
       showError(error.message || 'Failed to load tech packs');
       // On error, fallback to cached data (if available) without clearing current state
-      if (techPacks.length === 0) {
-        setTechPacks(loadCachedTechPacks());
-        setPagination(loadCachedPagination());
-      }
+      setTechPacks(prev => {
+        if (prev.length === 0) {
+          return loadCachedTechPacks();
+        }
+        return prev;
+      });
+      setPagination(prev => {
+        if (prev.total === 0) {
+          return loadCachedPagination();
+        }
+        return prev;
+      });
     } finally {
       setLoading(false);
     }
-  }, [techPacks.length]);
+  }, []); // ✅ Fixed: Removed techPacks.length dependency to prevent unnecessary re-renders
 
   // Optimistic update: Add techpack to list immediately without waiting for API
   const addTechPackToList = useCallback((techPack: ApiTechPack) => {

@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useCallback, memo } from 'react';
+import React, { useState, useMemo, useCallback, memo, useEffect } from 'react';
 import { ApiTechPack } from '../types/techpack';
 import { useAuth } from '../contexts/AuthContext';
 import { useTechPack } from '../contexts/TechPackContext';
+import { useDebounce } from '../hooks/useDebounce';
 import CreateTechPackWorkflow from './CreateTechPackWorkflow';
 import {
   Table,
@@ -57,6 +58,7 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
   const { loadTechPacks, addTechPackToList } = useTechPack();
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 500); // ✅ Debounce search input
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [seasonFilter, setSeasonFilter] = useState('');
@@ -82,6 +84,7 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
     }
   };
 
+  // ✅ Use debounced search term for filtering
   const filteredTechPacks = useMemo(() => {
     return safeTechPacks.filter(tp => {
       const name = (tp as any).productName || tp.name || '';
@@ -89,13 +92,13 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
       const season = (tp as any).season || tp.metadata?.season || '';
 
       return (
-        (name.toLowerCase().includes(searchTerm.toLowerCase()) || tp.articleCode.toLowerCase().includes(searchTerm.toLowerCase())) &&
+        (name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) || tp.articleCode.toLowerCase().includes(debouncedSearchTerm.toLowerCase())) &&
         (statusFilter ? tp.status === statusFilter : true) &&
         (categoryFilter ? category === categoryFilter : true) &&
         (seasonFilter ? season === seasonFilter : true)
       );
     });
-  }, [safeTechPacks, searchTerm, statusFilter, categoryFilter, seasonFilter]);
+  }, [safeTechPacks, debouncedSearchTerm, statusFilter, categoryFilter, seasonFilter]);
 
   const showDeleteConfirm = (id: string) => {
     Modal.confirm({

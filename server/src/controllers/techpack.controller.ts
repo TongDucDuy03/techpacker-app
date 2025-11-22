@@ -465,6 +465,9 @@ export class TechPackController {
         });
         await initialRevision.save();
 
+        // ✅ Invalidate cache after clone
+        await CacheInvalidationUtil.invalidateTechPackCache((newTechPack._id as Types.ObjectId).toString());
+
         sendSuccess(res, newTechPack, 'TechPack cloned successfully', 201);
 
       } else {
@@ -531,6 +534,9 @@ export class TechPackController {
           snapshot: newTechPack.toObject(),
         });
         await initialRevision.save();
+
+        // ✅ Invalidate cache after create
+        await CacheInvalidationUtil.invalidateTechPackCache((newTechPack._id as Types.ObjectId).toString());
 
         sendSuccess(res, newTechPack, 'TechPack created successfully', 201);
       }
@@ -1206,57 +1212,27 @@ export class TechPackController {
         ...(techpack.sharedWith?.map(s => s.userId.toString()) || [])
       ].filter(Boolean);
 
-      console.log('🔍 Debug shareable users filters:', {
-        currentUserId: user._id.toString(),
-        currentUserRole: user.role,
-        techpackId: (techpack._id as any).toString(),
-        techpackCreatedBy: techpack.createdBy?.toString(),
-        technicalDesignerId: techpack.technicalDesignerId?.toString(),
-        sharedWithCount: techpack.sharedWith?.length || 0,
-        excludedUserIds,
-        excludedCount: excludedUserIds.length
-      });
+      // ✅ Optimized: Parse query params and build single query
+      const includeAdmins = String((req.query || {}).includeAdmins || 'false') === 'true';
+      const includeAll = String((req.query || {}).includeAll || 'false') === 'true';
 
-      // First, let's see total users in system
-      const totalUsers = await User.countDocuments({ isActive: true });
-      console.log('📊 Total active users in system:', totalUsers);
-
-      // Check users by role
-      const usersByRole = await User.aggregate([
-        { $match: { isActive: true } },
-        { $group: { _id: '$role', count: { $sum: 1 } } }
-      ]);
-      console.log('👥 Users by role:', usersByRole);
-
-  // Parse query params to booleans explicitly
-  const includeAdmins = String((req.query || {}).includeAdmins || 'false') === 'true';
-  const includeAll = String((req.query || {}).includeAll || 'false') === 'true';
-
-      // Build base filters
+      // ✅ Optimized: Build single query instead of multiple queries
       const baseFilters: any = {
         _id: { $nin: excludedUserIds },
         isActive: true
       };
 
       // includeAll=true returns everyone except current/excluded
-      if (!includeAll) {
+      if (!includeAll && !includeAdmins) {
         // By default, exclude admins unless explicitly included
-        if (!includeAdmins) {
-          baseFilters.role = { $ne: UserRole.Admin };
-        }
+        baseFilters.role = { $ne: UserRole.Admin };
       }
 
-      let shareableUsers = await User.find({
-        ...baseFilters
-      }).select('firstName lastName email role').limit(100).lean();
-
-      // Fallback: if still empty and includeAll not requested, try including admins
-      if (!shareableUsers.length && !includeAll && !includeAdmins) {
-        shareableUsers = await User.find({
-          _id: { $nin: excludedUserIds },
-          isActive: true
-        }).select('firstName lastName email role').limit(100).lean();
-      }
+      // ✅ Single query instead of multiple queries + fallback
+      const shareableUsers = await User.find(baseFilters)
+        .select('firstName lastName email role')
+        .limit(100)
+        .lean();
 
       sendSuccess(res, shareableUsers, 'Shareable users retrieved successfully');
     } catch (error: any) {
