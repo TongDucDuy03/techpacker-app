@@ -186,6 +186,7 @@ export interface ITechPack extends Document {
   sampleMeasurementRounds?: ISampleMeasurementRound[];
   colorways: IColorway[];
   howToMeasure: IHowToMeasure[];
+  packingNotes?: string;
   createdBy: Types.ObjectId;
   createdByName: string;
   updatedBy: Types.ObjectId;
@@ -411,6 +412,7 @@ const TechPackSchema = new Schema<ITechPack>(
     },
     colorways: [ColorwaySchema],
     howToMeasure: [HowToMeasureSchema],
+    packingNotes: { type: String, trim: true },
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: 'User'

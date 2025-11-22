@@ -6,6 +6,7 @@ import TechPackSelectionModal from './TechPackSelectionModal';
 import CloneConfigurationModal, { CloneConfiguration } from './CloneConfigurationModal';
 import { ApiTechPack } from '../types/techpack.types';
 import { api } from '../lib/api';
+import { useTechPack } from '../contexts/TechPackContext';
 
 interface CreateTechPackWorkflowProps {
   visible: boolean;
@@ -23,6 +24,7 @@ const CreateTechPackWorkflowComponent: React.FC<CreateTechPackWorkflowProps> = (
   onCreateTechPack,
 }) => {
   const navigate = useNavigate();
+  const { loadTechPacks, addTechPackToList } = useTechPack();
   const [currentStep, setCurrentStep] = useState<WorkflowStep>('mode-selection');
   const [selectedSourceTechPack, setSelectedSourceTechPack] = useState<ApiTechPack | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -61,33 +63,60 @@ const CreateTechPackWorkflowComponent: React.FC<CreateTechPackWorkflowProps> = (
       return;
     }
 
+    // Get the ID from _id or id field (ApiTechPack uses _id)
+    const sourceId = (selectedSourceTechPack as any)._id || (selectedSourceTechPack as any).id;
+    if (!sourceId) {
+      message.error('Source TechPack ID is missing');
+      return;
+    }
+
     setIsCreating(true);
     try {
       const newTechPack = await api.cloneTechPack({
-        sourceId: selectedSourceTechPack.id,
+        sourceId: sourceId,
         newProductName: config.newProductName,
         newArticleCode: config.newArticleCode,
         season: config.season,
         copySections: config.copySections,
       });
 
+      const sourceProductName = (selectedSourceTechPack as any).productName || (selectedSourceTechPack as any).name || 'TechPack';
       message.success({
-        content: `✅ New TechPack created from ${selectedSourceTechPack.productName}`,
+        content: `✅ New TechPack created from ${sourceProductName}`,
         duration: 4,
       });
 
-      // Reset workflow and close modals
+      // OPTIMISTIC UPDATE: Add new techpack to list immediately (before API refresh)
+      // This ensures the list is updated instantly, even if backend cache hasn't updated yet
+      if (addTechPackToList && newTechPack) {
+        addTechPackToList(newTechPack);
+      }
+
+      // Reset workflow and close modals first
       handleCancel();
+
+      // Refresh the techpack list from server to ensure consistency
+      // This will run in background and update the list with server data
+      // The optimistic update above ensures user sees the new techpack immediately
+      loadTechPacks({ page: 1 }).catch(error => {
+        console.error('Failed to refresh techpack list:', error);
+        // Fallback: try reloading without params
+        loadTechPacks().catch(fallbackError => {
+          console.error('Failed to refresh techpack list (fallback):', fallbackError);
+        });
+      });
 
       // Call success callback or navigate
       if (onSuccess) {
         onSuccess(newTechPack);
       } else {
-        navigate(`/techpacks/${newTechPack.id}`);
+        const newTechPackId = (newTechPack as any)._id || (newTechPack as any).id;
+        navigate(`/techpacks/${newTechPackId}`);
       }
     } catch (error: any) {
       console.error('Clone TechPack error:', error);
-      message.error(error.message || 'Failed to clone TechPack');
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to clone TechPack';
+      message.error(errorMessage);
     } finally {
       setIsCreating(false);
     }

@@ -146,9 +146,17 @@ function AppContent() {
     }
   };
 
-  const handleBackToList = () => {
+  const handleBackToList = async () => {
     setSelectedTechPack(null);
     setCurrentTab('list');
+    // Refresh the list when returning to it
+    if (context?.loadTechPacks) {
+      try {
+        await context.loadTechPacks({ page: 1 });
+      } catch (error) {
+        console.error('Failed to refresh techpack list when returning:', error);
+      }
+    }
   };
 
   const handleUpdate = async (id: string, data: Partial<ApiTechPack>) => {

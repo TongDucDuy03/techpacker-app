@@ -17,6 +17,7 @@ interface TechPackContextType {
   revisionPagination: any;
   loadTechPacks: (params?: { page?: number; limit?: number; q?: string; status?: string }) => Promise<void>;
   createTechPack: (data: CreateTechPackInput) => Promise<ApiTechPack | undefined>;
+  addTechPackToList: (techPack: ApiTechPack) => void; // Optimistic update: add techpack to list immediately
   updateTechPack: (id: string, data: Partial<ApiTechPack>) => Promise<ApiTechPack | undefined>;
   deleteTechPack: (id: string) => Promise<void>;
   getTechPack: (id: string) => Promise<ApiTechPack | undefined>;
@@ -919,10 +920,25 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
   const loadTechPacks = useCallback(async (params = {}) => {
     setLoading(true);
     try {
-      const response = await api.listTechPacks(params);
+      // Add timestamp to bypass cache
+      const cacheBypassParams = { ...params, _nocache: Date.now() };
+      const response = await api.listTechPacks(cacheBypassParams);
       // Ensure response.data is always an array
       const techPacksData = Array.isArray(response.data) ? response.data : [];
-      setTechPacks(techPacksData);
+      
+      // Merge with current list to preserve optimistically added techpacks
+      // that might not be in server response yet (due to cache delay)
+      setTechPacks(prev => {
+        const serverIds = new Set(techPacksData.map(tp => (tp as any)._id || (tp as any).id));
+        // Keep optimistically added techpacks that aren't in server response yet
+        const optimisticTechPacks = prev.filter(tp => {
+          const tpId = (tp as any)._id || (tp as any).id;
+          return tpId && !serverIds.has(tpId);
+        });
+        // Combine: server data first, then optimistic updates
+        return [...techPacksData, ...optimisticTechPacks];
+      });
+      
       setPagination({ total: response.total, page: response.page, totalPages: response.totalPages });
     } catch (error: any) {
       showError(error.message || 'Failed to load tech packs');
@@ -935,6 +951,35 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     }
   }, [techPacks.length]);
+
+  // Optimistic update: Add techpack to list immediately without waiting for API
+  const addTechPackToList = useCallback((techPack: ApiTechPack) => {
+    setTechPacks(prev => {
+      // Check if techpack already exists (by _id or id)
+      const techPackId = (techPack as any)._id || (techPack as any).id;
+      const exists = prev.some(tp => {
+        const tpId = (tp as any)._id || (tp as any).id;
+        return tpId === techPackId;
+      });
+      
+      if (exists) {
+        // Update existing techpack
+        return prev.map(tp => {
+          const tpId = (tp as any)._id || (tp as any).id;
+          return tpId === techPackId ? techPack : tp;
+        });
+      } else {
+        // Add new techpack at the beginning of the list
+        return [techPack, ...prev];
+      }
+    });
+    
+    // Update pagination total
+    setPagination(prev => ({
+      ...prev,
+      total: prev.total + 1
+    }));
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -2174,6 +2219,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     revisionPagination,
     loadTechPacks,
     createTechPack,
+    addTechPackToList,
     updateTechPack,
     deleteTechPack,
     getTechPack,
@@ -2223,6 +2269,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     revisionPagination,
     loadTechPacks,
     createTechPack,
+    addTechPackToList,
     updateTechPack,
     deleteTechPack,
     getTechPack,

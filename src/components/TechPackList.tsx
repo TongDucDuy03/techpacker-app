@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, memo } from 'react';
 import { ApiTechPack } from '../types/techpack';
 import { useAuth } from '../contexts/AuthContext';
+import { useTechPack } from '../contexts/TechPackContext';
 import CreateTechPackWorkflow from './CreateTechPackWorkflow';
 import {
   Table,
@@ -53,6 +54,7 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
   onUpdateTechPack,
   onDeleteTechPack,
 }) => {
+  const { loadTechPacks, addTechPackToList } = useTechPack();
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -210,12 +212,34 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
             onCreateTechPack();
           }
         }}
-        onSuccess={(newTechPack) => {
+        onSuccess={async (newTechPack) => {
           setShowCreateWorkflow(false);
-          // Optionally refresh the list or call onCreateTechPack callback
-          if (onCreateTechPack) {
-            onCreateTechPack();
+          
+          // OPTIMISTIC UPDATE: Add new techpack to list immediately if not already added
+          // (CreateTechPackWorkflow should have already added it, but this ensures it's there)
+          if (addTechPackToList && newTechPack) {
+            addTechPackToList(newTechPack);
           }
+          
+          // Note: loadTechPacks was already called in CreateTechPackWorkflow
+          // But we'll call it again here to ensure the list is refreshed from server
+          // This runs in background and will merge with optimistic update
+          loadTechPacks({ page: 1 }).catch(error => {
+            console.error('Failed to refresh techpack list:', error);
+            // Fallback: try reloading without params
+            loadTechPacks().catch(fallbackError => {
+              console.error('Failed to refresh techpack list (fallback):', fallbackError);
+            });
+          });
+          
+          // Wait a bit to ensure state is updated before navigating
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Navigate to edit the newly created techpack
+          if (onEditTechPack && newTechPack) {
+            onEditTechPack(newTechPack);
+          }
+          // Note: We don't call onCreateTechPack() here because we want to edit the cloned techpack, not create a new one
         }}
       />
     </div>

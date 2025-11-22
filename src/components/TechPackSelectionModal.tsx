@@ -28,11 +28,15 @@ export const TechPackSelectionModal: React.FC<TechPackSelectionModalProps> = ({
     }
   }, [visible, techPacks.length, loadTechPacks]);
 
-  const filteredTechPacks = techPacks.filter(tp => 
-    tp.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tp.articleCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tp.season?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredTechPacks = techPacks.filter(tp => {
+    const productName = (tp as any).productName || (tp as any).name || '';
+    const season = (tp as any).season || (tp as any).metadata?.season || '';
+    return (
+      productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tp.articleCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      season.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
 
   const handleSelect = () => {
     if (selectedTechPack) {
@@ -117,7 +121,7 @@ export const TechPackSelectionModal: React.FC<TechPackSelectionModalProps> = ({
                     onClick={() => setSelectedTechPack(techPack)}
                     style={{
                       width: '100%',
-                      border: selectedTechPack?.id === techPack.id ? '2px solid #1890ff' : '1px solid #d9d9d9',
+                      border: (selectedTechPack as any)?._id === (techPack as any)._id || (selectedTechPack as any)?.id === (techPack as any).id ? '2px solid #1890ff' : '1px solid #d9d9d9',
                       cursor: 'pointer',
                     }}
                     styles={{ body: { padding: '16px' } }}
@@ -125,13 +129,13 @@ export const TechPackSelectionModal: React.FC<TechPackSelectionModalProps> = ({
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={{ flex: 1 }}>
                         <Title level={5} style={{ margin: '0 0 8px 0' }}>
-                          {techPack.productName}
+                          {(techPack as any).productName || (techPack as any).name || 'TechPack'}
                         </Title>
                         <Space direction="vertical" size={4}>
                           <Text strong>Article Code: {techPack.articleCode}</Text>
                           <Space>
                             <CalendarOutlined />
-                            <Text type="secondary">Season: {techPack.season || 'N/A'}</Text>
+                            <Text type="secondary">Season: {(techPack as any).season || (techPack as any).metadata?.season || 'N/A'}</Text>
                           </Space>
                           <Space>
                             <UserOutlined />
@@ -172,7 +176,7 @@ export const TechPackSelectionModal: React.FC<TechPackSelectionModalProps> = ({
             border: '1px solid #91d5ff'
           }}>
             <Text strong style={{ color: '#1890ff' }}>
-              Selected: {selectedTechPack.productName} ({selectedTechPack.articleCode})
+              Selected: {(selectedTechPack as any).productName || (selectedTechPack as any).name || 'TechPack'} ({selectedTechPack.articleCode})
             </Text>
           </div>
         )}

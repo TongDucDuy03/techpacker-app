@@ -41,15 +41,21 @@ const COPY_SECTIONS = [
     defaultChecked: true,
   },
   {
+    key: 'Construction',
+    label: 'Construction',
+    description: 'Construction instructions and guidelines',
+    defaultChecked: true,
+  },
+  {
     key: 'Colorways',
     label: 'Colorways',
     description: 'Color variations and specifications',
     defaultChecked: false,
   },
   {
-    key: 'HowToMeasure',
-    label: 'How to Measure',
-    description: 'Measurement instructions and guidelines',
+    key: 'Packing',
+    label: 'Packing',
+    description: 'Packing & folding instructions',
     defaultChecked: true,
   },
 ];
@@ -123,10 +129,10 @@ export const CloneConfigurationModal: React.FC<CloneConfigurationModalProps> = (
               <InfoCircleOutlined style={{ color: '#1890ff' }} />
               <div>
                 <Text strong>Cloning from: </Text>
-                <Text>{sourceTechPack.productName} ({sourceTechPack.articleCode})</Text>
+                <Text>{(sourceTechPack as any).productName || (sourceTechPack as any).name || 'TechPack'} ({sourceTechPack.articleCode})</Text>
                 <br />
                 <Text type="secondary" style={{ fontSize: '12px' }}>
-                  Version {sourceTechPack.version} • {sourceTechPack.season}
+                  Version {sourceTechPack.version} • {(sourceTechPack as any).season || (sourceTechPack as any).metadata?.season || 'N/A'}
                 </Text>
               </div>
             </Space>
@@ -137,7 +143,7 @@ export const CloneConfigurationModal: React.FC<CloneConfigurationModalProps> = (
           form={form}
           layout="vertical"
           initialValues={{
-            season: sourceTechPack?.season,
+            season: (sourceTechPack as any)?.season || (sourceTechPack as any)?.metadata?.season,
           }}
         >
           <Title level={5}>New TechPack Details</Title>
@@ -156,9 +162,16 @@ export const CloneConfigurationModal: React.FC<CloneConfigurationModalProps> = (
               <Form.Item
                 name="newArticleCode"
                 label="Article Code"
-                rules={[{ required: true, message: 'Article code is required' }]}
+                rules={[
+                  { required: true, message: 'Article code is required' },
+                  {
+                    pattern: /^[A-Z0-9_-]+$/,
+                    message: 'Article code can only contain uppercase letters, numbers, dash (-), and underscore (_)',
+                  },
+                ]}
+                normalize={(value) => value ? value.toUpperCase() : value}
               >
-                <Input placeholder="Enter new article code" />
+                <Input placeholder="Enter new article code (e.g., ABC123)" />
               </Form.Item>
             </Col>
           </Row>

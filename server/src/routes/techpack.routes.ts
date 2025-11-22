@@ -9,37 +9,139 @@ const router = Router();
 
 // Validation rules
 const techpackValidation = [
+  // Validation for mode
+  body('mode')
+    .optional()
+    .isIn(['new', 'clone'])
+    .withMessage('Mode must be either "new" or "clone"'),
+  
+  // Only require articleInfo fields when mode is not 'clone'
   body('articleInfo.productName')
-    .notEmpty()
-    .withMessage('Product name is required')
-    .isLength({ max: 100 })
-    .withMessage('Product name must be less than 100 characters'),
+    .custom((value, { req }) => {
+      if (req.body.mode === 'clone') {
+        return true; // Skip validation for clone mode
+      }
+      if (!value || value.trim().length === 0) {
+        throw new Error('Product name is required');
+      }
+      if (value.length > 100) {
+        throw new Error('Product name must be less than 100 characters');
+      }
+      return true;
+    }),
   
   body('articleInfo.articleCode')
-    .notEmpty()
-    .withMessage('Article code is required')
-    .isLength({ max: 20 })
-    .withMessage('Article code must be less than 20 characters')
-    .matches(/^[A-Z0-9\-_]+$/)
-    .withMessage('Article code can only contain uppercase letters, numbers, hyphens, and underscores'),
+    .custom((value, { req }) => {
+      if (req.body.mode === 'clone') {
+        return true; // Skip validation for clone mode
+      }
+      if (!value || value.trim().length === 0) {
+        throw new Error('Article code is required');
+      }
+      if (value.length > 20) {
+        throw new Error('Article code must be less than 20 characters');
+      }
+      if (!/^[A-Z0-9\-_]+$/.test(value)) {
+        throw new Error('Article code can only contain uppercase letters, numbers, hyphens, and underscores');
+      }
+      return true;
+    }),
   
   body('articleInfo.supplier')
-    .notEmpty()
-    .withMessage('Supplier is required')
-    .isLength({ max: 100 })
-    .withMessage('Supplier name must be less than 100 characters'),
+    .custom((value, { req }) => {
+      if (req.body.mode === 'clone') {
+        return true; // Skip validation for clone mode
+      }
+      if (!value || value.trim().length === 0) {
+        throw new Error('Supplier is required');
+      }
+      if (value.length > 100) {
+        throw new Error('Supplier name must be less than 100 characters');
+      }
+      return true;
+    }),
   
   body('articleInfo.season')
-    .notEmpty()
-    .withMessage('Season is required')
-    .isLength({ max: 50 })
-    .withMessage('Season must be less than 50 characters'),
+    .custom((value, { req }) => {
+      if (req.body.mode === 'clone') {
+        return true; // Skip validation for clone mode
+      }
+      if (!value || value.trim().length === 0) {
+        throw new Error('Season is required');
+      }
+      if (value.length > 50) {
+        throw new Error('Season must be less than 50 characters');
+      }
+      return true;
+    }),
   
   body('articleInfo.fabricDescription')
-    .notEmpty()
-    .withMessage('Fabric description is required')
-    .isLength({ max: 500 })
-    .withMessage('Fabric description must be less than 500 characters'),
+    .custom((value, { req }) => {
+      if (req.body.mode === 'clone') {
+        return true; // Skip validation for clone mode
+      }
+      if (!value || value.trim().length === 0) {
+        throw new Error('Fabric description is required');
+      }
+      if (value.length > 500) {
+        throw new Error('Fabric description must be less than 500 characters');
+      }
+      return true;
+    }),
+  
+  // Validation for clone mode
+  body('sourceId')
+    .custom((value, { req }) => {
+      if (req.body.mode === 'clone') {
+        if (!value) {
+          throw new Error('Source ID is required when mode is clone');
+        }
+        // Basic MongoDB ID format check (24 hex characters)
+        if (!/^[0-9a-fA-F]{24}$/.test(value)) {
+          throw new Error('Source ID must be a valid MongoDB ID when mode is clone');
+        }
+      }
+      return true;
+    }),
+  
+  body('newProductName')
+    .custom((value, { req }) => {
+      if (req.body.mode === 'clone') {
+        if (!value || value.trim().length === 0) {
+          throw new Error('New product name is required when mode is clone');
+        }
+        if (value.length > 100) {
+          throw new Error('New product name must be less than 100 characters');
+        }
+      }
+      return true;
+    }),
+  
+  body('newArticleCode')
+    .custom((value, { req }) => {
+      if (req.body.mode === 'clone') {
+        if (!value || value.trim().length === 0) {
+          throw new Error('New article code is required when mode is clone');
+        }
+        if (value.length > 20) {
+          throw new Error('New article code must be less than 20 characters');
+        }
+        if (!/^[A-Z0-9\-_]+$/.test(value)) {
+          throw new Error('New article code can only contain uppercase letters, numbers, hyphens, and underscores');
+        }
+      }
+      return true;
+    }),
+  
+  body('copySections')
+    .custom((value, { req }) => {
+      if (req.body.mode === 'clone' && value !== undefined) {
+        if (!Array.isArray(value)) {
+          throw new Error('Copy sections must be an array');
+        }
+      }
+      return true;
+    }),
   
   // Fallback validation for direct fields (backward compatibility)
   body('productName')

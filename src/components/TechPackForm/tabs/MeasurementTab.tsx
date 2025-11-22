@@ -969,7 +969,7 @@ type RoundModalFormState = {
       ? parseTolerance(measurement.plusTolerance)
       : (measurement.plusTolerance ?? 1.0);
 
-    const measurementSizes = Object.keys(measurement.sizes);
+    const measurementSizes = measurement.sizes ? Object.keys(measurement.sizes) : [];
     const resolvedBaseSize =
       measurement.baseSize ||
       measurementSizes[0] ||
@@ -981,11 +981,12 @@ type RoundModalFormState = {
       minusTolerance: minusTol,
       plusTolerance: plusTol,
       baseSize: resolvedBaseSize,
+      sizes: measurement.sizes || {},
     });
     setEditingIndex(index);
     setShowAddForm(true);
 
-    setSizeAdjustments(buildAdjustmentMap(measurement.sizes, resolvedBaseSize, measurementSizes.length > 0 ? measurementSizes : selectedSizes));
+    setSizeAdjustments(buildAdjustmentMap(measurement.sizes || {}, resolvedBaseSize, measurementSizes.length > 0 ? measurementSizes : selectedSizes));
 
     // Set selected sizes based on measurement data
     if (measurementSizes.length > 0 && updateMeasurementSizeRange) {
@@ -1010,7 +1011,7 @@ type RoundModalFormState = {
       id: `measurement_${Date.now()}`,
       pomCode: `${measurement.pomCode}_COPY`,
       pomName: `${measurement.pomName} (Copy)`,
-      sizes: { ...measurement.sizes },
+      sizes: measurement.sizes ? { ...measurement.sizes } : {},
     };
     addMeasurement(duplicate);
     showSuccess('Measurement duplicated');
@@ -1018,8 +1019,9 @@ type RoundModalFormState = {
 
   // Enhanced validation for display in table
   const validateMeasurement = (measurement: MeasurementPoint): ProgressionValidation => {
-    const order = selectedSizes.length > 0 ? selectedSizes : Object.keys(measurement.sizes);
-    return validateProgression(measurement.sizes, order);
+    const measurementSizes = measurement.sizes ? Object.keys(measurement.sizes) : [];
+    const order = selectedSizes.length > 0 ? selectedSizes : measurementSizes;
+    return validateProgression(measurement.sizes || {}, order);
   };
 
   const addCommonMeasurements = () => {
@@ -1566,7 +1568,7 @@ type RoundModalFormState = {
                         {toleranceDisplay}
                       </td>
                       {selectedSizes.map(size => {
-                        const value = measurement.sizes[size];
+                        const value = measurement.sizes ? measurement.sizes[size] : undefined;
                         const displayValue = formatMeasurementValue(value);
                         const isBaseCell = highlightedColumn ? size === highlightedColumn : measurement.baseSize === size;
                         return (

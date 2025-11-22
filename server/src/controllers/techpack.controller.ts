@@ -318,6 +318,13 @@ export class TechPackController {
           return sendError(res, 'Source ID, new product name, and new article code are required for cloning.', 400, 'VALIDATION_ERROR');
         }
 
+        // Validate articleCode format: only uppercase letters, numbers, dash, underscore
+        const articleCodeRegex = /^[A-Z0-9_-]+$/;
+        const upperArticleCode = newArticleCode.toUpperCase();
+        if (!articleCodeRegex.test(upperArticleCode)) {
+          return sendError(res, 'Article code can only contain uppercase letters, numbers, dash (-), and underscore (_).', 400, 'VALIDATION_ERROR');
+        }
+
         const sourceTechPack = await TechPack.findById(sourceId).lean();
         if (!sourceTechPack) {
           return sendError(res, 'Source TechPack not found.', 404, 'NOT_FOUND');
@@ -326,37 +333,107 @@ export class TechPackController {
         // Build the new tech pack data from the source
         const newTechPackData: Partial<ITechPack> = {};
 
-        // Copy sections based on the checkbox selection
+        // ALWAYS copy required fields from sourceTechPack (fallback to req.body if missing)
+        // These fields are mandatory for TechPack creation, so they must be present
+        const requiredFields: Array<keyof ITechPack> = ['supplier', 'season', 'fabricDescription', 'productDescription', 'technicalDesignerId'];
+        const missingFields: string[] = [];
+
+        // Get required fields from sourceTechPack, req.body, or report as missing
+        for (const field of requiredFields) {
+          if (sourceTechPack[field] !== undefined && sourceTechPack[field] !== null && sourceTechPack[field] !== '') {
+            (newTechPackData as any)[field] = sourceTechPack[field];
+          } else if (req.body[field] !== undefined && req.body[field] !== null && req.body[field] !== '') {
+            (newTechPackData as any)[field] = req.body[field];
+          } else {
+            // If field is technicalDesignerId and missing, use current user
+            if (field === 'technicalDesignerId') {
+              (newTechPackData as any)[field] = user._id;
+            } else {
+              missingFields.push(field);
+            }
+          }
+        }
+
+        // If required fields are missing, return error with details
+        if (missingFields.length > 0) {
+          return sendError(
+            res,
+            `Cannot clone TechPack: Required fields are missing from source: ${missingFields.join(', ')}. Please ensure the source TechPack has all required fields or provide them in the request.`,
+            400,
+            'VALIDATION_ERROR'
+          );
+        }
+
+        // Copy optional ArticleInfo fields if copySections includes 'ArticleInfo'
         if (copySections.includes('ArticleInfo')) {
           Object.assign(newTechPackData, {
-            supplier: sourceTechPack.supplier,
-            season: sourceTechPack.season,
-            fabricDescription: sourceTechPack.fabricDescription,
-            productDescription: sourceTechPack.productDescription,
-            designSketchUrl: sourceTechPack.designSketchUrl,
-            companyLogoUrl: sourceTechPack.companyLogoUrl,
-            category: sourceTechPack.category,
-            gender: sourceTechPack.gender,
-            brand: sourceTechPack.brand,
-            collectionName: sourceTechPack.collectionName,
-            targetMarket: sourceTechPack.targetMarket,
-            pricePoint: sourceTechPack.pricePoint,
-            retailPrice: sourceTechPack.retailPrice,
-            currency: sourceTechPack.currency,
-            description: sourceTechPack.description,
-            notes: sourceTechPack.notes,
-            technicalDesignerId: sourceTechPack.technicalDesignerId,
+            designSketchUrl: sourceTechPack.designSketchUrl || req.body.designSketchUrl,
+            companyLogoUrl: sourceTechPack.companyLogoUrl || req.body.companyLogoUrl,
+            category: sourceTechPack.category || req.body.category,
+            gender: sourceTechPack.gender || req.body.gender,
+            brand: sourceTechPack.brand || req.body.brand,
+            collectionName: sourceTechPack.collectionName || req.body.collectionName,
+            targetMarket: sourceTechPack.targetMarket || req.body.targetMarket,
+            pricePoint: sourceTechPack.pricePoint || req.body.pricePoint,
+            retailPrice: sourceTechPack.retailPrice || req.body.retailPrice,
+            currency: sourceTechPack.currency || req.body.currency || 'USD',
+            description: sourceTechPack.description || req.body.description,
+            notes: sourceTechPack.notes || req.body.notes,
+            lifecycleStage: sourceTechPack.lifecycleStage || req.body.lifecycleStage,
+            customerId: sourceTechPack.customerId || req.body.customerId,
           });
+        } else {
+          // Even if ArticleInfo is not selected, copy companyLogoUrl and other essential fields
+          // that might be needed for PDF generation
+          if (sourceTechPack.companyLogoUrl) {
+            newTechPackData.companyLogoUrl = sourceTechPack.companyLogoUrl;
+          } else if (req.body.companyLogoUrl) {
+            newTechPackData.companyLogoUrl = req.body.companyLogoUrl;
+          }
         }
-        if (copySections.includes('BOM')) newTechPackData.bom = sourceTechPack.bom;
-        if (copySections.includes('Measurements')) newTechPackData.measurements = sourceTechPack.measurements;
-        if (copySections.includes('Colorways')) newTechPackData.colorways = sourceTechPack.colorways;
-        if (copySections.includes('HowToMeasure')) newTechPackData.howToMeasure = sourceTechPack.howToMeasure;
+
+        // Override season if provided in req.body
+        if (req.body.season) {
+          newTechPackData.season = req.body.season;
+        }
+
+        // Copy sections based on the checkbox selection
+        if (copySections.includes('BOM')) {
+          newTechPackData.bom = sourceTechPack.bom || [];
+        } else {
+          newTechPackData.bom = [];
+        }
+        
+        if (copySections.includes('Measurements')) {
+          newTechPackData.measurements = sourceTechPack.measurements || [];
+        } else {
+          newTechPackData.measurements = [];
+        }
+        
+        if (copySections.includes('Colorways')) {
+          newTechPackData.colorways = sourceTechPack.colorways || [];
+        } else {
+          newTechPackData.colorways = [];
+        }
+        
+        // Handle Construction (new name) or HowToMeasure (backward compatibility)
+        if (copySections.includes('Construction') || copySections.includes('HowToMeasure')) {
+          newTechPackData.howToMeasure = sourceTechPack.howToMeasure || [];
+        } else {
+          newTechPackData.howToMeasure = [];
+        }
+        
+        // Handle Packing section
+        if (copySections.includes('Packing')) {
+          newTechPackData.packingNotes = sourceTechPack.packingNotes || '';
+        } else {
+          newTechPackData.packingNotes = '';
+        }
 
         // Override with new details and reset metadata
         Object.assign(newTechPackData, {
           productName: newProductName,
-          articleCode: newArticleCode.toUpperCase(),
+          articleCode: upperArticleCode,
           status: TechPackStatus.Draft,
           version: 'v1.0',
           createdBy: user._id,
