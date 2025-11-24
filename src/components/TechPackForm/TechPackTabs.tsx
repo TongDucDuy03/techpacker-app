@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTechPack } from '../../contexts/TechPackContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { ApiTechPack, Colorway } from '../../types/techpack';
+import { ApiTechPack, Colorway, SIZE_RANGES } from '../../types/techpack';
 import ArticleInfoTab, { ArticleInfoTabRef } from './tabs/ArticleInfoTab';
 import BomTab, { BomTabRef } from './tabs/BomTab';
 import MeasurementTab from './tabs/MeasurementTab';
@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { showError, showWarning } from '../../lib/toast';
 import { Modal } from 'antd';
+import { DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR, DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR } from '../../constants/measurementDisplay';
 
 interface TechPackTabsProps {
   onBackToList: () => void;
@@ -62,6 +63,25 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
         (initialTechPack as any).category ??
         (initialTechPack as any).metadata?.category ??
         '';
+
+      const resolvedGender = ((initialTechPack as any).gender || 'Unisex') as keyof typeof SIZE_RANGES;
+      const defaultSizeRange = [...(SIZE_RANGES[resolvedGender] || SIZE_RANGES['Unisex'])];
+
+      const rawSizeRange = Array.isArray((initialTechPack as any).measurementSizeRange)
+        ? (initialTechPack as any).measurementSizeRange.filter(
+            (size: any) => typeof size === 'string' && size.trim().length > 0
+          )
+        : [];
+      const normalizedSizeRange = rawSizeRange.length > 0 ? rawSizeRange : defaultSizeRange;
+      const serverBaseSize = (initialTechPack as any).measurementBaseSize;
+      const resolvedBaseSize =
+        serverBaseSize && normalizedSizeRange.includes(serverBaseSize)
+          ? serverBaseSize
+          : normalizedSizeRange[0];
+      const resolvedBaseHighlight =
+        (initialTechPack as any).measurementBaseHighlightColor || DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR;
+      const resolvedRowStripe =
+        (initialTechPack as any).measurementRowStripeColor || DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR;
 
       const rawHowToMeasures = ((initialTechPack as any).howToMeasure || []).map((htm: any, index: number) => {
         const steps = Array.isArray(htm.steps) && htm.steps.length > 0 ? htm.steps : (htm.instructions || []);
@@ -142,7 +162,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
             const parsed = parseInt(digits, 10);
             return Number.isNaN(parsed) ? 1 : parsed;
           })(),
-          gender: ((initialTechPack as any).gender || 'Unisex') as any,
+          gender: resolvedGender,
           productClass: resolvedProductClass,
           fitType: 'Regular' as const,
           supplier: (initialTechPack as any).supplier || '',
@@ -207,6 +227,10 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
           : [],
         measurements: (initialTechPack as any).measurements || [],
         sampleMeasurementRounds: (initialTechPack as any).sampleMeasurementRounds || [],
+        measurementSizeRange: normalizedSizeRange,
+        measurementBaseSize: resolvedBaseSize,
+        measurementBaseHighlightColor: resolvedBaseHighlight,
+        measurementRowStripeColor: resolvedRowStripe,
         howToMeasures: rawHowToMeasures,
         colorways: mappedColorways,
         revisionHistory: (initialTechPack as any).revisions || [],

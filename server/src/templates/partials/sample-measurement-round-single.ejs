@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sample Round: <%= round.name %></title>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 20mm 25mm;
+    }
+
+    body {
+      font-family: 'Roboto', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif;
+      font-size: 11pt;
+      line-height: 1.5;
+      color: #1f2933;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      margin: 0;
+      padding: 0;
+    }
+
+    .section-title {
+      font-size: 18pt;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 3px solid #111827;
+      padding-bottom: 10px;
+      margin: 0 0 24px 0;
+      page-break-after: avoid;
+      page-break-inside: avoid;
+      break-after: avoid;
+      break-inside: avoid;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .round-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      padding: 12px;
+      background: #f8fafc;
+      border-radius: 6px;
+      border: 1px solid #E0E0E0;
+      page-break-inside: avoid;
+    }
+
+    .round-name {
+      font-size: 16pt;
+      font-weight: 700;
+      color: #0f172a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .round-meta {
+      display: flex;
+      gap: 24px;
+      font-size: 10pt;
+      color: #475569;
+    }
+
+    .round-meta-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .round-meta-label {
+      font-size: 9pt;
+      color: #64748b;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    .round-meta-value {
+      font-weight: 600;
+      color: #0f172a;
+      font-size: 11pt;
+    }
+
+    .overall-comments {
+      margin: 18px 0;
+      padding: 12px;
+      background: #f1f5f9;
+      border-left: 4px solid #3b82f6;
+      border-radius: 6px;
+      font-size: 11pt;
+      page-break-inside: avoid;
+    }
+
+    .overall-comments-label {
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      font-size: 12pt;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 10pt;
+      background: #ffffff;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    tbody {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    thead {
+      display: table-header-group;
+    }
+
+    tbody {
+      display: table-row-group;
+    }
+
+    th, td {
+      border: 1px solid #E0E0E0;
+      padding: 10px 12px;
+      text-align: center;
+      vertical-align: middle;
+      word-break: break-word;
+    }
+
+    th {
+      background: #E0E0E0;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 12pt;
+      letter-spacing: 0.3px;
+      color: #0f172a;
+    }
+
+    tr:nth-child(even) td {
+      background: #f9fafb;
+    }
+
+    .pom-col {
+      text-align: left;
+      font-weight: 600;
+      background: #f8fafc !important;
+      min-width: 80px;
+      position: sticky;
+      left: 0;
+      z-index: 1;
+    }
+
+    .pom-code {
+      font-size: 9pt;
+      color: #475569;
+    }
+
+    .pom-name {
+      font-size: 11pt;
+      color: #0f172a;
+      font-weight: 600;
+    }
+
+    .size-col {
+      min-width: 50px;
+      font-weight: 500;
+    }
+
+    .value-requested {
+      color: #1e40af;
+      font-weight: 500;
+    }
+
+    .value-measured {
+      color: #059669;
+      font-weight: 500;
+    }
+
+    .value-diff-minus {
+      color: #dc2626;
+      font-weight: 600;
+    }
+
+    .value-diff-plus {
+      color: #16a34a;
+      font-weight: 600;
+    }
+
+    .value-diff-zero {
+      color: #6b7280;
+    }
+
+    .value-revised {
+      color: #7c3aed;
+      font-weight: 600;
+    }
+
+    .value-comments {
+      font-size: 10pt;
+      color: #475569;
+      text-align: left;
+      max-width: 120px;
+    }
+  </style>
+</head>
+<body>
+  <%- include('article-summary', { meta, images }) %>
+  <div class="section-title">Sample Measurement Round: <%= round.name %></div>
+
+  <div class="round-header">
+    <div>
+      <div class="round-name"><%= round.name %></div>
+    </div>
+    <div class="round-meta">
+      <div class="round-meta-item">
+        <div class="round-meta-label">Date</div>
+        <div class="round-meta-value"><%= round.date %></div>
+      </div>
+      <div class="round-meta-item">
+        <div class="round-meta-label">Reviewer</div>
+        <div class="round-meta-value"><%= round.reviewer %></div>
+      </div>
+      <div class="round-meta-item">
+        <div class="round-meta-label">Source</div>
+        <div class="round-meta-value"><%= round.requestedSource === 'previous' ? 'Previous Round' : 'Original Spec' %></div>
+      </div>
+      <div class="round-meta-item">
+        <div class="round-meta-label">Order</div>
+        <div class="round-meta-value">#<%= round.order %></div>
+      </div>
+    </div>
+  </div>
+
+  <% if (round.overallComments && round.overallComments !== '—') { %>
+    <div class="overall-comments">
+      <div class="overall-comments-label">Overall Comments</div>
+      <div><%= round.overallComments %></div>
+    </div>
+  <% } %>
+
+  <% if (round.entries && round.entries.length > 0) { %>
+    <% const sizes = sampleRounds.sizes || []; %>
+    <table>
+      <thead>
+        <tr>
+          <th class="pom-col" style="width:12%;">POM Code</th>
+          <th class="pom-col" style="width:15%;">Description</th>
+          <% sizes.forEach((size) => { %>
+            <th class="size-col" colspan="5" style="background: #E0E0E0; font-size: 12pt;">
+              <%= size %>
+            </th>
+          <% }) %>
+        </tr>
+        <tr>
+          <th class="pom-col"></th>
+          <th class="pom-col"></th>
+          <% sizes.forEach(() => { %>
+            <th style="font-size: 10pt; padding: 10px 12px;">Required</th>
+            <th style="font-size: 10pt; padding: 10px 12px;">Measured</th>
+            <th style="font-size: 10pt; padding: 10px 12px;">Diff</th>
+            <th style="font-size: 10pt; padding: 10px 12px;">Review</th>
+            <th style="font-size: 10pt; padding: 10px 12px;">Notes</th>
+          <% }) %>
+        </tr>
+      </thead>
+      <tbody>
+        <% round.entries.forEach((entry) => { %>
+          <tr>
+            <td class="pom-col">
+              <div class="pom-code"><%= entry.pomCode %></div>
+            </td>
+            <td class="pom-col">
+              <div class="pom-name"><%= entry.pomName %></div>
+            </td>
+            <% sizes.forEach((size) => { %>
+              <% const sizeData = entry.sizes[size] || {}; %>
+              <td class="value-requested"><%= sizeData.requested || '—' %></td>
+              <td class="value-measured"><%= sizeData.measured || '—' %></td>
+              <td class="<%= sizeData.diffClass || 'value-diff-zero' %>">
+                <%= sizeData.diff || '—' %>
+              </td>
+              <td class="value-revised"><%= sizeData.revised || '—' %></td>
+              <td class="value-comments"><%= sizeData.comments || '—' %></td>
+            <% }) %>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } else { %>
+    <div style="padding: 32px; text-align: center; color: #94a3b8; font-size: 11pt;">
+      No measurement entries for this round.
+    </div>
+  <% } %>
+</body>
+</html>
+

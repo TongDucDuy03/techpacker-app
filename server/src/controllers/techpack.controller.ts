@@ -480,6 +480,32 @@ export class TechPackController {
           return sendError(res, 'Product Name and Article Code are required.', 400, 'VALIDATION_ERROR');
         }
 
+        const rawMeasurementSizeRange = Array.isArray(req.body.measurementSizeRange)
+          ? req.body.measurementSizeRange
+          : [];
+        const measurementSizeRange = rawMeasurementSizeRange
+          .filter((size: any) => typeof size === 'string')
+          .map((size: string) => size.trim())
+          .filter((size: string) => size.length > 0);
+
+        const requestedBaseSize =
+          typeof req.body.measurementBaseSize === 'string'
+            ? req.body.measurementBaseSize.trim()
+            : undefined;
+        const measurementBaseSize =
+          requestedBaseSize && measurementSizeRange.includes(requestedBaseSize)
+            ? requestedBaseSize
+            : measurementSizeRange[0];
+
+        const measurementBaseHighlightColor =
+          typeof req.body.measurementBaseHighlightColor === 'string'
+            ? req.body.measurementBaseHighlightColor
+            : '#dbeafe';
+        const measurementRowStripeColor =
+          typeof req.body.measurementRowStripeColor === 'string'
+            ? req.body.measurementRowStripeColor
+            : '#f3f4f6';
+
         const techpackData = {
           productName,
           articleCode: articleCode.toUpperCase(),
@@ -512,6 +538,12 @@ export class TechPackController {
           measurements: measurements || [],
           colorways: colorways || [],
           howToMeasure: howToMeasures || [],
+          measurementSizeRange,
+          measurementBaseSize,
+          measurementBaseHighlightColor,
+          measurementRowStripeColor,
+          sampleMeasurementRounds: req.body.sampleMeasurementRounds || [],
+          packingNotes: req.body.packingNotes || '',
           sharedWith: [],
           auditLogs: [],
         };
@@ -611,7 +643,9 @@ export class TechPackController {
         'fabricDescription', 'productDescription', 'designSketchUrl', 'companyLogoUrl', 'status', 'category', 'gender', 'brand',
         'technicalDesignerId', 'lifecycleStage', 'collectionName', 'targetMarket', 'pricePoint',
         'retailPrice', 'currency', 'description', 'notes', 'bom',
-        'measurements', 'colorways', 'howToMeasure'
+        'measurements', 'colorways', 'howToMeasure', 'sampleMeasurementRounds',
+        'measurementSizeRange', 'measurementBaseSize', 'measurementBaseHighlightColor', 'measurementRowStripeColor',
+        'packingNotes'
       ];
 
       // Safely update only whitelisted fields that exist in request body
@@ -621,7 +655,7 @@ export class TechPackController {
       };
 
       // Array fields that need special merging logic
-      const arrayFields = ['bom', 'measurements', 'colorways', 'howToMeasure'];
+      const arrayFields = ['bom', 'measurements', 'colorways', 'howToMeasure', 'sampleMeasurementRounds'];
 
       allowedFields.forEach(field => {
         if (req.body.hasOwnProperty(field)) {
@@ -720,6 +754,23 @@ export class TechPackController {
             updateData.status = TechPackStatus.Approved;
             break;
         }
+      }
+
+      // Special handling for measurement settings to ensure data integrity
+      // If measurementSizeRange is provided, use it; otherwise, keep current value
+      const finalMeasurementSizeRange = updateData.measurementSizeRange || techpack.measurementSizeRange || [];
+      
+      // If measurementBaseSize is provided, validate it's in the size range
+      // If not provided, keep the current value
+      if (updateData.measurementBaseSize) {
+        const requestedBaseSize = updateData.measurementBaseSize.trim();
+        const validatedBaseSize = finalMeasurementSizeRange.includes(requestedBaseSize) 
+          ? requestedBaseSize 
+          : finalMeasurementSizeRange[0];
+        updateData.measurementBaseSize = validatedBaseSize;
+      } else if (techpack.measurementBaseSize) {
+        // Keep current base size if not being updated
+        updateData.measurementBaseSize = techpack.measurementBaseSize;
       }
 
       // Keep a snapshot of the old techpack for revision comparison

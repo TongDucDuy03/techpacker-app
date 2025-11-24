@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-Round Sample Measurement Table</title>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 15mm 20mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Roboto', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif;
+      font-size: 8px;
+      line-height: 1.3;
+      color: #1f2933;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      margin: 0;
+      padding: 0;
+    }
+
+    .section-title {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      border-bottom: 3px solid #111827;
+      padding-bottom: 8px;
+      margin: 0 0 16px 0;
+      page-break-after: avoid;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .metadata-section {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+      padding: 10px;
+      background: #f8fafc;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      page-break-inside: avoid;
+    }
+
+    .metadata-item {
+      font-size: 8px;
+    }
+
+    .metadata-label {
+      color: #64748b;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 7px;
+      margin-bottom: 2px;
+    }
+
+    .metadata-value {
+      color: #0f172a;
+      font-weight: 600;
+      font-size: 9px;
+    }
+
+    .table-container {
+      overflow-x: auto;
+      position: relative;
+      border: 2px solid #cbd5e1;
+      border-radius: 6px;
+      background: #ffffff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 7px;
+      background: #ffffff;
+      min-width: 100%;
+    }
+
+    thead {
+      display: table-header-group;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    tbody {
+      display: table-row-group;
+    }
+
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 5px 4px;
+      text-align: center;
+      vertical-align: middle;
+      word-break: break-word;
+    }
+
+    th {
+      background: #f1f5f9;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 7px;
+      letter-spacing: 0.4px;
+      color: #0f172a;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    /* Sticky left column for measurement points */
+    .sticky-col {
+      position: sticky;
+      left: 0;
+      background: #f8fafc !important;
+      z-index: 5;
+      font-weight: 600;
+      text-align: left;
+      padding-left: 8px;
+      min-width: 120px;
+      border-right: 2px solid #94a3b8;
+    }
+
+    .sticky-col-header {
+      position: sticky;
+      left: 0;
+      background: #e2e8f0 !important;
+      z-index: 15;
+      border-right: 2px solid #64748b;
+    }
+
+    /* Round column groups */
+    .round-column-group {
+      background: #f8fafc;
+      border-left: 2px solid #94a3b8;
+      border-right: 2px solid #94a3b8;
+    }
+
+    .round-header-row {
+      background: #e2e8f0 !important;
+      font-weight: 700;
+      font-size: 8px;
+    }
+
+    .round-subheader-row {
+      background: #f1f5f9 !important;
+      font-size: 6px;
+    }
+
+    /* Size sub-columns within each round */
+    .size-group {
+      border-left: 1px solid #cbd5e1;
+    }
+
+    .size-header {
+      background: #f8fafc;
+      font-weight: 600;
+      font-size: 7px;
+    }
+
+    /* Value styling */
+    .value-requested {
+      color: #1e40af;
+      font-weight: 600;
+      background: #eff6ff;
+    }
+
+    .value-measured {
+      color: #059669;
+      font-weight: 600;
+      background: #f0fdf4;
+    }
+
+    /* Diff color coding */
+    .diff-perfect {
+      color: #15803d;
+      font-weight: 700;
+      background: #dcfce7;
+    }
+
+    .diff-over {
+      color: #dc2626;
+      font-weight: 700;
+      background: #fee2e2;
+    }
+
+    .diff-under {
+      color: #ea580c;
+      font-weight: 700;
+      background: #ffedd5;
+    }
+
+    .diff-neutral {
+      color: #6b7280;
+      background: #f9fafb;
+    }
+
+    .value-revised {
+      color: #7c3aed;
+      font-weight: 600;
+      background: #f3e8ff;
+    }
+
+    .value-comments {
+      font-size: 6px;
+      color: #475569;
+      text-align: left;
+      padding: 3px;
+      background: #f8fafc;
+      max-width: 100px;
+      word-break: break-word;
+    }
+
+    /* Row striping */
+    tbody tr:nth-child(even) td:not(.sticky-col) {
+      background: #f9fafb;
+    }
+
+    tbody tr:nth-child(even) td.sticky-col {
+      background: #f1f5f9 !important;
+    }
+
+    /* Round comments section */
+    .round-comments-section {
+      margin-top: 12px;
+      padding: 10px;
+      background: #f8fafc;
+      border-left: 4px solid #3b82f6;
+      border-radius: 4px;
+      page-break-inside: avoid;
+    }
+
+    .round-comments-title {
+      font-weight: 700;
+      font-size: 8px;
+      text-transform: uppercase;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+
+    .round-comments-text {
+      font-size: 7px;
+      color: #475569;
+      line-height: 1.5;
+    }
+
+    /* Summary section */
+    .summary-section {
+      margin-top: 16px;
+      padding: 12px;
+      background: #f8fafc;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      page-break-inside: avoid;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .summary-item {
+      text-align: center;
+    }
+
+    .summary-label {
+      color: #64748b;
+      font-size: 7px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    .summary-value {
+      color: #0f172a;
+      font-weight: 700;
+      font-size: 11px;
+    }
+
+    /* Print optimizations */
+    @media print {
+      .table-container {
+        overflow: visible;
+      }
+      
+      thead {
+        display: table-header-group;
+      }
+      
+      tbody {
+        display: table-row-group;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="section-title">Sample Measurement Rounds - Multi-Round Table</div>
+
+  <% if (sampleRounds && sampleRounds.rounds && sampleRounds.rounds.length > 0) { %>
+    <!-- Metadata Section -->
+    <div class="metadata-section">
+      <div class="metadata-item">
+        <div class="metadata-label">Product</div>
+        <div class="metadata-value"><%= meta.productName || '—' %></div>
+      </div>
+      <div class="metadata-item">
+        <div class="metadata-label">Article Code</div>
+        <div class="metadata-value"><%= meta.articleCode || '—' %></div>
+      </div>
+      <div class="metadata-item">
+        <div class="metadata-label">Version</div>
+        <div class="metadata-value"><%= meta.version || '—' %></div>
+      </div>
+      <div class="metadata-item">
+        <div class="metadata-label">Total Rounds</div>
+        <div class="metadata-value"><%= sampleRounds.stats.totalRounds %></div>
+      </div>
+    </div>
+
+    <!-- Main Multi-Round Table -->
+    <div class="table-container">
+      <table>
+        <thead>
+          <!-- First header row: Round names -->
+          <tr class="round-header-row">
+            <th class="sticky-col sticky-col-header" rowspan="2" style="min-width: 80px;">POM Code</th>
+            <th class="sticky-col sticky-col-header" rowspan="2" style="min-width: 140px;">POM Name</th>
+            <% sampleRounds.rounds.forEach((round) => { %>
+              <th class="round-column-group" colspan="<%= (sampleRounds.sizes.length * 5) %>" style="text-align: center; padding: 8px;">
+                <%= round.name %>
+                <div style="font-size: 6px; font-weight: 400; margin-top: 2px; color: #64748b;">
+                  Date: <%= round.date %> | Reviewer: <%= round.reviewer %>
+                </div>
+              </th>
+            <% }) %>
+          </tr>
+          <!-- Second header row: Size groups and sub-columns -->
+          <tr class="round-subheader-row">
+            <% sampleRounds.rounds.forEach((round) => { %>
+              <% sampleRounds.sizes.forEach((size) => { %>
+                <th class="size-group size-header" colspan="5" style="background: #e2e8f0; font-weight: 700;">
+                  <%= size %>
+                </th>
+              <% }) %>
+            <% }) %>
+          </tr>
+          <!-- Third header row: Field names (Req, Meas, Diff, Rev, Note) -->
+          <tr class="round-subheader-row">
+            <% sampleRounds.rounds.forEach((round) => { %>
+              <% sampleRounds.sizes.forEach((size) => { %>
+                <th style="font-size: 6px; padding: 3px; background: #f1f5f9;">Req</th>
+                <th style="font-size: 6px; padding: 3px; background: #f1f5f9;">Meas</th>
+                <th style="font-size: 6px; padding: 3px; background: #f1f5f9;">Diff</th>
+                <th style="font-size: 6px; padding: 3px; background: #f1f5f9;">Rev</th>
+                <th style="font-size: 6px; padding: 3px; background: #f1f5f9;">Note</th>
+              <% }) %>
+            <% }) %>
+          </tr>
+        </thead>
+        <tbody>
+          <% 
+            // Use measurementPoints from render model, or build from first round's entries
+            let sortedPoints = [];
+            if (sampleRounds.measurementPoints && sampleRounds.measurementPoints.length > 0) {
+              sortedPoints = sampleRounds.measurementPoints.sort((a, b) => a.pomCode.localeCompare(b.pomCode));
+            } else if (sampleRounds.rounds && sampleRounds.rounds.length > 0 && sampleRounds.rounds[0].entries) {
+              const allPoints = new Map();
+              sampleRounds.rounds[0].entries.forEach(entry => {
+                const key = entry.pomCode;
+                if (!allPoints.has(key)) {
+                  allPoints.set(key, {
+                    pomCode: entry.pomCode,
+                    pomName: entry.pomName
+                  });
+                }
+              });
+              sortedPoints = Array.from(allPoints.values()).sort((a, b) => a.pomCode.localeCompare(b.pomCode));
+            }
+          %>
+          
+          <% sortedPoints.forEach((point) => { %>
+            <tr>
+              <td class="sticky-col"><%= point.pomCode %></td>
+              <td class="sticky-col"><%= point.pomName %></td>
+              
+              <% sampleRounds.rounds.forEach((round) => { %>
+                <% 
+                  // Find entry for this point in this round
+                  const entry = round.entries.find(e => 
+                    e.pomCode === point.pomCode || 
+                    (point.measurementId && e.measurementId === point.measurementId)
+                  );
+                %>
+                
+                <% sampleRounds.sizes.forEach((size) => { %>
+                  <% if (entry && entry.sizes && entry.sizes[size]) { %>
+                    <% const sizeData = entry.sizes[size]; %>
+                    <td class="value-requested"><%= sizeData.requested || '—' %></td>
+                    <td class="value-measured"><%= sizeData.measured || '—' %></td>
+                    <td class="<%= sizeData.diffClass || 'diff-neutral' %>">
+                      <%= sizeData.diff || '—' %>
+                    </td>
+                    <td class="value-revised"><%= sizeData.revised || '—' %></td>
+                    <td class="value-comments"><%= sizeData.comments || '—' %></td>
+                  <% } else { %>
+                    <td>—</td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td>—</td>
+                  <% } %>
+                <% }) %>
+              <% }) %>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Round Comments Sections -->
+    <% sampleRounds.rounds.forEach((round) => { %>
+      <% if (round.overallComments && round.overallComments !== '—' && round.overallComments.trim() !== '') { %>
+        <div class="round-comments-section">
+          <div class="round-comments-title">
+            <%= round.name %> - Overall Comments
+          </div>
+          <div class="round-comments-text">
+            <%= round.overallComments %>
+          </div>
+        </div>
+      <% } %>
+    <% }) %>
+
+    <!-- Summary Section -->
+    <div class="summary-section">
+      <div class="summary-grid">
+        <div class="summary-item">
+          <div class="summary-label">Total Rounds</div>
+          <div class="summary-value"><%= sampleRounds.stats.totalRounds %></div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Total Entries</div>
+          <div class="summary-value"><%= sampleRounds.stats.totalEntries %></div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Measurement Points</div>
+          <div class="summary-value"><%= sampleRounds.stats.totalMeasurementPoints || sortedPoints.length %></div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Size Range</div>
+          <div class="summary-value">
+            <%= sampleRounds.sizes && sampleRounds.sizes.length > 0 
+              ? `${sampleRounds.sizes[0]} - ${sampleRounds.sizes[sampleRounds.sizes.length - 1]}`
+              : 'N/A' %>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% } else { %>
+    <div style="padding: 32px; text-align: center; color: #94a3b8; font-size: 10px;">
+      <%= strings.emptySampleRounds || 'No sample measurement rounds recorded.' %>
+    </div>
+  <% } %>
+</body>
+</html>
+

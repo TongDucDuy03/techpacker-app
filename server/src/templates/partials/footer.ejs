@@ -1,37 +1,23 @@
 <style>
   .pdf-footer {
     width: 100%;
-    font-family: 'Roboto', Arial, sans-serif;
-    font-size: 8px;
+    font-family: 'Roboto', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif;
+    font-size: 9pt;
     color: #475569;
-    padding: 6px 0;
-    border-top: 1px solid #cbd5e1;
+    padding: 10px 0;
+    border-top: 1px solid #E0E0E0;
     display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .pdf-footer__info {
-    display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
   }
-  .pdf-footer__confidential {
-    text-align: center;
-    font-size: 7px;
-    color: #64748b;
-    font-style: italic;
+  .pdf-footer__info {
+    text-align: right;
+    font-size: 9pt;
   }
 </style>
 <div class="pdf-footer">
   <div class="pdf-footer__info">
-    <div>
-      Printed by: <span><%= printedBy || 'TechPacker User' %></span> | 
-      Date: <span><%= generatedAt || new Date().toLocaleDateString() %></span> | 
-      Page <span class="pageNumber"></span> of <span class="totalPages"></span>
-    </div>
-  </div>
-  <div class="pdf-footer__confidential">
-    Confidential — TechPacker System
+    Page <span class="pageNumber"></span> / <span class="totalPages"></span> — Confidential
   </div>
 </div>
 

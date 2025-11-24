@@ -6,14 +6,14 @@
   <title>BOM Images</title>
   <style>
     @page {
-      size: A4;
-      margin: 15mm 20mm;
+      size: A4 landscape;
+      margin: 20mm 25mm;
     }
 
     body {
       font-family: 'Roboto', Arial, sans-serif;
-      font-size: 10px;
-      line-height: 1.45;
+      font-size: 11pt;
+      line-height: 1.5;
       color: #1f2933;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -22,42 +22,80 @@
     }
 
     .section-title {
-      font-size: 13px;
+      font-size: 18pt;
       text-transform: uppercase;
-      letter-spacing: 0.6px;
-      border-bottom: 2px solid #111827;
-      padding-bottom: 6px;
-      margin: 0 0 12px 0;
+      letter-spacing: 1px;
+      border-bottom: 3px solid #111827;
+      padding-bottom: 10px;
+      margin: 0 0 24px 0;
       page-break-after: avoid;
+      page-break-inside: avoid;
+      break-after: avoid;
+      break-inside: avoid;
+      font-weight: 700;
+      color: #0f172a;
     }
 
     .grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
+      gap: 18px;
     }
 
     .grid-item {
-      border: 1px solid #d1d5db;
+      border: 1px solid #E0E0E0;
       border-radius: 6px;
-      padding: 10px;
+      padding: 12px;
       background: #fff;
-      min-height: 120px;
+      min-height: 160px;
       page-break-inside: avoid;
+      display: flex;
+      flex-direction: column;
     }
 
     .grid-item img {
       width: 100%;
-      height: 120px;
-      object-fit: cover;
-      border: 1px solid #cbd5e1;
-      border-radius: 4px;
-      margin-bottom: 8px;
+      height: 160px;
+      object-fit: contain;
+      border: 1px solid #E0E0E0;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      background: #f8fafc;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+    }
+
+    .grid-item-placeholder {
+      width: 100%;
+      height: 160px;
+      border: 1px solid #E0E0E0;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      font-size: 11pt;
+      background: #f8fafc;
+      text-align: center;
+    }
+
+    .grid-item-name {
+      font-size: 11pt;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+
+    .grid-item-details {
+      font-size: 10pt;
+      color: #64748b;
+      line-height: 1.5;
     }
 
     .text-muted {
       color: #6b7280;
-      font-size: 8px;
+      font-size: 9pt;
     }
 
     .avoid-break {
@@ -67,6 +105,7 @@
   </style>
 </head>
 <body>
+  <%- include('article-summary', { meta, images }) %>
   <div class="section-title"><%= strings.bomImageSheetTitle %></div>
 
   <% if (bomImages && bomImages.length) { %>
@@ -76,27 +115,27 @@
           <% if (item.image) { %>
             <img src="<%= item.image %>" alt="<%= item.name %>" />
           <% } else { %>
-            <div style="width:100%; height:120px; border:1px dashed #d1d5db; border-radius:4px; display:flex; align-items:center; justify-content:center; color:#9ca3af; font-size:9px;">
-              No image available
+            <div class="grid-item-placeholder">
+              No image provided
             </div>
           <% } %>
-          <div style="font-size:9px;">
-            <p><strong><%= item.name %></strong></p>
+          <div class="grid-item-name"><%= item.name %></div>
+          <div class="grid-item-details">
             <% if (item.part) { %>
-              <p class="text-muted">Part: <%= item.part %></p>
+              <div><strong>Part:</strong> <%= item.part %></div>
             <% } %>
             <% if (item.placement) { %>
-              <p class="text-muted">Placement: <%= item.placement %></p>
+              <div><strong>Placement:</strong> <%= item.placement %></div>
             <% } %>
             <% if (item.supplier) { %>
-              <p class="text-muted">Supplier: <%= item.supplier %></p>
+              <div><strong>Supplier:</strong> <%= item.supplier %></div>
             <% } %>
           </div>
         </div>
       <% }) %>
     </div>
   <% } else { %>
-    <div style="padding:32px; text-align:center; color:#94a3b8;"><%= strings.emptyBomImages %></div>
+    <div style="padding:32px; text-align:center; color:#94a3b8; font-size:11pt;"><%= strings.emptyBomImages %></div>
   <% } %>
 </body>
 </html>

@@ -83,9 +83,13 @@ function resolveUrl(url: string): string | null {
     const base = ensureTrailingSlash(DEFAULT_BASE_URL);
     let resolved = new URL(url, base).toString();
 
-    if (url.startsWith('/uploads/') && !resolved.includes('/api/')) {
+    // If URL starts with /uploads/, serve directly from root (not /api/v1/uploads/)
+    // because files are served at /uploads via express.static
+    if (url.startsWith('/uploads/')) {
       const baseUrl = new URL(base);
-      resolved = new URL(`/api/v1${url}`, `${baseUrl.protocol}//${baseUrl.host}`).toString();
+      // Remove /api/v1 if present in base URL
+      const host = `${baseUrl.protocol}//${baseUrl.host}`;
+      resolved = new URL(url, host).toString();
     }
 
     return resolved;

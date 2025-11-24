@@ -6,14 +6,14 @@
   <title>Notes & Care Symbols</title>
   <style>
     @page {
-      size: A4;
-      margin: 15mm 20mm;
+      size: A4 landscape;
+      margin: 20mm 25mm;
     }
 
     body {
       font-family: 'Roboto', Arial, sans-serif;
-      font-size: 10px;
-      line-height: 1.45;
+      font-size: 11pt;
+      line-height: 1.5;
       color: #1f2933;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -22,53 +22,85 @@
     }
 
     .section-title {
-      font-size: 13px;
+      font-size: 18pt;
       text-transform: uppercase;
-      letter-spacing: 0.6px;
-      border-bottom: 2px solid #111827;
-      padding-bottom: 6px;
-      margin: 24px 0 12px;
+      letter-spacing: 1px;
+      border-bottom: 3px solid #111827;
+      padding-bottom: 10px;
+      margin: 0 0 24px 0;
       page-break-after: avoid;
+      page-break-inside: avoid;
+      break-after: avoid;
+      break-inside: avoid;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .notes-box {
+      border: 1px solid #E0E0E0;
+      border-radius: 6px;
+      padding: 12px;
+      background: #f8fafc;
+      margin-bottom: 24px;
+      page-break-inside: avoid;
     }
 
     .notes-list {
-      list-style: disc;
-      margin-left: 18px;
+      list-style: none;
+      margin: 0;
+      padding: 0;
       line-height: 1.5;
-      margin-bottom: 24px;
     }
 
     .notes-list li {
       margin-bottom: 12px;
+      padding: 12px;
+      background: #fff;
+      border-left: 3px solid #3b82f6;
+      border-radius: 6px;
       page-break-inside: avoid;
+    }
+
+    .notes-list li strong {
+      display: block;
+      font-size: 14pt;
+      color: #0f172a;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .notes-list li div {
+      font-size: 11pt;
+      color: #1f2933;
     }
 
     .care-grid {
       display: grid;
       grid-template-columns: repeat(6, 1fr);
-      gap: 12px;
-      margin-top: 16px;
+      gap: 18px;
+      margin-top: 24px;
     }
 
     .care-item {
       text-align: center;
-      padding: 10px;
-      border: 1px solid #d1d5db;
+      padding: 12px;
+      border: 1px solid #E0E0E0;
       border-radius: 6px;
       background: #fff;
       page-break-inside: avoid;
     }
 
     .care-item img {
-      width: 48px;
-      height: 48px;
+      width: 56px;
+      height: 56px;
       object-fit: contain;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
 
     .text-muted {
       color: #6b7280;
-      font-size: 8px;
+      font-size: 9pt;
     }
 
     .avoid-break {
@@ -78,19 +110,22 @@
   </style>
 </head>
 <body>
+  <%- include('article-summary', { meta, images }) %>
   <% if (notes && notes.length) { %>
     <div class="section-title"><%= strings.notesTitle %></div>
-    <ul class="notes-list">
-      <% notes.forEach((note) => { %>
-        <li class="avoid-break">
-          <strong><%= note.title %></strong>
-          <% if (note.updatedAt) { %>
-            <span class="text-muted"> — <%= note.updatedAt %></span>
-          <% } %>
-          <div style="margin-top:4px; font-size:9px;"><%= note.body %></div>
-        </li>
-      <% }) %>
-    </ul>
+    <div class="notes-box">
+      <ul class="notes-list">
+        <% notes.forEach((note) => { %>
+          <li class="avoid-break">
+            <strong><%= note.title %></strong>
+            <div><%= note.body %></div>
+            <% if (note.updatedAt) { %>
+              <div class="text-muted" style="margin-top:6px; font-size:9pt;">Updated: <%= note.updatedAt %></div>
+            <% } %>
+          </li>
+        <% }) %>
+      </ul>
+    </div>
   <% } %>
 
   <% if (careSymbols && careSymbols.length) { %>
@@ -101,14 +136,14 @@
           <% if (symbol.image) { %>
             <img src="<%= symbol.image %>" alt="<%= symbol.label %>" />
           <% } else { %>
-            <div style="width:48px; height:48px; border:1px dashed #d1d5db; margin:0 auto 6px; display:flex; align-items:center; justify-content:center; color:#9ca3af; font-size:8px;">
-              N/A
+            <div style="width:56px; height:56px; border:1px solid #E0E0E0; margin:0 auto 8px; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:11pt; border-radius:4px; background:#f8fafc;">
+              No image provided
             </div>
           <% } %>
-          <div style="font-size:8px;">
-            <strong><%= symbol.label %></strong>
+          <div style="font-size:10pt;">
+            <strong style="font-weight:600;"><%= symbol.label %></strong>
             <% if (symbol.description) { %>
-              <div class="text-muted"><%= symbol.description %></div>
+              <div class="text-muted" style="margin-top:4px;"><%= symbol.description %></div>
             <% } %>
           </div>
         </div>
@@ -117,7 +152,7 @@
   <% } %>
 
   <% if ((!notes || notes.length === 0) && (!careSymbols || careSymbols.length === 0)) { %>
-    <div style="padding:32px; text-align:center; color:#94a3b8;">
+    <div style="padding:32px; text-align:center; color:#94a3b8; font-size:11pt;">
       <%= strings.emptyNotes %> & <%= strings.emptyCareSymbols %>
     </div>
   <% } %>

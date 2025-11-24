@@ -65,8 +65,15 @@ const DEFAULT_STRINGS = {
   emptyCareSymbols: 'Care instructions not provided.',
   colorwaysTitle: 'Colorways',
   emptyColorways: 'No colorways defined for this TechPack.',
-  sampleRoundsTitle: 'Sample Rounds',
+  sampleRoundsTitle: 'Sample Measurement Rounds',
   emptySampleRounds: 'No sample rounds recorded.',
+  sampleRoundsMultiTableTitle: 'Sample Measurement Rounds - Multi-Round Table',
+  sampleRoundsRequested: 'Requested (Spec)',
+  sampleRoundsMeasured: 'Measured',
+  sampleRoundsDiff: 'Diff',
+  sampleRoundsRevised: 'Revised',
+  sampleRoundsComments: 'Comments',
+  sampleRoundsOverallComments: 'Overall Comments',
   revisionsTitle: 'Revision History',
   emptyRevisions: 'No revision history available.',
 };
@@ -145,6 +152,33 @@ async function buildBomSection(techpack: TechPackDocumentLean) {
       const hexCode = material.hexCode || (colorValue && colorValue.startsWith('#') ? colorValue : null);
       const rgbCode = material.rgbCode || '';
 
+      // Determine material type based on part/category
+      const getMaterialType = (part: string, category: string): string => {
+        if (!part) return category || 'Other';
+        const partLower = part.toLowerCase();
+        if (partLower.includes('fabric') || partLower.includes('main fabric') || partLower.includes('lining') || partLower.includes('interfacing')) {
+          return 'Fabric';
+        }
+        if (partLower.includes('label') || partLower.includes('tag') || partLower.includes('hang tag')) {
+          return 'Label';
+        }
+        if (partLower.includes('button') || partLower.includes('zipper') || partLower.includes('snap') || 
+            partLower.includes('rivet') || partLower.includes('eyelet') || partLower.includes('buckle') ||
+            partLower.includes('d-ring') || partLower.includes('grommet') || partLower.includes('stud') ||
+            partLower.includes('hook') || partLower.includes('loop') || partLower.includes('velcro')) {
+          return 'Hardware';
+        }
+        if (partLower.includes('thread') || partLower.includes('elastic') || partLower.includes('drawstring') ||
+            partLower.includes('binding') || partLower.includes('piping') || partLower.includes('trim') ||
+            partLower.includes('ribbon') || partLower.includes('cord')) {
+          return 'Trim';
+        }
+        if (partLower.includes('embroidery') || partLower.includes('print')) {
+          return 'Decoration';
+        }
+        return category || 'Other';
+      };
+
       return {
         lineNumber: material.lineNumber || index + 1,
         part: material.part,
@@ -175,6 +209,7 @@ async function buildBomSection(techpack: TechPackDocumentLean) {
         updatedAt: material.updatedAt ? formatDate(material.updatedAt) : undefined,
         thumbnail,
         category: material.category,
+        materialType: getMaterialType(material.part || '', material.category || ''),
         statusBadge,
       };
     })
@@ -422,6 +457,17 @@ async function buildSampleMeasurementRoundsSection(techpack: TechPackDocumentLea
   const rounds = Array.isArray(techpack.sampleMeasurementRounds) ? techpack.sampleMeasurementRounds : [];
   const measurements = Array.isArray(techpack.measurements) ? techpack.measurements : [];
 
+  // Build measurement map for quick lookup
+  const measurementMap = new Map<string, any>();
+  measurements.forEach((m: any) => {
+    const pomCode = m.pomCode || m.point;
+    if (pomCode) {
+      measurementMap.set(pomCode, m);
+      if (m._id) measurementMap.set(m._id.toString(), m);
+      if (m.id) measurementMap.set(m.id.toString(), m);
+    }
+  });
+
   // Collect all sizes from measurements
   const allSizes = new Set<string>();
   measurements.forEach((m: any) => {
@@ -455,36 +501,174 @@ async function buildSampleMeasurementRoundsSection(techpack: TechPackDocumentLea
     return indexA - indexB;
   });
 
-  const roundsData = rounds.map((round: any, roundIndex: number) => {
-    const entries = Array.isArray(round.measurements) ? round.measurements : [];
+  // Helper function to calculate diff if not present
+  const calculateDiff = (requested: any, measured: any): string | undefined => {
+    if (!requested || !measured) return undefined;
+    const reqNum = parseFloat(String(requested).replace(',', '.'));
+    const measNum = parseFloat(String(measured).replace(',', '.'));
+    if (Number.isNaN(reqNum) || Number.isNaN(measNum)) return undefined;
+    return (measNum - reqNum).toFixed(1);
+  };
+
+  // Helper function to get requested value based on requestedSource
+  const getRequestedValue = (entry: any, round: any, previousRound: any, size: string, point?: any): string => {
+    // If entry already has requested value, use it
+    if (entry && entry.requested && entry.requested[size] && entry.requested[size] !== '—' && entry.requested[size] !== '') {
+      return String(entry.requested[size]);
+    }
+
+    // If requestedSource is 'previous', get from previous round's revised
+    if (round && round.requestedSource === 'previous' && previousRound && previousRound.entries) {
+      const pomCode = entry?.pomCode || point?.pomCode;
+      const measurementId = entry?.measurementId || point?.measurementId;
+      
+      const prevEntry = previousRound.entries.find((e: any) => 
+        (pomCode && e.pomCode === pomCode) || 
+        (measurementId && e.measurementId === measurementId)
+      );
+      
+      if (prevEntry && prevEntry.sizes && prevEntry.sizes[size]) {
+        const revised = prevEntry.sizes[size].revised;
+        if (revised && revised !== '—' && revised !== '') {
+          return String(revised);
+        }
+      }
+    }
+
+    // Otherwise, get from original measurement spec
+    const pomCode = entry?.pomCode || point?.pomCode;
+    const measurementId = entry?.measurementId || point?.measurementId;
     
-    const entriesData = entries.map((entry: any) => {
-      const requested = entry.requested || {};
-      const measured = entry.measured || {};
-      const diff = entry.diff || {};
-      const revised = entry.revised || {};
-      const comments = entry.comments || {};
+    let measurement = null;
+    if (measurementId) {
+      measurement = measurementMap.get(String(measurementId));
+    }
+    if (!measurement && pomCode) {
+      measurement = measurementMap.get(pomCode);
+    }
+    
+    if (measurement && measurement.sizes && measurement.sizes[size] !== undefined && measurement.sizes[size] !== null) {
+      return String(measurement.sizes[size]);
+    }
+
+    return '—';
+  };
+
+  // Get all unique measurement points - prioritize from original measurements, then from rounds
+  const allMeasurementPoints = new Map<string, { pomCode: string; pomName: string; measurementId?: string }>();
+  
+  // First, add all points from original measurements (this is the source of truth)
+  measurements.forEach((m: any) => {
+    const pomCode = m.pomCode || '—';
+    const pomName = m.pomName || '—';
+    if (pomCode !== '—') {
+      allMeasurementPoints.set(pomCode, {
+        pomCode,
+        pomName,
+        measurementId: m._id?.toString() || m.id,
+      });
+    }
+  });
+
+  // Then, add any additional points from rounds that might not be in measurements
+  rounds.forEach((round: any) => {
+    if (round.measurements) {
+      round.measurements.forEach((entry: any) => {
+        const pomCode = entry.pomCode || entry.point || '—';
+        const pomName = entry.pomName || entry.point || '—';
+        if (pomCode !== '—' && !allMeasurementPoints.has(pomCode)) {
+          allMeasurementPoints.set(pomCode, {
+            pomCode,
+            pomName,
+            measurementId: entry.measurementId,
+          });
+        }
+      });
+    }
+  });
+
+  // Build entry map for each round for quick lookup
+  const buildEntryMap = (entries: any[]) => {
+    const map = new Map<string, any>();
+    entries.forEach((entry: any) => {
+      const key = entry.pomCode || entry.point || '';
+      if (key) {
+        map.set(key, entry);
+        // Also map by measurementId if available
+        if (entry.measurementId) {
+          map.set(entry.measurementId.toString(), entry);
+        }
+      }
+    });
+    return map;
+  };
+
+  const roundsData: any[] = [];
+  
+  rounds.forEach((round: any, roundIndex: number) => {
+    const entries = Array.isArray(round.measurements) ? round.measurements : [];
+    const previousRound = roundIndex > 0 ? roundsData[roundIndex - 1] : null;
+    const entryMap = buildEntryMap(entries);
+    
+    // Build entries for all measurement points (not just those in this round)
+    const entriesData = Array.from(allMeasurementPoints.values()).map((point) => {
+      // Find entry for this point in this round
+      const entry = entryMap.get(point.pomCode) || 
+                    (point.measurementId ? entryMap.get(point.measurementId) : null) ||
+                    null;
+
+      const measured = entry?.measured || {};
+      const diff = entry?.diff || {};
+      const revised = entry?.revised || {};
+      const comments = entry?.comments || {};
 
       const sizeData: Record<string, any> = {};
       sortedSizes.forEach((size) => {
+        // Get requested value based on requestedSource
+        const requestedValue = getRequestedValue(entry, round, previousRound, size, point);
+        const measuredValue = measured[size] || '—';
+        
+        // Calculate diff if not present
+        let diffValue = diff[size];
+        if ((!diffValue || diffValue === '—') && requestedValue !== '—' && measuredValue !== '—') {
+          diffValue = calculateDiff(requestedValue, measuredValue);
+        }
+        if (!diffValue || diffValue === '—') diffValue = '—';
+
+        // Determine diff color class
+        let diffClass = 'diff-neutral';
+        if (diffValue !== '—') {
+          const diffNum = parseFloat(String(diffValue).replace(',', '.'));
+          if (!Number.isNaN(diffNum)) {
+            if (diffNum === 0) {
+              diffClass = 'diff-perfect'; // Perfect match - green
+            } else if (diffNum > 0) {
+              diffClass = 'diff-over'; // Over spec - red
+            } else {
+              diffClass = 'diff-under'; // Under spec - orange/yellow
+            }
+          }
+        }
+
         sizeData[size] = {
-          requested: requested[size] || '—',
-          measured: measured[size] || '—',
-          diff: diff[size] || '—',
+          requested: requestedValue,
+          measured: measuredValue,
+          diff: diffValue,
+          diffClass,
           revised: revised[size] || '—',
           comments: comments[size] || '—',
         };
       });
 
       return {
-        pomCode: entry.pomCode || entry.point || '—',
-        pomName: entry.pomName || entry.point || '—',
-        measurementId: entry.measurementId || '—',
+        pomCode: point.pomCode,
+        pomName: point.pomName,
+        measurementId: point.measurementId || '—',
         sizes: sizeData,
       };
     });
 
-    return {
+    roundsData.push({
       name: round.name || `Round ${roundIndex + 1}`,
       date: round.measurementDate ? formatDate(new Date(round.measurementDate)) : (round.date ? formatDate(new Date(round.date)) : '—'),
       reviewer: round.reviewer || '—',
@@ -492,15 +676,22 @@ async function buildSampleMeasurementRoundsSection(techpack: TechPackDocumentLea
       requestedSource: round.requestedSource || 'original',
       order: round.order || roundIndex + 1,
       entries: entriesData,
-    };
+    });
+  });
+
+  // Build unified measurement points list (all unique POMs across all rounds)
+  const unifiedMeasurementPoints = Array.from(allMeasurementPoints.values()).sort((a, b) => {
+    return a.pomCode.localeCompare(b.pomCode);
   });
 
   return {
     rounds: roundsData,
     sizes: sortedSizes,
+    measurementPoints: unifiedMeasurementPoints, // ✅ Added: unified list of all measurement points
     stats: {
       totalRounds: roundsData.length,
       totalEntries: roundsData.reduce((sum, r) => sum + r.entries.length, 0),
+      totalMeasurementPoints: unifiedMeasurementPoints.length,
     },
   };
 }

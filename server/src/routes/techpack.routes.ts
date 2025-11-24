@@ -194,6 +194,34 @@ const techpackValidation = [
     .isLength({ min: 3, max: 3 })
     .withMessage('Currency must be a 3-letter code'),
   
+  body('measurementSizeRange')
+    .optional()
+    .isArray()
+    .withMessage('Measurement size range must be an array')
+    .bail()
+    .custom((sizes) => (sizes as any[]).every(size => typeof size === 'string' && size.trim().length > 0))
+    .withMessage('Measurement size range values must be non-empty strings'),
+
+  body('measurementBaseSize')
+    .optional()
+    .isString()
+    .withMessage('Measurement base size must be a string'),
+
+  body('measurementBaseHighlightColor')
+    .optional()
+    .matches(/^#([0-9a-fA-F]{3}){1,2}$/)
+    .withMessage('Measurement base highlight color must be a valid hex color'),
+
+  body('measurementRowStripeColor')
+    .optional()
+    .matches(/^#([0-9a-fA-F]{3}){1,2}$/)
+    .withMessage('Measurement row stripe color must be a valid hex color'),
+
+  body('packingNotes')
+    .optional()
+    .isLength({ max: 2000 })
+    .withMessage('Packing notes must be less than 2000 characters'),
+
   body('bom')
     .optional()
     .isArray()
@@ -266,6 +294,34 @@ const patchValidation = [
     .isLength({ max: 500 })
     .withMessage('Fabric description must be less than 500 characters'),
   
+  body('measurementSizeRange')
+    .optional()
+    .isArray()
+    .withMessage('Measurement size range must be an array')
+    .bail()
+    .custom((sizes) => (sizes as any[]).every(size => typeof size === 'string' && size.trim().length > 0))
+    .withMessage('Measurement size range values must be non-empty strings'),
+
+  body('measurementBaseSize')
+    .optional()
+    .isString()
+    .withMessage('Measurement base size must be a string'),
+
+  body('measurementBaseHighlightColor')
+    .optional()
+    .matches(/^#([0-9a-fA-F]{3}){1,2}$/)
+    .withMessage('Measurement base highlight color must be a valid hex color'),
+
+  body('measurementRowStripeColor')
+    .optional()
+    .matches(/^#([0-9a-fA-F]{3}){1,2}$/)
+    .withMessage('Measurement row stripe color must be a valid hex color'),
+
+  body('packingNotes')
+    .optional()
+    .isLength({ max: 2000 })
+    .withMessage('Packing notes must be less than 2000 characters'),
+
   body('retailPrice')
     .optional()
     .isFloat({ min: 0 })

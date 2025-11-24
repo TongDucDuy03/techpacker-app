@@ -7,13 +7,13 @@
   <style>
     @page {
       size: A4 landscape;
-      margin: 15mm 20mm;
+      margin: 20mm 25mm;
     }
 
     body {
       font-family: 'Roboto', 'Arial', 'Helvetica', sans-serif;
-      font-size: 9px;
-      line-height: 1.4;
+      font-size: 11pt;
+      line-height: 1.5;
       color: #1f2933;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -22,20 +22,25 @@
     }
 
     .section-title {
-      font-size: 13px;
+      font-size: 18pt;
       text-transform: uppercase;
-      letter-spacing: 0.6px;
-      border-bottom: 2px solid #111827;
-      padding-bottom: 6px;
-      margin: 0 0 12px 0;
+      letter-spacing: 1px;
+      border-bottom: 3px solid #111827;
+      padding-bottom: 10px;
+      margin: 0 0 24px 0;
       page-break-after: avoid;
+      page-break-inside: avoid;
+      break-after: avoid;
+      break-inside: avoid;
+      font-weight: 700;
+      color: #0f172a;
     }
 
     .colorway-card {
-      border: 1px solid #cbd5e1;
+      border: 1px solid #E0E0E0;
       border-radius: 6px;
-      padding: 10px;
-      margin-bottom: 12px;
+      padding: 12px;
+      margin-bottom: 18px;
       page-break-inside: avoid;
       background: #ffffff;
     }
@@ -50,13 +55,13 @@
     }
 
     .colorway-name {
-      font-size: 11px;
-      font-weight: 600;
+      font-size: 14pt;
+      font-weight: 700;
       color: #0f172a;
     }
 
     .colorway-code {
-      font-size: 9px;
+      font-size: 10pt;
       color: #475569;
     }
 
@@ -96,9 +101,9 @@
     .colorway-info {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      margin-bottom: 10px;
-      font-size: 8px;
+      gap: 12px;
+      margin-bottom: 12px;
+      font-size: 11pt;
     }
 
     .info-item {
@@ -108,13 +113,15 @@
 
     .info-label {
       color: #64748b;
-      font-size: 7px;
-      margin-bottom: 2px;
+      font-size: 10pt;
+      margin-bottom: 4px;
+      font-weight: 600;
     }
 
     .info-value {
       color: #0f172a;
       font-weight: 500;
+      font-size: 11pt;
     }
 
     .color-swatch {
@@ -130,22 +137,34 @@
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 8px;
-      font-size: 8px;
+      margin-top: 12px;
+      font-size: 10pt;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    tbody {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
 
     th, td {
-      border: 1px solid #cbd5e1;
-      padding: 6px 4px;
+      border: 1px solid #E0E0E0;
+      padding: 10px 12px;
       text-align: left;
       vertical-align: top;
     }
 
     th {
-      background: #f1f5f9;
-      font-weight: 600;
+      background: #E0E0E0;
+      font-weight: 700;
       text-transform: uppercase;
-      font-size: 7px;
+      font-size: 12pt;
       color: #0f172a;
     }
 
@@ -163,11 +182,12 @@
 
     .text-muted {
       color: #64748b;
-      font-size: 7px;
+      font-size: 9pt;
     }
   </style>
 </head>
 <body>
+  <%- include('article-summary', { meta, images }) %>
   <div class="section-title"><%= strings.colorwaysTitle %></div>
 
   <% if (colorways && colorways.length > 0) { %>
@@ -236,8 +256,8 @@
         </div>
 
         <% if (colorway.notes && colorway.notes !== '—') { %>
-          <div style="margin-top: 8px; padding: 6px; background: #f8fafc; border-radius: 4px; font-size: 8px;">
-            <strong>Notes:</strong> <%= colorway.notes %>
+          <div style="margin-top: 12px; padding: 12px; background: #f8fafc; border-radius: 6px; font-size: 11pt;">
+            <strong style="font-weight:700;">Notes:</strong> <%= colorway.notes %>
           </div>
         <% } %>
 
@@ -283,7 +303,7 @@
       </div>
     <% }) %>
   <% } else { %>
-    <div style="padding: 32px; text-align: center; color: #94a3b8;">
+    <div style="padding: 32px; text-align: center; color: #94a3b8; font-size:11pt;">
       <%= strings.emptyColorways %>
     </div>
   <% } %>

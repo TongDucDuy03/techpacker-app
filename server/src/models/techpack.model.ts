@@ -186,6 +186,10 @@ export interface ITechPack extends Document {
   sampleMeasurementRounds?: ISampleMeasurementRound[];
   colorways: IColorway[];
   howToMeasure: IHowToMeasure[];
+  measurementSizeRange?: string[];
+  measurementBaseSize?: string;
+  measurementBaseHighlightColor?: string;
+  measurementRowStripeColor?: string;
   packingNotes?: string;
   createdBy: Types.ObjectId;
   createdByName: string;
@@ -412,6 +416,24 @@ const TechPackSchema = new Schema<ITechPack>(
     },
     colorways: [ColorwaySchema],
     howToMeasure: [HowToMeasureSchema],
+    measurementSizeRange: {
+      type: [String],
+      default: []
+    },
+    measurementBaseSize: {
+      type: String,
+      trim: true
+    },
+    measurementBaseHighlightColor: {
+      type: String,
+      trim: true,
+      default: '#dbeafe'
+    },
+    measurementRowStripeColor: {
+      type: String,
+      trim: true,
+      default: '#f3f4f6'
+    },
     packingNotes: { type: String, trim: true },
     createdBy: {
       type: Schema.Types.ObjectId,

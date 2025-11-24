@@ -6,14 +6,14 @@
   <title>BOM Table</title>
   <style>
     @page {
-      size: A4;
-      margin: 15mm 20mm;
+      size: A4 landscape;
+      margin: 20mm 25mm;
     }
 
     body {
       font-family: 'Roboto', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif;
-      font-size: 10px;
-      line-height: 1.45;
+      font-size: 11pt;
+      line-height: 1.5;
       color: #1f2933;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -22,21 +22,38 @@
     }
 
     .section-title {
-      font-size: 13px;
+      font-size: 18pt;
       text-transform: uppercase;
-      letter-spacing: 0.6px;
-      border-bottom: 2px solid #111827;
-      padding-bottom: 6px;
-      margin: 0 0 12px 0;
+      letter-spacing: 1px;
+      border-bottom: 3px solid #111827;
+      padding-bottom: 10px;
+      margin: 0 0 24px 0;
       page-break-after: avoid;
+      page-break-inside: avoid;
+      break-after: avoid;
+      break-inside: avoid;
+      font-weight: 700;
+      color: #0f172a;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 18px;
+      margin-bottom: 24px;
       background: #ffffff;
-      font-size: 9px;
+      font-size: 10pt;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    tbody {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
 
     thead {
@@ -44,18 +61,19 @@
     }
 
     th, td {
-      border: 1px solid #cbd5e1;
-      padding: 8px 6px;
+      border: 1px solid #E0E0E0;
+      padding: 10px 12px;
       vertical-align: top;
       word-break: break-word;
     }
 
     th {
-      background: #f1f5f9;
+      background: #E0E0E0;
       text-transform: uppercase;
-      font-size: 8px;
+      font-size: 12pt;
       letter-spacing: 0.4px;
       color: #0f172a;
+      font-weight: 700;
     }
 
     tr:nth-child(even) td {
@@ -90,153 +108,91 @@
     .summary-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      margin-top: 16px;
+      gap: 18px;
+      margin-top: 24px;
     }
 
     .summary-card {
-      border: 1px solid #d1d5db;
+      border: 1px solid #E0E0E0;
       border-radius: 6px;
       padding: 12px;
       background: #f8fafc;
+      page-break-inside: avoid;
     }
 
     .summary-card h4 {
-      font-size: 10px;
+      font-size: 14pt;
       text-transform: uppercase;
-      margin-bottom: 6px;
+      margin-bottom: 10px;
+      font-weight: 700;
+      color: #0f172a;
     }
 
     .summary-card p {
-      margin-bottom: 4px;
-      font-size: 9px;
+      margin-bottom: 6px;
+      font-size: 11pt;
     }
   </style>
 </head>
 <body>
+  <%- include('article-summary', { meta, images }) %>
   <div class="section-title"><%= strings.bomTitle %></div>
 
   <% if (bom && bom.rows && bom.rows.length) { %>
     <table class="bom-table">
     <thead>
       <tr>
-        <th style="width:5%;">#</th>
-        <th style="width:16%;">ITEM DETAILS</th>
-        <th style="width:14%;">Details</th>
-        <th style="width:11%;">PLACEMENT</th>
-        <th style="width:7%;" class="text-center">QTY</th>
-        <th style="width:7%;" class="text-center">UOM</th>
-        <th style="width:12%;">COLOR INFO</th>
+        <th style="width:3%;">#</th>
+        <th style="width:8%;">TYPE</th>
+        <th style="width:12%;">ITEM</th>
+        <th style="width:10%;">PART</th>
+        <th style="width:9%;">PLACEMENT</th>
+        <th style="width:5%;" class="text-center">QTY</th>
+        <th style="width:5%;" class="text-center">UOM</th>
         <th style="width:12%;">SUPPLIER</th>
-        <th style="width:16%;">NOTES</th>
+        <th style="width:36%;">NOTES</th>
       </tr>
     </thead>
       <tbody>
         <% bom.rows.forEach((row, idx) => { %>
-          <tr class="<%= row.thumbnail ? 'avoid-break' : '' %>">
+          <tr class="avoid-break">
             <td class="text-center"><%= row.lineNumber || idx + 1 %></td>
-            <td>
-              <% if (row.thumbnail) { %>
-                <img src="<%= row.thumbnail %>" alt="<%= row.materialName %>" class="thumb" />
-              <% } %>
-              <div style="margin-top:6px;">
-                <strong><%= row.materialName %></strong>
-                <% if (row.materialCode) { %>
-                  <div class="text-muted">Code: <%= row.materialCode %></div>
-                <% } %>
-              </div>
+            <td class="text-center">
+              <span style="font-weight:600; font-size:9pt; color:#475569;"><%= row.materialType || row.category || '—' %></span>
             </td>
             <td>
-              <div><strong>Part:</strong> <%= row.part || '—' %></div>
-              <% if (row.category) { %>
-                <div><strong>Category:</strong> <%= row.category %></div>
+              <div><strong><%= row.materialName %></strong></div>
+              <% if (row.materialCode) { %>
+                <div class="text-muted" style="font-size: 9pt;">Code: <%= row.materialCode %></div>
               <% } %>
+            </td>
+            <td>
+              <div><%= row.part || '—' %></div>
               <% if (row.size) { %>
-                <div><strong>Size:</strong> <%= row.size %></div>
-              <% } %>
-              <% if (row.materialComposition) { %>
-                <div style="font-size: 8px; margin-top: 4px;">
-                  <strong>Composition:</strong> <%= row.materialComposition %>
-                </div>
-              <% } %>
-              <% if (row.weight) { %>
-                <div style="font-size: 8px;"><strong>Weight:</strong> <%= row.weight %></div>
-              <% } %>
-              <% if (row.width) { %>
-                <div style="font-size: 8px;"><strong>Width:</strong> <%= row.width %></div>
-              <% } %>
-              <% if (row.shrinkage) { %>
-                <div style="font-size: 8px;"><strong>Shrinkage:</strong> <%= row.shrinkage %></div>
-              <% } %>
-              <% if (row.unitPrice) { %>
-                <div style="font-size: 8px; margin-top: 4px;"><strong>Unit Price:</strong> <%= row.unitPrice %></div>
+                <div class="text-muted" style="font-size: 9pt;">Size: <%= row.size %></div>
               <% } %>
             </td>
             <td><%= row.placement || '—' %></td>
             <td class="text-center"><%= row.quantity || '—' %></td>
             <td class="text-center"><%= row.uom || '—' %></td>
             <td>
-              <% if (row.hexCode) { %>
-                <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
-                  <span class="color-swatch" style="background-color: <%= row.hexCode %>; width: 16px; height: 16px; border: 1px solid #cbd5e1; border-radius: 3px; display: inline-block; flex-shrink: 0;"></span>
-                  <span style="font-size: 8px; font-weight: 600;"><%= row.hexCode %></span>
-                </div>
-              <% } %>
-              <% if (row.color || row.colorCode) { %>
-                <div class="text-muted" style="font-size: 8px;">
-                  <strong>Color:</strong> <%= row.colorCode || row.color || '—' %>
-                </div>
-              <% } %>
-              <% if (row.pantone) { %>
-                <div class="text-muted" style="font-size: 8px;">
-                  <strong>Pantone:</strong> <%= row.pantone %>
-                </div>
-              <% } %>
-              <% if (row.rgbCode) { %>
-                <div class="text-muted" style="font-size: 8px;">
-                  <strong>RGB:</strong> <%= row.rgbCode %>
-                </div>
-              <% } %>
-              <% if (!row.hexCode && !row.color && !row.colorCode && !row.pantone && !row.rgbCode) { %>
-                <div class="text-muted" style="font-size: 8px;">—</div>
-              <% } %>
-            </td>
-            <td>
               <div><%= row.supplier || '—' %></div>
               <% if (row.supplierCode) { %>
-                <div class="text-muted" style="font-size: 8px;">Code: <%= row.supplierCode %></div>
-              <% } %>
-              <% if (row.leadTime) { %>
-                <div class="text-muted" style="font-size: 8px;">Lead: <%= row.leadTime %> days</div>
-              <% } %>
-              <% if (row.moq) { %>
-                <div class="text-muted" style="font-size: 8px;">MOQ: <%= row.moq %></div>
-              <% } %>
-              <% if (row.statusBadge) { %>
-                <div style="margin-top:4px;">
-                  <span style="background:<%= row.statusBadge.background %>; color:<%= row.statusBadge.color %>; padding:2px 6px; border-radius:4px; font-size:8px; font-weight:600;">
-                    <%= row.statusBadge.label %>
-                  </span>
-                </div>
+                <div class="text-muted" style="font-size: 9pt;">Code: <%= row.supplierCode %></div>
               <% } %>
             </td>
             <td>
               <div><%= row.comments || '—' %></div>
-              <% if (row.careInstructions) { %>
-                <div class="text-muted" style="font-size: 8px; margin-top: 4px;">
-                  <strong>Care:</strong> <%= row.careInstructions %>
+              <% if (row.hexCode || row.pantone) { %>
+                <div style="margin-top:6px; font-size:9pt;">
+                  <% if (row.hexCode) { %>
+                    <span class="color-swatch" style="background-color: <%= row.hexCode %>; width: 14px; height: 14px; border: 1px solid #E0E0E0; border-radius: 3px; display: inline-block; vertical-align: middle; margin-right: 6px;"></span>
+                    <%= row.hexCode %>
+                  <% } %>
+                  <% if (row.pantone) { %>
+                    <% if (row.hexCode) { %> / <% } %>Pantone: <%= row.pantone %>
+                  <% } %>
                 </div>
-              <% } %>
-              <% if (row.testingRequirements) { %>
-                <div class="text-muted" style="font-size: 8px; margin-top: 4px;">
-                  <strong>Testing:</strong> <%= row.testingRequirements %>
-                </div>
-              <% } %>
-              <% if (row.totalPrice) { %>
-                <div class="text-muted" style="font-size: 8px; margin-top: 4px;">Total: <%= row.totalPrice %></div>
-              <% } %>
-              <% if (row.updatedAt) { %>
-                <div class="text-muted" style="font-size: 7px; margin-top: 4px;">Updated: <%= row.updatedAt %></div>
               <% } %>
             </td>
           </tr>
@@ -259,7 +215,7 @@
       </div>
     </div>
   <% } else { %>
-    <div style="padding:32px; text-align:center; color:#94a3b8;"><%= strings.emptyBom %></div>
+    <div style="padding:32px; text-align:center; color:#94a3b8; font-size:11pt;"><%= strings.emptyBom %></div>
   <% } %>
 </body>
 </html>

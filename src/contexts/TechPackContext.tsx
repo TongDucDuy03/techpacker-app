@@ -27,7 +27,7 @@ interface TechPackContextType {
   setCurrentTab: (tab: number) => void;
   updateFormState: (updates: Partial<ApiTechPack>) => void;
   resetFormState: () => void;
-  saveTechPack: () => Promise<void>;
+  saveTechPack: (techpackOverride?: TechPackFormState['techpack']) => Promise<void>;
   exportToPDF: () => void;
   addMeasurement: (measurement: MeasurementPoint) => void;
   updateMeasurement: (index: number, measurement: MeasurementPoint) => void;
@@ -684,6 +684,90 @@ const prepareValueMapForSave = (
   return result;
 };
 
+const objectIdPattern = /^[0-9a-fA-F]{24}$/;
+const resolveObjectId = (value: any) =>
+  typeof value === 'string' && objectIdPattern.test(value) ? value : undefined;
+
+const buildMeasurementPayloads = (techpackData: TechPackFormState['techpack']) => {
+  const { normalized: measurementsWithBase } = normalizeMeasurementBaseSizes(
+    techpackData.measurements || [],
+    techpackData.measurementBaseSize
+  );
+
+  const measurementsPayload = measurementsWithBase.map((measurement: any) => {
+    const {
+      minusTolerance,
+      plusTolerance,
+      toleranceMinus,
+      tolerancePlus,
+      ...rest
+    } = measurement || {};
+
+    const resolvedMinus = toleranceMinus ?? minusTolerance ?? 0;
+    const resolvedPlus = tolerancePlus ?? plusTolerance ?? 0;
+
+    return {
+      ...rest,
+      toleranceMinus: resolvedMinus,
+      tolerancePlus: resolvedPlus,
+    };
+  });
+
+  const measurementNameMap = new Map(
+    measurementsWithBase.map((measurement: any) => [
+      measurement?.pomCode,
+      measurement?.pomName || '',
+    ])
+  );
+
+  const sampleMeasurementRoundsPayload = (techpackData.sampleMeasurementRounds || []).map((round, index) => {
+    const measurementDate = round.date ? new Date(round.date) : undefined;
+    const normalizedDate =
+      measurementDate && !Number.isNaN(measurementDate.getTime()) ? measurementDate.toISOString() : undefined;
+
+    const mappedEntries = (round.measurements || []).map(entry => {
+      const requestedValues = prepareValueMapForSave(entry.requested, { keepEmpty: true }) ?? {};
+      const measuredValues = prepareValueMapForSave(entry.measured);
+      const diffValues = prepareValueMapForSave(entry.diff);
+      const revisedValues = prepareValueMapForSave(entry.revised);
+      const commentValues = prepareValueMapForSave(entry.comments, { preserveWhitespace: true });
+
+      const mappedEntry: any = {
+        ...(resolveObjectId((entry as any)._id) ? { _id: resolveObjectId((entry as any)._id) } : {}),
+        measurementId: resolveObjectId((entry as any).measurementId || entry.measurementId),
+        pomCode: entry.pomCode || '',
+        pomName: entry.pomName || '',
+        requested: requestedValues,
+      };
+
+      if (measuredValues) mappedEntry.measured = measuredValues;
+      if (diffValues) mappedEntry.diff = diffValues;
+      if (revisedValues) mappedEntry.revised = revisedValues;
+      if (commentValues) mappedEntry.comments = commentValues;
+
+      return mappedEntry;
+    });
+
+    return {
+      ...(resolveObjectId((round as any)._id) ? { _id: resolveObjectId((round as any)._id) } : {}),
+      name: round.name?.trim() || `Sample Round ${index + 1}`,
+      order: index + 1,
+      measurementDate: normalizedDate,
+      reviewer: round.reviewer || '',
+      overallComments: round.overallComments || '',
+      requestedSource: round.requestedSource || 'original',
+      measurements: mappedEntries,
+    };
+  });
+
+  return {
+    measurementsWithBase,
+    measurementsPayload,
+    sampleMeasurementRoundsPayload,
+    measurementNameMap,
+  };
+};
+
 const createEmptyTechpack = (): TechPackFormState['techpack'] => ({
   id: '',
   articleInfo: {
@@ -1202,80 +1286,17 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     }));
   }, [state.techpack.id]);
 
-  const saveTechPack = async () => {
+  const saveTechPack = async (techpackOverride?: TechPackFormState['techpack']) => {
     setState(prev => ({ ...prev, isSaving: true }));
     try {
-      const techpackData = state.techpack;
-      const { normalized: measurementsWithBase } = normalizeMeasurementBaseSizes(
-        techpackData.measurements || [],
-        techpackData.measurementBaseSize
-      );
+      const techpackData = techpackOverride ?? state.techpack;
 
-      const measurementsPayload = measurementsWithBase.map((measurement: any) => {
-        const {
-          minusTolerance,
-          plusTolerance,
-          toleranceMinus,
-          tolerancePlus,
-          ...rest
-        } = measurement || {};
-
-        const resolvedMinus = toleranceMinus ?? minusTolerance ?? 0;
-        const resolvedPlus = tolerancePlus ?? plusTolerance ?? 0;
-
-        return {
-          ...rest,
-          toleranceMinus: resolvedMinus,
-          tolerancePlus: resolvedPlus,
-        };
-      });
-
-      const measurementNameMap = new Map(measurementsWithBase.map((measurement: any) => [
-        measurement?.pomCode,
-        measurement?.pomName || '',
-      ]));
-
-      const objectIdPattern = /^[0-9a-fA-F]{24}$/;
-      const resolveObjectId = (value: any) => (typeof value === 'string' && objectIdPattern.test(value) ? value : undefined);
-
-      const sampleMeasurementRoundsPayload = (techpackData.sampleMeasurementRounds || []).map((round, index) => {
-        const measurementDate = round.date ? new Date(round.date) : undefined;
-        const normalizedDate = measurementDate && !Number.isNaN(measurementDate.getTime()) ? measurementDate.toISOString() : undefined;
-
-        const mappedEntries = (round.measurements || []).map(entry => {
-          const requestedValues = prepareValueMapForSave(entry.requested, { keepEmpty: true }) ?? {};
-          const measuredValues = prepareValueMapForSave(entry.measured);
-          const diffValues = prepareValueMapForSave(entry.diff);
-          const revisedValues = prepareValueMapForSave(entry.revised);
-          const commentValues = prepareValueMapForSave(entry.comments, { preserveWhitespace: true });
-
-          const mappedEntry: any = {
-            ...(resolveObjectId((entry as any)._id) ? { _id: resolveObjectId((entry as any)._id) } : {}),
-            measurementId: resolveObjectId((entry as any).measurementId || entry.measurementId),
-            pomCode: entry.pomCode || '',
-            pomName: entry.pomName || '',
-            requested: requestedValues,
-          };
-
-          if (measuredValues) mappedEntry.measured = measuredValues;
-          if (diffValues) mappedEntry.diff = diffValues;
-          if (revisedValues) mappedEntry.revised = revisedValues;
-          if (commentValues) mappedEntry.comments = commentValues;
-
-          return mappedEntry;
-        });
-
-        return {
-          ...(resolveObjectId((round as any)._id) ? { _id: resolveObjectId((round as any)._id) } : {}),
-          name: round.name?.trim() || `Sample Round ${index + 1}`,
-          order: index + 1,
-          measurementDate: normalizedDate,
-          reviewer: round.reviewer || '',
-          overallComments: round.overallComments || '',
-          requestedSource: round.requestedSource || 'original',
-          measurements: mappedEntries,
-        };
-      });
+      const {
+        measurementsWithBase,
+        measurementsPayload,
+        sampleMeasurementRoundsPayload,
+        measurementNameMap,
+      } = buildMeasurementPayloads(techpackData);
 
       const howToMeasuresPayload = (techpackData.howToMeasures || []).map((howToMeasure: any, index: number) => {
         const steps = Array.isArray(howToMeasure?.steps) && howToMeasure.steps.length > 0
@@ -1560,6 +1581,31 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     clientExportToPDF(state.techpack as any);
   };
 
+  const persistMeasurementSettings = async (techpackSnapshot: TechPackFormState['techpack']) => {
+    if (!techpackSnapshot?.id) return;
+    try {
+      const {
+        measurementsPayload,
+        sampleMeasurementRoundsPayload,
+      } = buildMeasurementPayloads(techpackSnapshot);
+
+      await api.patchTechPack(techpackSnapshot.id, {
+        measurements: measurementsPayload,
+        sampleMeasurementRounds: sampleMeasurementRoundsPayload,
+        measurementSizeRange: techpackSnapshot.measurementSizeRange || [],
+        measurementBaseSize:
+          techpackSnapshot.measurementBaseSize || techpackSnapshot.measurementSizeRange?.[0] || '',
+        measurementBaseHighlightColor:
+          techpackSnapshot.measurementBaseHighlightColor || DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR,
+        measurementRowStripeColor:
+          techpackSnapshot.measurementRowStripeColor || DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR,
+      });
+    } catch (error: any) {
+      console.error('Failed to persist measurement settings:', error);
+      showError(error?.message || 'Không thể lưu cài đặt Measurements. Vui lòng thử lại.');
+    }
+  };
+
   const updateMeasurementSizeRange = (sizes: string[]) => {
     setState(prev => {
       const incoming = Array.isArray(sizes) ? sizes : [];
@@ -1614,6 +1660,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateMeasurementBaseSize = (baseSize: string) => {
+    let snapshot: TechPackFormState['techpack'] | null = null;
     setState(prev => {
       const sizeRange =
         prev.techpack.measurementSizeRange && prev.techpack.measurementSizeRange.length > 0
@@ -1630,17 +1677,24 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
       }));
       const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
 
+      const updatedTechpack = {
+        ...prev.techpack,
+        measurementBaseSize: normalizedBaseSize,
+        measurements: nextMeasurements,
+        sampleMeasurementRounds: nextSampleRounds,
+      };
+      snapshot = updatedTechpack;
+
       return {
         ...prev,
-        techpack: {
-          ...prev.techpack,
-          measurementBaseSize: normalizedBaseSize,
-          measurements: nextMeasurements,
-          sampleMeasurementRounds: nextSampleRounds,
-        },
+        techpack: updatedTechpack,
         hasUnsavedChanges: true,
       };
     });
+
+    if (snapshot?.id) {
+      persistMeasurementSettings(snapshot);
+    }
   };
 
   const updateMeasurementDisplaySettings = (settings: { baseHighlightColor?: string; rowStripeColor?: string }) => {
