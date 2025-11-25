@@ -7,7 +7,7 @@ import Input from '../shared/Input';
 import Select from '../shared/Select';
 import Textarea from '../shared/Textarea';
 import Modal from '../shared/Modal';
-import { Plus, Upload, Download, Search, Filter, Package, AlertCircle, X, Copy, RotateCcw, Edit, ChevronLeft, ChevronRight, Save, CheckCircle, Eye, Trash2, FileText } from 'lucide-react';
+import { Plus, Upload, Download, Search, Filter, AlertCircle, X, Copy, RotateCcw, Edit, ChevronLeft, ChevronRight, Save, CheckCircle, Eye, Trash2, FileText } from 'lucide-react';
 import ZoomableImage from '../../common/ZoomableImage';
 import { showSuccess, showError, showWarning, showUndoToast } from '../../../lib/toast';
 import { api } from '../../../lib/api';
@@ -165,7 +165,8 @@ const validateConstructionItem = (item: Partial<Construction>, measurements: Mea
   if (item.imageUrl && schema.imageUrl?.custom) {
     const isUrl = /^https?:\/\//.test(item.imageUrl);
     const isDataUrl = /^data:image\/(jpeg|jpg|png|gif|svg\+xml);base64,/.test(item.imageUrl);
-    if (!isUrl && !isDataUrl) {
+    const isRelative = item.imageUrl.startsWith('/') || !item.imageUrl.includes('://');
+    if (!isUrl && !isDataUrl && !isRelative) {
       errors.imageUrl = 'URL ảnh không hợp lệ.';
     }
   }
@@ -193,20 +194,35 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
   }, [measurements]);
   
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001/api/v1';
+  const FILE_BASE_URL = (() => {
+    const stripped = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+    return stripped || API_BASE_URL;
+  })();
   
-  // Helper to get image URL - handles both relative and absolute URLs
+  const buildPublicUrl = (origin: string, path: string, search = '', hash = '') => {
+    const sanitizedPath = path.replace(/^\/api\/v1/, '');
+    return `${origin}${sanitizedPath.startsWith('/') ? sanitizedPath : `/${sanitizedPath}`}${search}${hash}`;
+  };
+  
+  // Helper to get image URL - handles absolute URLs and local uploads without /api/v1 prefix issues
   const getImageUrl = (url: string | undefined): string => {
     if (!url) return '';
-    // If URL is already absolute (starts with http:// or https://), return as-is
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
+    const trimmed = url.trim();
+    
+    if (/^https?:\/\//i.test(trimmed)) {
+      try {
+        const parsed = new URL(trimmed);
+        return buildPublicUrl(parsed.origin, parsed.pathname, parsed.search, parsed.hash);
+      } catch {
+        return trimmed;
+      }
     }
-    // If URL starts with /, it's already a path, just prepend API base
-    if (url.startsWith('/')) {
-      return `${API_BASE_URL}${url}`;
+    
+    const sanitizedPath = trimmed.replace(/^\/api\/v1/, '');
+    if (sanitizedPath.startsWith('/')) {
+      return `${FILE_BASE_URL}${sanitizedPath}`;
     }
-    // Otherwise, assume it's a relative path
-    return `${API_BASE_URL}/${url}`;
+    return `${FILE_BASE_URL}/${sanitizedPath}`;
   };
   
   // Cast to Construction array - decode metadata from videoUrl
@@ -268,7 +284,6 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
     relatedMeasurements: [],
   });
 
-  const [currentStep, setCurrentStep] = useState('');
 
   // Language options
   const languageOptions = [
@@ -356,25 +371,6 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
     setFormData(updatedFormData);
     validation.validateField(field, value);
   }, [formData, validation, measurementNameMap, constructions.length]);
-
-  const handleAddStep = () => {
-    if (currentStep.trim()) {
-      const newSteps = [...(formData.steps || []), currentStep.trim()];
-      setFormData(prev => ({ ...prev, steps: newSteps }));
-      setCurrentStep('');
-    }
-  };
-
-  const handleRemoveStep = (index: number) => {
-    const newSteps = (formData.steps || []).filter((_, i) => i !== index);
-    setFormData(prev => ({ ...prev, steps: newSteps }));
-  };
-
-  const handleEditStep = (index: number, newValue: string) => {
-    const newSteps = [...(formData.steps || [])];
-    newSteps[index] = newValue;
-    setFormData(prev => ({ ...prev, steps: newSteps }));
-  };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -544,7 +540,6 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
       commonMistakes: [],
       relatedMeasurements: [],
     });
-    setCurrentStep('');
     setShowModal(false);
     setEditingId(null);
     setImagePreview(null);
@@ -635,35 +630,6 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
     setImagePreview(duplicated.imageUrl ? getImageUrl(duplicated.imageUrl) : null);
     setShowModal(true);
     showSuccess('Duplicated construction. Please edit and save.');
-  };
-
-  const handleSaveTemplate = (item: Construction) => {
-    try {
-      const templates = JSON.parse(localStorage.getItem('constructionTemplates') || '[]');
-      templates.push({
-        ...item,
-        id: undefined,
-        templateName: `${item.pomCode} - ${new Date().toLocaleDateString()}`
-      });
-      localStorage.setItem('constructionTemplates', JSON.stringify(templates));
-      showSuccess('Template saved successfully');
-    } catch (error) {
-      showError('Failed to save template');
-    }
-  };
-
-  const handleLoadTemplate = (template: any) => {
-    const decoded = decodeMetadata(template.videoUrl || '');
-    setFormData({
-      ...template,
-      id: undefined,
-      videoUrl: decoded.videoUrl,
-      status: 'Draft' as ConstructionStatus,
-      comments: decoded.comments || ''
-    });
-    setEditingId(null);
-    setImagePreview(template.imageUrl ? getImageUrl(template.imageUrl) : null);
-    setShowModal(true);
   };
 
   const handleExport = () => {
@@ -828,15 +794,6 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
     showSuccess('Changes requested');
   };
 
-  // Get templates from localStorage
-  const templates = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem('constructionTemplates') || '[]');
-    } catch {
-      return [];
-    }
-  }, []);
-
   return (
     <div className="max-w-7xl mx-auto p-6">
       {/* Header */}
@@ -955,90 +912,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
           </>
         }
       >
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Select
-              label="POM Code"
-              value={formData.pomCode || ''}
-              onChange={handleInputChange('pomCode')}
-              onBlur={() => validation.setFieldTouched('pomCode')}
-              options={availablePomCodes}
-              placeholder="Select measurement point..."
-              required
-              error={validation.getFieldProps('pomCode').error}
-              helperText={validation.getFieldProps('pomCode').helperText}
-              data-error={validation.getFieldProps('pomCode').error ? 'true' : 'false'}
-            />
-            
-            <Select
-              label="Language"
-              value={formData.language || 'en-US'}
-              onChange={handleInputChange('language')}
-              onBlur={() => validation.setFieldTouched('language')}
-              options={languageOptions}
-              required
-              error={validation.getFieldProps('language').error}
-              helperText={validation.getFieldProps('language').helperText}
-            />
-          </div>
-
-          <Textarea
-            label="Description (Instructions)"
-            value={formData.description || ''}
-            onChange={handleInputChange('description')}
-            onBlur={() => validation.setFieldTouched('description')}
-            placeholder="Detailed construction instructions..."
-            required
-            rows={4}
-            error={validation.getFieldProps('description').error}
-            helperText={validation.getFieldProps('description').helperText}
-            data-error={validation.getFieldProps('description').error ? 'true' : 'false'}
-          />
-
-          {/* Steps */}
-          <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
-              Steps
-            </label>
-            
-            <div className="space-y-2 mb-3">
-              {(formData.steps || []).map((step, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-500 min-w-6">{index + 1}.</span>
-                  <input
-                    type="text"
-                    value={step}
-                    onChange={(e) => handleEditStep(index, e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button
-                    onClick={() => handleRemoveStep(index)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <input
-                type="text"
-                value={currentStep}
-                onChange={(e) => setCurrentStep(e.target.value)}
-                placeholder="Add a new step..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                onKeyDown={(e) => e.key === 'Enter' && handleAddStep()}
-              />
-              <button
-                onClick={handleAddStep}
-                className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-              >
-                Add
-              </button>
-            </div>
-          </div>
-
+        <div className="space-y-6">
           {/* Image Upload */}
           <div>
             <label className="text-sm font-medium text-gray-700 mb-2 block">
@@ -1127,21 +1001,11 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
             )}
           </div>
 
-          <Input
-            label="Video URL (Optional)"
-            value={formData.videoUrl || ''}
-            onChange={handleInputChange('videoUrl')}
-            onBlur={() => validation.setFieldTouched('videoUrl')}
-            placeholder="https://youtube.com/watch?v=..."
-            error={validation.getFieldProps('videoUrl').error}
-            helperText={validation.getFieldProps('videoUrl').helperText || 'Note: Status and comments are stored with video URL'}
-          />
-
           <Textarea
-            label="Comments"
+            label="Note"
             value={(formData as any).comments || ''}
             onChange={handleInputChange('comments')}
-            placeholder="Additional notes..."
+            placeholder="Ghi chú thêm..."
             rows={2}
           />
         </div>
@@ -1157,18 +1021,15 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">POM Code</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Steps</th>
-                {/* Status column removed */}
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Language</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Image</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Note</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {paginatedConstructions.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">
+                  <td colSpan={3} className="px-6 py-12 text-center text-sm text-gray-500">
                     No constructions added yet. Click 'Add Construction' to get started.
                   </td>
                 </tr>
@@ -1183,23 +1044,33 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
                       key={item.id}
                       className={`hover:bg-gray-50 ${hasErrors ? 'bg-red-50 border-l-4 border-red-500' : ''}`}
                     >
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {item.pomCode}
-                      </td>
                       <td className="px-6 py-4 text-sm text-gray-700">
-                        <div className="max-w-xs truncate" title={item.description}>
-                          {item.description}
+                        <div className="w-32 h-32 border border-gray-200 rounded-md bg-gray-50 flex items-center justify-center overflow-hidden">
+                          <ZoomableImage
+                            src={getImageUrl(item.imageUrl || '')}
+                            alt={item.pomCode ? `Construction ${item.pomCode}` : 'Construction image'}
+                            containerClassName="w-full h-full flex items-center justify-center"
+                            className="object-contain"
+                            fallback={
+                              <span className="text-xs text-gray-400 px-2 text-center leading-tight">
+                                No image
+                              </span>
+                            }
+                          />
                         </div>
-                        {hasErrors && errors.description && (
-                          <div className="mt-1 text-xs text-red-600">{errors.description}</div>
+                        {hasErrors && errors.imageUrl && (
+                          <div className="mt-1 text-xs text-red-600">{errors.imageUrl}</div>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {(item.steps || []).length} step(s)
-                      </td>
-                      {/* Status cell removed */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {languageOptions.find(l => l.value === item.language)?.label}
+                      <td className="px-6 py-4 text-sm text-gray-700">
+                        {item.comments ? (
+                          <p className="whitespace-pre-wrap">{item.comments}</p>
+                        ) : (
+                          <span className="text-gray-400 italic">Chưa có ghi chú</span>
+                        )}
+                        {hasErrors && errors.comments && (
+                          <div className="mt-1 text-xs text-red-600">{errors.comments}</div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">
@@ -1216,13 +1087,6 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
                             title="Duplicate"
                           >
                             <Copy className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleSaveTemplate(item)}
-                            className="text-indigo-600 hover:text-indigo-900"
-                            title="Save as Template"
-                          >
-                            <Package className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(item)}

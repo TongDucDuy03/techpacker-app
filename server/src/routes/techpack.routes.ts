@@ -659,6 +659,25 @@ router.post(
 );
 
 /**
+ * @route POST /api/techpacks/upload-bom-image
+ * @desc Upload a BOM material image
+ * @access Private (Admin and Designer only)
+ */
+router.post(
+  '/upload-bom-image',
+  requireAuth,
+  requireRole([UserRole.Admin, UserRole.Designer]),
+  upload.single('bomImage'),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded.' });
+    }
+    const fileUrl = `/uploads/${req.file.filename}`;
+    return res.status(200).json({ success: true, message: 'File uploaded successfully', data: { url: fileUrl } });
+  }
+);
+
+/**
  * @route POST /api/techpacks/upload-construction-image
  * @desc Upload a construction/how-to-measure image
  * @access Private (Admin and Designer only)

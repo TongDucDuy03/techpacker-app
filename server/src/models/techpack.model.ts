@@ -20,7 +20,15 @@ export interface IBOMItem {
   supplier: string;
   supplierCode?: string;
   color?: string;
+  colorCode?: string;
   pantoneCode?: string;
+  imageUrl?: string;
+  materialComposition?: string;
+  weight?: string;
+  width?: string;
+  shrinkage?: string;
+  careInstructions?: string;
+  testingRequirements?: string;
   unitPrice?: number;
   totalPrice?: number;
   leadTime?: number;
@@ -212,7 +220,15 @@ const BOMItemSchema = new Schema<IBOMItem>({
   supplier: { type: String, required: true },
   supplierCode: { type: String },
   color: { type: String },
+  colorCode: { type: String },
   pantoneCode: { type: String },
+  imageUrl: { type: String },
+  materialComposition: { type: String },
+  weight: { type: String },
+  width: { type: String },
+  shrinkage: { type: String },
+  careInstructions: { type: String },
+  testingRequirements: { type: String },
   unitPrice: { type: Number, min: 0 },
   totalPrice: { type: Number, min: 0 },
   leadTime: { type: Number, min: 0 },
@@ -290,8 +306,8 @@ const ColorwaySchema = new Schema<IColorway>({
     g: { type: Number, min: 0, max: 255 },
     b: { type: Number, min: 0, max: 255 }
   },
-  placement: { type: String, required: true },
-  materialType: { type: String, required: true },
+  placement: { type: String },
+  materialType: { type: String },
   supplier: { type: String },
   approved: { type: Boolean, default: false },
   isDefault: { type: Boolean, default: false },
@@ -303,11 +319,11 @@ const ColorwaySchema = new Schema<IColorway>({
 });
 
 const HowToMeasureSchema = new Schema<IHowToMeasure>({
-  pomCode: { type: String, required: true },
-  pomName: { type: String, required: true },
-  description: { type: String, required: true },
+  pomCode: { type: String },
+  pomName: { type: String },
+  description: { type: String },
   imageUrl: { type: String },
-  stepNumber: { type: Number, required: true },
+  stepNumber: { type: Number },
   instructions: [{ type: String }],
   tips: [{ type: String }],
   commonMistakes: [{ type: String }],

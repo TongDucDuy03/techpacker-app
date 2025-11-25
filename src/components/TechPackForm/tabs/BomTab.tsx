@@ -10,8 +10,13 @@ import Input from '../shared/Input';
 import Select from '../shared/Select';
 import Textarea from '../shared/Textarea';
 import Modal from '../shared/Modal';
+import ZoomableImage from '../../common/ZoomableImage';
 import { Plus, Upload, Download, Search, Filter, Package, AlertCircle, X, Copy, RotateCcw, Edit, ChevronLeft, ChevronRight } from 'lucide-react';
 import { showSuccess, showError, showWarning, showUndoToast } from '../../../lib/toast';
+import { api } from '../../../lib/api';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001/api/v1';
+const API_UPLOAD_BASE = API_BASE_URL.replace(/\/api\/v1$/, '');
 
 // Generate UUID v4
 const generateUUID = (): string => {
@@ -22,9 +27,47 @@ const generateUUID = (): string => {
   });
 };
 
+const getMaterialImageUrl = (url?: string | null): string => {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith('data:image/')) {
+    return trimmed;
+  }
+  if (trimmed.startsWith('/')) {
+    return `${API_UPLOAD_BASE}${trimmed}`;
+  }
+  return `${API_UPLOAD_BASE}/${trimmed.replace(/^\/+/, '')}`;
+};
+
+const validateMaterialImageFile = (file: File): string | null => {
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/svg+xml'];
+  if (!allowedTypes.includes(file.type)) {
+    return 'Chỉ hỗ trợ ảnh JPEG, PNG, GIF hoặc SVG.';
+  }
+  const maxSize = 5 * 1024 * 1024;
+  if (file.size > maxSize) {
+    return 'Dung lượng ảnh tối đa 5MB.';
+  }
+  return null;
+};
+
 // CSV Import/Export utilities
 const getCSVHeaders = (includePrice: boolean = false): string[] => {
-  const baseHeaders = ['Part', 'MaterialCode', 'MaterialName', 'Placement', 'Size', 'Quantity', 'UOM', 'Supplier', 'ColorCode', 'MaterialComposition', 'Comments'];
+  const baseHeaders = [
+    'Part',
+    'MaterialCode',
+    'MaterialName',
+    'Placement',
+    'Size',
+    'Quantity',
+    'UOM',
+    'Supplier',
+    'ColorCode',
+    'MaterialComposition',
+    'ImageUrl',
+    'Comments'
+  ];
   if (includePrice) {
     return [...baseHeaders, 'UnitPrice', 'TotalPrice'];
   }
@@ -45,6 +88,7 @@ const exportToCSV = (items: BomItem[], includePrice: boolean = false): string =>
       item.supplier || '',
       item.colorCode || '',
       item.materialComposition || '',
+      item.imageUrl || '',
       item.comments || ''
     ];
     if (includePrice) {
@@ -134,6 +178,14 @@ interface ColumnMapping {
   csvColumn: string;
   bomField: keyof BomItem | '';
 }
+
+type ColumnType = {
+  key: keyof BomItem | string;
+  header: string;
+  width?: string;
+  render?: (value: any, item: BomItem, index: number) => React.ReactNode;
+  sortable?: boolean;
+};
 
 const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   const context = useTechPack();
@@ -280,7 +332,19 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     supplierCode: '',
     unitPrice: undefined,
     totalPrice: undefined,
+    imageUrl: '',
   });
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (formData.imageUrl) {
+      setImagePreview(getMaterialImageUrl(formData.imageUrl));
+    } else {
+      setImagePreview(null);
+    }
+  }, [formData.imageUrl]);
 
   // Filter and search BOM items
   const filteredBom = useMemo(() => {
@@ -401,6 +465,53 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     validation.validateField(field, value);
   }, [formData, validation]);
 
+  const handleMaterialImageUpload = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const input = event.target;
+      const file = input.files?.[0];
+      if (!file) return;
+
+      const validationMessage = validateMaterialImageFile(file);
+      if (validationMessage) {
+        setImageUploadError(validationMessage);
+        input.value = '';
+        return;
+      }
+
+      setIsUploadingImage(true);
+      setImageUploadError(null);
+
+      const formDataObj = new FormData();
+      formDataObj.append('bomImage', file);
+
+      try {
+        const response = await api.post('/techpacks/upload-bom-image', formDataObj, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        const uploadedUrl = response.data?.data?.url || '';
+        handleInputChange('imageUrl')(uploadedUrl);
+        validation.validateField('imageUrl', uploadedUrl);
+        setImagePreview(uploadedUrl ? getMaterialImageUrl(uploadedUrl) : null);
+        showSuccess('Tải ảnh vật tư thành công.');
+      } catch (error: any) {
+        const errorMessage = error.response?.data?.message || error.message || 'Không thể tải ảnh vật tư.';
+        setImageUploadError(errorMessage);
+        showError(errorMessage);
+      } finally {
+        setIsUploadingImage(false);
+        input.value = '';
+      }
+    },
+    [handleInputChange, validation]
+  );
+
+  const handleRemoveMaterialImage = useCallback(() => {
+    setFormData(prev => ({ ...prev, imageUrl: '' }));
+    setImagePreview(null);
+    setImageUploadError(null);
+    validation.validateField('imageUrl', '');
+  }, [validation]);
+
   const handleSubmit = () => {
     // Validate the entire form before submission
     const validationResult = validation.validateForm(formData);
@@ -459,6 +570,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     const unitPrice = hasUnitPrice ? Number(formData.unitPrice) : undefined;
     const totalPrice = quantity > 0 && unitPrice !== undefined ? quantity * unitPrice : undefined;
     
+    const normalizedImageUrl = formData.imageUrl?.trim();
     const bomItem: BomItem = {
       id: editingIndex !== null ? bom[editingIndex].id : generateUUID(),
       part: formData.part!,
@@ -472,6 +584,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       materialComposition: formData.materialComposition || '',
       colorCode: formData.colorCode || '',
       supplierCode: formData.supplierCode || '',
+      imageUrl: normalizedImageUrl ? normalizedImageUrl : undefined,
       unitPrice: unitPrice,
       totalPrice: totalPrice,
     };
@@ -507,7 +620,11 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       materialComposition: '',
       colorCode: '',
       supplierCode: '',
+      imageUrl: '',
     });
+    setImagePreview(null);
+    setImageUploadError(null);
+    setIsUploadingImage(false);
     setShowModal(false);
     setEditingIndex(null);
     setEditingId(null);
@@ -516,7 +633,9 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   };
 
   const handleEdit = (item: BomItem, index: number) => {
-    setFormData(item);
+    setFormData({ ...item, imageUrl: item.imageUrl || '' });
+    setImagePreview(item.imageUrl ? getMaterialImageUrl(item.imageUrl) : null);
+    setImageUploadError(null);
     setEditingIndex(index);
     setEditingId(item.id);
     setShowModal(true);
@@ -661,6 +780,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
           comments: '',
           colorCode: '',
           materialComposition: '',
+          imageUrl: '',
         };
         addBomItem(bomItem);
         newItems.push(bomItem);
@@ -704,7 +824,8 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
         supplierCode: 'MAT-001',
         colorCode: '#000000',
         materialComposition: '100% Cotton',
-        comments: 'Sample comment'
+        comments: 'Sample comment',
+        imageUrl: 'https://via.placeholder.com/300x300.png?text=Material+Sample'
       }
     ];
     const csvContent = exportToCSV(sampleData, canViewPrice);
@@ -730,7 +851,22 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       
       // Auto-detect column mapping
       const autoMapping: Record<string, keyof BomItem | ''> = {};
-      const bomFields: (keyof BomItem)[] = ['part', 'materialName', 'placement', 'size', 'quantity', 'uom', 'supplier', 'supplierCode', 'colorCode', 'materialComposition', 'comments', 'unitPrice', 'totalPrice'];
+      const bomFields: (keyof BomItem)[] = [
+        'part',
+        'materialName',
+        'placement',
+        'size',
+        'quantity',
+        'uom',
+        'supplier',
+        'supplierCode',
+        'colorCode',
+        'materialComposition',
+        'imageUrl',
+        'comments',
+        'unitPrice',
+        'totalPrice'
+      ];
       
       headers.forEach(header => {
         const lowerHeader = header.toLowerCase().trim();
@@ -745,6 +881,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
         else if (lowerHeader.includes('supplier') && !lowerHeader.includes('code')) autoMapping[header] = 'supplier';
         else if (lowerHeader.includes('color')) autoMapping[header] = 'colorCode';
         else if (lowerHeader.includes('composition')) autoMapping[header] = 'materialComposition';
+        else if (lowerHeader.includes('image') || lowerHeader.includes('photo') || lowerHeader.includes('picture')) autoMapping[header] = 'imageUrl';
         else if (lowerHeader.includes('comment') || lowerHeader.includes('note')) autoMapping[header] = 'comments';
         else if (lowerHeader.includes('unitprice') || (lowerHeader.includes('unit') && lowerHeader.includes('price'))) autoMapping[header] = 'unitPrice';
         else if (lowerHeader.includes('totalprice') || (lowerHeader.includes('total') && lowerHeader.includes('price'))) autoMapping[header] = 'totalPrice';
@@ -810,6 +947,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
         const hasUnitPrice = item.unitPrice !== undefined && item.unitPrice !== null && item.unitPrice !== '';
         const unitPrice = hasUnitPrice ? Number(item.unitPrice) : undefined;
         const totalPrice = item.totalPrice ?? (quantity > 0 && unitPrice !== undefined ? quantity * unitPrice : undefined);
+        const trimmedImageUrl = typeof item.imageUrl === 'string' ? item.imageUrl.trim() : '';
         
         const bomItem: BomItem = {
           id: generateUUID(),
@@ -824,6 +962,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
           colorCode: item.colorCode || '',
           materialComposition: item.materialComposition || '',
           comments: item.comments || '',
+          imageUrl: trimmedImageUrl ? trimmedImageUrl : undefined,
           unitPrice: unitPrice,
           totalPrice: totalPrice,
         };
@@ -918,6 +1057,24 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       header: 'Material Name',
       width: '20%',
       sortable: true,
+    },
+    {
+      key: 'imageUrl' as keyof BomItem,
+      header: 'Image',
+      width: '120px',
+      render: (value: string, item: BomItem) => {
+        const resolvedSrc = getMaterialImageUrl(value);
+        return (
+          <ZoomableImage
+            src={resolvedSrc}
+            alt={`${item.materialName || item.part} preview`}
+            fit="contain"
+            containerClassName="w-20 h-20 rounded-md border border-gray-200 overflow-hidden bg-white flex items-center justify-center text-[10px] text-gray-400"
+            className="object-contain"
+            fallback={<span className="px-2 text-center leading-tight">No Image</span>}
+          />
+        );
+      },
     },
     {
       key: 'placement' as keyof BomItem,
@@ -1372,6 +1529,71 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               error={validation.getFieldProps('colorCode').error}
               helperText={validation.getFieldProps('colorCode').helperText}
             />
+
+            <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+              <div className="md:col-span-2">
+                <p className="text-sm font-medium text-gray-700 mb-2">Ảnh vật tư (upload)</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label
+                    htmlFor={`bom-image-upload-${editingId ?? 'new'}`}
+                    className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    {isUploadingImage ? 'Đang tải...' : 'Upload ảnh'}
+                  </label>
+                  <input
+                    id={`bom-image-upload-${editingId ?? 'new'}`}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/svg+xml"
+                    className="hidden"
+                    onChange={handleMaterialImageUpload}
+                    disabled={isUploadingImage}
+                  />
+                  {formData.imageUrl && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveMaterialImage}
+                      className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
+                    >
+                      <X className="w-3 h-3" />
+                      Xoá ảnh
+                    </button>
+                  )}
+                </div>
+                {imageUploadError && (
+                  <p className="mt-1 text-xs text-red-600">{imageUploadError}</p>
+                )}
+                {validation.getFieldProps('imageUrl').error && (
+                  <p className="mt-1 text-xs text-red-600">{validation.getFieldProps('imageUrl').error}</p>
+                )}
+                {validation.getFieldProps('imageUrl').helperText && (
+                  <p className="mt-1 text-xs text-gray-500">{validation.getFieldProps('imageUrl').helperText}</p>
+                )}
+                {formData.imageUrl && (
+                  <p className="mt-2 text-[11px] text-gray-500 break-all">
+                    Đường dẫn: {getMaterialImageUrl(formData.imageUrl)}
+                  </p>
+                )}
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-700">Preview</span>
+                <div className="relative mt-1 h-32 rounded-md border border-gray-200 bg-white flex items-center justify-center overflow-hidden">
+                  <ZoomableImage
+                    src={imagePreview || getMaterialImageUrl(formData.imageUrl)}
+                    alt={`${formData.materialName || formData.part || 'Material'} preview`}
+                    fit="contain"
+                    containerClassName="w-full h-full flex items-center justify-center text-xs text-gray-400 bg-white"
+                    className="object-contain"
+                    fallback={<span className="text-[11px] text-gray-400 px-2 text-center leading-tight">Chưa có ảnh</span>}
+                  />
+                  {isUploadingImage && (
+                    <div className="absolute inset-0 bg-white/70 flex items-center justify-center text-xs font-medium text-gray-700">
+                      Đang tải ảnh...
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
 
             <div className="md:col-span-2">
               <Input
@@ -1923,7 +2145,10 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                     <option value="supplier">Supplier</option>
                     <option value="colorCode">Color Code</option>
                     <option value="materialComposition">Material Composition</option>
+                    <option value="imageUrl">Material Image URL</option>
                     <option value="comments">Comments</option>
+                    <option value="unitPrice">Unit Price</option>
+                    <option value="totalPrice">Total Price</option>
                   </select>
                 </div>
               </div>

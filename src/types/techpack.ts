@@ -137,8 +137,8 @@ export interface Colorway {
   _id?: string;
   name: string;
   code: string;
-  placement: string;
-  materialType: string;
+  placement?: string;
+  materialType?: string;
   season?: string;
   isDefault: boolean;
   approvalStatus: 'Pending' | 'Approved' | 'Rejected';

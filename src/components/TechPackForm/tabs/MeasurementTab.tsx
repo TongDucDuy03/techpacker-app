@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import { useTechPack } from '../../../contexts/TechPackContext';
 import {
   MeasurementPoint,
@@ -28,11 +30,54 @@ interface ProgressionValidation {
   warnings: string[];
 }
 
+const sampleRoundQuillModules = {
+  toolbar: [
+    [{ header: [1, 2, 3, 4, 5, false] }],
+    [{ font: [] }],
+    [{ size: [] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ color: [] }, { background: [] }],
+    [{ script: 'sub' }, { script: 'super' }],
+    [{ list: 'ordered' }, { list: 'bullet' }],
+    [{ indent: '-1' }, { indent: '+1' }],
+    [{ align: [] }],
+    ['link'],
+    ['clean'],
+  ],
+  clipboard: {
+    matchVisual: false,
+  },
+  history: {
+    delay: 500,
+    maxStack: 100,
+    userOnly: true,
+  },
+};
+
+const sampleRoundQuillFormats = [
+  'header',
+  'font',
+  'size',
+  'bold',
+  'italic',
+  'underline',
+  'strike',
+  'color',
+  'background',
+  'script',
+  'list',
+  'bullet',
+  'indent',
+  'align',
+  'link',
+];
+
 const MeasurementTab: React.FC = () => {
   const context = useTechPack();
   const {
     state,
     addMeasurement,
+    insertMeasurementAt,
     updateMeasurement,
     deleteMeasurement,
     addSampleMeasurementRound,
@@ -97,7 +142,8 @@ const MeasurementTab: React.FC = () => {
     const measurementFallback = measurements.find(
       measurement => measurement.baseSize && selectedSizes.includes(measurement.baseSize)
     )?.baseSize;
-    return measurementFallback || selectedSizes[0];
+    const defaultBase = selectedSizes.includes('L') ? 'L' : selectedSizes[0];
+    return measurementFallback || defaultBase;
   }, [measurements, selectedSizes, state?.techpack?.measurementBaseSize]);
 
   const baseHighlightColor = DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR; // Always use default color
@@ -1004,8 +1050,8 @@ type RoundModalFormState = {
     }
   };
 
-  const handleDuplicateMeasurement = (measurement: MeasurementPoint) => {
-    if (!addMeasurement) return;
+  const handleDuplicateMeasurement = (measurement: MeasurementPoint, index: number) => {
+    if (!insertMeasurementAt) return;
     const duplicate: MeasurementPoint = {
       ...measurement,
       id: `measurement_${Date.now()}`,
@@ -1013,7 +1059,7 @@ type RoundModalFormState = {
       pomName: `${measurement.pomName} (Copy)`,
       sizes: measurement.sizes ? { ...measurement.sizes } : {},
     };
-    addMeasurement(duplicate);
+    insertMeasurementAt(index, duplicate);
     showSuccess('Measurement duplicated');
   };
 
@@ -1596,7 +1642,7 @@ type RoundModalFormState = {
                             Edit
                           </button>
                           <button
-                            onClick={() => handleDuplicateMeasurement(measurement)}
+                            onClick={() => handleDuplicateMeasurement(measurement, index)}
                             className="text-indigo-600 hover:text-indigo-900"
                           >
                             Duplicate
@@ -1697,13 +1743,18 @@ type RoundModalFormState = {
                     Requested Source: {requestedSourceLabels[round.requestedSource || 'original']}
                   </p>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Overall Comments</label>
-                  <textarea
-                    rows={2}
-                    value={round.overallComments || ''}
-                    onChange={(e) => handleRoundFieldChange(round.id, 'overallComments', e.target.value)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Summary of findings..."
-                  />
+                  <div className="rounded-md border border-gray-200 bg-white">
+                    <ReactQuill
+                      theme="snow"
+                      value={round.overallComments || ''}
+                      onChange={(content) => handleRoundFieldChange(round.id, 'overallComments', content)}
+                      modules={sampleRoundQuillModules}
+                      formats={sampleRoundQuillFormats}
+                      placeholder="Summary of findings..."
+                      readOnly={!isEditableRound(round.id)}
+                      className="min-h-[120px] rounded-md bg-white"
+                    />
+                  </div>
                 </div>
               </div>
             ))}

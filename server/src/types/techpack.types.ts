@@ -44,9 +44,18 @@ export interface Material {
   uom: string; // Unit of Measure
   supplier: string;
   materialCode?: string;
+  supplierCode?: string;
   color?: string;
+  colorCode?: string;
   pantoneCode?: string;
   comments?: string;
+  imageUrl?: string;
+  materialComposition?: string;
+  weight?: string;
+  width?: string;
+  shrinkage?: string;
+  careInstructions?: string;
+  testingRequirements?: string;
   unitPrice?: number;
   totalPrice?: number;
   leadTime?: number;
@@ -80,12 +89,12 @@ export interface Measurement {
 
 export interface HowToMeasureItem {
   _id?: string;
-  pomCode: string;
-  pomName: string;
-  description: string;
-  imageUrl: string;
-  stepNumber: number;
-  instructions: string[];
+  pomCode?: string;
+  pomName?: string;
+  description?: string;
+  imageUrl?: string;
+  stepNumber?: number;
+  instructions?: string[];
   tips?: string[];
   commonMistakes?: string[];
   relatedMeasurements?: string[];
@@ -121,8 +130,8 @@ export interface Colorway {
     y: number;
     k: number;
   };
-  placement: string;
-  materialType: string;
+  placement?: string;
+  materialType?: string;
   supplier?: string;
   approved?: boolean;
   isDefault?: boolean;

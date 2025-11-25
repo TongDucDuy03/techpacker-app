@@ -144,6 +144,12 @@ const resolveValue = (
   return value === undefined || value === null ? '' : String(value);
 };
 
+const SAMPLE_BOUND_SIZE = 'M';
+
+const getVisibleSampleSizes = (_sizeKeys: string[]): string[] => {
+  return [SAMPLE_BOUND_SIZE];
+};
+
 const SampleMeasurementsTable: React.FC<SampleMeasurementsTableProps> = ({
   measurementRows,
   sampleRounds,
@@ -242,7 +248,8 @@ const getDiffToneClass = (value: string): string => {
         </thead>
         <tbody className="bg-white divide-y divide-gray-100">
           {measurementRows.map((row, rowIndex) => {
-            const sizeKeys = getSizeKeysForRow(row, sampleRounds, availableSizes, getEntryForRound);
+            const rawSizeKeys = getSizeKeysForRow(row, sampleRounds, availableSizes, getEntryForRound);
+            const sizeKeys = getVisibleSampleSizes(rawSizeKeys);
             const tolerance = getToleranceDisplay(row);
             const measurementMethod = row.measurement?.measurementMethod;
             const isEvenRow = rowIndex % 2 === 0;
@@ -309,6 +316,7 @@ const getDiffToneClass = (value: string): string => {
                       >
                         {fieldKey === 'comments' ? (
                           <textarea
+                            rows={2}
                             value=""
                             onChange={event =>
                               onEntrySizeValueChange(
@@ -321,7 +329,6 @@ const getDiffToneClass = (value: string): string => {
                                 row.pomCode
                               )
                             }
-                            rows={2}
                             className="w-full min-w-[140px] border border-gray-300 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                             placeholder="Notes"
                           />
@@ -354,8 +361,8 @@ const getDiffToneClass = (value: string): string => {
 
                   if (fieldKey === 'comments') {
                     return (
-                      <td 
-                        key={cellKey} 
+                      <td
+                        key={cellKey}
                         className="border-r border-gray-200 px-2 py-1 align-top"
                         style={{ backgroundColor: rowBgColor }}
                       >

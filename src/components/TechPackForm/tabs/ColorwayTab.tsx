@@ -1,16 +1,12 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useTechPack } from '../../../contexts/TechPackContext';
-import { BomItem, Colorway, ColorwayPart } from '../../../types/techpack';
+import { Colorway } from '../../../types/techpack';
 import { useFormValidation } from '../../../hooks/useFormValidation';
-import { colorwayFormValidationSchema, colorwayPartValidationSchema } from '../../../utils/validationSchemas';
+import { colorwayFormValidationSchema } from '../../../utils/validationSchemas';
 import Input from '../shared/Input';
-import Select from '../shared/Select';
-import DataTable from '../shared/DataTable';
-import { Plus, Palette, Copy, Eye, Star, Upload, Download, AlertCircle, Image as ImageIcon, X, Trash2 } from 'lucide-react';
-import { validateFields } from '../../../utils/validation';
+import { Plus, Palette, Copy, Upload, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { showError, showSuccess } from '../../../lib/toast';
 import { api } from '../../../lib/api';
-import { useSeasonSuggestions } from '../../../hooks/useSeasonSuggestions';
 import ZoomableImage from '../../common/ZoomableImage';
 
 const API_UPLOAD_BASE =
@@ -31,19 +27,19 @@ const resolveImageUrl = (url?: string | null): string | null => {
 const ColorwayTab: React.FC = () => {
   const context = useTechPack();
   const { state, addColorway, updateColorway, deleteColorway } = context ?? {};
-  const { colorways = [], bom = [] } = state?.techpack ?? {};
+  const { colorways = [] } = state?.techpack ?? {};
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [selectedColorway, setSelectedColorway] = useState<string>('');
-  const [showPreview, setShowPreview] = useState(false);
+  // const [selectedColorway, setSelectedColorway] = useState<string>('');
+  // const [showPreview, setShowPreview] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Initialize validation for the form
   const validation = useFormValidation(colorwayFormValidationSchema);
-  const partValidation = useFormValidation(colorwayPartValidationSchema);
+  // const partValidation = useFormValidation(colorwayPartValidationSchema);
   
   const [formData, setFormData] = useState<Partial<Colorway>>({
     name: '',
@@ -62,47 +58,47 @@ const ColorwayTab: React.FC = () => {
     imageUrl: undefined,
   });
 
-  const [partFormData, setPartFormData] = useState<Partial<ColorwayPart>>({
-    bomItemId: undefined,
-    partName: '',
-    colorName: '',
-    pantoneCode: '',
-    hexCode: '#000000',
-    rgbCode: '',
-    colorType: 'Solid',
-  });
+  // const [partFormData, setPartFormData] = useState<Partial<ColorwayPart>>({
+  //   bomItemId: undefined,
+  //   partName: '',
+  //   colorName: '',
+  //   pantoneCode: '',
+  //   hexCode: '#000000',
+  //   rgbCode: '',
+  //   colorType: 'Solid',
+  // });
 
-  const bomSelectionData = useMemo(() => {
-    const map = new Map<string, BomItem>();
-    const options = bom.map((item, index) => {
-      const primaryId = (item as any)?.id || (item as any)?._id || `bom-${index}`;
-      const candidates = [
-        (item as any)?.id,
-        (item as any)?._id,
-        primaryId
-      ];
-      candidates
-        .filter(Boolean)
-        .forEach(id => map.set(String(id), item));
-      const labelParts = [item.part, item.materialName].filter(Boolean);
-      return {
-        value: primaryId,
-        label: labelParts.length ? labelParts.join(' • ') : item.part || `BOM Item ${index + 1}`,
-      };
-    });
-    return { map, options };
-  }, [bom]);
+  // const bomSelectionData = useMemo(() => {
+  //   const map = new Map<string, BomItem>();
+  //   const options = bom.map((item, index) => {
+  //     const primaryId = (item as any)?.id || (item as any)?._id || `bom-${index}`;
+  //     const candidates = [
+  //       (item as any)?.id,
+  //       (item as any)?._id,
+  //       primaryId
+  //     ];
+  //     candidates
+  //       .filter(Boolean)
+  //       .forEach(id => map.set(String(id), item));
+  //     const labelParts = [item.part, item.materialName].filter(Boolean);
+  //     return {
+  //       value: primaryId,
+  //       label: labelParts.length ? labelParts.join(' • ') : item.part || `BOM Item ${index + 1}`,
+  //     };
+  //   });
+  //   return { map, options };
+  // }, [bom]);
 
-  const bomById = bomSelectionData.map;
-  const bomOptions = bomSelectionData.options;
+  // const bomById = bomSelectionData.map;
+  // const bomOptions = bomSelectionData.options;
 
   // Color type options
-  const colorTypeOptions = [
-    { value: 'Solid', label: 'Solid Color' },
-    { value: 'Print', label: 'Print' },
-    { value: 'Embroidery', label: 'Embroidery' },
-    { value: 'Applique', label: 'Applique' },
-  ];
+  // const colorTypeOptions = [
+  //   { value: 'Solid', label: 'Solid Color' },
+  //   { value: 'Print', label: 'Print' },
+  //   { value: 'Embroidery', label: 'Embroidery' },
+  //   { value: 'Applique', label: 'Applique' },
+  // ];
 
   const renderImagePlaceholder = (subtitle = 'Upload an image to display') => (
     <div className="flex flex-col items-center justify-center text-gray-400">
@@ -113,30 +109,30 @@ const ColorwayTab: React.FC = () => {
   );
 
   // Approval status options
-  const approvalStatusOptions = [
-    { value: 'Pending', label: 'Pending' },
-    { value: 'Approved', label: 'Approved' },
-    { value: 'Rejected', label: 'Rejected' },
-  ];
+  // const approvalStatusOptions = [
+  //   { value: 'Pending', label: 'Pending' },
+  //   { value: 'Approved', label: 'Approved' },
+  //   { value: 'Rejected', label: 'Rejected' },
+  // ];
 
   // Production status options
-  const productionStatusOptions = [
-    { value: 'Lab Dip', label: 'Lab Dip' },
-    { value: 'Bulk Fabric', label: 'Bulk Fabric' },
-    { value: 'Finished', label: 'Finished' },
-  ];
+  // const productionStatusOptions = [
+  //   { value: 'Lab Dip', label: 'Lab Dip' },
+  //   { value: 'Bulk Fabric', label: 'Bulk Fabric' },
+  //   { value: 'Finished', label: 'Finished' },
+  // ];
 
-  const { seasonSuggestions, addSeasonSuggestion } = useSeasonSuggestions();
-  useEffect(() => {
-    const uniqueSeasons = Array.from(
-      new Set(colorways.map((c) => c.season).filter((season): season is string => Boolean(season)))
-    );
-    uniqueSeasons.forEach((season) => addSeasonSuggestion(season));
-  }, [colorways, addSeasonSuggestion]);
-  const seasonDatalistOptions = useMemo(
-    () => seasonSuggestions.map((season) => ({ value: season, label: season })),
-    [seasonSuggestions]
-  );
+  // const { seasonSuggestions, addSeasonSuggestion } = useSeasonSuggestions();
+  // useEffect(() => {
+  //   const uniqueSeasons = Array.from(
+  //     new Set(colorways.map((c) => c.season).filter((season): season is string => Boolean(season)))
+  //   );
+  //   uniqueSeasons.forEach((season) => addSeasonSuggestion(season));
+  // }, [colorways, addSeasonSuggestion]);
+  // const seasonDatalistOptions = useMemo(
+  //   () => seasonSuggestions.map((season) => ({ value: season, label: season })),
+  //   [seasonSuggestions]
+  // );
 
   const handleInputChange = (field: keyof Colorway) => (value: string | boolean) => {
     let nextValue: string | boolean = value;
@@ -159,11 +155,11 @@ const ColorwayTab: React.FC = () => {
     validation.validateField(field, nextValue);
   };
 
-  const handleSeasonChange = (value: string | number) => {
-    const nextValue = typeof value === 'number' ? String(value) : value;
-    handleInputChange('season')(nextValue);
-    addSeasonSuggestion(nextValue);
-  };
+  // const handleSeasonChange = (value: string | number) => {
+  //   const nextValue = typeof value === 'number' ? String(value) : value;
+  //   handleInputChange('season')(nextValue);
+  //   addSeasonSuggestion(nextValue);
+  // };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -244,86 +240,86 @@ const ColorwayTab: React.FC = () => {
     fileInputRef.current?.click();
   };
 
-  const handlePartInputChange = (field: keyof ColorwayPart) => (value: string) => {
-    const updatedPartFormData = { ...partFormData, [field]: value };
-    setPartFormData(updatedPartFormData);
-
-    // Validate the part field in real-time
-    partValidation.validateField(field, value);
-
-    // Auto-generate RGB from hex
-    if (field === 'hexCode' && value.match(/^#[0-9A-Fa-f]{6}$/)) {
-      const r = parseInt(value.slice(1, 3), 16);
-      const g = parseInt(value.slice(3, 5), 16);
-      const b = parseInt(value.slice(5, 7), 16);
-      setPartFormData(prev => ({ ...prev, rgbCode: `rgb(${r}, ${g}, ${b})` }));
-    }
-  };
-
-  const handleBomSelection = (value: string) => {
-    if (!value) {
-      setPartFormData(prev => ({ ...prev, bomItemId: undefined }));
-      return;
-    }
-    const selectedBom = bomById.get(value);
-    setPartFormData(prev => ({
-      ...prev,
-      bomItemId: value,
-      partName: selectedBom?.part || prev.partName || '',
-      colorName: prev.colorName || selectedBom?.materialName || prev.colorName || '',
-      supplier: prev.supplier || selectedBom?.supplier || '',
-    }));
-    partValidation.setFieldTouched('partName', true);
-  };
-
-  const handleAddPart = () => {
-    const { isValid } = partValidation.validateForm(partFormData as Record<string, any>);
-    if (!isValid) {
-      Object.keys(colorwayPartValidationSchema).forEach(field => {
-        partValidation.setFieldTouched(field, true);
-      });
-      return;
-    }
-
-    const newPart: ColorwayPart = {
-      id: `part_${Date.now()}`,
-      bomItemId: partFormData.bomItemId,
-      partName: partFormData.partName!,
-      colorName: partFormData.colorName!,
-      pantoneCode: partFormData.pantoneCode || '',
-      hexCode: partFormData.hexCode || '#000000',
-      rgbCode: partFormData.rgbCode || '',
-      colorType: partFormData.colorType || 'Solid',
-    };
-
-    setFormData(prev => ({
-      ...prev,
-      parts: [...(prev.parts || []), newPart]
-    }));
-
-    // Reset part form
-    setPartFormData({
-      bomItemId: undefined,
-      partName: '',
-      colorName: '',
-      pantoneCode: '',
-      hexCode: '#000000',
-      rgbCode: '',
-      colorType: 'Solid',
-    });
-  };
-
-  const handleRemovePart = (partId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      parts: (prev.parts || []).filter(part => part.id !== partId)
-    }));
-  };
-
-  const handleEditPart = (part: ColorwayPart) => {
-    setPartFormData(part);
-    handleRemovePart(part.id);
-  };
+  // const handlePartInputChange = (field: keyof ColorwayPart) => (value: string) => {
+  //   const updatedPartFormData = { ...partFormData, [field]: value };
+  //   setPartFormData(updatedPartFormData);
+  //
+  //   // Validate the part field in real-time
+  //   partValidation.validateField(field, value);
+  //
+  //   // Auto-generate RGB from hex
+  //   if (field === 'hexCode' && value.match(/^#[0-9A-Fa-f]{6}$/)) {
+  //     const r = parseInt(value.slice(1, 3), 16);
+  //     const g = parseInt(value.slice(3, 5), 16);
+  //     const b = parseInt(value.slice(5, 7), 16);
+  //     setPartFormData(prev => ({ ...prev, rgbCode: `rgb(${r}, ${g}, ${b})` }));
+  //   }
+  // };
+  //
+  // const handleBomSelection = (value: string) => {
+  //   if (!value) {
+  //     setPartFormData(prev => ({ ...prev, bomItemId: undefined }));
+  //     return;
+  //   }
+  //   const selectedBom = bomById.get(value);
+  //   setPartFormData(prev => ({
+  //     ...prev,
+  //     bomItemId: value,
+  //     partName: selectedBom?.part || prev.partName || '',
+  //     colorName: prev.colorName || selectedBom?.materialName || prev.colorName || '',
+  //     supplier: prev.supplier || selectedBom?.supplier || '',
+  //   }));
+  //   partValidation.setFieldTouched('partName', true);
+  // };
+  //
+  // const handleAddPart = () => {
+  //   const { isValid } = partValidation.validateForm(partFormData as Record<string, any>);
+  //   if (!isValid) {
+  //     Object.keys(colorwayPartValidationSchema).forEach(field => {
+  //       partValidation.setFieldTouched(field, true);
+  //     });
+  //     return;
+  //   }
+  //
+  //   const newPart: ColorwayPart = {
+  //     id: `part_${Date.now()}`,
+  //     bomItemId: partFormData.bomItemId,
+  //     partName: partFormData.partName!,
+  //     colorName: partFormData.colorName!,
+  //     pantoneCode: partFormData.pantoneCode || '',
+  //     hexCode: partFormData.hexCode || '#000000',
+  //     rgbCode: partFormData.rgbCode || '',
+  //     colorType: partFormData.colorType || 'Solid',
+  //   };
+  //
+  //   setFormData(prev => ({
+  //     ...prev,
+  //     parts: [...(prev.parts || []), newPart]
+  //   }));
+  //
+  //   // Reset part form
+  //   setPartFormData({
+  //     bomItemId: undefined,
+  //     partName: '',
+  //     colorName: '',
+  //     pantoneCode: '',
+  //     hexCode: '#000000',
+  //     rgbCode: '',
+  //     colorType: 'Solid',
+  //   });
+  // };
+  //
+  // const handleRemovePart = (partId: string) => {
+  //   setFormData(prev => ({
+  //     ...prev,
+  //     parts: (prev.parts || []).filter(part => part.id !== partId)
+  //   }));
+  // };
+  //
+  // const handleEditPart = (part: ColorwayPart) => {
+  //   setPartFormData(part);
+  //   handleRemovePart(part.id);
+  // };
 
   // Helper to format validation alert message
   const formatValidationAlert = (fieldKey: string): string => {
@@ -357,8 +353,8 @@ const ColorwayTab: React.FC = () => {
       _id: editingIndex !== null ? colorways[editingIndex]._id : undefined,
       name: (formData.name || '').trim(),
       code: (formData.code || '').trim(),
-      placement: (formData.placement || '').trim(),
-      materialType: (formData.materialType || '').trim(),
+      placement: formData.placement?.trim(),
+      materialType: formData.materialType?.trim(),
       season: formData.season || '',
       isDefault: !!formData.isDefault,
       approvalStatus: formData.approvalStatus || 'Pending',
@@ -464,82 +460,82 @@ const ColorwayTab: React.FC = () => {
     addColorway(duplicated);
   };
 
-  const handleSetDefault = (index: number) => {
-    colorways.forEach((colorway, i) => {
-      updateColorway(i, { 
-        ...colorway, 
-        isDefault: i === index,
-        imageUrl: colorway.imageUrl || '', // Preserve imageUrl
-      });
-    });
-  };
+  // const handleSetDefault = (index: number) => {
+  //   colorways.forEach((colorway, i) => {
+  //     updateColorway(i, { 
+  //       ...colorway, 
+  //       isDefault: i === index,
+  //       imageUrl: colorway.imageUrl || '', // Preserve imageUrl
+  //     });
+  //   });
+  // };
 
-  const validatePantoneCode = (code: string): boolean => {
-    // Basic Pantone code validation
-    return /^(PANTONE\s+)?[0-9]{2,3}-[0-9]{4}\s+(TPX|TCX|C|U)$/i.test(code) || code === '';
-  };
-
-  const validateHexCode = (code: string): boolean => {
-    return /^#[0-9A-Fa-f]{6}$/.test(code);
-  };
-
-  // Table columns for colorway parts
-  const partColumns = [
-    {
-      key: 'bomItemId' as keyof ColorwayPart,
-      header: 'Linked BOM',
-      width: '25%',
-      render: (_: any, item: ColorwayPart) => {
-        if (!item.bomItemId) {
-          return <span className="text-xs text-gray-400">Legacy / Custom</span>;
-        }
-        const linked = bomById.get(item.bomItemId);
-        if (!linked) {
-          return <span className="text-xs text-yellow-600">Missing BOM</span>;
-        }
-        return (
-          <div className="flex flex-col">
-            <span className="text-sm font-medium text-gray-900">{linked.part}</span>
-            <span className="text-xs text-gray-500 truncate">{linked.materialName}</span>
-          </div>
-        );
-      }
-    },
-    {
-      key: 'partName' as keyof ColorwayPart,
-      header: 'Part',
-      width: '20%',
-    },
-    {
-      key: 'colorName' as keyof ColorwayPart,
-      header: 'Color Name',
-      width: '20%',
-    },
-    {
-      key: 'pantoneCode' as keyof ColorwayPart,
-      header: 'Pantone Code',
-      width: '15%',
-    },
-    {
-      key: 'hexCode' as keyof ColorwayPart,
-      header: 'Color',
-      width: '10%',
-      render: (value: string) => (
-        <div className="flex items-center space-x-2">
-          <div 
-            className="w-6 h-6 rounded border border-gray-300"
-            style={{ backgroundColor: value }}
-          />
-          <span className="text-xs font-mono">{value}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'colorType' as keyof ColorwayPart,
-      header: 'Type',
-      width: '15%',
-    },
-  ];
+  // const validatePantoneCode = (code: string): boolean => {
+  //   // Basic Pantone code validation
+  //   return /^(PANTONE\s+)?[0-9]{2,3}-[0-9]{4}\s+(TPX|TCX|C|U)$/i.test(code) || code === '';
+  // };
+  //
+  // const validateHexCode = (code: string): boolean => {
+  //   return /^#[0-9A-Fa-f]{6}$/.test(code);
+  // };
+  //
+  // // Table columns for colorway parts
+  // const partColumns = [
+  //   {
+  //     key: 'bomItemId' as keyof ColorwayPart,
+  //     header: 'Linked BOM',
+  //     width: '25%',
+  //     render: (_: any, item: ColorwayPart) => {
+  //       if (!item.bomItemId) {
+  //         return <span className="text-xs text-gray-400">Legacy / Custom</span>;
+  //       }
+  //       const linked = bomById.get(item.bomItemId);
+  //       if (!linked) {
+  //         return <span className="text-xs text-yellow-600">Missing BOM</span>;
+  //       }
+  //       return (
+  //         <div className="flex flex-col">
+  //           <span className="text-sm font-medium text-gray-900">{linked.part}</span>
+  //           <span className="text-xs text-gray-500 truncate">{linked.materialName}</span>
+  //         </div>
+  //       );
+  //     }
+  //   },
+  //   {
+  //     key: 'partName' as keyof ColorwayPart,
+  //     header: 'Part',
+  //     width: '20%',
+  //   },
+  //   {
+  //     key: 'colorName' as keyof ColorwayPart,
+  //     header: 'Color Name',
+  //     width: '20%',
+  //   },
+  //   {
+  //     key: 'pantoneCode' as keyof ColorwayPart,
+  //     header: 'Pantone Code',
+  //     width: '15%',
+  //   },
+  //   {
+  //     key: 'hexCode' as keyof ColorwayPart,
+  //     header: 'Color',
+  //     width: '10%',
+  //     render: (value: string) => (
+  //       <div className="flex items-center space-x-2">
+  //         <div 
+  //           className="w-6 h-6 rounded border border-gray-300"
+  //           style={{ backgroundColor: value }}
+  //         />
+  //         <span className="text-xs font-mono">{value}</span>
+  //       </div>
+  //     ),
+  //   },
+  //   {
+  //     key: 'colorType' as keyof ColorwayPart,
+  //     header: 'Type',
+  //     width: '15%',
+  //   },
+  // ];
 
   return (
     <div className="max-w-7xl mx-auto p-6">
@@ -553,58 +549,30 @@ const ColorwayTab: React.FC = () => {
             </p>
           </div>
           
-          <div className="flex items-center space-x-4">
-            <div className="text-sm text-center">
-              <div className="text-2xl font-bold text-blue-600">{colorways.length}</div>
-              <div className="text-gray-500">Colorways</div>
-            </div>
-            <div className="text-sm text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {colorways.filter(c => c.approvalStatus === 'Approved').length}
-              </div>
-              <div className="text-gray-500">Approved</div>
-            </div>
+        {/* Hidden legacy stats */}
+        {/* <div className="flex items-center space-x-4">
+          <div className="text-sm text-center">
+            <div className="text-2xl font-bold text-blue-600">{colorways.length}</div>
+            <div className="text-gray-500">Colorways</div>
           </div>
+          <div className="text-sm text-center">
+            <div className="text-2xl font-bold text-green-600">
+              {colorways.filter(c => c.approvalStatus === 'Approved').length}
+            </div>
+            <div className="text-gray-500">Approved</div>
+          </div>
+        </div> */}
         </div>
       </div>
 
       {/* Controls */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={() => setShowPreview(!showPreview)}
-              className={`flex items-center px-3 py-2 text-sm font-medium rounded-md border transition-colors ${
-                showPreview
-                  ? 'bg-blue-100 text-blue-800 border-blue-300'
-                  : 'bg-gray-50 text-gray-600 border-gray-300 hover:bg-gray-100'
-              }`}
-            >
-              <Eye className="w-4 h-4 mr-2" />
-              Preview Mode
-            </button>
-
-            {colorways.length > 0 && (
-              <Select
-                label=""
-                value={selectedColorway}
-                onChange={setSelectedColorway}
-                options={colorways.map(c => ({ value: c.id, label: c.name }))}
-                placeholder="Select colorway to preview..."
-                className="min-w-48"
-              />
-            )}
-          </div>
-
-          <div className="flex items-center space-x-3">
-            <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
-              <Upload className="w-4 h-4 mr-2" />
-              Import
-            </button>
-            <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </button>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+          {/* Legacy preview + filters hidden */}
+          {/* <div className="flex items-center space-x-3">
+            ...
+          </div> */}
+          <div className="flex w-full justify-end">
             <button
               onClick={() => setShowAddForm(true)}
               className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
@@ -681,6 +649,32 @@ const ColorwayTab: React.FC = () => {
           </div>
 
           {/* Colorway Basic Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <Input
+              label="Colorway Name"
+              value={formData.name || ''}
+              onChange={handleInputChange('name')}
+              onBlur={validation.getFieldProps('name').onBlur}
+              placeholder="e.g., Navy Blazer"
+              required
+              error={validation.getFieldProps('name').error}
+              helperText={validation.getFieldProps('name').helperText}
+            />
+
+            <Input
+              label="Colorway Code"
+              value={formData.code || ''}
+              onChange={handleInputChange('code')}
+              onBlur={validation.getFieldProps('code').onBlur}
+              placeholder="e.g., NVY001"
+              required
+              error={validation.getFieldProps('code').error}
+              helperText={validation.getFieldProps('code').helperText}
+            />
+          </div>
+
+          {/* Legacy detailed fields intentionally hidden */}
+          {/* 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <Input
               label="Colorway Name"
@@ -832,12 +826,14 @@ const ColorwayTab: React.FC = () => {
               </label>
             </div>
           </div>
+          */}
 
           {/* Color Parts Section */}
+          {/* 
           <div className="border-t border-gray-200 pt-6">
             <h4 className="text-md font-semibold text-gray-800 mb-4">Color Parts</h4>
             
-            {/* Add Part Form */}
+            // Add Part Form
             <div className="bg-gray-50 rounded-lg p-4 mb-4">
               <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
                 <Select
@@ -929,7 +925,7 @@ const ColorwayTab: React.FC = () => {
               </div>
             </div>
 
-            {/* Parts Table */}
+            // Parts Table
             {formData.parts && formData.parts.length > 0 && (
               <DataTable
                 data={formData.parts}
@@ -943,9 +939,10 @@ const ColorwayTab: React.FC = () => {
               />
             )}
           </div>
+          */}
           
           {/* Validation Summary */}
-          {!validation.isValid && Object.keys(validation.errors).some(key => validation.touched[key]) && (
+          {/* {!validation.isValid && Object.keys(validation.errors).some(key => validation.touched[key]) && (
             <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-md">
               <div className="flex">
                 <div className="flex-shrink-0">
@@ -967,7 +964,7 @@ const ColorwayTab: React.FC = () => {
                 </div>
               </div>
             </div>
-          )}
+          )} */}
 
           <div className="flex items-center justify-end space-x-3 mt-6">
             <button
@@ -1010,17 +1007,22 @@ const ColorwayTab: React.FC = () => {
               </div>
               
               <div className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-2">
-                    <h3 className="text-lg font-semibold text-gray-900">{colorway.name}</h3>
-                    {colorway.isDefault && (
-                      <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                    )}
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {colorway.name || 'Untitled colorway'}
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Code:{' '}
+                      <span className="font-mono text-gray-800">
+                        {colorway.code || '—'}
+                      </span>
+                    </p>
                   </div>
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => handleDuplicate(colorway)}
-                      className="text-gray-600 hover:text-gray-800"
+                      className="text-gray-500 hover:text-gray-800"
                       title="Duplicate"
                     >
                       <Copy className="w-4 h-4" />
@@ -1032,105 +1034,14 @@ const ColorwayTab: React.FC = () => {
                     >
                       <Palette className="w-4 h-4" />
                     </button>
-                  </div>
-                </div>
-
-                <div className="text-sm text-gray-600 mb-3">
-                  <div>Code: <span className="font-mono">{colorway.code}</span></div>
-                  <div>Placement: <span className="font-medium text-gray-700">{colorway.placement}</span></div>
-                  <div>Material: <span className="font-medium text-gray-700">{colorway.materialType}</span></div>
-                  {colorway.supplier && (
-                    <div>Supplier: <span className="text-gray-700">{colorway.supplier}</span></div>
-                  )}
-                  {colorway.pantoneCode && (
-                    <div>Pantone: <span className="font-mono">{colorway.pantoneCode}</span></div>
-                  )}
-                  {colorway.hexColor && (
-                    <div className="flex items-center space-x-2">
-                      <span>Hex:</span>
-                      <span className="inline-flex items-center space-x-2">
-                        <span
-                          className="w-4 h-4 rounded border border-gray-300"
-                          style={{ backgroundColor: colorway.hexColor }}
-                        />
-                        <span className="font-mono">{colorway.hexColor}</span>
-                      </span>
-                    </div>
-                  )}
-                  {(colorway.approvalStatus !== 'Pending' || colorway.productionStatus) && (
-                    <div
-                      className={`flex items-center mt-1 ${
-                        colorway.approvalStatus !== 'Pending' && colorway.productionStatus
-                          ? 'justify-between'
-                          : colorway.approvalStatus !== 'Pending'
-                            ? 'justify-start'
-                            : 'justify-end'
-                      }`}
+                    <button
+                      onClick={() => handleDelete(colorway, index)}
+                      className="text-red-500 hover:text-red-700"
+                      title="Delete"
                     >
-                      {colorway.approvalStatus !== 'Pending' && (
-                        <span>
-                          Status:{' '}
-                          <span
-                            className={`font-medium ${
-                              colorway.approvalStatus === 'Approved'
-                                ? 'text-green-600'
-                                : colorway.approvalStatus === 'Rejected'
-                                  ? 'text-red-600'
-                                  : 'text-yellow-600'
-                            }`}
-                          >
-                            {colorway.approvalStatus}
-                          </span>
-                        </span>
-                      )}
-                      {colorway.productionStatus && (
-                        <span className="text-xs text-gray-500">{colorway.productionStatus}</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Color Swatches */}
-                <div className="space-y-2 mb-4">
-                  {colorway.parts.slice(0, 4).map((part) => (
-                    <div key={part.id} className="flex items-center space-x-3">
-                      <div 
-                        className="w-6 h-6 rounded border border-gray-300 flex-shrink-0"
-                        style={{ backgroundColor: part.hexCode }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-900 truncate">{part.partName}</div>
-                        <div className="text-xs text-gray-500 truncate">{part.colorName}</div>
-                      </div>
-                      {part.pantoneCode && (
-                        <div className="text-xs text-gray-400 font-mono">{part.pantoneCode}</div>
-                      )}
-                    </div>
-                  ))}
-                  {colorway.parts.length > 4 && (
-                    <div className="text-xs text-gray-500 text-center">
-                      +{colorway.parts.length - 4} more parts
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    {!colorway.isDefault && (
-                      <button
-                        onClick={() => handleSetDefault(index)}
-                        className="text-xs text-blue-600 hover:text-blue-800"
-                      >
-                        Set Default
-                      </button>
-                    )}
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleDelete(colorway, index)}
-                    className="text-xs text-red-600 hover:text-red-800"
-                  >
-                    Delete
-                  </button>
                 </div>
               </div>
             </div>
@@ -1148,24 +1059,12 @@ export const validateColorwaysForSave = (colorways: Colorway[]): { isValid: bool
   colorways.forEach((item) => {
     const itemErrors: Record<string, string> = {};
     
-    // Convert validation schema to ValidationRule format for validateFields
-    const schema: Record<string, any> = {};
-    Object.entries(colorwayFormValidationSchema).forEach(([key, rule]) => {
-      schema[key] = {
-        required: rule.required,
-        minLength: rule.minLength,
-        maxLength: rule.maxLength,
-        min: rule.min,
-        max: rule.max,
-        custom: rule.custom
-      };
-    });
-    
-    // Validate basic fields
-    const validationResult = validateFields(item as Record<string, any>, schema);
-    validationResult.errors.forEach(err => {
-      itemErrors[err.field] = err.message;
-    });
+    if (!item.name || item.name.trim().length < 2) {
+      itemErrors.name = 'Colorway name must be at least 2 characters long';
+    }
+    if (!item.code || item.code.trim().length === 0) {
+      itemErrors.code = 'Colorway code is required';
+    }
     
     if (Object.keys(itemErrors).length > 0) {
       errors.push({ id: item.id, item, errors: itemErrors });

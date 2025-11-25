@@ -69,8 +69,8 @@ const colorwaySpecSchema = z.object({
     g: z.number().min(0).max(255),
     b: z.number().min(0).max(255)
   }).optional(),
-  placement: z.string().min(1, 'Placement is required'),
-  materialType: z.string().min(1, 'Material type is required'),
+  placement: z.string().optional(),
+  materialType: z.string().optional(),
   supplier: z.string().optional(),
   approved: z.boolean().optional(),
   isDefault: z.boolean().optional(),

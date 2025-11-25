@@ -84,9 +84,22 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
     }
   };
 
-  // ✅ Use debounced search term for filtering
+  const formatDateTime = useCallback((value?: string) => {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    return date.toLocaleString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }, []);
+
+  // ✅ Use debounced search term for filtering + enforce created date sorting (newest first)
   const filteredTechPacks = useMemo(() => {
-    return safeTechPacks.filter(tp => {
+    const filtered = safeTechPacks.filter(tp => {
       const name = (tp as any).productName || tp.name || '';
       const category = (tp as any).productClass || (tp as any).category || tp.metadata?.category || '';
       const season = (tp as any).season || tp.metadata?.season || '';
@@ -97,6 +110,12 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
         (categoryFilter ? category === categoryFilter : true) &&
         (seasonFilter ? season === seasonFilter : true)
       );
+    });
+
+    return filtered.sort((a, b) => {
+      const aCreated = new Date(a.createdAt || 0).getTime();
+      const bCreated = new Date(b.createdAt || 0).getTime();
+      return bCreated - aCreated;
     });
   }, [safeTechPacks, debouncedSearchTerm, statusFilter, categoryFilter, seasonFilter]);
 
@@ -137,8 +156,19 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
       render: (status: string) => <Tag color={getStatusColor(status)} className="status-tag">{status.toUpperCase()}</Tag>
     },
     { title: 'Season', dataIndex: 'season', sorter: (a: any, b: any) => a.season.localeCompare(b.season), render: (s, r: any) => s || r.metadata?.season },
-    { title: 'Created Date', dataIndex: 'createdAt', sorter: (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(), render: (date: string) => new Date(date).toLocaleDateString() },
-    { title: 'Last Updated', dataIndex: 'updatedAt', sorter: (a: any, b: any) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(), render: (date: string) => new Date(date).toLocaleDateString() },
+    {
+      title: 'Created Date',
+      dataIndex: 'createdAt',
+      defaultSortOrder: 'descend',
+      sorter: (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      render: (date: string) => formatDateTime(date),
+    },
+    {
+      title: 'Last Updated',
+      dataIndex: 'updatedAt',
+      sorter: (a: any, b: any) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
+      render: (date: string) => formatDateTime(date),
+    },
     {
       title: 'Actions',
       key: 'actions',

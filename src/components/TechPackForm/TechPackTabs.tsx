@@ -221,6 +221,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
               shrinkage: item.shrinkage || '',
               careInstructions: item.careInstructions || '',
               testingRequirements: item.testingRequirements || '',
+              imageUrl: item.imageUrl || '',
               unitPrice: item.unitPrice,
               totalPrice: item.totalPrice,
             }))

@@ -148,6 +148,18 @@ export const bomItemValidationSchema: FormValidationConfig = {
       return null;
     }
   },
+  imageUrl: {
+    custom: (value: string) => {
+      if (!value) return null;
+      const trimmed = String(value).trim();
+      if (!trimmed) return null;
+      const isHttp = /^https?:\/\//i.test(trimmed);
+      const isDataUrl = /^data:image\//i.test(trimmed);
+      const isRelative = trimmed.startsWith('/') || trimmed.startsWith('./') || trimmed.startsWith('../');
+      if (isHttp || isDataUrl || isRelative) return null;
+      return 'URL ảnh không hợp lệ. Dùng đường dẫn http(s) hoặc tương đối.';
+    }
+  },
   materialComposition: { 
     maxLength: 500,
     custom: (value: string) => {
@@ -245,73 +257,6 @@ export const colorwayFormValidationSchema: FormValidationConfig = {
       return null;
     }
   },
-  placement: {
-    required: true,
-    minLength: 2,
-    maxLength: 100,
-    custom: (value: string) => {
-      if (!value || value.trim().length < 2) {
-        return 'Placement must be at least 2 characters long';
-      }
-      return null;
-    }
-  },
-  materialType: {
-    required: true,
-    minLength: 2,
-    maxLength: 100,
-    custom: (value: string) => {
-      if (!value || value.trim().length < 2) {
-        return 'Material type must be at least 2 characters long';
-      }
-      return null;
-    }
-  },
-  pantoneCode: {
-    custom: techPackValidators.pantoneCode
-  },
-  hexColor: {
-    custom: (value: string) => {
-      if (value && value.trim().length > 0) {
-        if (!/^#[0-9A-Fa-f]{6}$/.test(value)) {
-          return 'Please enter a valid hex color code (e.g., #FF0000)';
-        }
-      }
-      return null;
-    }
-  },
-  supplier: {
-    maxLength: 100,
-    custom: (value: string) => {
-      if (value && value.trim().length > 0 && value.trim().length < 2) {
-        return 'Supplier name must be at least 2 characters long';
-      }
-      return null;
-    }
-  },
-  notes: {
-    maxLength: 255,
-    custom: (value: string) => {
-      if (value && value.trim().length > 0 && value.trim().length < 5) {
-        return 'Notes must be at least 5 characters long';
-      }
-      return null;
-    }
-  },
-  season: {
-    custom: (value: string) => {
-      if (!value || value.trim().length === 0) {
-        return null;
-      }
-      if (value.trim().length < 2) {
-        return 'Season must be at least 2 characters long';
-      }
-      if (!/^[A-Za-z0-9\s\-_/]+$/.test(value.trim())) {
-        return 'Season can only contain letters, numbers, spaces, "-", "_" or "/"';
-      }
-      return null;
-    }
-  }
 };
 
 export const colorwayPartValidationSchema: FormValidationConfig = {

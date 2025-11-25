@@ -50,8 +50,6 @@ const measurementValidation = [
 const colorwayValidation = [
   body('name').notEmpty().withMessage('Colorway name is required'),
   body('code').notEmpty().withMessage('Colorway code is required'),
-  body('placement').notEmpty().withMessage('Placement is required'),
-  body('materialType').notEmpty().withMessage('Material type is required'),
   body('hexColor').optional().matches(/^#[0-9A-F]{6}$/i).withMessage('Invalid hex color format'),
   body('rgbColor.r').optional().isInt({ min: 0, max: 255 }).withMessage('RGB red must be 0-255'),
   body('rgbColor.g').optional().isInt({ min: 0, max: 255 }).withMessage('RGB green must be 0-255'),

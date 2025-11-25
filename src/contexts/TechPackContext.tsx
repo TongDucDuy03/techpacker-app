@@ -30,6 +30,7 @@ interface TechPackContextType {
   saveTechPack: (techpackOverride?: TechPackFormState['techpack']) => Promise<void>;
   exportToPDF: () => void;
   addMeasurement: (measurement: MeasurementPoint) => void;
+  insertMeasurementAt: (index: number, measurement: MeasurementPoint) => void;
   updateMeasurement: (index: number, measurement: MeasurementPoint) => void;
   deleteMeasurement: (index: number) => void;
   addSampleMeasurementRound: (round?: Partial<MeasurementSampleRound>) => void;
@@ -1368,12 +1369,14 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           return payload;
         });
 
+        const normalizedPlacement = colorway.placement?.trim();
+        const normalizedMaterialType = colorway.materialType?.trim();
         return {
           ...(colorway?._id && typeof colorway._id === 'string' && objectIdPattern.test(colorway._id) ? { _id: colorway._id } : {}),
           name: colorway.name.trim(),
           code: colorway.code.trim(),
-          placement: colorway.placement.trim(),
-          materialType: colorway.materialType.trim(),
+          ...(normalizedPlacement ? { placement: normalizedPlacement } : {}),
+          ...(normalizedMaterialType ? { materialType: normalizedMaterialType } : {}),
           pantoneCode: colorway.pantoneCode?.trim() || undefined,
           hexColor: colorway.hexColor?.trim() || undefined,
           rgbColor: hexToRgb(colorway.hexColor),
@@ -1388,10 +1391,10 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         };
       });
 
-      const incompleteColorway = colorwaysPayload.find(cw => !cw.name || !cw.code || !cw.placement || !cw.materialType);
+      const incompleteColorway = colorwaysPayload.find(cw => !cw.name || !cw.code);
       if (incompleteColorway) {
         setState(prev => ({ ...prev, isSaving: false }));
-        showError('Please complete all required colorway fields (name, code, placement, material type).');
+        showError('Please complete all required colorway fields (name, code).');
         return;
       }
 
@@ -1737,6 +1740,32 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           ? { ...measurement, baseSize }
           : measurement;
       const nextMeasurements = [...prev.techpack.measurements, normalizedMeasurement];
+      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
+      return {
+        ...prev,
+        techpack: {
+          ...prev.techpack,
+          measurements: nextMeasurements,
+          sampleMeasurementRounds: nextSampleRounds,
+        },
+        hasUnsavedChanges: true,
+      };
+    });
+  };
+
+  const insertMeasurementAt = (index: number, measurement: MeasurementPoint) => {
+    setState(prev => {
+      const baseSize =
+        prev.techpack.measurementBaseSize ||
+        (prev.techpack.measurementSizeRange && prev.techpack.measurementSizeRange[0]) ||
+        '';
+      const normalizedMeasurement =
+        baseSize && measurement.baseSize !== baseSize
+          ? { ...measurement, baseSize }
+          : measurement;
+      const nextMeasurements = [...prev.techpack.measurements];
+      const insertIndex = Math.min(Math.max(index + 1, 0), nextMeasurements.length);
+      nextMeasurements.splice(insertIndex, 0, normalizedMeasurement);
       const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
       return {
         ...prev,
@@ -2299,6 +2328,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     saveTechPack,
     exportToPDF,
     addMeasurement,
+    insertMeasurementAt,
     updateMeasurement,
     deleteMeasurement,
     addSampleMeasurementRound,
@@ -2349,6 +2379,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     saveTechPack,
     exportToPDF,
     addMeasurement,
+    insertMeasurementAt,
     updateMeasurement,
     deleteMeasurement,
     addSampleMeasurementRound,
