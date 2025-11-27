@@ -78,6 +78,70 @@ const DEFAULT_STRINGS = {
   emptyRevisions: 'No revision history available.',
 };
 
+type MeasurementUnit = 'mm' | 'cm' | 'inch-10' | 'inch-16' | 'inch-32';
+const DEFAULT_MEASUREMENT_UNIT: MeasurementUnit = 'cm';
+const MEASUREMENT_UNIT_SUFFIX_MAP: Record<MeasurementUnit, string> = {
+  mm: 'mm',
+  cm: 'cm',
+  'inch-10': 'inch-10',
+  'inch-16': 'inch-16',
+  'inch-32': 'inch-32',
+};
+
+const getMeasurementUnitSuffix = (unit?: MeasurementUnit | null): string => {
+  const normalized = unit && MEASUREMENT_UNIT_SUFFIX_MAP[unit] ? unit : DEFAULT_MEASUREMENT_UNIT;
+  return MEASUREMENT_UNIT_SUFFIX_MAP[normalized];
+};
+
+const normalizeMeasurementUnit = (unit?: string | null): MeasurementUnit => {
+  if (unit && MEASUREMENT_UNIT_SUFFIX_MAP[unit as MeasurementUnit]) {
+    return unit as MeasurementUnit;
+  }
+  return DEFAULT_MEASUREMENT_UNIT;
+};
+
+const parseMeasurementNumber = (value: unknown): number | undefined => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : undefined;
+  }
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+};
+
+const formatMeasurementValue = (value: unknown, unit: MeasurementUnit): string => {
+  const parsed = parseMeasurementNumber(value);
+  if (parsed === undefined) return '—';
+  const formatted =
+    Math.abs(parsed % 1) < 1e-6
+      ? parsed.toFixed(0)
+      : parsed.toFixed(2).replace(/\.00$/, '');
+  return `${formatted} ${getMeasurementUnitSuffix(unit)}`;
+};
+
+const formatToleranceRange = (
+  minus?: number,
+  plus?: number,
+  unit?: MeasurementUnit
+): string => {
+  if (minus === undefined && plus === undefined) {
+    return '—';
+  }
+  const normalizedUnit = normalizeMeasurementUnit(unit);
+  const fallback = minus ?? plus ?? 0;
+  const safeMinus = minus ?? fallback;
+  const safePlus = plus ?? fallback;
+  const suffix = getMeasurementUnitSuffix(normalizedUnit);
+
+  if (Math.abs(safeMinus - safePlus) < 1e-3) {
+    return `±${Math.abs(safeMinus).toFixed(1)} ${suffix}`;
+  }
+
+  return `-${safeMinus.toFixed(1)} ${suffix} / +${safePlus.toFixed(1)} ${suffix}`;
+};
+
 function formatDate(date?: Date, format = 'MMM D, YYYY HH:mm') {
   if (!date) return undefined;
   return dayjs(date).format(format);
@@ -300,6 +364,9 @@ function buildMeasurementRows(techpack: TechPackDocumentLean, sizes: string[]) {
   let currentGroup: string | null = null;
 
   measurements.forEach((measurement: any) => {
+    const unit = normalizeMeasurementUnit(measurement.unit);
+    const parsedMinus = parseMeasurementNumber(measurement.toleranceMinus);
+    const parsedPlus = parseMeasurementNumber(measurement.tolerancePlus);
     const groupLabel = measurement.category || measurement.group || measurement.measurementType;
     if (groupLabel && groupLabel !== currentGroup) {
       rows.push({
@@ -317,7 +384,7 @@ function buildMeasurementRows(techpack: TechPackDocumentLean, sizes: string[]) {
       if (raw === null || raw === undefined || raw === '') {
         sizeValues[size] = '—';
       } else {
-        sizeValues[size] = `${raw}`;
+        sizeValues[size] = formatMeasurementValue(raw, unit);
         filled += 1;
       }
     });
@@ -332,8 +399,9 @@ function buildMeasurementRows(techpack: TechPackDocumentLean, sizes: string[]) {
       isGroup: false,
       pomCode: measurement.pomCode,
       pomName: measurement.pomName,
-      toleranceMinus: measurement.toleranceMinus ?? '—',
-      tolerancePlus: measurement.tolerancePlus ?? '—',
+      toleranceMinus: parsedMinus === undefined ? '—' : formatMeasurementValue(parsedMinus, unit),
+      tolerancePlus: parsedPlus === undefined ? '—' : formatMeasurementValue(parsedPlus, unit),
+      toleranceDisplay: formatToleranceRange(parsedMinus, parsedPlus, unit),
       sizes: sizeValues,
       notes: measurement.notes,
       type: measurement.measurementType,

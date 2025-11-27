@@ -6,6 +6,7 @@ import {
   MeasurementSampleValueMap,
   MeasurementRequestedSource,
 } from '../../../types/techpack';
+import { getMeasurementUnitSuffix, DEFAULT_MEASUREMENT_UNIT, MeasurementUnit } from '../../../types/techpack';
 import { SampleMeasurementRow } from '../../../types/measurements';
 import { parseTolerance, formatTolerance } from './measurementHelpers';
 
@@ -112,26 +113,29 @@ const getSizeKeysForRow = (
   return ordered;
 };
 
-const getToleranceDisplay = (row: SampleMeasurementRow): { label: string; minus?: number; plus?: number } => {
+const getToleranceDisplay = (row: SampleMeasurementRow): { label: string; minus?: number; plus?: number; unitSuffix?: string } => {
   if (!row.measurement) {
     return { label: '—' };
   }
 
   const minus = parseTolerance(row.measurement.minusTolerance);
   const plus = parseTolerance(row.measurement.plusTolerance);
+  const unitSuffix = getMeasurementUnitSuffix((row.measurement.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT);
 
   if (minus === plus) {
     return {
-      label: formatTolerance(minus),
+      label: formatTolerance(minus, row.measurement.unit as MeasurementUnit),
       minus,
       plus,
+      unitSuffix,
     };
   }
 
   return {
-    label: `-${minus.toFixed(1)} / +${plus.toFixed(1)} cm`,
+    label: `-${minus.toFixed(1)} ${unitSuffix} / +${plus.toFixed(1)} ${unitSuffix}`,
     minus,
     plus,
+    unitSuffix,
   };
 };
 
@@ -251,6 +255,7 @@ const getDiffToneClass = (value: string): string => {
             const rawSizeKeys = getSizeKeysForRow(row, sampleRounds, availableSizes, getEntryForRound);
             const sizeKeys = getVisibleSampleSizes(rawSizeKeys);
             const tolerance = getToleranceDisplay(row);
+            const unitSuffix = getMeasurementUnitSuffix((row.measurement?.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT);
             const measurementMethod = row.measurement?.measurementMethod;
             const isEvenRow = rowIndex % 2 === 0;
             const rowBgColor = isEvenRow ? '#ffffff' : '#f9fafb';
@@ -283,7 +288,7 @@ const getDiffToneClass = (value: string): string => {
                         className="border-r border-gray-200 px-2 py-2 align-top text-center text-sm text-gray-900"
                         style={{ backgroundColor: rowBgColor }}
                       >
-                        {requestedValue || '—'}
+                        {requestedValue ? `${requestedValue} ${unitSuffix}` : '—'}
                       </td>
                     );
                   }
@@ -450,6 +455,9 @@ const getDiffToneClass = (value: string): string => {
                     >
                       <div className="text-sm font-semibold text-gray-900">
                         {row.pomCode ? `${row.pomCode} - ${row.pomName || row.measurement?.pomName || ''}` : row.pomName || row.measurement?.pomName || 'Measurement'}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Unit: {unitSuffix}
                       </div>
                       {measurementMethod && (
                         <div className="text-xs text-gray-500 mt-1">

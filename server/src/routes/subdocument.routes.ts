@@ -35,6 +35,10 @@ const measurementValidation = [
   body('pomName').notEmpty().withMessage('POM name is required'),
   body('toleranceMinus').isFloat({ min: 0 }).withMessage('Tolerance minus must be positive'),
   body('tolerancePlus').isFloat({ min: 0 }).withMessage('Tolerance plus must be positive'),
+  body('unit')
+    .optional()
+    .isIn(['mm', 'cm', 'inch-10', 'inch-16', 'inch-32'])
+    .withMessage('Unit must be one of mm, cm, inch-10, inch-16, inch-32'),
   body('sizes').isObject().withMessage('Sizes must be an object'),
   body('sizes.XS').optional().isFloat({ min: 0 }).withMessage('XS size must be positive'),
   body('sizes.S').optional().isFloat({ min: 0 }).withMessage('S size must be positive'),

@@ -13,11 +13,13 @@ import {
 import { useFormValidation } from '../../../hooks/useFormValidation';
 import { measurementValidationSchema } from '../../../utils/validationSchemas';
 import Input from '../shared/Input';
+import Select from '../shared/Select';
 import { Plus, Upload, Download, Ruler, AlertTriangle, Info, AlertCircle, X, Save, CheckCircle, Copy } from 'lucide-react';
 import { showSuccess, showWarning, showError } from '../../../lib/toast';
 import SampleMeasurementsTable from './SampleMeasurementsTable';
 import { SampleMeasurementRow } from '../../../types/measurements';
 import { parseTolerance, formatTolerance, parseStepValue, formatStepValue, formatMeasurementValue } from './measurementHelpers';
+import { MEASUREMENT_UNITS, DEFAULT_MEASUREMENT_UNIT, MeasurementUnit, getMeasurementUnitSuffix } from '../../../types/techpack';
 import { SIZE_PRESET_OPTIONS, getPresetById } from '../../../constants/sizePresets';
 import ConfirmationDialog from '../../ConfirmationDialog';
 import { DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR, DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR } from '../../../constants/measurementDisplay';
@@ -111,6 +113,7 @@ const MeasurementTab: React.FC = () => {
     pomName: '',
     minusTolerance: 1.0, // Changed to number
     plusTolerance: 1.0, // Changed to number
+    unit: DEFAULT_MEASUREMENT_UNIT,
     sizes: {},
     baseSize: undefined,
     notes: '',
@@ -123,6 +126,10 @@ const MeasurementTab: React.FC = () => {
   const [baseSizeSelectorValue, setBaseSizeSelectorValue] = useState('');
   const [pendingBaseSize, setPendingBaseSize] = useState<string | null>(null);
   const [showBaseSizeConfirm, setShowBaseSizeConfirm] = useState(false);
+  const measurementUnitOptions = useMemo(
+    () => MEASUREMENT_UNITS.map(unit => ({ value: unit.value, label: unit.label })),
+    []
+  );
 
   const configuredSizeRange = state?.techpack?.measurementSizeRange;
   const defaultGenderSizes = useMemo(
@@ -819,9 +826,14 @@ type RoundModalFormState = {
   };
 
   // Enhanced progression validation
-  const validateProgression = useCallback((sizes: Record<string, number>, sizeOrder: string[]): ProgressionValidation => {
+  const validateProgression = useCallback((
+    sizes: Record<string, number>,
+    sizeOrder: string[],
+    unit: MeasurementUnit = DEFAULT_MEASUREMENT_UNIT
+  ): ProgressionValidation => {
     const errors: string[] = [];
     const warnings: string[] = [];
+    const unitSuffix = getMeasurementUnitSuffix(unit);
     
     // Filter sizes that have values
     const sizeEntries = sizeOrder
@@ -860,13 +872,13 @@ type RoundModalFormState = {
         warnings.push(`${sizeEntries[i - 1].size} and ${sizeEntries[i].size} have the same value`);
       } else if (percentDiff < 1) {
         // Very small increase (< 1%) - warning
-        warnings.push(`Very small progression between ${sizeEntries[i - 1].size} and ${sizeEntries[i].size} (${diff.toFixed(2)}cm)`);
+        warnings.push(`Very small progression between ${sizeEntries[i - 1].size} and ${sizeEntries[i].size} (${diff.toFixed(2)} ${unitSuffix})`);
       }
     }
 
     if (progressionIssues.length > 0) {
       const issueDetails = progressionIssues
-        .map(issue => `${issue.from} → ${issue.to}: decreased by ${issue.diff.toFixed(2)}cm`)
+        .map(issue => `${issue.from} → ${issue.to}: decreased by ${issue.diff.toFixed(2)} ${unitSuffix}`)
         .join('; ');
       
       if (progressionMode === 'strict') {
@@ -951,7 +963,11 @@ type RoundModalFormState = {
     }
 
     // Validate progression
-    const progressionValidation = validateProgression(sizes, selectedSizes);
+    const progressionValidation = validateProgression(
+      sizes,
+      selectedSizes,
+      (formData.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT
+    );
     
     if (!progressionValidation.isValid && progressionMode === 'strict') {
       // Block submission if strict mode and has errors
@@ -970,6 +986,7 @@ type RoundModalFormState = {
       pomName: formData.pomName!,
       minusTolerance: formData.minusTolerance ?? 1.0,
       plusTolerance: formData.plusTolerance ?? 1.0,
+      unit: (formData.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT,
       sizes,
       notes: formData.notes || '',
       measurementMethod: formData.measurementMethod || '',
@@ -994,6 +1011,7 @@ type RoundModalFormState = {
       pomName: '',
       minusTolerance: 1.0,
       plusTolerance: 1.0,
+      unit: DEFAULT_MEASUREMENT_UNIT,
       sizes: {},
       baseSize: selectedSizes[0],
       notes: '',
@@ -1026,6 +1044,7 @@ type RoundModalFormState = {
       ...measurement,
       minusTolerance: minusTol,
       plusTolerance: plusTol,
+      unit: (measurement.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT,
       baseSize: resolvedBaseSize,
       sizes: measurement.sizes || {},
     });
@@ -1058,6 +1077,7 @@ type RoundModalFormState = {
       pomCode: `${measurement.pomCode}_COPY`,
       pomName: `${measurement.pomName} (Copy)`,
       sizes: measurement.sizes ? { ...measurement.sizes } : {},
+      unit: (measurement.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT,
     };
     insertMeasurementAt(index, duplicate);
     showSuccess('Measurement duplicated');
@@ -1067,7 +1087,11 @@ type RoundModalFormState = {
   const validateMeasurement = (measurement: MeasurementPoint): ProgressionValidation => {
     const measurementSizes = measurement.sizes ? Object.keys(measurement.sizes) : [];
     const order = selectedSizes.length > 0 ? selectedSizes : measurementSizes;
-    return validateProgression(measurement.sizes || {}, order);
+    return validateProgression(
+      measurement.sizes || {},
+      order,
+      (measurement.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT
+    );
   };
 
   const addCommonMeasurements = () => {
@@ -1092,6 +1116,7 @@ type RoundModalFormState = {
         pomName: measurement.pomName,
         minusTolerance: 1.0,
         plusTolerance: 1.0,
+        unit: DEFAULT_MEASUREMENT_UNIT,
         sizes,
         measurementMethod: measurement.method,
         notes: '',
@@ -1291,8 +1316,19 @@ type RoundModalFormState = {
               helperText={validation.getFieldProps('pomName').helperText}
             />
 
+            <Select
+              label="Unit *"
+              value={formData.unit || DEFAULT_MEASUREMENT_UNIT}
+              onChange={handleInputChange('unit')}
+              onBlur={() => validation.setFieldTouched('unit')}
+              options={measurementUnitOptions}
+              required
+              error={validation.getFieldProps('unit').error}
+              helperText={validation.getFieldProps('unit').helperText || 'Applies to tolerances and all size values'}
+            />
+
             <Input
-              label="Minus Tolerance (cm) *"
+              label={`Minus Tolerance (${getMeasurementUnitSuffix(formData.unit as MeasurementUnit)}) *`}
               value={formData.minusTolerance ?? ''}
               onChange={(value) => handleInputChange('minusTolerance')(typeof value === 'string' ? parseFloat(value) || 0 : value)}
               onBlur={() => validation.setFieldTouched('minusTolerance')}
@@ -1303,11 +1339,14 @@ type RoundModalFormState = {
               placeholder="e.g., 1.0"
               required
               error={validation.getFieldProps('minusTolerance').error}
-              helperText={validation.getFieldProps('minusTolerance').helperText || 'Tolerance in centimeters'}
+              helperText={
+                validation.getFieldProps('minusTolerance').helperText
+                || `Tolerance in ${getMeasurementUnitSuffix(formData.unit as MeasurementUnit)}`
+              }
             />
 
             <Input
-              label="Plus Tolerance (cm) *"
+              label={`Plus Tolerance (${getMeasurementUnitSuffix(formData.unit as MeasurementUnit)}) *`}
               value={formData.plusTolerance ?? ''}
               onChange={(value) => handleInputChange('plusTolerance')(typeof value === 'string' ? parseFloat(value) || 0 : value)}
               onBlur={() => validation.setFieldTouched('plusTolerance')}
@@ -1318,7 +1357,10 @@ type RoundModalFormState = {
               placeholder="e.g., 1.0"
               required
               error={validation.getFieldProps('plusTolerance').error}
-              helperText={validation.getFieldProps('plusTolerance').helperText || 'Tolerance in centimeters'}
+              helperText={
+                validation.getFieldProps('plusTolerance').helperText
+                || `Tolerance in ${getMeasurementUnitSuffix(formData.unit as MeasurementUnit)}`
+              }
             />
 
             <div className="md:col-span-2">
@@ -1335,7 +1377,9 @@ type RoundModalFormState = {
 
           {/* Size Measurements Grid */}
           <div className="mb-6">
-            <h4 className="text-md font-medium text-gray-800 mb-3">Base Size & Jump (cm)</h4>
+            <h4 className="text-md font-medium text-gray-800 mb-3">
+              Base Size &amp; Jump ({getMeasurementUnitSuffix(formData.unit as MeasurementUnit)})
+            </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-1 block">Base Size</label>
@@ -1355,7 +1399,9 @@ type RoundModalFormState = {
                 <p className="text-xs text-gray-500 mt-2">Managed in Size Range Configuration. Base size controls the highlighted column and jump calculations.</p>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 block">Base Measurement (cm)</label>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">
+                  Base Measurement ({getMeasurementUnitSuffix(formData.unit as MeasurementUnit)})
+                </label>
                 <input
                   type="number"
                   step="0.01"
@@ -1383,7 +1429,7 @@ type RoundModalFormState = {
                       <div className="text-lg font-semibold text-blue-900">{size}</div>
                       <div className="text-sm text-blue-800 mt-1">
                         {baseValue !== undefined && !Number.isNaN(baseValue)
-                          ? `${formatMeasurementValue(baseValue)} cm`
+                          ? `${formatMeasurementValue(baseValue)} ${getMeasurementUnitSuffix(formData.unit as MeasurementUnit)}`
                           : 'Enter a base value'}
                       </div>
                     </div>
@@ -1405,7 +1451,12 @@ type RoundModalFormState = {
                       placeholder="+0.5 / +1/2 / -0.25"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Actual: <span className="font-medium text-gray-700">{displayActual !== '-' ? `${displayActual} cm` : '--'}</span>
+                      Actual:{' '}
+                      <span className="font-medium text-gray-700">
+                        {displayActual !== '-'
+                          ? `${displayActual} ${getMeasurementUnitSuffix(formData.unit as MeasurementUnit)}`
+                          : '--'}
+                      </span>
                     </p>
                   </div>
                 );
@@ -1569,9 +1620,10 @@ type RoundModalFormState = {
                   const plusTol = typeof measurement.plusTolerance === 'string'
                     ? parseTolerance(measurement.plusTolerance)
                     : (measurement.plusTolerance ?? 1.0);
+                  const unitSuffix = getMeasurementUnitSuffix((measurement.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT);
                   const toleranceDisplay = minusTol === plusTol 
-                    ? formatTolerance(minusTol)
-                    : `-${minusTol.toFixed(1)}cm / +${plusTol.toFixed(1)}cm`;
+                    ? formatTolerance(minusTol, measurement.unit as MeasurementUnit)
+                    : `-${minusTol.toFixed(1)} ${unitSuffix} / +${plusTol.toFixed(1)} ${unitSuffix}`;
                   const rowBackgroundColor = validationResult.errors.length > 0
                     ? '#fee2e2'
                     : validationResult.warnings.length > 0
@@ -1629,7 +1681,7 @@ type RoundModalFormState = {
                             } ${isBaseCell ? 'text-slate-900 font-semibold' : ''}`}
                             style={isBaseCell ? { backgroundColor: baseHighlightColor } : undefined}
                           >
-                            {value === undefined || value === null ? '-' : displayValue}
+                            {value === undefined || value === null ? '-' : `${displayValue} ${unitSuffix}`}
                           </td>
                         );
                       })}
@@ -1894,9 +1946,9 @@ type RoundModalFormState = {
           <div className="text-sm text-blue-800">
             <p className="font-medium mb-1">Measurement Guidelines:</p>
             <ul className="list-disc list-inside space-y-1 text-blue-700">
-              <li>All measurements should be in centimeters</li>
+              <li>Each measurement point stores its own unit (default is centimeters)</li>
               <li>Ensure size progression is logical (each size should be larger than or equal to the previous)</li>
-              <li>Tolerance values are in centimeters (e.g., 1.0 means ±1.0cm)</li>
+              <li>Tolerance values follow the selected unit (e.g., 1.0 means ±1.0 {getMeasurementUnitSuffix(formData.unit as MeasurementUnit)})</li>
               <li>Use consistent tolerance values across similar measurement points</li>
               <li>Zero values are preserved - use empty field to indicate "not measured"</li>
               <li>Complete all measurements in a round before creating a new round</li>
@@ -1929,7 +1981,7 @@ export const validateMeasurementsForSave = (
   const { normalized } = normalizeMeasurementBaseSizes(measurements, options?.defaultBaseSize);
   
   // Only validate fields that exist on the UI form
-  const visibleFields = ['pomCode', 'pomName', 'minusTolerance', 'plusTolerance'];
+  const visibleFields = ['pomCode', 'pomName', 'minusTolerance', 'plusTolerance', 'unit'];
   
   normalized.forEach((item) => {
     const itemErrors: Record<string, string> = {};

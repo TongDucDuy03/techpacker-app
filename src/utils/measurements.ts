@@ -1,4 +1,4 @@
-import { MeasurementPoint } from '../types/techpack';
+import { MeasurementPoint, DEFAULT_MEASUREMENT_UNIT } from '../types/techpack';
 
 export const normalizeMeasurementBaseSizes = (
   measurements: MeasurementPoint[] = [],
@@ -8,6 +8,8 @@ export const normalizeMeasurementBaseSizes = (
   const normalized = measurements.map((measurement) => {
     if (!measurement) return measurement;
 
+    const resolvedUnit = measurement.unit || DEFAULT_MEASUREMENT_UNIT;
+    const unitAdjusted = measurement.unit !== resolvedUnit;
     const trimmedBase = measurement.baseSize?.trim();
     const sizeKeys = Object.keys(measurement.sizes || {}).filter((size) => {
       const value = measurement.sizes?.[size];
@@ -17,7 +19,11 @@ export const normalizeMeasurementBaseSizes = (
     if (sizeKeys.length === 0) {
       if (trimmedBase && trimmedBase !== measurement.baseSize) {
         changed = true;
-        return { ...measurement, baseSize: trimmedBase };
+        return { ...measurement, baseSize: trimmedBase, unit: resolvedUnit };
+      }
+      if (unitAdjusted) {
+        changed = true;
+        return { ...measurement, unit: resolvedUnit };
       }
       return measurement;
     }
@@ -34,6 +40,10 @@ export const normalizeMeasurementBaseSizes = (
       sizeKeys[0];
 
     if (!resolvedBase) {
+      if (unitAdjusted) {
+        changed = true;
+        return { ...measurement, unit: resolvedUnit };
+      }
       return measurement;
     }
 
@@ -50,6 +60,7 @@ export const normalizeMeasurementBaseSizes = (
     return {
       ...measurement,
       baseSize: resolvedBase,
+      unit: resolvedUnit,
     };
   });
 

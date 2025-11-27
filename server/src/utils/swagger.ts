@@ -141,6 +141,7 @@ const options = {
             pomName: { type: 'string' },
             toleranceMinus: { type: 'number', minimum: 0 },
             tolerancePlus: { type: 'number', minimum: 0 },
+            unit: { type: 'string', enum: ['mm', 'cm', 'inch-10', 'inch-16', 'inch-32'], default: 'cm' },
             sizes: {
               type: 'object',
               properties: {

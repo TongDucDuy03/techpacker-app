@@ -1,5 +1,8 @@
 import { FormValidationConfig } from '../hooks/useFormValidation';
 import { techPackValidators } from './validation';
+import { MEASUREMENT_UNITS } from '../types/techpack';
+
+const MEASUREMENT_UNIT_VALUES = MEASUREMENT_UNITS.map(unit => unit.value);
 
 // Clean, single-definition validation schemas for TechPack UI
 
@@ -211,7 +214,7 @@ export const measurementValidationSchema: FormValidationConfig = {
     custom: (value: number) => {
       if (value !== undefined && value !== null) {
         if (value < 0) return 'Minus tolerance cannot be negative';
-        if (value > 50) return 'Minus tolerance is too large (max 50cm)';
+        if (value > 50) return 'Minus tolerance is too large (max 50 units)';
       }
       return null;
     }
@@ -223,13 +226,21 @@ export const measurementValidationSchema: FormValidationConfig = {
     custom: (value: number) => {
       if (value !== undefined && value !== null) {
         if (value < 0) return 'Plus tolerance cannot be negative';
-        if (value > 50) return 'Plus tolerance is too large (max 50cm)';
+        if (value > 50) return 'Plus tolerance is too large (max 50 units)';
       }
       return null;
     }
   },
   measurement: { required: true, min: 0, max: 1000, custom: techPackValidators.measurement },
-  unit: { required: true, custom: (v: string) => (['cm', 'mm', 'in'].includes(v) ? null : 'Please select a valid measurement unit') },
+  unit: {
+    required: true,
+    custom: (value: string) => {
+      if (!value) return 'Please select a measurement unit';
+      return MEASUREMENT_UNIT_VALUES.includes(value as typeof MEASUREMENT_UNIT_VALUES[number])
+        ? null
+        : 'Please select a valid measurement unit';
+    }
+  },
   category: { required: true },
   notes: { maxLength: 255 }
 };

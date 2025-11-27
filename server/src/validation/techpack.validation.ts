@@ -27,11 +27,14 @@ export const materialSpecSchema = z.object({
 });
 
 // Measurement specification schema
+const measurementUnitEnum = z.enum(['mm', 'cm', 'inch-10', 'inch-16', 'inch-32']);
+
 const measurementSpecSchema = z.object({
   pomCode: z.string().min(1, 'POM code is required'),
   pomName: z.string().min(1, 'POM name is required'),
-  toleranceMinus: z.number(),
-  tolerancePlus: z.number(),
+  toleranceMinus: z.number().min(0, 'Minus tolerance must be positive'),
+  tolerancePlus: z.number().min(0, 'Plus tolerance must be positive'),
+  unit: measurementUnitEnum.default('cm'),
   sizes: z.object({
     XS: z.number().optional(),
     S: z.number().optional(),

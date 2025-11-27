@@ -21,18 +21,23 @@ const Input: React.FC<InputProps> = ({
   datalistOptions,
   listId,
 }) => {
+  const isNumeric = type === 'number';
+  const resolvedType = isNumeric ? 'text' : type;
+  const resolvedInputMode = inputMode ?? (isNumeric ? 'decimal' : undefined);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (type === 'number') {
+    if (isNumeric) {
       const raw = e.target.value;
-      const transitionalStates = ['', '-', '.', '-.', raw.endsWith('.') ? raw : null].filter(
+      const normalized = raw.replace(/,/g, '.');
+      const transitionalStates = ['', '-', '.', '-.', normalized.endsWith('.') ? normalized : null].filter(
         (state): state is string => state !== null && state !== undefined
       );
-      if (transitionalStates.includes(raw)) {
-        onChange(raw);
+      if (transitionalStates.includes(normalized)) {
+        onChange(normalized);
         return;
       }
 
-      const parsed = Number(raw);
+      const parsed = Number(normalized);
       if (Number.isNaN(parsed)) {
         onChange('');
       } else {
@@ -65,7 +70,7 @@ const Input: React.FC<InputProps> = ({
       
       <input
         id={inputId}
-        type={type}
+        type={resolvedType}
         value={value}
         onChange={handleChange}
         onBlur={onBlur}
@@ -76,7 +81,7 @@ const Input: React.FC<InputProps> = ({
         min={min}
         max={max}
         step={step}
-        inputMode={inputMode}
+        inputMode={resolvedInputMode}
         list={resolvedListId}
         className={`
           px-3 py-2 border rounded-md shadow-sm text-sm

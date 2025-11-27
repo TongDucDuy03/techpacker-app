@@ -71,6 +71,7 @@ export interface Measurement {
   pomName: string;
   toleranceMinus: number;
   tolerancePlus: number;
+  unit?: MeasurementUnit;
   sizes: {
     XS?: number;
     S?: number;
@@ -303,7 +304,7 @@ export class PDFGenerationError extends Error {
 
 // Utility types
 export type SizeKey = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL' | 'XXXL';
-export type MeasurementUnit = 'cm' | 'inch' | 'mm';
+export type MeasurementUnit = 'mm' | 'cm' | 'inch-10' | 'inch-16' | 'inch-32';
 export type MaterialUOM = 'pcs' | 'yards' | 'meters' | 'kg' | 'lbs' | 'sets';
 export type LifecycleStage = 'Concept' | 'Development' | 'Sampling' | 'Production' | 'Discontinued';
 export type ApprovalStatus = 'Pending' | 'Approved' | 'Rejected' | 'Revision Required';

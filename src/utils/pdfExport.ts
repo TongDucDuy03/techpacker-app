@@ -1,4 +1,4 @@
-import { TechPack } from '../types/techpack';
+import { TechPack, MeasurementUnit, getMeasurementUnitSuffix, DEFAULT_MEASUREMENT_UNIT } from '../types/techpack';
 import { formatMeasurementValue, formatTolerance } from '../components/TechPackForm/tabs/measurementHelpers';
 import { DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR, DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR } from '../constants/measurementDisplay';
 
@@ -101,9 +101,10 @@ export class TechPackPDFExporter {
       const plus = typeof measurement.plusTolerance === 'number'
         ? measurement.plusTolerance
         : parseFloat(String(measurement.plusTolerance)) || 0;
+      const unitSuffix = getMeasurementUnitSuffix((measurement.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT);
       const toleranceDisplay = Math.abs(minus - plus) < 1e-3
-        ? formatTolerance(minus)
-        : `-${minus.toFixed(1)}cm / +${plus.toFixed(1)}cm`;
+        ? formatTolerance(minus, measurement.unit as MeasurementUnit)
+        : `-${minus.toFixed(1)} ${unitSuffix} / +${plus.toFixed(1)} ${unitSuffix}`;
 
       return [
         measurement.pomCode,
@@ -111,7 +112,7 @@ export class TechPackPDFExporter {
         toleranceDisplay,
         ...sizeOrder.map(size => {
           const value = measurement.sizes[size];
-          return value === undefined || value === null ? '-' : formatMeasurementValue(value);
+          return value === undefined || value === null ? '-' : `${formatMeasurementValue(value)} ${unitSuffix}`;
         }),
         measurement.notes || '',
       ];

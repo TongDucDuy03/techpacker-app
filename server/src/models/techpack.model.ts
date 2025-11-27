@@ -39,12 +39,15 @@ export interface IBOMItem {
   comments?: string;
 }
 
+export type MeasurementUnit = 'mm' | 'cm' | 'inch-10' | 'inch-16' | 'inch-32';
+
 export interface IMeasurement {
   _id?: Types.ObjectId;
   pomCode: string;
   pomName: string;
   toleranceMinus: number;
   tolerancePlus: number;
+  unit?: MeasurementUnit;
   sizes: {
     XS?: number;
     S?: number;
@@ -244,6 +247,7 @@ const MeasurementSchema = new Schema<IMeasurement>({
   pomName: { type: String, required: true },
   toleranceMinus: { type: Number, required: true },
   tolerancePlus: { type: Number, required: true },
+  unit: { type: String, enum: ['mm', 'cm', 'inch-10', 'inch-16', 'inch-32'], default: 'cm' },
   sizes: {
     XS: { type: Number },
     S: { type: Number },

@@ -63,12 +63,39 @@ export interface BomItem {
   totalPrice?: number; // Thành tiền = quantity * unitPrice (chỉ Admin hoặc role > viewer mới thấy)
 }
 
+export const MEASUREMENT_UNITS = [
+  { value: 'mm', label: 'Millimeters (mm)', shortLabel: 'mm' },
+  { value: 'cm', label: 'Centimeters (cm)', shortLabel: 'cm' },
+  { value: 'inch-10', label: 'Inches (1/10\")', shortLabel: 'inch-10' },
+  { value: 'inch-16', label: 'Inches (1/16\")', shortLabel: 'inch-16' },
+  { value: 'inch-32', label: 'Inches (1/32\")', shortLabel: 'inch-32' }
+] as const;
+
+export type MeasurementUnit = typeof MEASUREMENT_UNITS[number]['value'];
+export type MeasurementUnitMeta = typeof MEASUREMENT_UNITS[number];
+export const DEFAULT_MEASUREMENT_UNIT: MeasurementUnit = 'cm';
+
+const MEASUREMENT_UNIT_MAP: Record<MeasurementUnit, MeasurementUnitMeta> = MEASUREMENT_UNITS.reduce(
+  (map, unit) => {
+    map[unit.value] = unit;
+    return map;
+  },
+  {} as Record<MeasurementUnit, MeasurementUnitMeta>
+);
+
+export const getMeasurementUnitMeta = (unit?: MeasurementUnit | null): MeasurementUnitMeta =>
+  (unit && MEASUREMENT_UNIT_MAP[unit]) || MEASUREMENT_UNIT_MAP[DEFAULT_MEASUREMENT_UNIT];
+
+export const getMeasurementUnitSuffix = (unit?: MeasurementUnit | null): string =>
+  getMeasurementUnitMeta(unit).shortLabel;
+
 export interface MeasurementPoint {
   id: string;
   pomCode: string;
   pomName: string;
   minusTolerance: number; // Changed from string to number (in cm)
   plusTolerance: number; // Changed from string to number (in cm)
+  unit?: MeasurementUnit;
   sizes: Record<string, number>; // XS, S, M, L, XL, XXL, etc.
   baseSize?: string;
   notes?: string;

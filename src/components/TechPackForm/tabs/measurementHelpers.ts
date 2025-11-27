@@ -1,3 +1,5 @@
+import { DEFAULT_MEASUREMENT_UNIT, MeasurementUnit, getMeasurementUnitSuffix } from '../../../types/techpack';
+
 export const parseTolerance = (value: string | number | undefined): number => {
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : 1.0;
@@ -11,9 +13,10 @@ export const parseTolerance = (value: string | number | undefined): number => {
   return 1.0;
 };
 
-export const formatTolerance = (value: number): string => {
-  const normalized = Number.isFinite(value) ? value : 0;
-  return `±${normalized.toFixed(1)}cm`;
+export const formatTolerance = (value: number, unit?: MeasurementUnit): string => {
+  const normalized = Number.isFinite(value) ? Math.abs(value) : 0;
+  const suffix = getMeasurementUnitSuffix(unit || DEFAULT_MEASUREMENT_UNIT);
+  return `±${normalized.toFixed(1)} ${suffix}`;
 };
 
 const FRACTION_DENOMS = [2, 4, 8] as const;

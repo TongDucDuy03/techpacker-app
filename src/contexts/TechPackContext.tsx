@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from './AuthContext';
-import { ApiTechPack, CreateTechPackInput, TechPackListResponse, TechPackFormState, MeasurementPoint, HowToMeasure, BomItem, Colorway, ColorwayPart, MeasurementSampleRound, MeasurementSampleEntry, MeasurementSampleValueMap, MeasurementRequestedSource, SIZE_RANGES } from '../types/techpack';
+import { ApiTechPack, CreateTechPackInput, TechPackListResponse, TechPackFormState, MeasurementPoint, HowToMeasure, BomItem, Colorway, ColorwayPart, MeasurementSampleRound, MeasurementSampleEntry, MeasurementSampleValueMap, MeasurementRequestedSource, SIZE_RANGES, DEFAULT_MEASUREMENT_UNIT, MeasurementUnit } from '../types/techpack';
 import { normalizeMeasurementBaseSizes } from '../utils/measurements';
 import { api } from '../lib/api';
 import { showPromise, showError } from '../lib/toast';
@@ -706,9 +706,11 @@ const buildMeasurementPayloads = (techpackData: TechPackFormState['techpack']) =
 
     const resolvedMinus = toleranceMinus ?? minusTolerance ?? 0;
     const resolvedPlus = tolerancePlus ?? plusTolerance ?? 0;
+    const resolvedUnit = (measurement?.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT;
 
     return {
       ...rest,
+      unit: resolvedUnit,
       toleranceMinus: resolvedMinus,
       tolerancePlus: resolvedPlus,
     };

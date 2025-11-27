@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, memo, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useTechPack } from '../../../contexts/TechPackContext';
-import { BomItem, Colorway, ColorwayPart, UNITS_OF_MEASURE, COMMON_MATERIALS, COMMON_PLACEMENTS, TechPackRole } from '../../../types/techpack';
+import { BomItem, Colorway, ColorwayPart, UNITS_OF_MEASURE, COMMON_MATERIALS, TechPackRole } from '../../../types/techpack';
 import { useFormValidation } from '../../../hooks/useFormValidation';
 import { bomItemValidationSchema } from '../../../utils/validationSchemas';
 import { useDebounce } from '../../../hooks/useDebounce';
@@ -1423,12 +1423,12 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               data-error={validation.getFieldProps('materialName').error ? 'true' : 'false'}
             />
 
-            <Select
+            <Input
               label="Placement"
               value={formData.placement || ''}
               onChange={handleInputChange('placement')}
               onBlur={() => validation.setFieldTouched('placement')}
-              options={COMMON_PLACEMENTS}
+              placeholder="e.g., Body, Sleeve, Collar"
               error={validation.getFieldProps('placement').error}
               helperText={validation.getFieldProps('placement').helperText}
             />
