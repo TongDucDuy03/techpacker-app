@@ -66,9 +66,9 @@ export interface BomItem {
 export const MEASUREMENT_UNITS = [
   { value: 'mm', label: 'Millimeters (mm)', shortLabel: 'mm' },
   { value: 'cm', label: 'Centimeters (cm)', shortLabel: 'cm' },
-  { value: 'inch-10', label: 'Inches (1/10\")', shortLabel: 'inch-10' },
-  { value: 'inch-16', label: 'Inches (1/16\")', shortLabel: 'inch-16' },
-  { value: 'inch-32', label: 'Inches (1/32\")', shortLabel: 'inch-32' }
+  { value: 'inch-10', label: 'Inch 10', shortLabel: 'inch-10' },
+  { value: 'inch-16', label: 'Inch 16', shortLabel: 'inch-16' },
+  { value: 'inch-32', label: 'Inch 32', shortLabel: 'inch-32' }
 ] as const;
 
 export type MeasurementUnit = typeof MEASUREMENT_UNITS[number]['value'];

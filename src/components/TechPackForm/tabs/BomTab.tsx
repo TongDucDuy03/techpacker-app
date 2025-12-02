@@ -59,7 +59,7 @@ const getCSVHeaders = (includePrice: boolean = false): string[] => {
     'MaterialCode',
     'MaterialName',
     'Placement',
-    'Size',
+    'Size/Width/Usage',
     'Quantity',
     'UOM',
     'Supplier',
@@ -1083,7 +1083,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     },
     {
       key: 'size' as keyof BomItem,
-      header: 'Size',
+      header: 'Size/Width/Usage',
       width: '8%',
     },
     {
@@ -1434,7 +1434,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             />
 
             <Input
-              label="Size"
+              label="Size/Width/Usage"
               value={formData.size || ''}
               onChange={handleInputChange('size')}
               onBlur={() => validation.setFieldTouched('size')}
@@ -2139,7 +2139,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                     <option value="materialName">Material Name</option>
                     <option value="supplierCode">Supplier Code</option>
                     <option value="placement">Placement</option>
-                    <option value="size">Size</option>
+                    <option value="size">Size/Width/Usage</option>
                     <option value="quantity">Quantity</option>
                     <option value="uom">Unit of Measure</option>
                     <option value="supplier">Supplier</option>
