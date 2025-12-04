@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TechPack - <%= meta.productName %> - <%= meta.articleCode %></title>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 0;
+    }
+
+    @page :first {
+      margin-top: 0;
+    }
+
+    html, body {
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 11px;
+      line-height: 1.3;
+      color: #1f2933;
+      background: white;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    * {
+      font-size: 11px;
+      line-height: 1.3;
+      -webkit-hyphens: none;
+      -moz-hyphens: none;
+      hyphens: none;
+    }
+
+    h1, h2, h3, h4, h5 {
+      font-weight: 600;
+      color: #111827;
+      margin: 0;
+    }
+
+    .page {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-height: 210mm;
+      margin: 0;
+      padding: 0 8mm;
+      background: white;
+      position: relative;
+      page-break-after: always;
+      box-sizing: border-box;
+    }
+
+    .page:last-child {
+      page-break-after: auto;
+    }
+
+    .page.landscape {
+      width: 100%;
+      max-width: 100%;
+      min-height: 210mm;
+    }
+
+    .section-title {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      border-bottom: 2px solid #111827;
+      padding-bottom: 8px;
+      margin: 20px 0 15px 0;
+      page-break-after: avoid;
+      color: #0f172a;
+    }
+
+    .section-subtitle {
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      margin: 15px 0 10px 0;
+    }
+
+    table {
+      width: 100% !important;
+      max-width: 100% !important;
+      border-collapse: collapse;
+      margin-bottom: 15px;
+      background: #ffffff;
+      font-size: 11px;
+      line-height: 1.3;
+      table-layout: fixed;
+      page-break-inside: auto;
+    }
+
+    thead {
+      display: table-header-group;
+    }
+
+    tbody {
+      display: table-row-group;
+    }
+
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 4px 6px;
+      vertical-align: top;
+      text-align: left;
+      word-wrap: break-word;
+      hyphens: none;
+      overflow: hidden;
+    }
+
+    th {
+      background: #f1f5f9;
+      text-transform: uppercase;
+      font-size: 8px;
+      letter-spacing: 0.4px;
+      color: #0f172a;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    td {
+      word-break: break-word;
+      white-space: normal;
+    }
+
+    tr:nth-child(even) td {
+      background: #f9fafb;
+    }
+
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+    .text-left { text-align: left; }
+    .text-muted { color: #6b7280; }
+    .avoid-break { page-break-inside: avoid; break-inside: avoid; }
+    .page-break { page-break-before: always; }
+    .keep-together { page-break-inside: avoid; }
+
+    /* Cover Page Styles */
+    .cover-page {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 100%;
+    }
+
+    .cover-logo {
+      max-width: 200px;
+      max-height: 100px;
+      margin-bottom: 30px;
+      object-fit: contain;
+    }
+
+    .cover-title {
+      font-size: 32px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+      color: #0f172a;
+    }
+
+    .cover-article-code {
+      font-size: 18px;
+      color: #475569;
+      margin-bottom: 30px;
+    }
+
+    .cover-image {
+      max-width: 80%;
+      max-height: 400px;
+      object-fit: contain;
+      margin: 30px 0;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+    }
+
+    .cover-description {
+      font-size: 11px;
+      color: #64748b;
+      line-height: 1.6;
+      max-width: 80%;
+      margin-top: 20px;
+    }
+
+    /* Article Summary Styles */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    .summary-card {
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 12px;
+      background: #f8fafc;
+    }
+
+    .summary-card h4 {
+      font-size: 10px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      color: #0f172a;
+    }
+
+    .summary-card p {
+      margin-bottom: 4px;
+      font-size: 9px;
+    }
+
+    .info-table {
+      width: 100%;
+      margin-bottom: 15px;
+    }
+
+    .info-table th {
+      width: 30%;
+      background: #f8fafc;
+    }
+
+    /* Article Summary Tables */
+    .article-summary {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 12px;
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.35;
+    }
+
+    .article-summary td {
+      padding: 8px 12px;
+      border: 1px solid #E1E7EE;
+      font-size: 11px;
+      vertical-align: top;
+    }
+
+    .article-summary td.label {
+      width: 40%;
+      background: #f8fafc;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .article-summary td.value {
+      width: 60%;
+      background: #ffffff;
+      color: #1f2933;
+    }
+
+    .section-heading {
+      background: #F7F9FB;
+      font-weight: 600;
+      padding: 8px 12px;
+      margin-top: 18px;
+      margin-bottom: 0;
+      border-top: 2px solid #2C3E50;
+      font-size: 12px;
+      color: #0f172a;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .article-image-img {
+      max-width: 260px;
+      width: 100%;
+      height: auto;
+      display: block;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+    }
+
+    .article-image-placeholder {
+      width: 260px;
+      height: auto;
+    }
+
+    /* BOM Part Grouping */
+    .bom-part {
+      margin-bottom: 25px;
+      page-break-inside: avoid;
+    }
+
+    .bom-part-header {
+      background: #f7f9fb;
+      font-weight: 600;
+      padding: 10px 12px;
+      border: 1px solid #e1e7ee;
+      border-bottom: 2px solid #cbd5e1;
+      font-size: 12px;
+      color: #0f172a;
+      margin-bottom: 0;
+    }
+
+    /* BOM Table Styles */
+    .bom-table {
+      font-size: 11px;
+      line-height: 1.3;
+      table-layout: fixed;
+      width: 100% !important;
+      border-collapse: collapse;
+      margin-bottom: 0;
+    }
+
+    .bom-table th,
+    .bom-table td {
+      padding: 8px 10px;
+      border: 1px solid #dfe7ee;
+      vertical-align: middle;
+      font-size: 11px;
+      font-family: Arial, Helvetica, sans-serif;
+      writing-mode: horizontal-tb !important;
+      word-break: normal !important;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      hyphens: none;
+      -webkit-hyphens: none;
+      -moz-hyphens: none;
+    }
+
+    .bom-table th {
+      background: #f1f5f9;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 9px;
+      color: #0f172a;
+    }
+
+    /* Material Name column - allow word wrap */
+    .bom-table td.col-name {
+      white-space: normal !important;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      width: 240px;
+    }
+
+    /* Image column */
+    .bom-table td.col-image {
+      text-align: center;
+      width: 80px;
+    }
+
+    .bom-table td.col-image img {
+      max-width: 64px;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+      object-fit: contain;
+    }
+
+    /* Colorways chips */
+    .color-chip {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px dashed #d0d7df;
+      margin-right: 6px;
+      margin-bottom: 4px;
+      font-size: 9px;
+      background: #f8fafc;
+      color: #475569;
+    }
+
+    /* Fixed column widths for BOM table - Optimized for landscape A4 */
+    .bom-table th:nth-child(1),
+    .bom-table td:nth-child(1) { width: 3%; } /* # */
+    .bom-table th:nth-child(2),
+    .bom-table td:nth-child(2) { width: 5%; } /* Part */
+    .bom-table th:nth-child(3),
+    .bom-table td:nth-child(3) { width: 7%; } /* Material Name */
+    .bom-table th:nth-child(4),
+    .bom-table td:nth-child(4) { width: 6%; } /* Material Code */
+    .bom-table th:nth-child(5),
+    .bom-table td:nth-child(5) { width: 5%; } /* Placement */
+    .bom-table th:nth-child(6),
+    .bom-table td:nth-child(6) { width: 3.5%; } /* Size */
+    .bom-table th:nth-child(7),
+    .bom-table td:nth-child(7) { width: 3.5%; } /* Quantity */
+    .bom-table th:nth-child(8),
+    .bom-table td:nth-child(8) { width: 3%; } /* UOM */
+    .bom-table th:nth-child(9),
+    .bom-table td:nth-child(9) { width: 4.5%; } /* Color */
+    .bom-table th:nth-child(10),
+    .bom-table td:nth-child(10) { width: 4.5%; } /* Color Code */
+    .bom-table th:nth-child(11),
+    .bom-table td:nth-child(11) { width: 4.5%; } /* Pantone */
+    .bom-table th:nth-child(12),
+    .bom-table td:nth-child(12) { width: 5.5%; } /* Supplier */
+    .bom-table th:nth-child(13),
+    .bom-table td:nth-child(13) { width: 4.5%; } /* Supplier Code */
+    .bom-table th:nth-child(14),
+    .bom-table td:nth-child(14) { width: 7%; } /* Composition */
+    .bom-table th:nth-child(15),
+    .bom-table td:nth-child(15) { width: 3.5%; } /* Width */
+    .bom-table th:nth-child(16),
+    .bom-table td:nth-child(16) { width: 3.5%; } /* Weight */
+    .bom-table th:nth-child(17),
+    .bom-table td:nth-child(17) { width: 3.5%; } /* Shrinkage */
+    .bom-table th:nth-child(18),
+    .bom-table td:nth-child(18) { width: 3%; } /* Image */
+    .bom-table th:nth-child(19),
+    .bom-table td:nth-child(19) { width: 5.5%; } /* Testing */
+    .bom-table th:nth-child(20),
+    .bom-table td:nth-child(20) { width: 5.5%; } /* Care */
+    .bom-table th:nth-child(21),
+    .bom-table td:nth-child(21) { width: 4%; } /* Unit Price */
+    .bom-table th:nth-child(22),
+    .bom-table td:nth-child(22) { width: 4%; } /* Total Price */
+    .bom-table th:nth-child(23),
+    .bom-table td:nth-child(23) { width: 3.5%; } /* Lead Time */
+    .bom-table th:nth-child(24),
+    .bom-table td:nth-child(24) { width: 3.5%; } /* MOQ */
+    .bom-table th:nth-child(25),
+    .bom-table td:nth-child(25) { width: 3%; } /* Approved */
+    .bom-table th:nth-child(26),
+    .bom-table td:nth-child(26) { width: 4.5%; } /* Approved By */
+    .bom-table th:nth-child(27),
+    .bom-table td:nth-child(27) { width: 7%; } /* Comments */
+
+    /* Code-type fields: no wrap */
+    .bom-table td.material-code,
+    .bom-table td.supplier-code,
+    .bom-table td.color-code,
+    .bom-table td.pantone-code {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Allow wrapping for long text fields */
+    .bom-table td.material-name,
+    .bom-table td.composition,
+    .bom-table td.comments,
+    .bom-table td.notes {
+      white-space: normal !important;
+      word-break: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .bom-image {
+      width: 50px;
+      height: auto;
+      max-height: 50px;
+      object-fit: contain;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      display: block;
+      margin: 0 auto;
+    }
+
+    /* Measurement Table Styles */
+    .measurement-table {
+      font-size: 11px;
+      line-height: 1.3;
+      table-layout: fixed;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+
+    .measurement-table th,
+    .measurement-table td {
+      padding: 4px 6px;
+      word-wrap: break-word;
+      word-break: break-word;
+      white-space: normal;
+      hyphens: none;
+    }
+
+    .measurement-table th {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .measurement-table th.size-col,
+    .measurement-table td.size-col {
+      text-align: center;
+      font-weight: 600;
+      width: 4%;
+    }
+
+    .measurement-table td.tol-minus {
+      color: #b91c1c;
+      text-align: center;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .measurement-table td.tol-plus {
+      color: #15803d;
+      text-align: center;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .measurement-table td.critical {
+      background: #fee2e2 !important;
+    }
+
+    .measurement-table td.base-size {
+      background: #dbeafe !important;
+      font-weight: 700;
+    }
+
+    /* Sample Measurement Rounds */
+    .round-info {
+      margin-bottom: 15px;
+    }
+
+    .round-info .info-table {
+      font-size: 10px;
+    }
+
+    .sample-round-table {
+      font-size: 11px;
+      line-height: 1.3;
+      table-layout: fixed;
+      width: 100% !important;
+      max-width: 100% !important;
+      border-collapse: collapse;
+    }
+
+    .sample-round-table th,
+    .sample-round-table td {
+      padding: 6px 8px;
+      border: 1px solid #CDD5DF;
+      vertical-align: top;
+      writing-mode: horizontal-tb !important;
+      hyphens: none;
+      -webkit-hyphens: none;
+      -moz-hyphens: none;
+    }
+
+    .sample-round-table th {
+      background: #f1f5f9;
+      text-transform: uppercase;
+      font-size: 9px;
+      font-weight: 600;
+      color: #0f172a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      word-break: keep-all;
+    }
+
+    .sample-round-table td {
+      word-break: keep-all;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Allow wrapping only for POM Name column */
+    .sample-round-table td.pom-name {
+      white-space: normal !important;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      width: 15%;
+    }
+
+    /* Allow wrapping for Comments column */
+    .sample-round-table td.comments {
+      white-space: normal !important;
+      word-break: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .sample-round-table td.pom-code {
+      white-space: nowrap;
+      font-weight: 600;
+    }
+
+    .sample-round-table td.tol-minus {
+      color: #b91c1c;
+      font-weight: 600;
+    }
+
+    .sample-round-table td.tol-plus {
+      color: #15803d;
+      font-weight: 600;
+    }
+
+    /* How To Measure Styles */
+    .howto-item {
+      display: flex;
+      gap: 15px;
+      padding: 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: #f8fafc;
+      margin-bottom: 15px;
+      page-break-inside: avoid;
+    }
+
+    .howto-image {
+      flex: 0 0 200px;
+      max-width: 200px;
+    }
+
+    .howto-image img {
+      width: 100%;
+      max-height: 200px;
+      object-fit: contain;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      background: white;
+    }
+
+    .howto-content {
+      flex: 1;
+    }
+
+    .howto-content h3 {
+      font-size: 11px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      color: #0f172a;
+    }
+
+    .howto-content p {
+      font-size: 9px;
+      line-height: 1.5;
+      margin-bottom: 6px;
+    }
+
+    .howto-content ul,
+    .howto-content ol {
+      margin-left: 18px;
+      margin-top: 6px;
+      font-size: 9px;
+    }
+
+    .howto-content li {
+      margin-bottom: 4px;
+      line-height: 1.4;
+    }
+
+    /* Colorway Styles */
+    .colorway-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .colorway-item {
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 12px;
+      background: white;
+      page-break-inside: avoid;
+    }
+
+    .colorway-swatch {
+      width: 60px;
+      height: 60px;
+      border: 2px solid #9ca3af;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    .colorway-info {
+      font-size: 9px;
+      line-height: 1.4;
+    }
+
+    .colorway-info p {
+      margin-bottom: 3px;
+    }
+
+    .colorway-info strong {
+      color: #0f172a;
+      font-weight: 600;
+    }
+
+    .colorway-parts {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .colorway-part-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 8px;
+    }
+
+    .colorway-part-swatch {
+      width: 20px;
+      height: 20px;
+      border: 1px solid #9ca3af;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    /* Packing Instructions */
+    .packing-notes {
+      background: #f8fafc;
+      border: 1px solid #e1e7ee;
+      border-radius: 6px;
+      padding: 20px;
+      margin-top: 15px;
+      font-size: 11px;
+      line-height: 1.6;
+      color: #1f2933;
+    }
+
+    .packing-notes ul {
+      margin: 10px 0;
+      padding-left: 25px;
+    }
+
+    .packing-notes li {
+      margin-bottom: 8px;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .packing-notes p {
+      margin: 10px 0;
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+    /* Revision History */
+    .revision-table {
+      font-size: 11px;
+      line-height: 1.3;
+      table-layout: fixed;
+      width: 100%;
+    }
+
+    .revision-table th,
+    .revision-table td {
+      padding: 4px 6px;
+      word-wrap: break-word;
+      word-break: normal;
+      white-space: normal;
+      hyphens: none;
+    }
+
+    .revision-table th {
+      white-space: nowrap;
+    }
+
+    /* Status Badges */
+    .status-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 7px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .status-approved {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .status-pending {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .status-critical {
+      background: #fee2e2;
+      color: #dc2626;
+    }
+
+    @media print {
+      .page {
+        page-break-after: always;
+      }
+
+      .avoid-break,
+      .keep-together {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      table {
+        page-break-inside: auto;
+      }
+
+      thead {
+        display: table-header-group;
+      }
+
+      tbody {
+        display: table-row-group;
+      }
+
+      tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+      }
+
+      /* Repeat header on each page */
+      .bom-table thead {
+        display: table-header-group;
+      }
+
+      .measurement-table thead {
+        display: table-header-group;
+      }
+
+      /* Prevent breaking inside cells */
+      td, th {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- I. Cover Page -->
+  <div class="page cover-page">
+    <% if (images && images.companyLogo) { %>
+      <img src="<%= images.companyLogo %>" alt="Company Logo" class="cover-logo" onerror="this.style.display='none';" />
+    <% } %>
+    <h1 class="cover-title"><%= meta.productName %></h1>
+    <div class="cover-article-code">
+      <strong>Article Code:</strong> <%= meta.articleCode %> | <strong>Version:</strong> <%= meta.version %>
+    </div>
+    <% if (images && images.coverImage) { %>
+      <img src="<%= images.coverImage %>" alt="Product Design" class="cover-image" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';" />
+    <% } else { %>
+      <div class="cover-image-placeholder">
+        <svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+          <rect width="400" height="300" fill="#f3f4f6"/>
+          <text x="50%" y="50%" font-family="Arial" font-size="14" fill="#9ca3af" text-anchor="middle" dy=".3em">No Image</text>
+        </svg>
+      </div>
+    <% } %>
+    <div class="cover-description">
+      <p><strong>Season:</strong> <%= meta.season %> | <strong>Brand:</strong> <%= meta.brand %> | <strong>Collection:</strong> <%= meta.collectionName %></p>
+      <p><strong>Supplier:</strong> <%= meta.supplier %> | <strong>Category:</strong> <%= meta.category %> | <strong>Gender:</strong> <%= meta.gender %></p>
+      <p><strong>Fit Type:</strong> <%= meta.fitType %> | <strong>Lifecycle:</strong> <%= meta.lifecycleStage %></p>
+      <p style="margin-top: 15px;"><%= meta.productDescription %></p>
+      <p style="margin-top: 10px; font-size: 10px; color: #64748b;">
+        Created: <%= articleSummary.tracking.createdDate %> | Updated: <%= articleSummary.tracking.updatedAt %><br/>
+        Created By: <%= articleSummary.tracking.createdBy %>
+      </p>
+    </div>
+  </div>
+
+  <!-- II. Article Summary -->
+  <div class="page">
+    <h2 class="section-title" style="font-size: 18px; font-weight: 700; margin-bottom: 20px; padding-top: 15px; border-top: 2px solid #2C3E50;">Article Summary</h2>
+    
+    <div class="article-header" style="display: flex; gap: 25px; align-items: flex-start;">
+      <div class="article-info" style="flex: 1;">
+        <!-- General Info -->
+        <div class="section-heading">General Info</div>
+        <table class="article-summary">
+          <tr><td class="label">Article Code</td><td class="value"><%= articleSummary.generalInfo.articleCode %></td></tr>
+          <tr><td class="label">Product Name</td><td class="value"><%= articleSummary.generalInfo.productName %></td></tr>
+          <tr><td class="label">Version</td><td class="value"><%= articleSummary.generalInfo.version %></td></tr>
+          <tr><td class="label">Status</td><td class="value"><%= articleSummary.generalInfo.status %></td></tr>
+          <tr><td class="label">Lifecycle Stage</td><td class="value"><%= articleSummary.generalInfo.lifecycleStage %></td></tr>
+          <tr><td class="label">Brand</td><td class="value"><%= articleSummary.generalInfo.brand %></td></tr>
+          <tr><td class="label">Season</td><td class="value"><%= articleSummary.generalInfo.season %></td></tr>
+          <tr><td class="label">Collection</td><td class="value"><%= articleSummary.generalInfo.collection %></td></tr>
+          <tr><td class="label">Target Market</td><td class="value"><%= articleSummary.generalInfo.targetMarket %></td></tr>
+          <tr><td class="label">Price Point</td><td class="value"><%= articleSummary.generalInfo.pricePoint %></td></tr>
+          <tr><td class="label">Retail Price</td><td class="value"><%= articleSummary.generalInfo.retailPrice %></td></tr>
+        </table>
+
+        <!-- Technical Info -->
+        <div class="section-heading">Technical Info</div>
+        <table class="article-summary">
+          <tr><td class="label">Fit Type</td><td class="value"><%= articleSummary.technicalInfo.fitType %></td></tr>
+          <tr><td class="label">Product Class / Category</td><td class="value"><%= articleSummary.technicalInfo.productClass %></td></tr>
+          <tr><td class="label">Supplier</td><td class="value"><%= articleSummary.technicalInfo.supplier %></td></tr>
+          <tr><td class="label">Technical Designer</td><td class="value"><%= articleSummary.technicalInfo.technicalDesignerId %></td></tr>
+          <tr><td class="label">Customer ID</td><td class="value"><%= articleSummary.technicalInfo.customerId %></td></tr>
+          <tr><td class="label">Owner</td><td class="value"><%= articleSummary.technicalInfo.ownerId %></td></tr>
+        </table>
+
+        <!-- Fabric & Composition -->
+        <div class="section-heading">Fabric & Composition</div>
+        <table class="article-summary">
+          <tr><td class="label">Fabric Description</td><td class="value"><%= articleSummary.fabricAndComposition.fabricDescription %></td></tr>
+          <tr><td class="label">Material Info</td><td class="value"><%= articleSummary.fabricAndComposition.materialInfo %></td></tr>
+        </table>
+
+        <!-- Tracking -->
+        <div class="section-heading">Tracking</div>
+        <table class="article-summary">
+          <tr><td class="label">Created Date</td><td class="value"><%= articleSummary.tracking.createdDate %></td></tr>
+          <tr><td class="label">Updated At</td><td class="value"><%= articleSummary.tracking.updatedAt %></td></tr>
+          <tr><td class="label">Created By</td><td class="value"><%= articleSummary.tracking.createdBy %></td></tr>
+          <tr><td class="label">Updated By</td><td class="value"><%= articleSummary.tracking.updatedBy %></td></tr>
+        </table>
+      </div>
+      
+      <div class="article-image" style="flex: 0 0 280px; position: sticky; top: 0;">
+        <% if (images && images.coverImage && images.coverImage !== 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=') { %>
+          <img src="<%= images.coverImage %>" alt="Article Image" class="article-image-img" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';" />
+        <% } else { %>
+          <div class="article-image-placeholder">
+            <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=" alt="No Image" class="article-image-img" />
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- III. Bill of Materials (BOM) -->
+  <% if (bom && bom.parts && bom.parts.length > 0) { %>
+    <div class="page">
+      <h2 class="section-title">Bill of Materials (BOM)</h2>
+      
+      <% bom.parts.forEach((part) => { %>
+        <div class="bom-part">
+          <div class="bom-part-header">PART: <%= part.partName %></div>
+          
+          <table class="bom-table">
+            <thead>
+              <tr>
+                <th style="width: 20%;">Material Name</th>
+                <th style="width: 8%;">Image</th>
+                <th style="width: 10%;">Placement</th>
+                <th style="width: 12%;">Size/Width/Usage</th>
+                <th style="width: 6%;">Qty</th>
+                <th style="width: 6%;">UOM</th>
+                <th style="width: 12%;">Supplier</th>
+                <th style="width: 8%;">Unit Price</th>
+                <th style="width: 8%;">Total Price</th>
+                <th style="width: 10%;">Comments</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% part.items.forEach((item) => { %>
+                <tr>
+                  <td class="col-name"><%= item.materialName %></td>
+                  <td class="col-image">
+                    <img src="<%= item.imageUrl %>" alt="Material" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMCIgZmlsbD0iIzljYTNhZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';" />
+                  </td>
+                  <td><%= item.placement %></td>
+                  <td><%= item.sizeWidthUsage %></td>
+                  <td class="text-center"><%= item.quantity %></td>
+                  <td><%= item.uom %></td>
+                  <td><%= item.supplier %></td>
+                  <td><%= item.unitPrice %></td>
+                  <td><%= item.totalPrice %></td>
+                  <td>
+                    <% if (item.colorways && item.colorways.length > 0) { %>
+                      <% item.colorways.forEach((colorway) => { %>
+                        <span class="color-chip"><%= colorway %></span>
+                      <% }); %>
+                      <% if (item.comments && item.comments !== '—') { %>
+                        <br/><%= item.comments %>
+                      <% } %>
+                    <% } else { %>
+                      <%= item.comments %>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% }); %>
+    </div>
+  <% } %>
+
+  <!-- IV. Measurement Specification -->
+  <% if (measurements && measurements.rows && measurements.rows.length > 0) { %>
+    <div class="page">
+      <h2 class="section-title">Garment Measurement Specification</h2>
+      <table class="measurement-table">
+        <thead>
+          <tr>
+            <th>POM Code</th>
+            <th>POM Name</th>
+            <th>Type</th>
+            <th>Category</th>
+            <th>-Tol</th>
+            <th>+Tol</th>
+            <% measurements.sizeRange.forEach((size) => { %>
+              <th class="size-col <%= size === measurements.baseSize ? 'base-size' : '' %>"><%= size %></th>
+            <% }); %>
+            <th>Unit</th>
+            <th>Notes</th>
+            <th>Critical</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% measurements.rows.forEach((row) => { %>
+            <tr class="<%= row.critical ? 'critical' : '' %>">
+              <td><strong><%= row.pomCode %></strong></td>
+              <td><%= row.pomName %></td>
+              <td><%= row.measurementType %></td>
+              <td><%= row.category %></td>
+              <td class="tol-minus"><%= row.minusTolerance %></td>
+              <td class="tol-plus"><%= row.plusTolerance %></td>
+              <% measurements.sizeRange.forEach((size) => { %>
+                <td class="size-col <%= size === measurements.baseSize ? 'base-size' : '' %>">
+                  <%= row.sizes[size] %>
+                </td>
+              <% }); %>
+              <td><%= row.unit %></td>
+              <td><%= row.notes %></td>
+              <td class="text-center">
+                <% if (row.critical) { %>
+                  <span class="status-badge status-critical">●</span>
+                <% } else { %>
+                  —
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+
+  <!-- V. Sample Measurement Rounds -->
+  <% if (sampleMeasurementRounds && sampleMeasurementRounds.length > 0) { %>
+    <% sampleMeasurementRounds.forEach((round) => { %>
+      <div class="page">
+        <h2 class="section-title">Sample Measurement Round: <%= round.name %></h2>
+        
+        <!-- Round Information -->
+        <div class="round-info">
+          <table class="info-table" style="margin-bottom: 15px;">
+            <tr>
+              <th style="width: 20%;">Round Name</th>
+              <td><%= round.name %></td>
+              <th style="width: 20%;">Measurement Date</th>
+              <td><%= round.measurementDate %></td>
+            </tr>
+            <tr>
+              <th>Reviewer</th>
+              <td><%= round.reviewer %></td>
+              <th>Requested Source</th>
+              <td><%= round.requestedSource %></td>
+            </tr>
+            <% if (round.overallComments && round.overallComments !== '—') { %>
+              <tr>
+                <th>Overall Comments</th>
+                <td colspan="3"><%= round.overallComments %></td>
+              </tr>
+            <% } %>
+          </table>
+        </div>
+
+        <!-- Sample Measurement Table - One row per POM -->
+        <table class="sample-round-table">
+          <thead>
+            <tr>
+              <th style="width: 12%;">POM Code</th>
+              <th style="width: 15%;">Measurement Point</th>
+              <th style="width: 6%;">Base Size</th>
+              <th style="width: 5%;">-Tol</th>
+              <th style="width: 5%;">+Tol</th>
+              <th style="width: 8%;">Requested</th>
+              <th style="width: 8%;">Measured</th>
+              <th style="width: 8%;">Diff</th>
+              <th style="width: 8%;">Revised</th>
+              <th style="width: 25%;">Comments</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% round.measurements.forEach((entry) => { %>
+              <tr>
+                <td class="pom-code"><strong><%= entry.pomCode %></strong></td>
+                <td class="pom-name"><%= entry.pomName %></td>
+                <td class="text-center"><%= measurements.baseSize || '—' %></td>
+                <td class="text-center tol-minus"><%= entry.toleranceMinus || '—' %></td>
+                <td class="text-center tol-plus"><%= entry.tolerancePlus || '—' %></td>
+                <td class="text-center">
+                  <% 
+                    // Get requested value for base size or first available size
+                    const requestedValue = entry.requested && measurements.sizeRange 
+                      ? (entry.requested[measurements.baseSize] || entry.requested[measurements.sizeRange[0]] || '—')
+                      : '—';
+                  %>
+                  <%= requestedValue %>
+                </td>
+                <td class="text-center">
+                  <% 
+                    const measuredValue = entry.measured && measurements.sizeRange 
+                      ? (entry.measured[measurements.baseSize] || entry.measured[measurements.sizeRange[0]] || '—')
+                      : '—';
+                  %>
+                  <%= measuredValue %>
+                </td>
+                <td class="text-center">
+                  <% 
+                    const diffValue = entry.diff && measurements.sizeRange 
+                      ? (entry.diff[measurements.baseSize] || entry.diff[measurements.sizeRange[0]] || '—')
+                      : '—';
+                  %>
+                  <%= diffValue %>
+                </td>
+                <td class="text-center">
+                  <% 
+                    const revisedValue = entry.revised && measurements.sizeRange 
+                      ? (entry.revised[measurements.baseSize] || entry.revised[measurements.sizeRange[0]] || '—')
+                      : '—';
+                  %>
+                  <%= revisedValue %>
+                </td>
+                <td class="comments">
+                  <% 
+                    const commentsValue = entry.comments && measurements.sizeRange 
+                      ? (entry.comments[measurements.baseSize] || entry.comments[measurements.sizeRange[0]] || '—')
+                      : '—';
+                  %>
+                  <%= commentsValue %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% }); %>
+  <% } %>
+
+  <!-- VI. How To Measure -->
+  <% if (howToMeasures && howToMeasures.length > 0) { %>
+    <div class="page">
+      <h2 class="section-title">How To Measure</h2>
+      <% howToMeasures.forEach((item) => { %>
+        <div class="howto-item keep-together">
+          <% if (item.imageUrl) { %>
+            <div class="howto-image">
+              <img src="<%= item.imageUrl %>" alt="<%= item.pomName %>" />
+            </div>
+          <% } %>
+          <div class="howto-content">
+            <h3>Step <%= item.stepNumber %>: <%= item.pomCode %> - <%= item.pomName %></h3>
+            <p><strong>Description:</strong> <%= item.description %></p>
+            <% if (item.steps && item.steps.length > 0) { %>
+              <p><strong>Steps:</strong></p>
+              <ol>
+                <% item.steps.forEach((step) => { %>
+                  <li><%= step %></li>
+                <% }); %>
+              </ol>
+            <% } %>
+            <% if (item.tips && item.tips.length > 0) { %>
+              <p><strong>Tips:</strong></p>
+              <ul>
+                <% item.tips.forEach((tip) => { %>
+                  <li><%= tip %></li>
+                <% }); %>
+              </ul>
+            <% } %>
+            <% if (item.commonMistakes && item.commonMistakes.length > 0) { %>
+              <p><strong>Common Mistakes:</strong></p>
+              <ul>
+                <% item.commonMistakes.forEach((mistake) => { %>
+                  <li><%= mistake %></li>
+                <% }); %>
+              </ul>
+            <% } %>
+            <% if (item.relatedMeasurements && item.relatedMeasurements.length > 0) { %>
+              <p><strong>Related Measurements:</strong> <%= item.relatedMeasurements.join(', ') %></p>
+            <% } %>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+  <% } %>
+
+  <!-- VII. Colorways & Color Allocation -->
+  <% if (colorways && colorways.length > 0) { %>
+    <div class="page">
+      <h2 class="section-title">Colorways & Color Allocation</h2>
+      <div class="colorway-grid">
+        <% colorways.forEach((colorway) => { %>
+          <div class="colorway-item keep-together">
+            <h3 style="font-size: 11px; margin-bottom: 8px;"><%= colorway.name %> (<%= colorway.code %>)</h3>
+            <% if (colorway.hexColor) { %>
+              <span class="colorway-swatch" style="background-color: <%= colorway.hexColor %>;"></span>
+            <% } %>
+            <div class="colorway-info">
+              <p><strong>Pantone:</strong> <%= colorway.pantoneCode || '—' %></p>
+              <p><strong>Hex:</strong> <%= colorway.hexColor || '—' %></p>
+              <p><strong>RGB:</strong> <%= colorway.rgbColor || '—' %></p>
+              <p><strong>Supplier:</strong> <%= colorway.supplier || '—' %></p>
+              <p><strong>Status:</strong> 
+                <span class="status-badge <%= colorway.approvalStatus === 'Approved' ? 'status-approved' : 'status-pending' %>">
+                  <%= colorway.approvalStatus %>
+                </span>
+              </p>
+              <p><strong>Season:</strong> <%= colorway.season %></p>
+              <p><strong>Collection:</strong> <%= colorway.collectionName %></p>
+              <p><strong>Notes:</strong> <%= colorway.notes %></p>
+            </div>
+            <% if (colorway.parts && colorway.parts.length > 0) { %>
+              <div class="colorway-parts">
+                <p style="font-weight: 600; margin-bottom: 6px;">Parts:</p>
+                <% colorway.parts.forEach((part) => { %>
+                  <div class="colorway-part-item">
+                    <% if (part.hexCode) { %>
+                      <span class="colorway-part-swatch" style="background-color: <%= part.hexCode %>;"></span>
+                    <% } %>
+                    <div>
+                      <strong><%= part.partName %></strong>: <%= part.colorName %>
+                      <% if (part.pantoneCode) { %> (<%= part.pantoneCode %>)<% } %>
+                    </div>
+                  </div>
+                <% }); %>
+              </div>
+            <% } %>
+            <% if (colorway.imageUrl) { %>
+              <img src="<%= colorway.imageUrl %>" alt="<%= colorway.name %>" style="width: 100%; max-height: 150px; object-fit: contain; margin-top: 10px; border: 1px solid #d1d5db; border-radius: 4px;" />
+            <% } %>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+  <% } %>
+
+  <!-- VIII. Packing Instructions -->
+  <div class="page">
+    <h2 class="section-title">Packing Instructions</h2>
+    <div class="packing-notes">
+      <% if (packingNotes && packingNotes !== '—' && packingNotes.trim()) { %>
+        <% 
+          // Normalize and split packing notes
+          const normalizedNotes = packingNotes.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+          const notes = normalizedNotes.split('\n').filter(n => n.trim());
+        %>
+        <% if (notes.length > 0) { %>
+          <ul>
+            <% notes.forEach((note) => { %>
+              <li><%= note.trim() %></li>
+            <% }); %>
+          </ul>
+        <% } else { %>
+          <p><%= packingNotes %></p>
+        <% } %>
+      <% } else { %>
+        <p style="color: #64748b; font-style: italic;">No packing instructions provided.</p>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- IX. Revision History -->
+  <% if (revisionHistory && revisionHistory.length > 0) { %>
+    <div class="page">
+      <h2 class="section-title">Revision History</h2>
+      <table class="revision-table">
+        <thead>
+          <tr>
+            <th>Version</th>
+            <th>Modified By</th>
+            <th>Modified At</th>
+            <th>Description</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% revisionHistory.forEach((revision) => { %>
+            <tr>
+              <td><%= revision.version %></td>
+              <td><%= revision.modifiedBy %></td>
+              <td><%= revision.modifiedAt %></td>
+              <td><%= revision.description %></td>
+              <td><%= revision.status %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+
+  <!-- X. Appendix (Optional) -->
+  <div class="page">
+    <h2 class="section-title">Appendix</h2>
+    <table class="info-table">
+      <tr><th>Completeness</th><td><%= summary ? 'Complete' : 'Incomplete' %></td></tr>
+      <tr><th>Total BOM Items</th><td><%= summary ? summary.bomCount : 0 %></td></tr>
+      <tr><th>Total Measurements</th><td><%= summary ? summary.measurementCount : 0 %></td></tr>
+      <tr><th>Total Colorways</th><td><%= colorways ? colorways.length : 0 %></td></tr>
+      <tr><th>Generated At</th><td><%= generatedAt %></td></tr>
+      <tr><th>Printed By</th><td><%= printedBy %></td></tr>
+    </table>
+  </div>
+</body>
+</html>
+

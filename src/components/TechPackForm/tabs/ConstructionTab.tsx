@@ -278,6 +278,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
     language: 'en-US',
     status: 'Draft' as ConstructionStatus,
     comments: '',
+    note: '',
     stepNumber: constructions.length + 1,
     tips: [],
     commonMistakes: [],
@@ -508,6 +509,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
       tips: formData.tips || [],
       commonMistakes: formData.commonMistakes || [],
       relatedMeasurements: formData.relatedMeasurements || [],
+      note: formData.note || '',
     };
 
     if (editingId) {
@@ -535,6 +537,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
       language: 'en-US',
       status: 'Draft' as ConstructionStatus,
       comments: '',
+      note: '',
       stepNumber: constructions.length + 1,
       tips: [],
       commonMistakes: [],
@@ -559,6 +562,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
       videoUrl: decoded.videoUrl,
       status: decoded.status || (item as any).status || 'Draft' as ConstructionStatus,
       comments: decoded.comments || (item as any).comments || '',
+      note: (item as any).note || '',
       pomName: item.pomName || measurementNameMap.get(item.pomCode) || '',
       stepNumber: item.stepNumber || constructions.length + 1,
       tips: item.tips || [],
@@ -1003,8 +1007,8 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
 
           <Textarea
             label="Note"
-            value={(formData as any).comments || ''}
-            onChange={handleInputChange('comments')}
+            value={(formData as any).note || ''}
+            onChange={handleInputChange('note')}
             placeholder="Ghi chú thêm..."
             rows={2}
           />
@@ -1063,8 +1067,8 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
                         )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700">
-                        {item.comments ? (
-                          <p className="whitespace-pre-wrap">{item.comments}</p>
+                        {(item as any).note ? (
+                          <p className="whitespace-pre-wrap">{(item as any).note}</p>
                         ) : (
                           <span className="text-gray-400 italic">Chưa có ghi chú</span>
                         )}

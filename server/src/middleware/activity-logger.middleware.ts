@@ -36,7 +36,7 @@ export const createActivityLogger = (options: ActivityLoggerOptions) => {
                 target = {
                   type: 'TechPack',
                   id: new Types.ObjectId(id),
-                  name: body?.data?.techpack?.productName || body?.data?.productName || 'Unknown'
+                  name: body?.data?.techpack?.articleName || body?.data?.techpack?.productName || body?.data?.articleName || body?.data?.productName || 'Unknown'
                 };
               }
             }
@@ -76,7 +76,7 @@ export const activityLoggers = {
       return {
         type: 'TechPack',
         id: body.data?.techpack?._id || req.params.id,
-        name: body.data?.techpack?.productName || 'New TechPack'
+        name: body.data?.techpack?.articleName || body.data?.techpack?.productName || 'New TechPack'
       };
     }
   }),

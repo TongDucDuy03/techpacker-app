@@ -97,7 +97,7 @@ const TechPackDetailComponent: React.FC<TechPackDetailProps> = ({
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Version</label>
-                <p className="mt-1 text-sm text-gray-900">{techPack.version || 'V1'}</p>
+                <p className="mt-1 text-sm text-gray-900">{(techPack as any).sampleType || techPack.version || ''}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Status</label>

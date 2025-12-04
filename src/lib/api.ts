@@ -476,6 +476,24 @@ class ApiClient {
     return techPack;
   }
 
+  /**
+   * Export TechPack as PDF
+   * @param id TechPack ID
+   * @param options PDF export options (orientation, format)
+   * @returns Blob of PDF file
+   */
+  async exportTechPackPDF(id: string, options?: { orientation?: 'portrait' | 'landscape'; format?: 'A4' | 'Letter' | 'Legal' }): Promise<Blob> {
+    const params: any = {};
+    if (options?.orientation) params.orientation = options.orientation;
+    if (options?.format) params.format = options.format;
+
+    const response = await this.axiosInstance.get(`/techpacks/${id}/pdf`, {
+      params,
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
   async bulkOperations(data: any): Promise<{ message: string; modifiedCount: number }> {
     const response = await this.axiosInstance.patch<ApiResponse<{ modifiedCount: number }>>('/techpacks/bulk', data);
     const responseData: any = response.data ?? {};

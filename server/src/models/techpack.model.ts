@@ -138,6 +138,7 @@ export interface IHowToMeasure {
   tips?: string[];
   commonMistakes?: string[];
   relatedMeasurements?: string[];
+  note?: string; // Add note field for Construction tab
 }
 
 export enum TechPackRole {
@@ -169,9 +170,9 @@ export interface IAuditLogEntry {
 }
 
 export interface ITechPack extends Document {
-  productName: string;
+  articleName: string; // Renamed from productName
   articleCode: string;
-  version: string;
+  sampleType: string; // Renamed from version
   technicalDesignerId: Types.ObjectId;
   customerId?: string;
   supplier: string;
@@ -199,6 +200,7 @@ export interface ITechPack extends Document {
   howToMeasure: IHowToMeasure[];
   measurementSizeRange?: string[];
   measurementBaseSize?: string;
+  measurementUnit?: string; // Unit for all measurements (table-level)
   measurementBaseHighlightColor?: string;
   measurementRowStripeColor?: string;
   packingNotes?: string;
@@ -331,7 +333,8 @@ const HowToMeasureSchema = new Schema<IHowToMeasure>({
   instructions: [{ type: String }],
   tips: [{ type: String }],
   commonMistakes: [{ type: String }],
-  relatedMeasurements: [{ type: String }]
+  relatedMeasurements: [{ type: String }],
+  note: { type: String, trim: true }
 });
 
 const SharedAccessSchema = new Schema<ISharedAccess>({
@@ -356,9 +359,9 @@ const AuditLogEntrySchema = new Schema<IAuditLogEntry>({
 
 const TechPackSchema = new Schema<ITechPack>(
   {
-    productName: {
+    articleName: {
       type: String,
-      required: [true, 'Product name is required'],
+      required: [true, 'Article name is required'],
       trim: true
     },
     articleCode: {
@@ -368,9 +371,11 @@ const TechPackSchema = new Schema<ITechPack>(
       trim: true,
       uppercase: true
     },
-    version: {
+    sampleType: {
       type: String,
-      default: 'V1'
+      default: 'V1',
+      trim: true,
+      maxlength: 120
     },
     technicalDesignerId: {
       type: Schema.Types.ObjectId,
@@ -436,6 +441,11 @@ const TechPackSchema = new Schema<ITechPack>(
     },
     colorways: [ColorwaySchema],
     howToMeasure: [HowToMeasureSchema],
+    measurementUnit: {
+      type: String,
+      enum: ['mm', 'cm', 'inch-10', 'inch-16', 'inch-32'],
+      default: 'cm'
+    },
     measurementSizeRange: {
       type: [String],
       default: []
@@ -489,8 +499,8 @@ TechPackSchema.index({ season: 1, brand: 1 }); // Season/brand filter
 TechPackSchema.index({ createdAt: -1 }); // General sorting
 // Compound index for common list query pattern
 TechPackSchema.index({ status: 1, createdAt: -1 });
-// Text search index for productName and articleCode
-TechPackSchema.index({ productName: 'text', articleCode: 'text' });
+// Text search index for articleName and articleCode
+TechPackSchema.index({ articleName: 'text', articleCode: 'text' });
 
 // Performance optimization: Compound indexes for complex queries in getTechPacks
 // These indexes optimize the $or queries with status filtering

@@ -85,7 +85,7 @@ export class NotificationService {
       if (filteredUserIds.length > 0) {
         await this.notifyUsers(filteredUserIds, {
           title: 'TechPack Reverted',
-          body: `${revertedBy.firstName} ${revertedBy.lastName} reverted TechPack "${techpack?.productName}" to version ${targetVersion}. New version: ${newVersion}`,
+          body: `${revertedBy.firstName} ${revertedBy.lastName} reverted TechPack "${(techpack as any)?.articleName || (techpack as any)?.productName || 'Unknown'}" to version ${targetVersion}. New version: ${newVersion}`,
           link: `/techpacks/${techPackId}`,
           type: 'info',
           metadata: {
@@ -130,7 +130,7 @@ export class NotificationService {
       if (userIds.length > 0) {
         await this.notifyUsers(userIds, {
           title: `Revision ${status === 'approved' ? 'Approved' : 'Rejected'}`,
-          body: `${approvedBy.firstName} ${approvedBy.lastName} ${status} a revision for TechPack "${techpack?.productName}"${reason ? `: ${reason}` : ''}`,
+          body: `${approvedBy.firstName} ${approvedBy.lastName} ${status} a revision for TechPack "${(techpack as any)?.articleName || (techpack as any)?.productName || 'Unknown'}"${reason ? `: ${reason}` : ''}`,
           link: `/techpacks/${techPackId}/revisions/${revisionId}`,
           type: status === 'approved' ? 'success' : 'warning',
           metadata: {

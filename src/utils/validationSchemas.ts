@@ -20,18 +20,17 @@ export const articleInfoValidationSchema: FormValidationConfig = {
       return null;
     }
   },
-  productName: {
+  articleName: {
     required: true,
     minLength: 2,
     maxLength: 255,
     custom: techPackValidators.productName
   },
-  version: {
-    required: true,
-    min: 1,
-    max: 999,
-    custom: (value: number) => {
-      if (!Number.isInteger(value)) return 'Version must be a whole number';
+  sampleType: {
+    required: false,
+    maxLength: 120,
+    custom: (value: string) => {
+      if (value && value.trim().length > 120) return 'Sample type must not exceed 120 characters';
       return null;
     }
   },

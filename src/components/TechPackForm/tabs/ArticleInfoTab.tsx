@@ -26,7 +26,7 @@ export interface ArticleInfoTabRef {
   validateAndSave: () => boolean;
 }
 
-const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props, ref) => {
+const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps, ref) => {
   const { techPack, mode = 'create', onUpdate, setCurrentTab } = props;
   const validation = useFormValidation(articleInfoValidationSchema);
   const { articleInfo } = techPack ?? {};
@@ -40,10 +40,11 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
   const [isDuplicate, setIsDuplicate] = useState(false);
 
   // Fallback if no techPack is passed
+  // Support both old field names (productName, version) and new field names (articleName, sampleType) for backward compatibility
   const safeArticleInfo = articleInfo ?? {
     articleCode: '',
-    productName: '',
-    version: 1,
+    articleName: '',
+    sampleType: '',
     gender: 'Unisex',
     productClass: '',
     fitType: 'Regular',
@@ -372,8 +373,8 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
         articleInfo: {
           ...safeArticleInfo, // Keep id and other fields
           articleCode: '',
-          productName: '',
-          version: 1,
+          articleName: '',
+          sampleType: '',
           gender: 'Unisex',
           productClass: '',
           fitType: 'Regular',
@@ -444,7 +445,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
     const nextInfo = safeArticleInfo as any;
     // Shallow compare relevant fields of Article Info and status
     const fieldsToCompare = [
-      'articleCode','productName','version','gender','productClass','fitType','supplier','technicalDesignerId',
+      'articleCode','articleName','sampleType','gender','productClass','fitType','supplier','technicalDesignerId',
       'fabricDescription','productDescription','designSketchUrl','companyLogoUrl','season','lifecycleStage','brand','collection',
       'targetMarket','pricePoint','currency','retailPrice','notes'
     ];
@@ -478,8 +479,8 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
       const firstField = Object.keys(errors)[0];
       const fieldLabelMap: Record<string, string> = {
         articleCode: 'Article Code',
-        productName: 'Product Name',
-        version: 'Version',
+        articleName: 'Article Name',
+        sampleType: 'Sample Type',
         gender: 'Gender',
         productClass: 'Product Class',
         fitType: 'Fit Type',
@@ -524,8 +525,8 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
         const firstField = Object.keys(errors)[0];
         const fieldLabelMap: Record<string, string> = {
           articleCode: 'Article Code',
-          productName: 'Product Name',
-          version: 'Version',
+          articleName: 'Article Name',
+          sampleType: 'Sample Type',
           gender: 'Gender',
           productClass: 'Product Class',
           fitType: 'Fit Type',
@@ -576,7 +577,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
 
   // Calculate form completion percentage
   const completionPercentage = useMemo(() => {
-    const requiredFields = ['articleCode', 'productName', 'fabricDescription', 'productDescription', 'supplier', 'season', 'technicalDesignerId', 'gender', 'productClass', 'fitType'];
+    const requiredFields = ['articleCode', 'articleName', 'fabricDescription', 'productDescription', 'supplier', 'season', 'technicalDesignerId', 'gender', 'productClass', 'fitType'];
     const optionalFields = ['brand', 'collection', 'targetMarket', 'pricePoint', 'notes'];
 
     let totalRequired = requiredFields.length;
@@ -693,35 +694,31 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
               </div>
 
               <Input
-                label="Product Name"
-                value={safeArticleInfo.productName}
-                onChange={handleInputChange('productName')}
-                onBlur={() => validation.setFieldTouched('productName')}
+                label="Article Name"
+                value={safeArticleInfo.articleName || (safeArticleInfo as any).productName || ''}
+                onChange={handleInputChange('articleName')}
+                onBlur={() => validation.setFieldTouched('articleName')}
                 placeholder="e.g., Men's Oxford Button-Down Shirt"
                 required
                 maxLength={255}
                 disabled={mode === 'view'}
-                error={validation.getFieldProps('productName').error}
-                helperText={validation.getFieldProps('productName').helperText}
+                error={validation.getFieldProps('articleName').error}
+                helperText={validation.getFieldProps('articleName').helperText}
               />
 
-              {/* Version - Readonly when editing/viewing */}
+              {/* Sample Type - Text input */}
               <div className="relative">
                 <Input
-                  label="Version"
-                  value={safeArticleInfo.version}
-                  onChange={handleInputChange('version')}
-                  onBlur={() => validation.setFieldTouched('version')}
-                  type="number"
-                  min={1}
-                  max={999}
-                  disabled={mode === 'view' || mode === 'edit'}
-                  error={validation.getFieldProps('version').error}
-                  helperText={
-                    (mode === 'edit' || mode === 'view') 
-                      ? 'Version is automatically managed by the system' 
-                      : validation.getFieldProps('version').helperText
-                  }
+                  label="Sample Type"
+                  value={safeArticleInfo.sampleType || (safeArticleInfo as any).version || ''}
+                  onChange={handleInputChange('sampleType')}
+                  onBlur={() => validation.setFieldTouched('sampleType')}
+                  type="text"
+                  placeholder="Enter sample type"
+                  maxLength={120}
+                  disabled={mode === 'view'}
+                  error={validation.getFieldProps('sampleType').error}
+                  helperText={validation.getFieldProps('sampleType').helperText}
                 />
                 {(mode === 'edit' || mode === 'view') && (
                   <div className="absolute right-3 top-8 text-gray-400">
@@ -1330,13 +1327,13 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
             <div className="space-y-4">
               <div className="p-4 bg-gray-50 rounded-lg">
                 <h4 className="font-medium text-gray-900 mb-2">
-                  {safeArticleInfo.productName || 'Product Name'}
+                  {safeArticleInfo.articleName || (safeArticleInfo as any).productName || 'Article Name'}
                 </h4>
                 <p className="text-sm text-gray-600 mb-2">
                   {safeArticleInfo.articleCode || 'Article Code'}
                 </p>
                 <div className="flex items-center text-xs text-gray-500 space-x-2">
-                  <span>v{safeArticleInfo.version}</span>
+                  <span>{safeArticleInfo.sampleType || 'N/A'}</span>
                   <span>•</span>
                   <span>{safeArticleInfo.gender}</span>
                   <span>•</span>
@@ -1424,5 +1421,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef, ArticleInfoTabProps>((props
     </div>
   );
 });
+
+ArticleInfoTab.displayName = 'ArticleInfoTab';
 
 export default ArticleInfoTab;

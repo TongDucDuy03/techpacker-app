@@ -7,8 +7,11 @@ export type TechPackStatus = 'Draft' | 'In Review' | 'Approved' | 'Rejected' | '
 export interface ArticleInfo {
   id?: string;
   articleCode: string;
-  productName: string;
-  version: number | string; // Backend uses string 'V1', frontend can use number
+  articleName: string; // Renamed from productName
+  sampleType: string; // Renamed from version, now text input
+  // Backward compatibility fields
+  productName?: string; // Deprecated, use articleName
+  version?: number | string; // Deprecated, use sampleType
   gender: 'Men' | 'Women' | 'Unisex' | 'Kids';
   productClass: string; // Maps to backend 'category'
   fitType: 'Regular' | 'Slim' | 'Loose' | 'Relaxed' | 'Oversized';
@@ -142,6 +145,7 @@ export interface HowToMeasure {
   stepNumber?: number;
   instructions?: string[];
   tips?: string[];
+  note?: string;
   commonMistakes?: string[];
   relatedMeasurements?: string[];
 }
@@ -281,7 +285,9 @@ export interface ApiTechPack {
   _id: string;
   name: string;
   articleCode: string;
-  version: string;
+  articleName?: string; // New field name
+  sampleType?: string; // New field name
+  version?: string; // Deprecated, use sampleType
   status: 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'archived';
   ownerId: string;
   createdBy: string;
@@ -334,6 +340,7 @@ export interface TechPack {
   updatedAt: string;
   measurementSizeRange?: string[];
   measurementBaseSize?: string;
+  measurementUnit?: MeasurementUnit; // Unit for all measurements (table-level)
   measurementBaseHighlightColor?: string;
   measurementRowStripeColor?: string;
   packingNotes?: string;

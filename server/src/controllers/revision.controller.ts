@@ -520,7 +520,7 @@ export class RevisionController {
           target: {
             type: 'TechPack',
             id: savedTechpack._id as Types.ObjectId,
-            name: savedTechpack.productName
+            name: (savedTechpack as any).articleName || (savedTechpack as any).productName || 'Unknown'
           },
           details: {
             action: 'revert',
@@ -657,7 +657,7 @@ export class RevisionController {
           target: {
             type: 'TechPack',
             id: techpack._id as Types.ObjectId,
-            name: techpack.productName
+            name: (techpack as any).articleName || (techpack as any).productName || 'Unknown'
           },
           details: {
             action: 'comment',

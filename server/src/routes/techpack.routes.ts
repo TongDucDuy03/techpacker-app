@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import techpackController from '../controllers/techpack.controller';
 import { requireAuth, requireRole, requireTechPackAccess } from '../middleware/auth.middleware';
-import upload from '../middleware/upload.middleware';
+import upload, { processUploadedImage } from '../middleware/upload.middleware';
 import { UserRole } from '../models/user.model';
 
 const router = Router();
@@ -16,15 +16,33 @@ const techpackValidation = [
     .withMessage('Mode must be either "new" or "clone"'),
   
   // Only require articleInfo fields when mode is not 'clone'
+  // Support both articleName (new) and productName (old) for backward compatibility
+  body('articleInfo.articleName')
+    .custom((value, { req }) => {
+      if (req.body.mode === 'clone') {
+        return true; // Skip validation for clone mode
+      }
+      // If articleName is not provided, check for productName (backward compatibility)
+      const productName = req.body.articleInfo?.productName || req.body.productName;
+      if (!value && !productName) {
+        throw new Error('Article name is required');
+      }
+      if (value && value.length > 255) {
+        throw new Error('Article name must be less than 255 characters');
+      }
+      return true;
+    }),
   body('articleInfo.productName')
     .custom((value, { req }) => {
       if (req.body.mode === 'clone') {
         return true; // Skip validation for clone mode
       }
-      if (!value || value.trim().length === 0) {
+      // Only validate if articleName is not provided (backward compatibility)
+      const articleName = req.body.articleInfo?.articleName || req.body.articleName;
+      if (!articleName && (!value || value.trim().length === 0)) {
         throw new Error('Product name is required');
       }
-      if (value.length > 100) {
+      if (value && value.length > 100) {
         throw new Error('Product name must be less than 100 characters');
       }
       return true;
@@ -609,6 +627,7 @@ router.post(
   requireAuth,
   requireRole([UserRole.Admin, UserRole.Designer]),
   upload.single('designSketch'),
+  processUploadedImage,
   (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded.' });
@@ -629,6 +648,7 @@ router.post(
   requireAuth,
   requireRole([UserRole.Admin, UserRole.Designer]),
   upload.single('companyLogo'),
+  processUploadedImage,
   (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded.' });
@@ -648,6 +668,7 @@ router.post(
   requireAuth,
   requireRole([UserRole.Admin, UserRole.Designer]),
   upload.single('colorwayImage'),
+  processUploadedImage,
   (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded.' });
@@ -668,6 +689,7 @@ router.post(
   requireAuth,
   requireRole([UserRole.Admin, UserRole.Designer]),
   upload.single('bomImage'),
+  processUploadedImage,
   (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded.' });
@@ -687,6 +709,7 @@ router.post(
   requireAuth,
   requireRole([UserRole.Admin, UserRole.Designer]),
   upload.single('constructionImage'),
+  processUploadedImage,
   (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded.' });
@@ -695,6 +718,19 @@ router.post(
     const fileUrl = `/uploads/${req.file.filename}`;
     return res.status(200).json({ success: true, message: 'File uploaded successfully', data: { url: fileUrl } });
   }
+);
+
+/**
+ * @route GET /api/techpacks/:id/pdf
+ * @desc Export TechPack as PDF
+ * @access Private (with TechPack access control)
+ */
+router.get(
+  '/:id/pdf',
+  requireAuth,
+  idValidation,
+  requireTechPackAccess(['view']),
+  techpackController.exportPDF
 );
 
 export default router;

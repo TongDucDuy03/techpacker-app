@@ -1,303 +1,613 @@
-import fs from 'fs';
+import puppeteer, { Browser } from 'puppeteer';
 import path from 'path';
-import os from 'os';
-import { promisify } from 'util';
 import ejs from 'ejs';
-import { Browser } from 'puppeteer';
-import puppeteer from 'puppeteer';
-import PQueue from 'p-queue';
-import { buildRenderModel } from './pdf-renderer.service';
-import { cacheService } from './cache.service';
-import { PDFGenerationError, PDFErrorCode } from '../types/techpack.types';
+import { ITechPack, IBOMItem, IMeasurement, ISampleMeasurementRound, IHowToMeasure, IColorway, IColorwayPart } from '../models/techpack.model';
+import fs from 'fs/promises';
 
-const mkdir = promisify(fs.mkdir);
-const stat = promisify(fs.stat);
-const unlink = promisify(fs.unlink);
+// Type for PDF generation - accepts both Mongoose document and plain object (lean)
+// Using 'any' to handle Mongoose's FlattenMaps type which has complex nested types
+type TechPackForPDF = ITechPack | any;
 
-const TEMPLATE_DIR = path.join(__dirname, '../templates');
-const TMP_DIR = process.env.PDF_TMP_DIR || path.join(os.tmpdir(), 'techpack-pdf');
-const PDF_TIMEOUT = Number(process.env.PDF_TIMEOUT || 60_000);
-const PDF_CACHE_TTL = Number(process.env.PDF_CACHE_TTL || 21_600);
-const PDF_CONCURRENCY = Number(process.env.PDF_CONCURRENCY || 3);
-
-interface GenerateOptions {
-  techpack: any;
-  printedBy: string;
-  includeSections?: string[];
-  force?: boolean;
-  // If true, generate PDF in landscape orientation
-  landscape?: boolean;
+export interface PDFOptions {
+  format?: 'A4' | 'Letter' | 'Legal';
+  orientation?: 'portrait' | 'landscape';
+  margin?: {
+    top?: string;
+    bottom?: string;
+    left?: string;
+    right?: string;
+  };
+  includeImages?: boolean;
+  imageQuality?: number;
+  displayHeaderFooter?: boolean;
 }
 
-interface PDFMetadata {
-  path: string;
+export interface PDFGenerationResult {
+  buffer: Buffer;
+  filename: string;
   size: number;
   pages: number;
-  generatedAt: string;
-  cached: boolean;
 }
 
-interface PreviewOptions extends GenerateOptions {
-  width?: number;
-}
-
-export class PDFService {
-  private browserPromise: Promise<Browser> | null = null;
-  private readonly queue: PQueue;
-  private readonly inFlight: Map<string, Promise<PDFMetadata>>;
+class PDFService {
+  private browser: Browser | null = null;
+  private readonly templateDir: string;
+  private readonly maxConcurrent: number = 3;
+  private activeGenerations: number = 0;
 
   constructor() {
-    this.queue = new PQueue({
-      concurrency: PDF_CONCURRENCY,
-    });
-    this.inFlight = new Map();
-    this.ensureTmpDir();
+    this.templateDir = path.join(__dirname, '../templates');
   }
 
-  private async ensureTmpDir() {
-    try {
-      await mkdir(TMP_DIR, { recursive: true });
-    } catch (error) {
-      console.warn('Unable to create PDF temp directory', TMP_DIR, error);
-    }
-  }
-
+  /**
+   * Initialize browser instance (lazy loading)
+   */
   private async getBrowser(): Promise<Browser> {
-    if (!this.browserPromise) {
-      this.browserPromise = puppeteer.launch({
-        headless: 'new',
+    if (!this.browser) {
+      this.browser = await puppeteer.launch({
+        headless: true,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
           '--disable-gpu',
-          '--no-zygote',
-          '--single-process',
+          '--disable-web-security',
         ],
       });
     }
-    return this.browserPromise;
+    return this.browser;
   }
 
-  private buildCacheKey(techpack: any, options?: GenerateOptions) {
-    const updatedAt = techpack.updatedAt ? new Date(techpack.updatedAt).getTime() : 0;
-    const orientation = options?.landscape === false ? 'portrait' : 'landscape';
-    return `pdf:techpack:${techpack._id}:v${techpack.version}:${updatedAt}:${orientation}`;
-  }
-
-  private buildFilePath(techpack: any) {
-    const safeName = String(techpack.articleCode || techpack._id).replace(/[^a-z0-9_-]+/gi, '_');
-    return path.join(TMP_DIR, `techpack-${safeName}-v${techpack.version}.pdf`);
-  }
-
-  private async renderTemplate(payload: any): Promise<string> {
-    const templatePath = path.join(TEMPLATE_DIR, 'techpack-template.ejs');
-    try {
-      return await ejs.renderFile(templatePath, payload, { async: true });
-    } catch (error) {
-      throw new PDFGenerationError(
-        PDFErrorCode.TEMPLATE_ERROR,
-        `Template rendering failed: ${(error as Error)?.message ?? 'unknown error'}`,
-        error
-      );
+  /**
+   * Close browser instance
+   */
+  async closeBrowser(): Promise<void> {
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = null;
     }
   }
 
-  private async renderPartial(name: string, payload: any): Promise<string> {
-    const filePath = path.join(TEMPLATE_DIR, 'partials', `${name}.ejs`);
-    return ejs.renderFile(filePath, payload, { async: true });
+  /**
+   * Normalize text data - remove control characters and normalize line breaks
+   */
+  private normalizeText(text: any): string {
+    if (!text) return '—';
+    const str = String(text);
+    // Remove control characters (0x0B, 0x0C, 0x0D bất thường)
+    let normalized = str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    // Normalize line breaks to spaces
+    normalized = normalized.replace(/\r\n|\r|\n/g, ' ');
+    // Remove multiple spaces
+    normalized = normalized.replace(/\s+/g, ' ').trim();
+    return normalized || '—';
   }
 
-  private async generateForKey(cacheKey: string, options: GenerateOptions): Promise<PDFMetadata> {
-    const filePath = this.buildFilePath(options.techpack);
-    const renderOptions: any = {
-      printedBy: options.printedBy,
-      generatedAt: new Date(),
-    };
-    if (options.includeSections !== undefined) {
-      renderOptions.includeSections = options.includeSections;
-    }
-    const htmlPayload = await buildRenderModel(options.techpack, renderOptions);
-    const html = await this.renderTemplate(htmlPayload);
+  /**
+   * Prepare techpack data for PDF template
+   */
+  private prepareTechPackData(techpack: TechPackForPDF): any {
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const uploadsBaseUrl = process.env.UPLOADS_BASE_URL || baseUrl;
+    const serverUrl = process.env.SERVER_URL || baseUrl;
 
-    const headerTemplate = await this.renderPartial('header', {
-      meta: htmlPayload.meta,
-      printedBy: options.printedBy,
-      generatedAt: htmlPayload.generatedAt,
-    });
-    const footerTemplate = await this.renderPartial('footer', {
-      meta: htmlPayload.meta,
-    });
-
-    const browser = await this.getBrowser();
-    const page = await browser.newPage();
-    const isLandscape = options.landscape !== false;
-
-    try {
-      await page.setContent(html, {
-        waitUntil: ['networkidle0', 'domcontentloaded'],
-      });
-
-      await page.pdf({
-        path: filePath,
-        format: 'A4',
-        landscape: isLandscape,
-        printBackground: true,
-        displayHeaderFooter: true,
-        headerTemplate,
-        footerTemplate,
-        margin: { top: '20mm', bottom: '20mm', left: '15mm', right: '15mm' },
-      });
-    } catch (error) {
-      throw new PDFGenerationError(
-        PDFErrorCode.PUPPETEER_ERROR,
-        `PDF generation failed: ${(error as Error)?.message ?? 'unknown error'}`,
-        error
-      );
-    } finally {
-      await page.close();
-    }
-
-    const { size, pages } = await this.inspectPdf(filePath);
-    const metadata: PDFMetadata = {
-      path: filePath,
-      size,
-      pages,
-      generatedAt: new Date().toISOString(),
-      cached: false,
+    // Helper to prepare image URL - handles base64, absolute URLs, relative URLs, and provides placeholder
+    const prepareImageUrl = (url?: string, placeholder?: string): string => {
+      // Default placeholder SVG
+      const defaultPlaceholder = placeholder || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
+      
+      if (!url || url.trim() === '') {
+        return defaultPlaceholder;
+      }
+      
+      const trimmedUrl = url.trim();
+      
+      // Already base64 image
+      if (trimmedUrl.startsWith('data:image/')) {
+        return trimmedUrl;
+      }
+      
+      // Already absolute URL
+      if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
+        return trimmedUrl;
+      }
+      
+      // Relative URL starting with /
+      if (trimmedUrl.startsWith('/')) {
+        // Check if it's a server upload path
+        if (trimmedUrl.startsWith('/uploads/') || trimmedUrl.startsWith('/api/uploads/')) {
+          return `${serverUrl}${trimmedUrl}`;
+        }
+        // Static assets
+        if (trimmedUrl.startsWith('/static/')) {
+          return `${baseUrl}${trimmedUrl}`;
+        }
+        // Other relative paths
+        return `${baseUrl}${trimmedUrl}`;
+      }
+      
+      // Relative URL without leading slash - treat as upload
+      return `${uploadsBaseUrl}/${trimmedUrl}`;
     };
 
-    await cacheService.set(cacheKey, metadata, PDF_CACHE_TTL);
-    return metadata;
-  }
+    // Legacy helper for backward compatibility
+    const toAbsoluteUrl = (url?: string): string | undefined => {
+      if (!url) return undefined;
+      const prepared = prepareImageUrl(url);
+      // Return undefined if it's placeholder to maintain backward compatibility
+      return prepared.includes('No Image') ? undefined : prepared;
+    };
 
-  private async inspectPdf(filePath: string) {
-    const stats = await stat(filePath);
-    const pageCount = await this.countPages(filePath);
-    return { size: stats.size, pages: pageCount };
-  }
-
-  private async countPages(filePath: string): Promise<number> {
-    const stream = fs.createReadStream(filePath);
-    let pages = 0;
-    const pattern = /\/Type\s*\/Page[^s]/g;
-
-    return new Promise<number>((resolve, reject) => {
-      stream.on('data', (chunk) => {
-        const matches = chunk.toString('utf8').match(pattern);
-        if (matches) pages += matches.length;
+    // Format dates
+    const formatDate = (date?: Date | string): string => {
+      if (!date) return '—';
+      const d = typeof date === 'string' ? new Date(date) : date;
+      return d.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
       });
-      stream.on('end', () => resolve(Math.max(pages, 1)));
-      stream.on('error', reject);
-    });
-  }
+    };
 
-  async getOrCreatePdf(options: GenerateOptions): Promise<PDFMetadata> {
-    const cacheKey = this.buildCacheKey(options.techpack, options);
+    // Get technical designer name
+    const technicalDesignerName = 
+      (techpack.technicalDesignerId as any)?.firstName && 
+      (techpack.technicalDesignerId as any)?.lastName
+        ? `${(techpack.technicalDesignerId as any).firstName} ${(techpack.technicalDesignerId as any).lastName}`
+        : '—';
 
-    if (!options.force) {
-      const cached = await cacheService.get<PDFMetadata>(cacheKey);
-      if (cached) {
-        try {
-          const stats = await stat(cached.path);
-          if (stats.isFile()) {
-            return { ...cached, cached: true };
-          }
-        } catch {
-          await cacheService.del(cacheKey);
+    // Prepare Article Summary data
+    const articleSummary = {
+      generalInfo: {
+        articleCode: techpack.articleCode || '—',
+        productName: (techpack as any).articleName || (techpack as any).productName || '—',
+        version: (techpack as any).sampleType || (techpack as any).version || '—',
+        status: techpack.status || '—',
+        lifecycleStage: techpack.lifecycleStage || '—',
+        brand: techpack.brand || '—',
+        season: techpack.season || '—',
+        collection: techpack.collectionName || '—',
+        targetMarket: techpack.targetMarket || '—',
+        pricePoint: techpack.pricePoint || '—',
+        retailPrice: techpack.retailPrice ? `${techpack.retailPrice} ${techpack.currency || 'USD'}` : '—',
+      },
+      technicalInfo: {
+        fitType: '—', // Not in model, add if needed
+        productClass: techpack.category || '—',
+        supplier: techpack.supplier || '—',
+        technicalDesignerId: technicalDesignerName,
+        customerId: techpack.customerId || '—',
+        ownerId: (techpack.createdBy as any)?.firstName && (techpack.createdBy as any)?.lastName
+          ? `${(techpack.createdBy as any).firstName} ${(techpack.createdBy as any).lastName}`
+          : '—',
+      },
+      fabricAndComposition: {
+        fabricDescription: techpack.fabricDescription || '—',
+        materialInfo: techpack.bom?.find((item: IBOMItem) => item.part?.toLowerCase().includes('main') || item.part?.toLowerCase().includes('fabric'))?.materialComposition || '—',
+      },
+      tracking: {
+        createdDate: formatDate(techpack.createdAt),
+        updatedAt: formatDate(techpack.updatedAt),
+        createdBy: techpack.createdByName || '—',
+        updatedBy: techpack.updatedByName || '—',
+      },
+    };
+
+    // Prepare BOM data - Group by Part and normalize fields
+    // Helper to prepare image URL with placeholder
+    const prepareBOMImageUrl = (url?: string): string => {
+      if (!url) {
+        return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMCIgZmlsbD0iIzljYTNhZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';
+      }
+      if (url.startsWith('data:image/')) return url;
+      if (url.startsWith('http://') || url.startsWith('https://')) return url;
+      const absoluteUrl = toAbsoluteUrl(url);
+      return absoluteUrl || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMCIgZmlsbD0iIzljYTNhZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';
+    };
+
+    // Group BOM items by Part
+    const bomByPart: { [key: string]: any[] } = {};
+    (techpack.bom || []).forEach((item: IBOMItem) => {
+      const partName = this.normalizeText(item.part) || 'Unassigned';
+      if (!bomByPart[partName]) {
+        bomByPart[partName] = [];
+      }
+      
+      // Prepare colorways as chips (if multiple colors, combine into one string)
+      const colorways: string[] = [];
+      if (item.color) {
+        const colorText = this.normalizeText(item.color);
+        if (item.colorCode) {
+          colorways.push(`${colorText} (${this.normalizeText(item.colorCode)})`);
+        } else if (item.pantoneCode) {
+          colorways.push(`${colorText} (Pantone: ${this.normalizeText(item.pantoneCode)})`);
+        } else {
+          colorways.push(colorText);
         }
       }
-    }
 
-    if (this.inFlight.has(cacheKey)) {
-      return this.inFlight.get(cacheKey)!;
-    }
+      // Build size/width/usage string
+      const sizeInfo: string[] = [];
+      if (item.size) sizeInfo.push(`Size: ${this.normalizeText(item.size)}`);
+      if (item.width) sizeInfo.push(`Width: ${this.normalizeText(item.width)}`);
+      // Usage can be derived from placement or other fields if needed
+      const sizeWidthUsage = sizeInfo.length > 0 ? sizeInfo.join(' / ') : '—';
 
-    const job: Promise<PDFMetadata> = this.queue.add(async () => {
-      let timer: NodeJS.Timeout | null = null;
-      try {
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          timer = setTimeout(() => {
-            reject(new PDFGenerationError(PDFErrorCode.PUPPETEER_ERROR, 'PDF generation timeout'));
-          }, PDF_TIMEOUT);
+      bomByPart[partName].push({
+        materialName: this.normalizeText(item.materialName),
+        imageUrl: prepareBOMImageUrl(item.imageUrl),
+        placement: this.normalizeText(item.placement),
+        sizeWidthUsage: sizeWidthUsage,
+        quantity: item.quantity || 0,
+        uom: this.normalizeText(item.uom),
+        supplier: this.normalizeText(item.supplier),
+        unitPrice: item.unitPrice ? `${item.unitPrice} ${techpack.currency || 'USD'}` : '—',
+        totalPrice: item.totalPrice ? `${item.totalPrice} ${techpack.currency || 'USD'}` : '—',
+        comments: this.normalizeText(item.comments),
+        colorways: colorways.length > 0 ? colorways : [],
+      });
+    });
+
+    // Convert to array format for template
+    const bomParts = Object.keys(bomByPart).map((partName) => ({
+      partName,
+      items: bomByPart[partName],
+    }));
+
+    // Prepare Measurements data
+    const sizeRange = techpack.measurementSizeRange || ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+    const baseSize = techpack.measurementBaseSize || sizeRange[0] || 'M';
+    const baseHighlightColor = techpack.measurementBaseHighlightColor || '#dbeafe';
+    const rowStripeColor = techpack.measurementRowStripeColor || '#f3f4f6';
+
+    const measurementRows = (techpack.measurements || []).map((measurement: IMeasurement) => {
+      const row: any = {
+        pomCode: measurement.pomCode || '—',
+        pomName: measurement.pomName || '—',
+        measurementType: measurement.measurementType || '—',
+        category: measurement.category || '—',
+        minusTolerance: measurement.toleranceMinus || 0,
+        plusTolerance: measurement.tolerancePlus || 0,
+        notes: measurement.notes || '—',
+        critical: measurement.critical || false,
+        unit: measurement.unit || 'cm',
+        sizes: {},
+      };
+
+      // Add size values
+      sizeRange.forEach((size: string) => {
+        row.sizes[size] = measurement.sizes?.[size] || '—';
+      });
+
+      return row;
+    });
+
+    // Prepare Sample Measurement Rounds
+    // Find corresponding measurement for tolerance values
+    const measurementMap = new Map();
+    (techpack.measurements || []).forEach((m: IMeasurement) => {
+      measurementMap.set(m.pomCode, m);
+    });
+
+    const sampleRounds = (techpack.sampleMeasurementRounds || []).map((round: ISampleMeasurementRound) => ({
+      name: round.name || '—',
+      measurementDate: round.measurementDate ? formatDate(round.measurementDate) : '—',
+      reviewer: (round.createdBy as any)?.firstName && (round.createdBy as any)?.lastName
+        ? `${(round.createdBy as any).firstName} ${(round.createdBy as any).lastName}`
+        : '—',
+      requestedSource: round.requestedSource || 'original',
+      overallComments: round.overallComments || '—',
+      measurements: (round.measurements || []).map((entry: any) => {
+        // Get tolerance from entry or find corresponding measurement
+        const correspondingMeasurement = measurementMap.get(entry.pomCode);
+        const toleranceMinus = entry.toleranceMinus !== undefined 
+          ? entry.toleranceMinus 
+          : (correspondingMeasurement?.toleranceMinus || '—');
+        const tolerancePlus = entry.tolerancePlus !== undefined 
+          ? entry.tolerancePlus 
+          : (correspondingMeasurement?.tolerancePlus || '—');
+
+        const entryRow: any = {
+          pomCode: entry.pomCode || '—',
+          pomName: entry.pomName || '—',
+          toleranceMinus,
+          tolerancePlus,
+          requested: {},
+          measured: {},
+          diff: {},
+          revised: {},
+          comments: {},
+        };
+
+        // Keep size-based data for potential future use, but we'll use base size for display
+        sizeRange.forEach((size: string) => {
+          entryRow.requested[size] = entry.requested?.[size] || '—';
+          entryRow.measured[size] = entry.measured?.[size] || '—';
+          entryRow.diff[size] = entry.diff?.[size] || '—';
+          entryRow.revised[size] = entry.revised?.[size] || '—';
+          entryRow.comments[size] = entry.comments?.[size] || '—';
         });
 
-        const result = await Promise.race<PDFMetadata>([
-          this.generateForKey(cacheKey, options),
-          timeoutPromise,
-        ]);
+        return entryRow;
+      }),
+    }));
 
-        return result;
-      } finally {
-        if (timer) clearTimeout(timer);
-      }
-    }) as Promise<PDFMetadata>;
+    // Prepare How To Measure
+    const howToMeasures = (techpack.howToMeasure || []).map((item: IHowToMeasure) => ({
+      stepNumber: item.stepNumber || 0,
+      pomCode: item.pomCode || '—',
+      pomName: item.pomName || '—',
+      description: item.description || '—',
+      imageUrl: toAbsoluteUrl(item.imageUrl),
+      steps: item.instructions || [],
+      tips: item.tips || [],
+      commonMistakes: item.commonMistakes || [],
+      relatedMeasurements: item.relatedMeasurements || [],
+    }));
 
-    this.inFlight.set(cacheKey, job);
+    // Prepare Colorways
+    const colorways = (techpack.colorways || []).map((colorway: IColorway) => ({
+      name: colorway.name || '—',
+      code: colorway.code || '—',
+      pantoneCode: colorway.pantoneCode || '—',
+      hexColor: colorway.hexColor || '—',
+      rgbColor: colorway.rgbColor ? `rgb(${colorway.rgbColor.r}, ${colorway.rgbColor.g}, ${colorway.rgbColor.b})` : '—',
+      supplier: colorway.supplier || '—',
+      productionStatus: '—', // Not in model
+      approved: colorway.approved ? 'Yes' : 'No',
+      approvalStatus: colorway.approved ? 'Approved' : 'Pending',
+      season: colorway.season || techpack.season || '—',
+      collectionName: colorway.collectionName || techpack.collectionName || '—',
+      notes: colorway.notes || '—',
+      imageUrl: toAbsoluteUrl(colorway.imageUrl),
+      parts: (colorway.parts || []).map((part: IColorwayPart) => ({
+        partName: part.partName || '—',
+        colorName: part.colorName || '—',
+        pantoneCode: part.pantoneCode || '—',
+        hexCode: part.hexCode || '—',
+        rgbCode: part.rgbCode || '—',
+        imageUrl: toAbsoluteUrl(part.imageUrl),
+        supplier: part.supplier || '—',
+        colorType: part.colorType || 'Solid',
+      })),
+    }));
 
-    try {
-      const result = await job;
-      return result;
-    } finally {
-      this.inFlight.delete(cacheKey);
-    }
-  }
+    // Prepare Revision History (will be populated from database in generatePDF method)
+    const revisionHistory: any[] = [];
 
-  async generatePreview(options: PreviewOptions): Promise<string> {
-    const renderOptions: any = {
-      printedBy: options.printedBy,
-      generatedAt: new Date(),
+    // Calculate summary statistics
+    const summary = {
+      bomCount: bomParts.reduce((sum: number, part: any) => sum + part.items.length, 0),
+      uniqueSuppliers: new Set(bomParts.flatMap((part: any) => part.items.map((item: any) => item.supplier).filter((s: string) => s && s !== '—'))).size,
+      approvedMaterials: bomParts.reduce((sum: number, part: any) => sum + part.items.filter((item: any) => item.approved === 'Yes').length, 0),
+      measurementCount: measurementRows.length,
+      criticalMeasurements: measurementRows.filter((r: any) => r.critical).length,
+      sizeRange: sizeRange.join(', '),
+      howToMeasureCount: howToMeasures.length,
+      howToMeasureWithImage: howToMeasures.filter((h: any) => h.imageUrl).length,
+      howToMeasureTips: howToMeasures.reduce((sum: number, h: any) => sum + (h.tips?.length || 0), 0),
+      notesCount: 0, // Will be calculated from packing notes
+      careSymbolCount: 0,
+      lastExport: formatDate(new Date()),
     };
-    if (options.includeSections !== undefined) {
-      renderOptions.includeSections = options.includeSections;
-    }
-    const payload = await buildRenderModel(options.techpack, renderOptions);
 
-    const html = await this.renderTemplate(payload);
-    const browser = await this.getBrowser();
-    const page = await browser.newPage();
-
-    try {
-      await page.setViewport({ width: 1200, height: 1600 });
-      await page.setContent(html, { waitUntil: ['networkidle0', 'domcontentloaded'] });
-      const buffer = await page.screenshot({
-        type: 'png',
-        fullPage: false,
-        clip: { x: 0, y: 0, width: options.width || 1280, height: 960 },
-      });
-      return `data:image/png;base64,${buffer.toString('base64')}`;
-    } finally {
-      await page.close();
-    }
-  }
-
-  async validate(techpack: any) {
-    const errors: string[] = [];
-    if (!techpack.productName) errors.push('Product name is required');
-    if (!techpack.articleCode) errors.push('Article code is required');
-    if (!techpack.version) errors.push('Version is required');
-    if (!Array.isArray(techpack.bom) || techpack.bom.length === 0) {
-      errors.push('At least one BOM item is required');
-    }
-    if (!Array.isArray(techpack.measurements) || techpack.measurements.length === 0) {
-      errors.push('At least one measurement is required');
-    }
     return {
-      isValid: errors.length === 0,
-      errors,
+      meta: {
+        productName: (techpack as any).articleName || (techpack as any).productName || '—',
+        articleCode: techpack.articleCode || '—',
+        version: (techpack as any).sampleType || (techpack as any).version || '—',
+        season: techpack.season || '—',
+        brand: techpack.brand || '—',
+        category: techpack.category || '—',
+        productClass: techpack.category || '—',
+        gender: techpack.gender || '—',
+        fitType: '—',
+        collectionName: techpack.collectionName || '—',
+        supplier: techpack.supplier || '—',
+        updatedAt: formatDate(techpack.updatedAt),
+        createdAt: formatDate(techpack.createdAt),
+        createdByName: techpack.createdByName || '—',
+        designSketchUrl: prepareImageUrl(techpack.designSketchUrl),
+        productDescription: techpack.productDescription || techpack.description || '—',
+        fabricDescription: techpack.fabricDescription || '—',
+        lifecycleStage: techpack.lifecycleStage || '—',
+        status: techpack.status || '—',
+        targetMarket: techpack.targetMarket || '—',
+        pricePoint: techpack.pricePoint || '—',
+        retailPrice: techpack.retailPrice,
+        currency: techpack.currency || 'USD',
+        description: techpack.description || techpack.productDescription || '—',
+        designer: technicalDesignerName,
+      },
+      images: (() => {
+        // Helper to prepare image URL with placeholder fallback
+        const prepareImageUrl = (url?: string): string => {
+          if (!url) {
+            return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
+          }
+          if (url.startsWith('data:image/')) return url;
+          if (url.startsWith('http://') || url.startsWith('https://')) return url;
+          const absoluteUrl = toAbsoluteUrl(url);
+          return absoluteUrl || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
+        };
+        return {
+          companyLogo: prepareImageUrl(techpack.companyLogoUrl),
+          coverImage: prepareImageUrl(techpack.designSketchUrl),
+        };
+      })(),
+      articleSummary,
+      bom: {
+        parts: bomParts,
+        // Calculate statistics from all items across all parts
+        stats: (() => {
+          const allItems = bomParts.flatMap((part) => part.items);
+          return {
+            bomCount: allItems.length,
+            uniqueSuppliers: new Set(allItems.map((item: any) => item.supplier).filter((s: string) => s && s !== '—')).size,
+            approvedMaterials: allItems.filter((item: any) => item.approved === 'Yes').length,
+          };
+        })(),
+      },
+      measurements: {
+        rows: measurementRows,
+        sizeRange,
+        baseSize,
+        baseHighlightColor,
+        rowStripeColor,
+      },
+      sampleMeasurementRounds: sampleRounds,
+      howToMeasures,
+      colorways,
+      packingNotes: techpack.packingNotes || '—',
+      revisionHistory,
+      summary,
+      printedBy: techpack.updatedByName || techpack.createdByName || 'System',
+      generatedAt: formatDate(new Date()),
     };
   }
 
-  async cleanup(filePath: string) {
+  /**
+   * Generate PDF from techpack data
+   */
+  async generatePDF(techpack: TechPackForPDF, options: PDFOptions = {}): Promise<PDFGenerationResult> {
+    if (this.activeGenerations >= this.maxConcurrent) {
+      throw new Error('Maximum concurrent PDF generations reached. Please try again later.');
+    }
+
+    this.activeGenerations++;
+
     try {
-      await unlink(filePath);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        console.warn('Failed to remove temp PDF', filePath, error);
+      const browser = await this.getBrowser();
+      const page = await browser.newPage();
+
+      // Prepare template data
+      const templateData = this.prepareTechPackData(techpack);
+      
+      // Fetch revision history
+      try {
+        const Revision = (await import('../models/revision.model')).default;
+        const revisions = await Revision.find({ techPackId: techpack._id })
+          .populate('createdBy', 'firstName lastName')
+          .sort({ createdAt: -1 })
+          .lean();
+        
+        templateData.revisionHistory = revisions.map((rev: any) => ({
+          version: rev.version || '—',
+          modifiedBy: rev.createdByName || 
+            (rev.createdBy?.firstName && rev.createdBy?.lastName 
+              ? `${rev.createdBy.firstName} ${rev.createdBy.lastName}` 
+              : '—'),
+          modifiedAt: rev.createdAt ? new Date(rev.createdAt).toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+          }) : '—',
+          description: rev.description || (rev.changes?.summary) || '—',
+          status: rev.statusAtChange || '—',
+        }));
+      } catch (error) {
+        console.warn('Could not fetch revision history:', error);
+        templateData.revisionHistory = [];
       }
+
+      // Read and render main template
+      const templatePath = path.join(this.templateDir, 'techpack-full-template.ejs');
+      
+      // Check if full template exists, otherwise use existing template
+      let templateContent: string;
+      try {
+        templateContent = await fs.readFile(templatePath, 'utf-8');
+      } catch {
+        // Fallback to existing template
+        const existingTemplatePath = path.join(this.templateDir, 'techpack-template.ejs');
+        templateContent = await fs.readFile(existingTemplatePath, 'utf-8');
+      }
+
+      // Render HTML with EJS
+      const html = await ejs.render(
+        templateContent,
+        templateData,
+        {
+          async: false,
+          root: this.templateDir,
+        }
+      );
+
+      // Set content
+      await page.setContent(html, {
+        waitUntil: 'networkidle0',
+        timeout: 30000,
+      });
+
+      // Generate PDF - Default to landscape for better table display
+      const pdfOptions: any = {
+        format: options.format || 'A4',
+        landscape: options.orientation !== 'portrait', // Default to landscape
+        printBackground: true,
+        margin: {
+          top: options.margin?.top || '10mm',
+          bottom: options.margin?.bottom || '10mm',
+          left: options.margin?.left || '8mm',
+          right: options.margin?.right || '8mm',
+        },
+        displayHeaderFooter: options.displayHeaderFooter !== false,
+        headerTemplate: options.displayHeaderFooter !== false
+          ? await this.getHeaderTemplate(templateData)
+          : '',
+        footerTemplate: options.displayHeaderFooter !== false
+          ? await this.getFooterTemplate(templateData)
+          : '',
+      };
+
+      const pdfBuffer = await page.pdf(pdfOptions);
+
+      await page.close();
+
+      // Generate filename
+      const sampleType = (techpack as any).sampleType || (techpack as any).version || 'V1';
+      const filename = `Techpack_${techpack.articleCode}_${sampleType}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+      return {
+        buffer: pdfBuffer,
+        filename,
+        size: pdfBuffer.length,
+        pages: Math.ceil(pdfBuffer.length / 10000), // Rough estimate
+      };
+    } catch (error: any) {
+      console.error('PDF generation error:', error);
+      throw new Error(`Failed to generate PDF: ${error.message}`);
+    } finally {
+      this.activeGenerations--;
+    }
+  }
+
+  /**
+   * Get header template for PDF
+   */
+  private async getHeaderTemplate(data: any): Promise<string> {
+    try {
+      const headerPath = path.join(this.templateDir, 'partials', 'header.ejs');
+      const headerContent = await fs.readFile(headerPath, 'utf-8');
+      return ejs.render(headerContent, { meta: data.meta });
+    } catch {
+      return '<div style="font-size: 10px; text-align: center; width: 100%; padding: 10px;"><span class="pageNumber"></span> / <span class="totalPages"></span></div>';
+    }
+  }
+
+  /**
+   * Get footer template for PDF
+   */
+  private async getFooterTemplate(data: any): Promise<string> {
+    try {
+      const footerPath = path.join(this.templateDir, 'partials', 'footer.ejs');
+      const footerContent = await fs.readFile(footerPath, 'utf-8');
+      return ejs.render(footerContent, { meta: data.meta });
+    } catch {
+      return '<div style="font-size: 9px; text-align: center; width: 100%; padding: 10px;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>';
     }
   }
 }
 
-export const pdfService = new PDFService();
-export default pdfService;
+export default new PDFService();
+

@@ -93,6 +93,7 @@ const MeasurementTab: React.FC = () => {
   } = context ?? {};
   const { measurements = [], articleInfo, sampleMeasurementRounds = [] } = state?.techpack ?? {};
   const hasUnsavedChanges = state?.hasUnsavedChanges ?? false;
+  const tableUnit = (state?.techpack?.measurementUnit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT;
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -113,7 +114,6 @@ const MeasurementTab: React.FC = () => {
     pomName: '',
     minusTolerance: 1.0, // Changed to number
     plusTolerance: 1.0, // Changed to number
-    unit: DEFAULT_MEASUREMENT_UNIT,
     sizes: {},
     baseSize: undefined,
     notes: '',
@@ -966,7 +966,7 @@ type RoundModalFormState = {
     const progressionValidation = validateProgression(
       sizes,
       selectedSizes,
-      (formData.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT
+      tableUnit
     );
     
     if (!progressionValidation.isValid && progressionMode === 'strict') {
@@ -986,7 +986,7 @@ type RoundModalFormState = {
       pomName: formData.pomName!,
       minusTolerance: formData.minusTolerance ?? 1.0,
       plusTolerance: formData.plusTolerance ?? 1.0,
-      unit: (formData.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT,
+      unit: tableUnit, // Use table-level unit
       sizes,
       notes: formData.notes || '',
       measurementMethod: formData.measurementMethod || '',
@@ -1011,7 +1011,6 @@ type RoundModalFormState = {
       pomName: '',
       minusTolerance: 1.0,
       plusTolerance: 1.0,
-      unit: DEFAULT_MEASUREMENT_UNIT,
       sizes: {},
       baseSize: selectedSizes[0],
       notes: '',
@@ -1044,7 +1043,6 @@ type RoundModalFormState = {
       ...measurement,
       minusTolerance: minusTol,
       plusTolerance: plusTol,
-      unit: (measurement.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT,
       baseSize: resolvedBaseSize,
       sizes: measurement.sizes || {},
     });
@@ -1234,6 +1232,44 @@ type RoundModalFormState = {
             </p>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Measurement Unit</label>
+            <Select
+              value={tableUnit}
+              onChange={async (value) => {
+                const newUnit = value as MeasurementUnit;
+                // Update local state first
+                updateMeasurementDisplaySettings({ unit: newUnit });
+                // Update all existing measurements to use the new unit
+                measurements.forEach((measurement, index) => {
+                  updateMeasurement(index, { ...measurement, unit: newUnit });
+                });
+                // Wait a bit for state to update, then auto-save to backend
+                if (saveTechPack && state?.techpack?.id) {
+                  try {
+                    // Use setTimeout to ensure state is updated before save
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    // Get updated techpack with new unit
+                    const updatedTechpack = {
+                      ...state.techpack,
+                      measurementUnit: newUnit,
+                    };
+                    await saveTechPack(updatedTechpack);
+                    showSuccess('Measurement unit updated and saved');
+                  } catch (error: any) {
+                    console.error('Failed to save measurement unit:', error);
+                    showError(error?.message || 'Failed to save measurement unit');
+                  }
+                }
+              }}
+              options={measurementUnitOptions}
+              className="w-full"
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              Unit applies to all measurements in this techpack. Changing it updates all measurement values.
+            </p>
+          </div>
+
           <div className="flex flex-wrap items-center gap-3">
             <input
               value={newSizeLabel}
@@ -1316,19 +1352,8 @@ type RoundModalFormState = {
               helperText={validation.getFieldProps('pomName').helperText}
             />
 
-            <Select
-              label="Unit *"
-              value={formData.unit || DEFAULT_MEASUREMENT_UNIT}
-              onChange={handleInputChange('unit')}
-              onBlur={() => validation.setFieldTouched('unit')}
-              options={measurementUnitOptions}
-              required
-              error={validation.getFieldProps('unit').error}
-              helperText={validation.getFieldProps('unit').helperText || 'Applies to tolerances and all size values'}
-            />
-
             <Input
-              label={`Minus Tolerance (${getMeasurementUnitSuffix(formData.unit as MeasurementUnit)}) *`}
+              label={`Minus Tolerance (${getMeasurementUnitSuffix(tableUnit)}) *`}
               value={formData.minusTolerance ?? ''}
               onChange={(value) => handleInputChange('minusTolerance')(typeof value === 'string' ? parseFloat(value) || 0 : value)}
               onBlur={() => validation.setFieldTouched('minusTolerance')}
@@ -1346,7 +1371,7 @@ type RoundModalFormState = {
             />
 
             <Input
-              label={`Plus Tolerance (${getMeasurementUnitSuffix(formData.unit as MeasurementUnit)}) *`}
+              label={`Plus Tolerance (${getMeasurementUnitSuffix(tableUnit)}) *`}
               value={formData.plusTolerance ?? ''}
               onChange={(value) => handleInputChange('plusTolerance')(typeof value === 'string' ? parseFloat(value) || 0 : value)}
               onBlur={() => validation.setFieldTouched('plusTolerance')}
@@ -1378,7 +1403,7 @@ type RoundModalFormState = {
           {/* Size Measurements Grid */}
           <div className="mb-6">
             <h4 className="text-md font-medium text-gray-800 mb-3">
-              Base Size &amp; Jump ({getMeasurementUnitSuffix(formData.unit as MeasurementUnit)})
+              Base Size &amp; Jump ({getMeasurementUnitSuffix(tableUnit)})
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
@@ -1400,7 +1425,7 @@ type RoundModalFormState = {
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-1 block">
-                  Base Measurement ({getMeasurementUnitSuffix(formData.unit as MeasurementUnit)})
+                  Base Measurement ({getMeasurementUnitSuffix(tableUnit)})
                 </label>
                 <input
                   type="number"
@@ -1429,7 +1454,7 @@ type RoundModalFormState = {
                       <div className="text-lg font-semibold text-blue-900">{size}</div>
                       <div className="text-sm text-blue-800 mt-1">
                         {baseValue !== undefined && !Number.isNaN(baseValue)
-                          ? `${formatMeasurementValue(baseValue)} ${getMeasurementUnitSuffix(formData.unit as MeasurementUnit)}`
+                          ? `${formatMeasurementValue(baseValue)} ${getMeasurementUnitSuffix(tableUnit)}`
                           : 'Enter a base value'}
                       </div>
                     </div>
@@ -1454,7 +1479,7 @@ type RoundModalFormState = {
                       Actual:{' '}
                       <span className="font-medium text-gray-700">
                         {displayActual !== '-'
-                          ? `${displayActual} ${getMeasurementUnitSuffix(formData.unit as MeasurementUnit)}`
+                          ? `${displayActual} ${getMeasurementUnitSuffix(tableUnit)}`
                           : '--'}
                       </span>
                     </p>
@@ -1620,10 +1645,9 @@ type RoundModalFormState = {
                   const plusTol = typeof measurement.plusTolerance === 'string'
                     ? parseTolerance(measurement.plusTolerance)
                     : (measurement.plusTolerance ?? 1.0);
-                  const unitSuffix = getMeasurementUnitSuffix((measurement.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT);
                   const toleranceDisplay = minusTol === plusTol 
-                    ? formatTolerance(minusTol, measurement.unit as MeasurementUnit)
-                    : `-${minusTol.toFixed(1)} ${unitSuffix} / +${plusTol.toFixed(1)} ${unitSuffix}`;
+                    ? formatTolerance(minusTol, tableUnit).replace(/\s*(cm|inch)/gi, '')
+                    : `-${minusTol.toFixed(1)} / +${plusTol.toFixed(1)}`;
                   const rowBackgroundColor = validationResult.errors.length > 0
                     ? '#fee2e2'
                     : validationResult.warnings.length > 0
@@ -1681,7 +1705,7 @@ type RoundModalFormState = {
                             } ${isBaseCell ? 'text-slate-900 font-semibold' : ''}`}
                             style={isBaseCell ? { backgroundColor: baseHighlightColor } : undefined}
                           >
-                            {value === undefined || value === null ? '-' : `${displayValue} ${unitSuffix}`}
+                            {value === undefined || value === null ? '-' : displayValue}
                           </td>
                         );
                       })}
@@ -1826,6 +1850,7 @@ type RoundModalFormState = {
             measurementRows={measurementRows}
             sampleRounds={sampleMeasurementRounds}
             availableSizes={selectedSizes}
+            tableUnit={tableUnit}
             getEntryForRound={getEntryForRound}
             onEntrySizeValueChange={handleEntrySizeValueChange}
             onDeleteRound={handleDeleteSampleRound}
@@ -1946,9 +1971,9 @@ type RoundModalFormState = {
           <div className="text-sm text-blue-800">
             <p className="font-medium mb-1">Measurement Guidelines:</p>
             <ul className="list-disc list-inside space-y-1 text-blue-700">
-              <li>Each measurement point stores its own unit (default is centimeters)</li>
+              <li>All measurements use the same unit selected at the table level</li>
               <li>Ensure size progression is logical (each size should be larger than or equal to the previous)</li>
-              <li>Tolerance values follow the selected unit (e.g., 1.0 means ±1.0 {getMeasurementUnitSuffix(formData.unit as MeasurementUnit)})</li>
+              <li>Tolerance values follow the selected unit (e.g., 1.0 means ±1.0 {getMeasurementUnitSuffix(tableUnit)})</li>
               <li>Use consistent tolerance values across similar measurement points</li>
               <li>Zero values are preserved - use empty field to indicate "not measured"</li>
               <li>Complete all measurements in a round before creating a new round</li>
@@ -1981,7 +2006,7 @@ export const validateMeasurementsForSave = (
   const { normalized } = normalizeMeasurementBaseSizes(measurements, options?.defaultBaseSize);
   
   // Only validate fields that exist on the UI form
-  const visibleFields = ['pomCode', 'pomName', 'minusTolerance', 'plusTolerance', 'unit'];
+  const visibleFields = ['pomCode', 'pomName', 'minusTolerance', 'plusTolerance'];
   
   normalized.forEach((item) => {
     const itemErrors: Record<string, string> = {};

@@ -102,7 +102,7 @@ export class SubdocumentController {
         target: {
           type: 'TechPack',
           id: techpack._id as Types.ObjectId,
-          name: techpack.productName
+          name: (techpack as any).articleName || (techpack as any).productName || 'Unknown'
         },
         details: { bomItem: newBOMItem },
         req
@@ -219,7 +219,7 @@ export class SubdocumentController {
         target: {
           type: 'TechPack',
           id: techpack._id as Types.ObjectId,
-          name: techpack.productName
+          name: (techpack as any).articleName || (techpack as any).productName || 'Unknown'
         },
         details: { bomItemId: bomId, updates: req.body },
         req
@@ -329,7 +329,7 @@ export class SubdocumentController {
         target: {
           type: 'TechPack',
           id: techpack._id as Types.ObjectId,
-          name: techpack.productName
+          name: (techpack as any).articleName || (techpack as any).productName || 'Unknown'
         },
         details: { deletedBomItem: deletedItem },
         req
@@ -443,7 +443,7 @@ export class SubdocumentController {
         target: {
           type: 'TechPack',
           id: techpack._id as Types.ObjectId,
-          name: techpack.productName
+          name: (techpack as any).articleName || (techpack as any).productName || 'Unknown'
         },
         details: { measurement: newMeasurement },
         req
@@ -561,7 +561,7 @@ export class SubdocumentController {
         target: {
           type: 'TechPack',
           id: techpack._id as Types.ObjectId,
-          name: techpack.productName
+          name: (techpack as any).articleName || (techpack as any).productName || 'Unknown'
         },
         details: { measurementId, updates: req.body },
         req
@@ -664,7 +664,7 @@ export class SubdocumentController {
         target: {
           type: 'TechPack',
           id: techpack._id as Types.ObjectId,
-          name: techpack.productName
+          name: (techpack as any).articleName || (techpack as any).productName || 'Unknown'
         },
         details: { deletedMeasurement },
         req
@@ -770,7 +770,7 @@ export class SubdocumentController {
         target: {
           type: 'TechPack',
           id: techpack._id as Types.ObjectId,
-          name: techpack.productName
+          name: (techpack as any).articleName || (techpack as any).productName || 'Unknown'
         },
         details: { colorway: newColorway },
         req
@@ -882,7 +882,7 @@ export class SubdocumentController {
         target: {
           type: 'TechPack',
           id: techpack._id as Types.ObjectId,
-          name: techpack.productName
+          name: (techpack as any).articleName || (techpack as any).productName || 'Unknown'
         },
         details: { colorwayId, updates: req.body },
         req
@@ -986,7 +986,7 @@ export class SubdocumentController {
         target: {
           type: 'TechPack',
           id: techpack._id as Types.ObjectId,
-          name: techpack.productName
+          name: (techpack as any).articleName || (techpack as any).productName || 'Unknown'
         },
         details: { deletedColorway },
         req

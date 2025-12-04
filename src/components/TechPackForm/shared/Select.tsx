@@ -18,7 +18,7 @@ const Select: React.FC<SelectProps> = ({
     onChange(e.target.value);
   };
 
-  const selectId = `select-${label.toLowerCase().replace(/\s+/g, '-')}`;
+  const selectId = `select-${(label || 'select').toLowerCase().replace(/\s+/g, '-')}`;
 
   // Normalize options to array of objects
   const normalizedOptions = options.map(option => 
@@ -29,13 +29,15 @@ const Select: React.FC<SelectProps> = ({
 
   return (
     <div className={`flex flex-col space-y-1 ${className}`}>
-      <label 
-        htmlFor={selectId}
-        className="text-sm font-medium text-gray-700 flex items-center"
-      >
-        {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </label>
+      {label && (
+        <label 
+          htmlFor={selectId}
+          className="text-sm font-medium text-gray-700 flex items-center"
+        >
+          {label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+      )}
       
       <select
         id={selectId}

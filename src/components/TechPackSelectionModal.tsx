@@ -153,7 +153,7 @@ export const TechPackSelectionModal: React.FC<TechPackSelectionModalProps> = ({
                           {techPack.status || 'Draft'}
                         </Tag>
                         <Text type="secondary" style={{ fontSize: '12px' }}>
-                          v{techPack.version || '1.0'}
+                          {(techPack as any).sampleType || techPack.version || ''}
                         </Text>
                         <Text type="secondary" style={{ fontSize: '12px' }}>
                           {techPack.updatedAt ? new Date(techPack.updatedAt).toLocaleDateString() : 'N/A'}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTechPack } from '../../contexts/TechPackContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { ApiTechPack, Colorway, SIZE_RANGES } from '../../types/techpack';
+import { ApiTechPack, Colorway, SIZE_RANGES, DEFAULT_MEASUREMENT_UNIT } from '../../types/techpack';
 import ArticleInfoTab, { ArticleInfoTabRef } from './tabs/ArticleInfoTab';
 import BomTab, { BomTabRef } from './tabs/BomTab';
 import MeasurementTab from './tabs/MeasurementTab';
@@ -99,6 +99,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
           tips: htm.tips || [],
           commonMistakes: htm.commonMistakes || [],
           relatedMeasurements: htm.relatedMeasurements || [],
+          note: htm.note || '',
         };
       });
 
@@ -230,6 +231,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
         sampleMeasurementRounds: (initialTechPack as any).sampleMeasurementRounds || [],
         measurementSizeRange: normalizedSizeRange,
         measurementBaseSize: resolvedBaseSize,
+        measurementUnit: (initialTechPack as any).measurementUnit || DEFAULT_MEASUREMENT_UNIT,
         measurementBaseHighlightColor: resolvedBaseHighlight,
         measurementRowStripeColor: resolvedRowStripe,
         howToMeasures: rawHowToMeasures,

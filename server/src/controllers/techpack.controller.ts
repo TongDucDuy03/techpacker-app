@@ -103,6 +103,7 @@ export class TechPackController {
     this.getShareableUsers = this.getShareableUsers.bind(this);
     this.getAccessList = this.getAccessList.bind(this);
     this.updateShareRole = this.updateShareRole.bind(this);
+    this.exportPDF = this.exportPDF.bind(this);
   }
 
 
@@ -165,7 +166,7 @@ export class TechPackController {
       const filterQuery: any = {};
       if (q) {
         const searchRegex = { $regex: q, $options: 'i' };
-        filterQuery.$or = [{ productName: searchRegex }, { articleCode: searchRegex }, { supplier: searchRegex }];
+        filterQuery.$or = [{ articleName: searchRegex }, { articleCode: searchRegex }, { supplier: searchRegex }];
       }
 
       if (status) {
@@ -190,7 +191,7 @@ export class TechPackController {
           .sort(sortOptions)
           .skip(skip)
           .limit(limitNum)
-          .select('articleCode productName brand season status category createdAt updatedAt technicalDesignerId createdBy sharedWith supplier lifecycleStage gender currency version fabricDescription productDescription designSketchUrl companyLogoUrl')
+          .select('articleCode articleName brand season status category createdAt updatedAt technicalDesignerId createdBy sharedWith supplier lifecycleStage gender currency sampleType fabricDescription productDescription designSketchUrl companyLogoUrl')
           .lean(),
         TechPack.countDocuments(query)
       ]);
@@ -224,13 +225,13 @@ export class TechPackController {
       const normalizedCode = articleCode.toUpperCase().trim();
 
       // Check if article code exists
-      const existing = await TechPack.findOne({ articleCode: normalizedCode }).select('_id articleCode productName').lean();
+      const existing = await TechPack.findOne({ articleCode: normalizedCode }).select('_id articleCode articleName').lean();
 
       if (existing) {
         return sendSuccess(res, { 
           exists: true, 
           articleCode: existing.articleCode,
-          productName: existing.productName 
+          articleName: existing.articleName 
         }, 'Article code already exists');
       }
 
@@ -314,8 +315,10 @@ export class TechPackController {
 
       if (mode === 'clone') {
         // --- CLONE LOGIC ---
-        if (!sourceId || !newProductName || !newArticleCode) {
-          return sendError(res, 'Source ID, new product name, and new article code are required for cloning.', 400, 'VALIDATION_ERROR');
+        // Support both old field names (newProductName) and new field names (articleName) for backward compatibility
+        const articleName = req.body.articleName || newProductName;
+        if (!sourceId || !articleName || !newArticleCode) {
+          return sendError(res, 'Source ID, new article name, and new article code are required for cloning.', 400, 'VALIDATION_ERROR');
         }
 
         // Validate articleCode format: only uppercase letters, numbers, dash, underscore
@@ -432,10 +435,10 @@ export class TechPackController {
 
         // Override with new details and reset metadata
         Object.assign(newTechPackData, {
-          productName: newProductName,
+          articleName: articleName,
           articleCode: upperArticleCode,
           status: TechPackStatus.Draft,
-          version: 'v1.0',
+          sampleType: '',
           createdBy: user._id,
           createdByName: `${user.firstName} ${user.lastName}`,
           updatedBy: user._id,
@@ -454,7 +457,7 @@ export class TechPackController {
           version: 'v1.0',
           changeType: 'manual', // Use 'manual' instead of 'clone' (not in enum)
           changes: {
-            summary: `Cloned from ${sourceTechPack.productName} (v${sourceTechPack.version})`,
+            summary: `Cloned from ${sourceTechPack.articleName || (sourceTechPack as any).productName} (${sourceTechPack.sampleType || (sourceTechPack as any).version})`,
             details: { clone: { cloned: 1 }, sourceId: sourceTechPack._id.toString() },
           },
           createdBy: user._id,
@@ -474,10 +477,12 @@ export class TechPackController {
         // --- CREATE FROM SCRATCH LOGIC (existing logic) ---
         const { articleInfo, bom, measurements, colorways, howToMeasures } = restOfBody;
 
-        const productName = articleInfo?.productName || req.body.productName;
+        // Support both old field names (productName, version) and new field names (articleName, sampleType) for backward compatibility
+        const articleName = articleInfo?.articleName || req.body.articleName || articleInfo?.productName || req.body.productName;
         const articleCode = articleInfo?.articleCode || req.body.articleCode;
-        if (!productName || !articleCode) {
-          return sendError(res, 'Product Name and Article Code are required.', 400, 'VALIDATION_ERROR');
+        const sampleType = articleInfo?.sampleType || req.body.sampleType || articleInfo?.version || req.body.version || '';
+        if (!articleName || !articleCode) {
+          return sendError(res, 'Article Name and Article Code are required.', 400, 'VALIDATION_ERROR');
         }
 
         const rawMeasurementSizeRange = Array.isArray(req.body.measurementSizeRange)
@@ -505,11 +510,15 @@ export class TechPackController {
           typeof req.body.measurementRowStripeColor === 'string'
             ? req.body.measurementRowStripeColor
             : '#f3f4f6';
+        const measurementUnit =
+          typeof req.body.measurementUnit === 'string' && ['mm', 'cm', 'inch-10', 'inch-16', 'inch-32'].includes(req.body.measurementUnit)
+            ? req.body.measurementUnit
+            : 'cm';
 
         const techpackData = {
-          productName,
+          articleName,
           articleCode: articleCode.toUpperCase(),
-          version: 'v1.0',
+          sampleType: sampleType,
           supplier: articleInfo?.supplier || req.body.supplier,
           season: articleInfo?.season || req.body.season,
           fabricDescription: articleInfo?.fabricDescription || req.body.fabricDescription,
@@ -540,6 +549,7 @@ export class TechPackController {
           howToMeasure: howToMeasures || [],
           measurementSizeRange,
           measurementBaseSize,
+          measurementUnit,
           measurementBaseHighlightColor,
           measurementRowStripeColor,
           sampleMeasurementRounds: req.body.sampleMeasurementRounds || [],
@@ -638,13 +648,14 @@ export class TechPackController {
       }
 
       // Define whitelist of updatable fields to prevent schema validation errors
+      // Support both old field names (productName, version) and new field names (articleName, sampleType) for backward compatibility
       const allowedFields = [
-        'productName', 'articleCode', 'version', 'supplier', 'season',
+        'articleName', 'productName', 'articleCode', 'sampleType', 'version', 'supplier', 'season',
         'fabricDescription', 'productDescription', 'designSketchUrl', 'companyLogoUrl', 'status', 'category', 'gender', 'brand',
         'technicalDesignerId', 'lifecycleStage', 'collectionName', 'targetMarket', 'pricePoint',
         'retailPrice', 'currency', 'description', 'notes', 'bom',
         'measurements', 'colorways', 'howToMeasure', 'sampleMeasurementRounds',
-        'measurementSizeRange', 'measurementBaseSize', 'measurementBaseHighlightColor', 'measurementRowStripeColor',
+        'measurementSizeRange', 'measurementBaseSize', 'measurementUnit', 'measurementBaseHighlightColor', 'measurementRowStripeColor',
         'packingNotes'
       ];
 
@@ -653,6 +664,76 @@ export class TechPackController {
         updatedBy: user._id,
         updatedByName: `${user.firstName} ${user.lastName}`
       };
+
+      // Handle articleInfo object - map to top level fields
+      if (req.body.articleInfo && typeof req.body.articleInfo === 'object') {
+        const articleInfo = req.body.articleInfo;
+        // Map articleInfo fields to top level
+        if (articleInfo.articleName !== undefined) {
+          updateData.articleName = articleInfo.articleName;
+        }
+        if (articleInfo.articleCode !== undefined) {
+          updateData.articleCode = articleInfo.articleCode;
+        }
+        if (articleInfo.sampleType !== undefined) {
+          updateData.sampleType = articleInfo.sampleType;
+        }
+        if (articleInfo.supplier !== undefined) {
+          updateData.supplier = articleInfo.supplier;
+        }
+        if (articleInfo.season !== undefined) {
+          updateData.season = articleInfo.season;
+        }
+        if (articleInfo.fabricDescription !== undefined) {
+          updateData.fabricDescription = articleInfo.fabricDescription;
+        }
+        if (articleInfo.productDescription !== undefined) {
+          updateData.productDescription = articleInfo.productDescription;
+        }
+        if (articleInfo.designSketchUrl !== undefined) {
+          updateData.designSketchUrl = articleInfo.designSketchUrl;
+        }
+        if (articleInfo.companyLogoUrl !== undefined) {
+          updateData.companyLogoUrl = articleInfo.companyLogoUrl;
+        }
+        if (articleInfo.gender !== undefined) {
+          updateData.gender = articleInfo.gender;
+        }
+        if (articleInfo.productClass !== undefined) {
+          updateData.category = articleInfo.productClass;
+        }
+        if (articleInfo.fitType !== undefined) {
+          updateData.fitType = articleInfo.fitType;
+        }
+        if (articleInfo.technicalDesignerId !== undefined) {
+          updateData.technicalDesignerId = articleInfo.technicalDesignerId;
+        }
+        if (articleInfo.lifecycleStage !== undefined) {
+          updateData.lifecycleStage = articleInfo.lifecycleStage;
+        }
+        if (articleInfo.brand !== undefined) {
+          updateData.brand = articleInfo.brand;
+        }
+        if (articleInfo.collection !== undefined || articleInfo.collectionName !== undefined) {
+          updateData.collectionName = articleInfo.collection || articleInfo.collectionName;
+        }
+        if (articleInfo.targetMarket !== undefined) {
+          updateData.targetMarket = articleInfo.targetMarket;
+        }
+        if (articleInfo.pricePoint !== undefined) {
+          updateData.pricePoint = articleInfo.pricePoint;
+        }
+        if (articleInfo.notes !== undefined) {
+          updateData.notes = articleInfo.notes;
+        }
+        // Backward compatibility
+        if (articleInfo.productName !== undefined && !updateData.articleName) {
+          updateData.articleName = articleInfo.productName;
+        }
+        if (articleInfo.version !== undefined && !updateData.sampleType) {
+          updateData.sampleType = articleInfo.version;
+        }
+      }
 
       // Array fields that need special merging logic
       const arrayFields = ['bom', 'measurements', 'colorways', 'howToMeasure', 'sampleMeasurementRounds'];
@@ -773,6 +854,21 @@ export class TechPackController {
         updateData.measurementBaseSize = techpack.measurementBaseSize;
       }
 
+      // Handle measurementUnit - ensure it's saved if provided
+      if (updateData.measurementUnit !== undefined) {
+        // Validate measurementUnit value (should be 'mm', 'cm', 'inch-10', 'inch-16', or 'inch-32')
+        const validUnits = ['mm', 'cm', 'inch-10', 'inch-16', 'inch-32'];
+        if (validUnits.includes(updateData.measurementUnit)) {
+          // Valid unit, keep it
+        } else {
+          // Invalid unit, use default
+          updateData.measurementUnit = 'cm';
+        }
+      } else if ((techpack as any).measurementUnit) {
+        // Keep current unit if not being updated
+        updateData.measurementUnit = (techpack as any).measurementUnit;
+      }
+
       // Keep a snapshot of the old techpack for revision comparison
       const oldTechPack = techpack.toObject({ virtuals: true }) as ITechPack;
 
@@ -788,7 +884,7 @@ export class TechPackController {
 
       // Compare the old version with the updated in-memory version
       const changes = RevisionService.compareTechPacks(oldTechPack, techpack as ITechPack);
-      let revisionVersion = techpack.version; // Default to current version if no changes
+      let revisionVersion = (techpack as any).sampleType || (techpack as any).version || 'V1'; // Default to current version if no changes
 
       // If there are meaningful changes, increment the version
       if (changes.summary !== 'No changes detected.' && changes.summary !== 'Error detecting changes.') {
@@ -931,7 +1027,7 @@ export class TechPackController {
         cacheService.delPattern('techpack:list:*') // Invalidate all list caches
       ]);
 
-      await logActivity({ userId: user._id, userName: `${user.firstName} ${user.lastName}`, action: ActivityAction.TECHPACK_DELETE, target: { type: 'TechPack', id: techpack._id as Types.ObjectId, name: techpack.productName }, req });
+      await logActivity({ userId: user._id, userName: `${user.firstName} ${user.lastName}`, action: ActivityAction.TECHPACK_DELETE, target: { type: 'TechPack', id: techpack._id as Types.ObjectId, name: (techpack as any).articleName || (techpack as any).productName || 'Unknown' }, req });
       sendSuccess(res, {}, 'TechPack archived successfully');
     } catch (error: any) {
       console.error('Delete TechPack error:', error);
@@ -961,11 +1057,13 @@ export class TechPackController {
       }
 
       const { _id, createdAt, updatedAt, sharedWith, auditLogs, ...techPackData } = originalTechPack;
+      const originalArticleName = (originalTechPack as any).articleName || (originalTechPack as any).productName || 'Unknown';
+      const originalSampleType = (originalTechPack as any).sampleType || (originalTechPack as any).version || '';
       const duplicatedTechPack = await TechPack.create({
         ...techPackData,
         articleCode: `${originalTechPack.articleCode}-COPY`,
-        productName: `${originalTechPack.productName} (Copy)`,
-        version: keepVersion ? originalTechPack.version : 'V1',
+        articleName: `${originalArticleName} (Copy)`,
+        sampleType: keepVersion ? originalSampleType : '',
         status: TechPackStatus.Draft,
         createdBy: user._id,
         updatedBy: user._id,
@@ -973,7 +1071,7 @@ export class TechPackController {
         auditLogs: []
       });
 
-      await logActivity({ userId: user._id, userName: `${user.firstName} ${user.lastName}`, action: ActivityAction.TECHPACK_CREATE, target: { type: 'TechPack', id: duplicatedTechPack._id as Types.ObjectId, name: duplicatedTechPack.productName }, req });
+      await logActivity({ userId: user._id, userName: `${user.firstName} ${user.lastName}`, action: ActivityAction.TECHPACK_CREATE, target: { type: 'TechPack', id: duplicatedTechPack._id as Types.ObjectId, name: (duplicatedTechPack as any).articleName || (duplicatedTechPack as any).productName || 'Unknown' }, req });
       sendSuccess(res, duplicatedTechPack, 'TechPack duplicated successfully', 201);
     } catch (error: any) {
       console.error('Duplicate TechPack error:', error);
@@ -1129,7 +1227,7 @@ export class TechPackController {
         target: {
           type: 'TechPack',
           id: techpack._id as Types.ObjectId,
-          name: techpack.productName
+          name: (techpack as any).articleName || (techpack as any).productName || 'Unknown'
         },
         req,
         details: `Shared with ${targetUser.firstName} ${targetUser.lastName} as ${role}`
@@ -1194,7 +1292,7 @@ export class TechPackController {
         target: {
           type: 'TechPack',
           id: techpack._id as Types.ObjectId,
-          name: techpack.productName
+          name: (techpack as any).articleName || (techpack as any).productName || 'Unknown'
         },
         req,
         details: `Revoked access from ${targetUser?.firstName || 'Unknown'} ${targetUser?.lastName || 'User'}`
@@ -1427,7 +1525,7 @@ export class TechPackController {
         target: {
           type: 'TechPack',
           id: techpack._id as Types.ObjectId,
-          name: techpack.productName
+          name: (techpack as any).articleName || (techpack as any).productName || 'Unknown'
         },
         req,
         details: `Updated ${targetUser.firstName} ${targetUser.lastName} role from ${oldRole} to ${role}`
@@ -1437,6 +1535,70 @@ export class TechPackController {
     } catch (error: any) {
       console.error('Update share role error:', error);
       sendError(res, 'Failed to update role');
+    }
+  }
+
+  /**
+   * Export TechPack as PDF
+   * GET /api/techpacks/:id/pdf
+   */
+  async exportPDF(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { orientation, format } = req.query;
+      const user = req.user!;
+
+      // Get techpack
+      const techpack = await TechPack.findById(id)
+        .populate('technicalDesignerId', 'firstName lastName')
+        .populate('createdBy', 'firstName lastName')
+        .populate('updatedBy', 'firstName lastName')
+        .lean();
+
+      if (!techpack) {
+        return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
+      }
+
+      // Check access
+      const isOwner = techpack.createdBy?.toString() === user._id.toString();
+      const isSharedWith = techpack.sharedWith?.some(s => s.userId.toString() === user._id.toString()) || false;
+
+      if (user.role !== UserRole.Admin && !isOwner && !isSharedWith) {
+        return sendError(res, 'Access denied', 403, 'FORBIDDEN');
+      }
+
+      // Import PDF service
+      const pdfService = (await import('../services/pdf.service')).default;
+
+      // Prepare PDF options - Default to landscape for better table display
+      const pdfOptions = {
+        format: (format as 'A4' | 'Letter' | 'Legal') || 'A4',
+        orientation: (orientation as 'portrait' | 'landscape') || 'landscape',
+        displayHeaderFooter: true,
+        includeImages: true,
+        imageQuality: 90,
+        margin: {
+          top: '10mm',
+          bottom: '10mm',
+          left: '10mm',
+          right: '10mm',
+        },
+      };
+
+      // Generate PDF (techpack is already a lean object from .lean() call)
+      // Type assertion needed because .lean() returns FlattenMaps type which doesn't match ITechPack exactly
+      const result = await pdfService.generatePDF(techpack as any, pdfOptions);
+
+      // Set response headers
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+      res.setHeader('Content-Length', result.size.toString());
+
+      // Send PDF buffer
+      res.send(result.buffer);
+    } catch (error: any) {
+      console.error('Export PDF error:', error);
+      sendError(res, `Failed to export PDF: ${error.message}`, 500, 'PDF_GENERATION_ERROR');
     }
   }
 

@@ -87,9 +87,9 @@ const colorwaySpecSchema = z.object({
 // Create tech pack schema
 export const createTechPackSchema = z.object({
   body: z.object({
-    productName: z.string().min(1, 'Product name is required'),
+    articleName: z.string().min(1, 'Article name is required'),
     articleCode: z.string().min(1, 'Article code is required').transform(val => val.toUpperCase()),
-    version: z.string().optional().default('V1'),
+    sampleType: z.string().max(120, 'Sample type must be 120 characters or less').optional(),
     technicalDesignerId: objectIdSchema,
     customerId: z.string().optional(),
     supplier: z.string().min(1, 'Supplier is required'),
@@ -132,9 +132,9 @@ export const updateTechPackSchema = z.object({
     id: objectIdSchema
   }),
   body: z.object({
-    productName: z.string().min(1, 'Product name is required').optional(),
+    articleName: z.string().min(1, 'Article name is required').optional(),
     articleCode: z.string().min(1, 'Article code is required').transform(val => val.toUpperCase()).optional(),
-    version: z.string().optional(),
+    sampleType: z.string().max(120, 'Sample type must not exceed 120 characters').optional(),
     technicalDesignerId: objectIdSchema.optional(),
     customerId: z.string().optional(),
     supplier: z.string().min(1, 'Supplier is required').optional(),

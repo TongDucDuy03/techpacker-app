@@ -3,8 +3,7 @@ import { useAuth } from './AuthContext';
 import { ApiTechPack, CreateTechPackInput, TechPackListResponse, TechPackFormState, MeasurementPoint, HowToMeasure, BomItem, Colorway, ColorwayPart, MeasurementSampleRound, MeasurementSampleEntry, MeasurementSampleValueMap, MeasurementRequestedSource, SIZE_RANGES, DEFAULT_MEASUREMENT_UNIT, MeasurementUnit } from '../types/techpack';
 import { normalizeMeasurementBaseSizes } from '../utils/measurements';
 import { api } from '../lib/api';
-import { showPromise, showError } from '../lib/toast';
-import { exportTechPackToPDF as clientExportToPDF } from '../utils/pdfExport';
+import { showPromise, showError, showSuccess } from '../lib/toast';
 import { DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR, DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR } from '../constants/measurementDisplay';
 import { useDebouncedCallback } from '../hooks/useDebounce';
 
@@ -28,7 +27,7 @@ interface TechPackContextType {
   updateFormState: (updates: Partial<ApiTechPack>) => void;
   resetFormState: () => void;
   saveTechPack: (techpackOverride?: TechPackFormState['techpack']) => Promise<void>;
-  exportToPDF: () => void;
+  exportToPDF: () => Promise<void>;
   addMeasurement: (measurement: MeasurementPoint) => void;
   insertMeasurementAt: (index: number, measurement: MeasurementPoint) => void;
   updateMeasurement: (index: number, measurement: MeasurementPoint) => void;
@@ -58,7 +57,7 @@ interface TechPackContextType {
   removeColorwayAssignment: (colorwayId: string, bomItemId: string) => void;
   updateMeasurementSizeRange: (sizes: string[]) => void;
   updateMeasurementBaseSize: (baseSize: string) => void;
-  updateMeasurementDisplaySettings: (settings: { baseHighlightColor?: string; rowStripeColor?: string }) => void;
+  updateMeasurementDisplaySettings: (settings: { baseHighlightColor?: string; rowStripeColor?: string; unit?: MeasurementUnit }) => void;
 }
 
 const TechPackContext = createContext<TechPackContextType | undefined>(undefined);
@@ -800,6 +799,7 @@ const createEmptyTechpack = (): TechPackFormState['techpack'] => ({
   status: 'Draft',
   measurementSizeRange: [...SIZE_RANGES['Unisex']],
   measurementBaseSize: SIZE_RANGES['Unisex'][0],
+  measurementUnit: DEFAULT_MEASUREMENT_UNIT,
   measurementBaseHighlightColor: DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR,
   measurementRowStripeColor: DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR,
   packingNotes: '',
@@ -1292,7 +1292,9 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
   const saveTechPack = async (techpackOverride?: TechPackFormState['techpack']) => {
     setState(prev => ({ ...prev, isSaving: true }));
     try {
-      const techpackData = techpackOverride ?? state.techpack;
+      // Get the latest state to ensure we have the most up-to-date measurementUnit
+      const latestState = state;
+      const techpackData = techpackOverride ?? latestState.techpack;
 
       const {
         measurementsWithBase,
@@ -1318,6 +1320,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           relatedMeasurements: howToMeasure?.relatedMeasurements || [],
           language: howToMeasure?.language || 'en-US',
           videoUrl: howToMeasure?.videoUrl || '',
+          note: howToMeasure?.note || '',
         };
 
         const existingId = (howToMeasure as any)._id || howToMeasure?.id;
@@ -1403,10 +1406,13 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
       // If techpack has an ID, update existing; otherwise create new
       if (techpackData.id && techpackData.id !== '') {
         // For updates, use PATCH with flat fields expected by backend patch handler
+        // Get measurementUnit from techpackData or latest state, ensuring we use the actual selected value
+        // Priority: techpackData.measurementUnit > latestState.techpack.measurementUnit > DEFAULT
+        const currentMeasurementUnit = techpackData.measurementUnit || latestState.techpack.measurementUnit || DEFAULT_MEASUREMENT_UNIT;
         const updatePayload = {
-          productName: techpackData.articleInfo.productName,
+          articleName: techpackData.articleInfo.articleName || (techpackData.articleInfo as any).productName || '',
           articleCode: techpackData.articleInfo.articleCode,
-          version: techpackData.articleInfo.version.toString(),
+          sampleType: techpackData.articleInfo.sampleType || (techpackData.articleInfo as any).version?.toString() || '',
           supplier: techpackData.articleInfo.supplier || '',
           season: techpackData.articleInfo.season,
           fabricDescription: techpackData.articleInfo.fabricDescription || '',
@@ -1433,6 +1439,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           sampleMeasurementRounds: sampleMeasurementRoundsPayload,
           measurementSizeRange: techpackData.measurementSizeRange || [],
           measurementBaseSize: techpackData.measurementBaseSize || techpackData.measurementSizeRange?.[0] || '',
+          measurementUnit: currentMeasurementUnit,
           measurementBaseHighlightColor: techpackData.measurementBaseHighlightColor || DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR,
           measurementRowStripeColor: techpackData.measurementRowStripeColor || DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR,
           packingNotes: techpackData.packingNotes || '',
@@ -1455,6 +1462,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         }
       } else {
         // For create, send nested articleInfo to satisfy route validation
+        // Get measurementUnit from techpackData or latest state, ensuring we use the actual selected value
+        const currentMeasurementUnitForCreate = techpackData.measurementUnit || latestState.techpack.measurementUnit || DEFAULT_MEASUREMENT_UNIT;
         const createPayload: CreateTechPackInput = {
           articleInfo: {
             productName: techpackData.articleInfo.productName,
@@ -1483,6 +1492,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           status: techpackData.status as any,
           measurementSizeRange: techpackData.measurementSizeRange || [],
           measurementBaseSize: techpackData.measurementBaseSize || techpackData.measurementSizeRange?.[0],
+          measurementUnit: currentMeasurementUnitForCreate,
           measurementBaseHighlightColor: techpackData.measurementBaseHighlightColor || DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR,
           measurementRowStripeColor: techpackData.measurementRowStripeColor || DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR,
           packingNotes: techpackData.packingNotes || '',
@@ -1522,68 +1532,41 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const exportToPDF = () => {
-    // If the techpack has been saved to the server, request server-generated PDF
-    const techpackId = state.techpack?.id || state.techpack?.articleInfo?.articleCode;
-    // Prefer server PDF when we have an id
-    if (techpackId) {
-      const useLandscape = true;
-      (async () => {
-        try {
-          // Show loading message
-          const loadingToast = showPromise(
-            api.get(`/techpacks/${techpackId}/pdf`, { 
-              responseType: 'blob', // Use blob for easier handling
-              params: { landscape: useLandscape ? 'true' : 'false' },
-              timeout: 300000, // 5 minutes timeout for large PDFs
-            }),
-            {
-              loading: 'Generating PDF...',
-              success: 'PDF generated successfully! Downloading...',
-              error: (err) => err.message || 'Failed to generate PDF',
-            }
-          );
+  const exportToPDF = async () => {
+    try {
+      if (!state.techpack.id) {
+        showError('Cannot export PDF: TechPack ID is missing. Please save the TechPack first.');
+        return;
+      }
 
-          const response = await loadingToast;
-          
-          // Create blob from response
-          const blob = response.data instanceof Blob 
-            ? response.data 
-            : new Blob([response.data], { type: 'application/pdf' });
-          
-          // Create download link and trigger download
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          const filename = `Techpack_${state.techpack.articleInfo.articleCode || 'techpack'}_v${state.techpack.articleInfo.version || 1}.pdf`;
-          link.download = filename;
-          link.style.display = 'none';
-          
-          // Append to body, click, then remove
-          document.body.appendChild(link);
-          link.click();
-          
-          // Cleanup
-          setTimeout(() => {
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-          }, 100);
-          
-        } catch (err: any) {
-          showError(err?.message || 'Failed to export PDF from server. Falling back to client export.');
-          // Fallback to client-side export (HTML print)
-          try {
-            clientExportToPDF(state.techpack as any);
-          } catch (e) {
-            showError('Client-side export failed as well.');
-          }
-        }
-      })();
-      return;
+      // Call PDF export API
+      const blob = await api.exportTechPackPDF(state.techpack.id, {
+        orientation: 'portrait',
+        format: 'A4',
+      });
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Generate filename from techpack data
+      const articleCode = state.techpack.articleInfo?.articleCode || state.techpack.id;
+      const version = state.techpack.articleInfo?.sampleType || state.techpack.articleInfo?.version || '';
+      const filename = `Techpack_${articleCode}_${version}.pdf`;
+      
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      showSuccess('PDF exported successfully!');
+    } catch (error: any) {
+      console.error('PDF export error:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to export PDF';
+      showError(`PDF export failed: ${errorMessage}`);
     }
-
-    // If not saved on server, fall back to client-side HTML export/print
-    clientExportToPDF(state.techpack as any);
   };
 
   const persistMeasurementSettings = async (techpackSnapshot: TechPackFormState['techpack']) => {
@@ -1600,6 +1583,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         measurementSizeRange: techpackSnapshot.measurementSizeRange || [],
         measurementBaseSize:
           techpackSnapshot.measurementBaseSize || techpackSnapshot.measurementSizeRange?.[0] || '',
+        measurementUnit: (techpackSnapshot as any).measurementUnit || DEFAULT_MEASUREMENT_UNIT,
         measurementBaseHighlightColor:
           techpackSnapshot.measurementBaseHighlightColor || DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR,
         measurementRowStripeColor:
@@ -1702,10 +1686,11 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const updateMeasurementDisplaySettings = (settings: { baseHighlightColor?: string; rowStripeColor?: string }) => {
+  const updateMeasurementDisplaySettings = (settings: { baseHighlightColor?: string; rowStripeColor?: string; unit?: MeasurementUnit }) => {
     setState(prev => {
       const currentBaseHighlight = prev.techpack.measurementBaseHighlightColor || DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR;
       const currentRowStripe = prev.techpack.measurementRowStripeColor || DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR;
+      const currentUnit = prev.techpack.measurementUnit || DEFAULT_MEASUREMENT_UNIT;
       const nextBaseHighlight =
         settings.baseHighlightColor === undefined
           ? currentBaseHighlight
@@ -1714,8 +1699,9 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         settings.rowStripeColor === undefined
           ? currentRowStripe
           : resolveMeasurementColor(settings.rowStripeColor, currentRowStripe);
+      const nextUnit = settings.unit !== undefined ? settings.unit : currentUnit;
 
-      if (nextBaseHighlight === currentBaseHighlight && nextRowStripe === currentRowStripe) {
+      if (nextBaseHighlight === currentBaseHighlight && nextRowStripe === currentRowStripe && nextUnit === currentUnit) {
         return prev;
       }
 
@@ -1725,6 +1711,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           ...prev.techpack,
           measurementBaseHighlightColor: nextBaseHighlight,
           measurementRowStripeColor: nextRowStripe,
+          measurementUnit: nextUnit,
         },
         hasUnsavedChanges: true,
       };

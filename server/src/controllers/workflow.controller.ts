@@ -82,7 +82,7 @@ export class WorkflowController {
       if (oldStatus !== newStatus) {
         const revision = new Revision({
           techPackId: techpack._id,
-          version: techpack.version,
+          version: (techpack as any).sampleType || (techpack as any).version || 'V1',
           changes: {
             summary: `Status changed from ${oldStatus} to ${newStatus}`,
             details: {
@@ -119,7 +119,7 @@ export class WorkflowController {
         target: {
           type: 'TechPack',
           id: techpack._id as Types.ObjectId,
-          name: techpack.productName
+          name: (techpack as any).articleName || (techpack as any).productName || 'Unknown'
         },
         details: {
           action,
@@ -136,7 +136,8 @@ export class WorkflowController {
         data: {
           techpack: {
             id: techpack._id,
-            productName: techpack.productName,
+            articleName: (techpack as any).articleName || (techpack as any).productName || 'Unknown',
+            productName: (techpack as any).articleName || (techpack as any).productName || 'Unknown', // Backward compatibility
             articleCode: techpack.articleCode,
             status: techpack.status,
             updatedAt: techpack.updatedAt
@@ -291,9 +292,10 @@ export class WorkflowController {
 
       // Create new revision before reverting
       const currentSnapshot = techpack.toObject();
+      const currentVersion = (techpack as any).sampleType || (techpack as any).version || 'V1';
       const newRevision = new Revision({
         techPackId: techpack._id,
-        version: `${techpack.version}-REVERT`,
+        version: `${currentVersion}-REVERT`,
         changes: [{
           field: 'revert',
           oldValue: 'Current state',
@@ -324,7 +326,7 @@ export class WorkflowController {
         target: {
           type: 'TechPack',
           id: techpack._id as Types.ObjectId,
-          name: techpack.productName
+          name: (techpack as any).articleName || (techpack as any).productName || 'Unknown'
         },
         details: {
           action: 'revert',
