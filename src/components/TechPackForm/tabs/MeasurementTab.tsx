@@ -640,17 +640,146 @@ type RoundModalFormState = {
   }, [deleteSampleMeasurementRound]);
 
   const handleSaveSampleRound = useCallback(async (roundId: string) => {
-    if (!saveTechPack) return;
+    if (!saveTechPack || !state?.techpack) return;
     
     try {
-      // Lưu toàn bộ TechPack (bao gồm sample measurement rounds)
-      // Logic hiện tại đã đảm bảo: các sizes không được điền sẽ giữ nguyên giá trị requested
+      // Tìm round đang được lưu
+      const round = sampleMeasurementRounds.find(r => r.id === roundId);
+      
+      console.log('='.repeat(80));
+      console.log('🔍 SAVING SAMPLE ROUND:', roundId);
+      console.log('📦 Round:', JSON.stringify(round, null, 2));
+      console.log('📏 Current measurements count:', measurements.length);
+      measurements.forEach((m, idx) => {
+        console.log(`  [${idx}] ${m.pomCode} (id: ${m.id}):`, m.sizes);
+      });
+      
+      // Tạo bản sao measurements để cập nhật
+      let updatedMeasurements = [...measurements];
+      let hasUpdates = false;
+      
+      if (round && round.measurements) {
+        console.log('✅ Round has measurements, processing...');
+        // Duyệt qua các entries trong round
+        for (const entry of round.measurements) {
+          console.log('📝 Processing entry:', {
+            measurementId: entry.measurementId,
+            pomCode: entry.pomCode,
+            revised: entry.revised
+          });
+          
+          // Tìm measurement tương ứng chỉ bằng pomCode (vì measurementId thường là undefined)
+          const measurementIndex = updatedMeasurements.findIndex(
+            m => m.pomCode === entry.pomCode
+          );
+          
+          console.log('🔎 Found measurement at index:', measurementIndex);
+          
+          if (measurementIndex !== -1 && entry.revised) {
+            const measurement = updatedMeasurements[measurementIndex];
+            
+            // Lấy giá trị revised và cập nhật vào measurement.sizes
+            const updatedSizes = { ...measurement.sizes };
+            let hasRevised = false;
+            
+            // Duyệt qua các sizes trong revised
+            Object.keys(entry.revised).forEach(sizeKey => {
+              const revisedValue = entry.revised[sizeKey];
+              console.log(`  - Size ${sizeKey}: revised value = ${revisedValue}`);
+              
+              // Chỉ cập nhật nếu revised có giá trị (không null, undefined, hoặc chuỗi rỗng)
+              if (revisedValue !== null && revisedValue !== undefined && String(revisedValue).trim() !== '') {
+                const numValue = parseFloat(String(revisedValue));
+                if (!isNaN(numValue)) {
+                  console.log(`    ✅ Updating size ${sizeKey}: ${measurement.sizes?.[sizeKey]} → ${numValue}`);
+                  updatedSizes[sizeKey] = numValue;
+                  hasRevised = true;
+                }
+              }
+            });
+            
+            // Nếu có giá trị revised, cập nhật measurement trong mảng
+            if (hasRevised) {
+              updatedMeasurements[measurementIndex] = {
+                ...measurement,
+                sizes: updatedSizes
+              };
+              hasUpdates = true;
+              console.log('✅ Updated measurement:', updatedMeasurements[measurementIndex]);
+            }
+          }
+        }
+      }
+      
+      console.log('📊 Has updates:', hasUpdates);
+      console.log('📊 Updated measurements:', updatedMeasurements);
+      
+      // Nếu có cập nhật measurements, cập nhật từng measurement VÀ tính lại sizes khác
+      if (hasUpdates && updateMeasurement) {
+        // Cập nhật đồng bộ từng measurement
+        for (let i = 0; i < updatedMeasurements.length; i++) {
+          const oldMeasurement = measurements[i];
+          const updatedMeasurement = updatedMeasurements[i];
+          const oldSizes = oldMeasurement?.sizes || {};
+          const newSizes = updatedMeasurement?.sizes || {};
+          
+          // Kiểm tra xem sizes có thay đổi không
+          const sizesChanged = JSON.stringify(oldSizes) !== JSON.stringify(newSizes);
+          
+          if (sizesChanged) {
+            console.log(`🔄 Updating measurement ${i}:`, {
+              pomCode: updatedMeasurement.pomCode,
+              old: oldSizes,
+              new: newSizes
+            });
+            
+            // Tìm baseSize cho measurement này
+            const baseSize = updatedMeasurement.baseSize || measurementBaseSize;
+            
+            if (baseSize && newSizes[baseSize] !== undefined) {
+              // Tính adjustments từ sizes CŨ (trước khi cập nhật)
+              const adjustments = deriveAdjustmentsFromSizes(oldSizes, baseSize);
+              console.log(`  📐 Base size: ${baseSize}, Adjustments:`, adjustments);
+              
+              // Tính lại TẤT CẢ sizes dựa trên base value MỚI và adjustments cũ
+              const recalculatedSizes = recalcSizesFromBase(
+                baseSize,
+                newSizes[baseSize],
+                adjustments,
+                selectedSizes
+              );
+              
+              console.log(`  ✨ Recalculated sizes:`, recalculatedSizes);
+              
+              // Cập nhật measurement với sizes đã được tính lại
+              updateMeasurement(i, {
+                ...updatedMeasurement,
+                sizes: recalculatedSizes
+              });
+            } else {
+              // Nếu không có baseSize, chỉ cập nhật sizes mới
+              updateMeasurement(i, updatedMeasurement);
+            }
+          }
+        }
+        
+        // Đợi một chút để state cập nhật
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      // Lưu toàn bộ TechPack
       await saveTechPack();
-      showSuccess('Sample measurement round saved successfully');
+      
+      if (hasUpdates) {
+        showSuccess('Sample round saved and measurements updated from revised values');
+      } else {
+        showSuccess('Sample measurement round saved successfully');
+      }
     } catch (error: any) {
+      console.error('❌ Error saving sample round:', error);
       showError(error.message || 'Failed to save sample measurement round');
     }
-  }, [saveTechPack]);
+  }, [saveTechPack, sampleMeasurementRounds, measurements, state?.techpack, updateMeasurement, measurementBaseSize, deriveAdjustmentsFromSizes, recalcSizesFromBase, selectedSizes]);
 
   const getDateInputValue = useCallback((value?: string) => {
     if (!value) return '';
@@ -1850,6 +1979,7 @@ type RoundModalFormState = {
             measurementRows={measurementRows}
             sampleRounds={sampleMeasurementRounds}
             availableSizes={selectedSizes}
+            baseSize={measurementBaseSize}
             tableUnit={tableUnit}
             getEntryForRound={getEntryForRound}
             onEntrySizeValueChange={handleEntrySizeValueChange}

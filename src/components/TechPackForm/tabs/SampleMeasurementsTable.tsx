@@ -16,6 +16,7 @@ interface SampleMeasurementsTableProps {
   measurementRows: SampleMeasurementRow[];
   sampleRounds: MeasurementSampleRound[];
   availableSizes: string[];
+  baseSize?: string; // Base size to display in sample measurements table
   tableUnit?: MeasurementUnit; // Unit from table level
   getEntryForRound: (
     round: MeasurementSampleRound,
@@ -149,16 +150,23 @@ const resolveValue = (
   return value === undefined || value === null ? '' : String(value);
 };
 
-const SAMPLE_BOUND_SIZE = 'M';
-
-const getVisibleSampleSizes = (_sizeKeys: string[]): string[] => {
-  return [SAMPLE_BOUND_SIZE];
+const getVisibleSampleSizes = (sizeKeys: string[], baseSize?: string): string[] => {
+  // If baseSize is provided and exists in sizeKeys, return only that size
+  if (baseSize && sizeKeys.includes(baseSize)) {
+    return [baseSize];
+  }
+  // Fallback: if no baseSize or baseSize not in sizeKeys, return 'M' or first available
+  if (sizeKeys.includes('M')) {
+    return ['M'];
+  }
+  return sizeKeys.length > 0 ? [sizeKeys[0]] : ['M'];
 };
 
 const SampleMeasurementsTable: React.FC<SampleMeasurementsTableProps> = ({
   measurementRows,
   sampleRounds,
   availableSizes,
+  baseSize,
   tableUnit = DEFAULT_MEASUREMENT_UNIT,
   getEntryForRound,
   onEntrySizeValueChange,
@@ -255,7 +263,7 @@ const getDiffToneClass = (value: string): string => {
         <tbody className="bg-white divide-y divide-gray-100">
           {measurementRows.map((row, rowIndex) => {
             const rawSizeKeys = getSizeKeysForRow(row, sampleRounds, availableSizes, getEntryForRound);
-            const sizeKeys = getVisibleSampleSizes(rawSizeKeys);
+            const sizeKeys = getVisibleSampleSizes(rawSizeKeys, baseSize);
             const tolerance = getToleranceDisplay(row, tableUnit);
             const unitSuffix = getMeasurementUnitSuffix(tableUnit);
             const measurementMethod = row.measurement?.measurementMethod;
