@@ -416,10 +416,37 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
       if (response.data.success) {
         const imageUrl = response.data.data.url;
         const fullImageUrl = getImageUrl(imageUrl);
-        setFormData(prev => ({ ...prev, imageUrl: fullImageUrl }));
+        
+        console.log('📷 [handleImageUpload] imageUrl from server:', imageUrl);
+        console.log('📷 [handleImageUpload] fullImageUrl:', fullImageUrl);
+        console.log('📷 [handleImageUpload] editingId:', editingId);
+        
+        setFormData(prev => {
+          console.log('📷 [handleImageUpload] prev formData:', prev);
+          const updated = { ...prev, imageUrl: fullImageUrl };
+          console.log('📷 [handleImageUpload] updated formData:', updated);
+          return updated;
+        });
         setImagePreview(fullImageUrl);
         validation.validateField('imageUrl', fullImageUrl);
         setUploadError(null);
+        
+        // If editing an existing construction, update it in context immediately
+        // This ensures the image is saved even if user closes modal without clicking Save
+        if (editingId) {
+          const existingConstruction = constructions.find(c => c.id === editingId);
+          if (existingConstruction) {
+            const updatedConstruction = {
+              ...existingConstruction,
+              imageUrl: fullImageUrl
+            };
+            updateHowToMeasureById(editingId, updatedConstruction);
+            console.log('📷 [handleImageUpload] Updated existing construction in context');
+          }
+        } else {
+          console.log('📷 [handleImageUpload] Creating new construction - image will be saved when Save button clicked');
+        }
+        
         showSuccess('Image uploaded successfully');
       } else {
         setUploadError(response.data.message || 'Failed to upload image.');
@@ -458,72 +485,108 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
   };
 
   const handleSubmit = (saveAsRequested: boolean = false) => {
-    // Validate the entire form before submission
-    const validationResult = validation.validateForm(formData);
-    const itemValidation = validateConstructionItem(formData, measurements);
-
-    if (!validationResult.isValid || !itemValidation.isValid) {
-      // Mark all fields as touched to show validation errors
-      Object.keys(howToMeasureValidationSchema).forEach(field => {
-        validation.setFieldTouched(field, true);
-      });
+    try {
+      console.log('🔍 [handleSubmit] START');
+      console.log('🔍 [handleSubmit] formData:', formData);
+      console.log('🔍 [handleSubmit] formData.imageUrl:', formData.imageUrl);
+      console.log('🔍 [handleSubmit] formData.pomCode:', formData.pomCode);
       
-      // Focus on first error field
-      setTimeout(() => {
-        const firstErrorField = document.querySelector('[data-error="true"]') as HTMLElement;
-        if (firstErrorField) {
-          firstErrorField.focus();
-          firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Validate the entire form before submission
+      console.log('🔍 [handleSubmit] Starting validation...');
+      
+      // Skip validation if we have an image - allow saving construction with just an image
+      const hasImage = formData.imageUrl && formData.imageUrl.trim().length > 0;
+      const hasContent = (formData.pomCode && formData.pomCode.trim().length > 0) ||
+                         (formData.description && formData.description.trim().length >= 10) ||
+                         (formData.steps && formData.steps.length > 0);
+      
+      if (hasImage && !hasContent) {
+        console.log('✅ [handleSubmit] Has image only - skipping validation');
+      } else {
+        const validationResult = validation.validateForm(formData);
+        const itemValidation = validateConstructionItem(formData, measurements);
+
+        console.log('🔍 [handleSubmit] validationResult:', validationResult);
+        console.log('🔍 [handleSubmit] itemValidation:', itemValidation);
+
+        if (!validationResult.isValid || !itemValidation.isValid) {
+          console.log('❌ [handleSubmit] Validation failed!');
+          console.log('❌ validation errors:', validationResult.errors);
+          console.log('❌ item errors:', itemValidation.errors);
+          
+          // Mark all fields as touched to show validation errors
+          Object.keys(howToMeasureValidationSchema).forEach(field => {
+            validation.setFieldTouched(field, true);
+          });
+          
+          // Focus on first error field
+          setTimeout(() => {
+            const firstErrorField = document.querySelector('[data-error="true"]') as HTMLElement;
+            if (firstErrorField) {
+              firstErrorField.focus();
+              firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 100);
+          
+          return;
         }
-      }, 100);
-      
-      return;
+      }
+
+      // Validate status transitions
+      // Approval disabled
+
+      const status = saveAsRequested ? 'Requested' : ((formData as any).status || 'Draft');
+      const comments = (formData as any).comments || '';
+      const videoUrl = formData.videoUrl || '';
+
+      const pomName = formData.pomName || measurementNameMap.get(formData.pomCode || '') || '';
+      const stepNumber = typeof formData.stepNumber === 'number'
+        ? formData.stepNumber
+        : Number((formData as any).stepNumber) || constructions.length + 1;
+   
+      // Encode metadata into videoUrl field
+      const encodedVideoUrl = encodeMetadata(videoUrl, status, comments);
+   
+      const construction: HowToMeasure = {
+        id: editingId || generateUUID(),
+        pomCode: formData.pomCode || `GENERIC-${Date.now()}`,
+        description: formData.description || 'Construction detail',
+        imageUrl: formData.imageUrl || '',
+        steps: formData.steps || [],
+        videoUrl: encodedVideoUrl,
+        language: formData.language || 'en-US',
+        pomName,
+        stepNumber,
+        instructions: formData.steps || [],
+        tips: formData.tips || [],
+        commonMistakes: formData.commonMistakes || [],
+        relatedMeasurements: formData.relatedMeasurements || [],
+        note: formData.note || '',
+      };
+
+      console.log('✅ [handleSubmit] construction object:', construction);
+      console.log('✅ [handleSubmit] construction.imageUrl:', construction.imageUrl);
+
+      if (editingId) {
+        // Check if item is approved
+        // Approved lock removed
+        
+        console.log('✅ [handleSubmit] Updating existing construction');
+        updateHowToMeasureById(editingId, construction);
+        showSuccess('Construction updated successfully');
+      } else {
+        console.log('✅ [handleSubmit] Adding new construction');
+        addHowToMeasure(construction);
+        showSuccess('Construction added successfully');
+      }
+
+      console.log('✅ [handleSubmit] Resetting form');
+      resetForm();
+      console.log('✅ [handleSubmit] DONE');
+    } catch (error) {
+      console.error('💥 [handleSubmit] ERROR:', error);
+      showError('Failed to save construction: ' + (error as Error).message);
     }
-
-    // Validate status transitions
-    // Approval disabled
-
-    const status = saveAsRequested ? 'Requested' : ((formData as any).status || 'Draft');
-    const comments = (formData as any).comments || '';
-    const videoUrl = formData.videoUrl || '';
-
-    const pomName = formData.pomName || measurementNameMap.get(formData.pomCode || '') || '';
-    const stepNumber = typeof formData.stepNumber === 'number'
-      ? formData.stepNumber
-      : Number((formData as any).stepNumber) || constructions.length + 1;
- 
-    // Encode metadata into videoUrl field
-    const encodedVideoUrl = encodeMetadata(videoUrl, status, comments);
- 
-    const construction: HowToMeasure = {
-      id: editingId || generateUUID(),
-      pomCode: formData.pomCode!,
-      description: formData.description!,
-      imageUrl: formData.imageUrl || '',
-      steps: formData.steps || [],
-      videoUrl: encodedVideoUrl,
-      language: formData.language || 'en-US',
-      pomName,
-      stepNumber,
-      instructions: formData.steps || [],
-      tips: formData.tips || [],
-      commonMistakes: formData.commonMistakes || [],
-      relatedMeasurements: formData.relatedMeasurements || [],
-      note: formData.note || '',
-    };
-
-    if (editingId) {
-      // Check if item is approved
-      // Approved lock removed
-      
-      updateHowToMeasureById(editingId, construction);
-      showSuccess('Construction updated successfully');
-    } else {
-      addHowToMeasure(construction);
-      showSuccess('Construction added successfully');
-    }
-
-    resetForm();
   };
 
   const resetForm = () => {
