@@ -1933,24 +1933,14 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addHowToMeasure = (howToMeasure: HowToMeasure) => {
-    console.log('🔧 [addHowToMeasure] Adding construction:', howToMeasure);
-    console.log('🔧 [addHowToMeasure] imageUrl:', howToMeasure.imageUrl);
-    
-    setState(prev => {
-      const updated = {
-        ...prev,
-        techpack: {
-          ...prev.techpack,
-          howToMeasures: [...prev.techpack.howToMeasures, howToMeasure]
-        },
-        hasUnsavedChanges: true
-      };
-      
-      console.log('🔧 [addHowToMeasure] Updated howToMeasures count:', updated.techpack.howToMeasures.length);
-      console.log('🔧 [addHowToMeasure] New item imageUrl:', updated.techpack.howToMeasures[updated.techpack.howToMeasures.length - 1].imageUrl);
-      
-      return updated;
-    });
+    setState(prev => ({
+      ...prev,
+      techpack: {
+        ...prev.techpack,
+        howToMeasures: [...prev.techpack.howToMeasures, howToMeasure]
+      },
+      hasUnsavedChanges: true
+    }));
   };
 
   const updateHowToMeasure = (index: number, howToMeasure: HowToMeasure) => {

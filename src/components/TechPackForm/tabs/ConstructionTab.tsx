@@ -128,15 +128,7 @@ const validateConstructionItem = (item: Partial<Construction>, measurements: Mea
   // Use howToMeasureValidationSchema validation
   const schema = howToMeasureValidationSchema;
   
-  // Validate pomCode
-  if (schema.pomCode?.required && (!item.pomCode || item.pomCode.trim().length === 0)) {
-    errors.pomCode = 'Vui lòng chọn điểm đo hợp lệ.';
-  } else if (item.pomCode && measurements.length > 0) {
-    const exists = measurements.some(m => m.pomCode === item.pomCode);
-    if (!exists) {
-      errors.pomCode = 'POM Code không tồn tại trong measurements.';
-    }
-  }
+  // POM Code validation removed - field not visible to user
   
   // Validate description (instructions)
   if (schema.description?.required) {
@@ -355,23 +347,10 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
       nextValue = value.toString();
     }
 
-    if (field === 'pomCode') {
-      const pomName = measurementNameMap.get(String(value)) || '';
-      const updatedFormData = {
-        ...formData,
-        pomCode: String(value),
-        pomName,
-        stepNumber: formData.stepNumber ?? constructions.length + 1,
-      };
-      setFormData(updatedFormData);
-      validation.validateField(field, value);
-      return;
-    }
-
     const updatedFormData = { ...formData, [field]: nextValue };
     setFormData(updatedFormData);
     validation.validateField(field, value);
-  }, [formData, validation, measurementNameMap, constructions.length]);
+  }, [formData, validation]);
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -417,16 +396,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
         const imageUrl = response.data.data.url;
         const fullImageUrl = getImageUrl(imageUrl);
         
-        console.log('📷 [handleImageUpload] imageUrl from server:', imageUrl);
-        console.log('📷 [handleImageUpload] fullImageUrl:', fullImageUrl);
-        console.log('📷 [handleImageUpload] editingId:', editingId);
-        
-        setFormData(prev => {
-          console.log('📷 [handleImageUpload] prev formData:', prev);
-          const updated = { ...prev, imageUrl: fullImageUrl };
-          console.log('📷 [handleImageUpload] updated formData:', updated);
-          return updated;
-        });
+        setFormData(prev => ({ ...prev, imageUrl: fullImageUrl }));
         setImagePreview(fullImageUrl);
         validation.validateField('imageUrl', fullImageUrl);
         setUploadError(null);
@@ -441,10 +411,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
               imageUrl: fullImageUrl
             };
             updateHowToMeasureById(editingId, updatedConstruction);
-            console.log('📷 [handleImageUpload] Updated existing construction in context');
           }
-        } else {
-          console.log('📷 [handleImageUpload] Creating new construction - image will be saved when Save button clicked');
         }
         
         showSuccess('Image uploaded successfully');
@@ -486,33 +453,20 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
 
   const handleSubmit = (saveAsRequested: boolean = false) => {
     try {
-      console.log('🔍 [handleSubmit] START');
-      console.log('🔍 [handleSubmit] formData:', formData);
-      console.log('🔍 [handleSubmit] formData.imageUrl:', formData.imageUrl);
-      console.log('🔍 [handleSubmit] formData.pomCode:', formData.pomCode);
-      
       // Validate the entire form before submission
-      console.log('🔍 [handleSubmit] Starting validation...');
       
       // Skip validation if we have an image - allow saving construction with just an image
       const hasImage = formData.imageUrl && formData.imageUrl.trim().length > 0;
-      const hasContent = (formData.pomCode && formData.pomCode.trim().length > 0) ||
-                         (formData.description && formData.description.trim().length >= 10) ||
+      const hasContent = (formData.description && formData.description.trim().length >= 10) ||
                          (formData.steps && formData.steps.length > 0);
       
       if (hasImage && !hasContent) {
-        console.log('✅ [handleSubmit] Has image only - skipping validation');
+        // Skip validation - has image only
       } else {
         const validationResult = validation.validateForm(formData);
         const itemValidation = validateConstructionItem(formData, measurements);
 
-        console.log('🔍 [handleSubmit] validationResult:', validationResult);
-        console.log('🔍 [handleSubmit] itemValidation:', itemValidation);
-
         if (!validationResult.isValid || !itemValidation.isValid) {
-          console.log('❌ [handleSubmit] Validation failed!');
-          console.log('❌ validation errors:', validationResult.errors);
-          console.log('❌ item errors:', itemValidation.errors);
           
           // Mark all fields as touched to show validation errors
           Object.keys(howToMeasureValidationSchema).forEach(field => {
@@ -564,25 +518,18 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
         note: formData.note || '',
       };
 
-      console.log('✅ [handleSubmit] construction object:', construction);
-      console.log('✅ [handleSubmit] construction.imageUrl:', construction.imageUrl);
-
       if (editingId) {
         // Check if item is approved
         // Approved lock removed
         
-        console.log('✅ [handleSubmit] Updating existing construction');
         updateHowToMeasureById(editingId, construction);
         showSuccess('Construction updated successfully');
       } else {
-        console.log('✅ [handleSubmit] Adding new construction');
         addHowToMeasure(construction);
         showSuccess('Construction added successfully');
       }
 
-      console.log('✅ [handleSubmit] Resetting form');
       resetForm();
-      console.log('✅ [handleSubmit] DONE');
     } catch (error) {
       console.error('💥 [handleSubmit] ERROR:', error);
       showError('Failed to save construction: ' + (error as Error).message);

@@ -322,19 +322,22 @@ export const colorwayPartValidationSchema: FormValidationConfig = {
 
 export const howToMeasureValidationSchema: FormValidationConfig = {
   pomCode: {
-    required: true,
+    required: false,
     minLength: 2,
     maxLength: 20,
     custom: (value: string, formData?: any) => {
-      if (!value || value.trim().length < 2) {
-        return 'Vui lòng chọn điểm đo hợp lệ.';
-      }
-      // Check if pomCode exists in measurements (if available)
-      const measurements = formData?.measurements || [];
-      if (measurements.length > 0) {
-        const exists = measurements.some((m: any) => m.pomCode === value);
-        if (!exists) {
-          return 'POM Code không tồn tại trong measurements.';
+      // POM Code is optional - only validate if provided
+      if (value && value.trim().length > 0) {
+        if (value.trim().length < 2) {
+          return 'POM Code phải có ít nhất 2 ký tự.';
+        }
+        // Check if pomCode exists in measurements (if available)
+        const measurements = formData?.measurements || [];
+        if (measurements.length > 0) {
+          const exists = measurements.some((m: any) => m.pomCode === value);
+          if (!exists) {
+            return 'POM Code không tồn tại trong measurements.';
+          }
         }
       }
       return null;
