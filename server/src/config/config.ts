@@ -39,7 +39,7 @@ export const config = {
   uploadPath: process.env.UPLOAD_PATH || './uploads',
 
   // PDF Generation
-  pdfTimeout: parseInt(process.env.PDF_TIMEOUT || '30000', 10),
+  pdfTimeout: parseInt(process.env.PDF_TIMEOUT || '120000', 10),
   pdfConcurrentLimit: parseInt(process.env.PDF_CONCURRENT_LIMIT || '5', 10),
 
   // Logging

@@ -36,7 +36,17 @@ class PDFService {
   private activeGenerations: number = 0;
 
   constructor() {
-    this.templateDir = path.join(__dirname, '../templates');
+    // Handle both dev (src/) and production (dist/) paths
+    // In production, __dirname is dist/services, so go up to dist then to src/templates
+    // In dev with ts-node, __dirname is src/services, so go up to src then to templates
+    const possiblePaths = [
+      path.join(__dirname, '../templates'),           // src/services -> src/templates (dev)
+      path.join(__dirname, '../../src/templates'),    // dist/services -> src/templates (prod)
+    ];
+    
+    // Find first existing path
+    const fs = require('fs');
+    this.templateDir = possiblePaths.find(p => fs.existsSync(p)) || possiblePaths[0];
   }
 
   /**
@@ -44,17 +54,26 @@ class PDFService {
    */
   private async getBrowser(): Promise<Browser> {
     if (!this.browser) {
-      this.browser = await puppeteer.launch({
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--disable-gpu',
-          '--disable-web-security',
-        ],
-      });
+      try {
+        this.browser = await puppeteer.launch({
+          headless: 'new',
+          executablePath: process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--disable-gpu',
+            '--disable-web-security',
+            '--font-render-hinting=none',
+          ],
+          timeout: 60000, // 60 seconds timeout for browser launch
+        });
+        console.log('Browser launched successfully');
+      } catch (error: any) {
+        console.error('Failed to launch browser:', error);
+        throw new Error(`Failed to launch Puppeteer browser: ${error.message}`);
+      }
     }
     return this.browser;
   }
@@ -512,16 +531,27 @@ class PDFService {
       }
 
       // Read and render main template
-      const templatePath = path.join(this.templateDir, 'techpack-full-template.ejs');
+      // Try templates in order of preference
+      let templateContent: string = '';
+      const templatePaths = [
+        path.join(this.templateDir, 'techpack-full-template.ejs'),
+        path.join(this.templateDir, 'techpack-template.ejs'),
+      ];
       
-      // Check if full template exists, otherwise use existing template
-      let templateContent: string;
-      try {
-        templateContent = await fs.readFile(templatePath, 'utf-8');
-      } catch {
-        // Fallback to existing template
-        const existingTemplatePath = path.join(this.templateDir, 'techpack-template.ejs');
-        templateContent = await fs.readFile(existingTemplatePath, 'utf-8');
+      let templateLoaded = false;
+      for (const templatePath of templatePaths) {
+        try {
+          templateContent = await fs.readFile(templatePath, 'utf-8');
+          console.log(`Using template: ${path.basename(templatePath)}`);
+          templateLoaded = true;
+          break;
+        } catch {
+          console.warn(`Template not found: ${path.basename(templatePath)}`);
+        }
+      }
+      
+      if (!templateLoaded || !templateContent) {
+        throw new Error('No PDF template found. Please ensure template files exist in the templates directory.');
       }
 
       // Render HTML with EJS
@@ -535,16 +565,23 @@ class PDFService {
       );
 
       // Set content
+      // Changed from 'networkidle0' to 'domcontentloaded' to avoid waiting for all images
+      // This significantly improves performance for templates with many external images
       await page.setContent(html, {
-        waitUntil: 'networkidle0',
-        timeout: 30000,
+        waitUntil: 'domcontentloaded',
+        timeout: 120000, // 120 seconds
       });
+
+      // Wait a bit for critical styles and layout to settle
+      // Using setTimeout instead of deprecated waitForTimeout
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Generate PDF - Default to landscape for better table display
       const pdfOptions: any = {
         format: options.format || 'A4',
         landscape: options.orientation !== 'portrait', // Default to landscape
         printBackground: true,
+        timeout: 60000, // 60 seconds for PDF generation
         margin: {
           top: options.margin?.top || '10mm',
           bottom: options.margin?.bottom || '10mm',
@@ -576,6 +613,18 @@ class PDFService {
       };
     } catch (error: any) {
       console.error('PDF generation error:', error);
+      console.error('Error stack:', error.stack);
+      
+      // Try to close page if it exists
+      try {
+        const pages = await this.browser?.pages();
+        if (pages && pages.length > 1) {
+          await pages[pages.length - 1].close();
+        }
+      } catch (cleanupError) {
+        console.error('Page cleanup error:', cleanupError);
+      }
+      
       throw new Error(`Failed to generate PDF: ${error.message}`);
     } finally {
       this.activeGenerations--;

@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tech Pack - <%= meta.productName || meta.articleName || 'Product' %>
+    </title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 15mm 10mm;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            line-height: 1.4;
+            background: #f5f5f5;
+            padding: 20px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Fixed Header on Every Page */
+        .header {
+            border: 2px solid #000;
+            margin-bottom: 20px;
+            page-break-after: avoid;
+            background: white;
+            width: 100%;
+        }
+
+        .header-title {
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
+            padding: 8px;
+            border-bottom: 2px solid #000;
+            background: #f0f0f0;
+        }
+
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .header-table td {
+            border: 1px solid #000;
+            padding: 4px 8px;
+            font-size: 9px;
+            vertical-align: top;
+        }
+
+        .header-table .label {
+            font-weight: bold;
+            background: #f5f5f5;
+            width: 140px;
+        }
+
+        .header-table .value {
+            background: white;
+        }
+
+        .header-image-cell {
+            text-align: center;
+            vertical-align: middle;
+            padding: 5px;
+            border: 1px solid #000;
+        }
+
+        .header-image-cell img {
+            max-width: 100px;
+            max-height: 80px;
+            object-fit: contain;
+        }
+
+        /* Page Break Controls */
+        .section {
+            margin-bottom: 25px;
+            page-break-inside: avoid;
+        }
+
+        .section.page-break-before {
+            page-break-before: always;
+            margin-top: 0;
+            padding-top: 20px;
+        }
+
+        .section-title {
+            background: #333;
+            color: white;
+            padding: 8px 12px;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .info-item {
+            border: 1px solid #ddd;
+            padding: 10px;
+        }
+
+        .info-item strong {
+            display: block;
+            color: #666;
+            font-size: 8px;
+            margin-bottom: 3px;
+            text-transform: uppercase;
+        }
+
+        .info-item span {
+            display: block;
+            font-size: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            font-size: 9px;
+        }
+
+        th {
+            background: #e8e8e8;
+            padding: 6px;
+            text-align: left;
+            border: 1px solid #999;
+            font-weight: bold;
+            font-size: 8px;
+        }
+
+        td {
+            padding: 6px;
+            border: 1px solid #ccc;
+            vertical-align: top;
+        }
+
+        tr:nth-child(even) {
+            background: #fafafa;
+        }
+
+        .measurement-table th {
+            background: #e8e8e8;
+            font-size: 8px;
+        }
+
+        .measurement-table td {
+            text-align: center;
+            font-size: 9px;
+        }
+
+        .measurement-table td:first-child,
+        .measurement-table td:nth-child(2) {
+            text-align: left;
+            font-weight: bold;
+        }
+
+        .color-swatch {
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+            border: 1px solid #999;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        .notes {
+            background: #fffacd;
+            border-left: 4px solid #ffd700;
+            padding: 12px;
+            margin: 15px 0;
+            page-break-inside: avoid;
+        }
+
+        .notes strong {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .size-badge {
+            background: #666;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 3px;
+            font-size: 10px;
+            display: inline-block;
+            margin: 2px;
+        }
+
+        .image-placeholder {
+            width: 80px;
+            height: 80px;
+            border: 1px solid #ddd;
+            display: inline-block;
+            margin: 5px;
+            background: #f9f9f9;
+            text-align: center;
+            line-height: 80px;
+            font-size: 9px;
+            color: #999;
+            object-fit: cover;
+        }
+
+        h3 {
+            margin: 15px 0 10px 0;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                padding: 0;
+                background: white;
+            }
+
+            .container {
+                box-shadow: none;
+                padding: 20px;
+                max-width: 100%;
+            }
+
+            .header {
+                position: running(header);
+            }
+
+            .section {
+                page-break-inside: avoid;
+                orphans: 3;
+                widows: 3;
+            }
+
+            .section-title {
+                page-break-after: avoid;
+            }
+
+            table {
+                page-break-inside: auto;
+            }
+
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+
+            thead {
+                display: table-header-group;
+            }
+
+            tfoot {
+                display: table-footer-group;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+
+        <!-- ============================================ -->
+        <!-- FIXED HEADER - Appears on every page -->
+        <!-- ============================================ -->
+        <div class="header">
+            <div class="header-title">
+                REFIT Measurement Chart XXS-XLT
+                <div style="float: right; font-size: 11px;">
+                    All measurements are in Inch&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Version <%= meta.version || '1' %>
+                </div>
+            </div>
+
+            <table class="header-table">
+                <tr>
+                    <!-- Left Column - Logo/Brand -->
+                    <td rowspan="5" class="header-image-cell" style="width: 120px;">
+                        <% if (meta.brandLogo || meta.logo) { %>
+                            <img src="<%= meta.brandLogo || meta.logo %>" alt="Brand Logo"
+                                onerror="this.style.display='none'" />
+                            <% } else { %>
+                                <strong style="font-size: 12px;">
+                                    <%= meta.brand || 'Edwards' %>
+                                </strong>
+                                <% } %>
+                    </td>
+
+                    <!-- Article Info Section -->
+                    <td class="label">Article Code</td>
+                    <td class="value">
+                        <%= meta.articleCode || '1276' %>
+                    </td>
+                    <td class="label" rowspan="2" style="width: 100px;">Description</td>
+                    <td class="value" rowspan="2" style="width: 200px;"></td>
+                    <td class="label">Product Group</td>
+                    <td class="value">
+                        <%= meta.productGroup || 'Tops' %>
+                    </td>
+
+                    <!-- Right Column - Product Image -->
+                    <td rowspan="5" class="header-image-cell" style="width: 120px;">
+                        <% if (images?.coverImage || meta.designSketchUrl) { %>
+                            <img src="<%= images?.coverImage || meta.designSketchUrl %>" alt="Product"
+                                onerror="this.style.display='none'" />
+                            <% } %>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="label">Article Name</td>
+                    <td class="value">
+                        <%= meta.productName || meta.articleName || 'LS Cotton Blend Security Shirt' %>
+                    </td>
+                    <td class="label">Product Sub-</td>
+                    <td class="value">
+                        <%= meta.productSubCategory || 'Short sleeve' %>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="label">Created On</td>
+                    <td class="value">
+                        <%= meta.createdAt || meta.createdOn || '09/20/23 12:47:36 PM' %>
+                    </td>
+                    <td class="label">Material</td>
+                    <td class="value" rowspan="2">
+                        <%= meta.fabricDescription || 'Poly/Cotton Security Fabric (F0082)' %><br>
+                            <small>
+                                <%= meta.materialComposition || '65% Polyester/35% Cotton, 5oz' %>
+                            </small>
+                            <% if (meta.supplier) { %>
+                                <br><small>Supplier: <%= meta.supplier %></small>
+                                <% } %>
+                    </td>
+                    <td class="label">Season</td>
+                    <td class="value">
+                        <%= meta.season || 'Active Development' %>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="label">Last Modified</td>
+                    <td class="value">
+                        <%= meta.updatedAt || meta.lastModified || '07/29/25 8:19:27 AM' %>
+                    </td>
+                    <td class="label">Life Cycle Stage</td>
+                    <td class="value">
+                        <%= meta.lifecycleStage || meta.lifeCycleStage || meta.status || 'Production' %>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- 1. ARTICLE SUMMARY -->
+        <!-- ============================================ -->
+        <div class="section">
+            <div class="section-title">Article Summary</div>
+
+            <div class="info-grid">
+                <div class="info-item">
+                    <strong>Article Code</strong>
+                    <span>
+                        <%= meta.articleCode || '-' %>
+                    </span>
+                </div>
+                <div class="info-item">
+                    <strong>Article Name</strong>
+                    <span>
+                        <%= meta.productName || meta.articleName || '-' %>
+                    </span>
+                </div>
+                <div class="info-item">
+                    <strong>Brand</strong>
+                    <span>
+                        <%= meta.brand || '-' %>
+                    </span>
+                </div>
+                <div class="info-item">
+                    <strong>Season</strong>
+                    <span>
+                        <%= meta.season || '-' %>
+                    </span>
+                </div>
+                <div class="info-item">
+                    <strong>Category</strong>
+                    <span>
+                        <%= meta.category || meta.productClass || '-' %>
+                    </span>
+                </div>
+                <div class="info-item">
+                    <strong>Target Market</strong>
+                    <span>
+                        <%= meta.targetMarket || '-' %>
+                    </span>
+                </div>
+                <div class="info-item">
+                    <strong>Price Point</strong>
+                    <span>
+                        <%= meta.pricePoint || '-' %>
+                    </span>
+                </div>
+                <div class="info-item">
+                    <strong>Retail Price</strong>
+                    <span>
+                        <%= meta.retailPrice ? meta.retailPrice + ' ' + (meta.currency || 'USD' ) : '-' %>
+                    </span>
+                </div>
+            </div>
+
+            <% if (images?.coverImage || meta.designSketchUrl) { %>
+                <div style="text-align: center; margin: 15px 0;">
+                    <strong style="display: block; margin-bottom: 10px;">DESIGN SKETCH</strong>
+                    <img src="<%= images?.coverImage || meta.designSketchUrl %>"
+                        style="max-width: 400px; max-height: 500px; border: 1px solid #ddd;" alt="Design Sketch"
+                        onerror="this.style.display='none'" />
+                </div>
+                <% } %>
+
+                    <% if (meta.productDescription || meta.description) { %>
+                        <div style="margin-top: 15px;">
+                            <strong>DESCRIPTION:</strong>
+                            <p style="margin-top: 5px; line-height: 1.6;">
+                                <%= meta.productDescription || meta.description %>
+                            </p>
+                        </div>
+                        <% } %>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- 2. BILL OF MATERIALS -->
+        <!-- ============================================ -->
+        <% if (bom && bom.parts && bom.parts.length> 0) { %>
+            <div class="section page-break-before">
+                <div class="section-title">Bill of Materials</div>
+
+                <% // Group items by category const fabrics=[]; const trims=[]; const labels=[]; const packaging=[];
+                    bom.parts.forEach(part=> {
+                    part.items.forEach(item => {
+                    const partName = (part.partName || '').toLowerCase();
+                    const materialName = (item.materialName || '').toLowerCase();
+
+                    if (partName.includes('fabric') || partName.includes('main') || materialName.includes('fabric')) {
+                    fabrics.push({...item, part: part.partName});
+                    } else if (partName.includes('label') || materialName.includes('label') ||
+                    materialName.includes('hang')) {
+                    labels.push({...item, part: part.partName});
+                    } else if (partName.includes('packaging') || materialName.includes('polybag') ||
+                    materialName.includes('clip') || materialName.includes('bag')) {
+                    packaging.push({...item, part: part.partName});
+                    } else {
+                    trims.push({...item, part: part.partName});
+                    }
+                    });
+                    });
+                    %>
+
+                    <!-- Fabric -->
+                    <% if (fabrics.length> 0) { %>
+                        <h3>Fabric</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 10%;">Part</th>
+                                    <th style="width: 20%;">Material</th>
+                                    <th style="width: 15%;">Placement</th>
+                                    <th style="width: 10%;">Size</th>
+                                    <th style="width: 8%;">Qty</th>
+                                    <th style="width: 8%;">UOM</th>
+                                    <th style="width: 12%;">Supplier</th>
+                                    <th style="width: 17%;">Comments</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% fabrics.forEach(item=> { %>
+                                    <tr>
+                                        <td>
+                                            <%= item.part || '-' %>
+                                        </td>
+                                        <td>
+                                            <%= item.materialName || '-' %>
+                                                <% if (item.sizeWidthUsage && item.sizeWidthUsage !=='—' ) { %>
+                                                    <br><small>
+                                                        <%= item.sizeWidthUsage %>
+                                                    </small>
+                                                    <% } %>
+                                        </td>
+                                        <td>
+                                            <%= item.placement || 'None' %>
+                                        </td>
+                                        <td>
+                                            <%= item.size || '-' %>
+                                        </td>
+                                        <td>
+                                            <%= item.quantity || '0' %>
+                                        </td>
+                                        <td>
+                                            <%= item.uom || 'Yards' %>
+                                        </td>
+                                        <td>
+                                            <%= item.supplier || '-' %>
+                                        </td>
+                                        <td>
+                                            <%= item.comments || '-' %>
+                                                <% if (item.colorways && item.colorways.length> 0) { %>
+                                                    <br><small>
+                                                        <%= item.colorways.join(', ') %></small>
+              <% } %>
+            </td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+      <% } %>
+
+      <!-- Trims -->
+      <% if (trims.length > 0) { %>
+      <h3>Trims</h3>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 10%;">Part</th>
+            <th style="width: 20%;">Material</th>
+            <th style="width: 15%;">Placement</th>
+            <th style="width: 10%;">Size</th>
+            <th style="width: 8%;">Qty</th>
+            <th style="width: 8%;">UOM</th>
+            <th style="width: 12%;">Supplier</th>
+            <th style="width: 17%;">Comments</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% trims.forEach(item => { %>
+          <tr>
+            <td><%= item.part || ' -' %>
+                                        </td>
+                                        <td>
+                                            <%= item.materialName || '-' %>
+                                        </td>
+                                        <td>
+                                            <%= item.placement || '-' %>
+                                        </td>
+                                        <td>
+                                            <%= item.sizeWidthUsage || item.size || '-' %>
+                                        </td>
+                                        <td>
+                                            <%= item.quantity || '0' %>
+                                        </td>
+                                        <td>
+                                            <%= item.uom || 'Each' %>
+                                        </td>
+                                        <td>
+                                            <%= item.supplier || '-' %>
+                                        </td>
+                                        <td>
+                                            <%= item.comments || '-' %>
+                                                <% if (item.colorways && item.colorways.length> 0) { %>
+                                                    <br><small>
+                                                        <%= item.colorways.join(', ') %></small>
+              <% } %>
+            </td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+      <% } %>
+
+      <!-- Labels -->
+      <% if (labels.length > 0) { %>
+      <h3>Labels</h3>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 12%;">Part</th>
+            <th style="width: 25%;">Material</th>
+            <th style="width: 20%;">Placement</th>
+            <th style="width: 10%;">Qty</th>
+            <th style="width: 10%;">UOM</th>
+            <th style="width: 23%;">Comments</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% labels.forEach(item => { %>
+          <tr>
+            <td><%= item.part || ' -' %>
+                                        </td>
+                                        <td>
+                                            <%= item.materialName || '-' %>
+                                        </td>
+                                        <td>
+                                            <%= item.placement || '-' %>
+                                        </td>
+                                        <td>
+                                            <%= item.quantity || '1' %>
+                                        </td>
+                                        <td>
+                                            <%= item.uom || 'Each' %>
+                                        </td>
+                                        <td>
+                                            <%= item.comments || '-' %>
+                                        </td>
+                                    </tr>
+                                    <% }); %>
+                            </tbody>
+                        </table>
+                        <% } %>
+
+                            <!-- Packaging -->
+                            <% if (packaging.length> 0) { %>
+                                <h3>Packaging</h3>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 12%;">Part</th>
+                                            <th style="width: 25%;">Material</th>
+                                            <th style="width: 10%;">Qty</th>
+                                            <th style="width: 10%;">UOM</th>
+                                            <th style="width: 18%;">Supplier</th>
+                                            <th style="width: 25%;">Comments</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% packaging.forEach(item=> { %>
+                                            <tr>
+                                                <td>
+                                                    <%= item.part || '-' %>
+                                                </td>
+                                                <td>
+                                                    <%= item.materialName || '-' %>
+                                                </td>
+                                                <td>
+                                                    <%= item.quantity || '1' %>
+                                                </td>
+                                                <td>
+                                                    <%= item.uom || 'Each' %>
+                                                </td>
+                                                <td>
+                                                    <%= item.supplier || '-' %>
+                                                </td>
+                                                <td>
+                                                    <%= item.comments || '-' %>
+                                                </td>
+                                            </tr>
+                                            <% }); %>
+                                    </tbody>
+                                </table>
+                                <% } %>
+            </div>
+            <% } %>
+
+                <!-- ============================================ -->
+                <!-- 3. MEASUREMENTS - REFIT VERSION -->
+                <!-- ============================================ -->
+                <% if (measurements && measurements.rows && measurements.rows.length> 0) { %>
+                    <div class="section page-break-before">
+                        <div class="section-title">Refit Measurement Chart</div>
+
+                        <% if (measurements.sizeRange && measurements.sizeRange.length> 0) { %>
+                            <div style="margin-bottom: 15px;">
+                                <strong>SIZE RANGE:</strong>
+                                <div style="margin-top: 8px;">
+                                    <% measurements.sizeRange.forEach(size=> { %>
+                                        <span class="size-badge">
+                                            <%= size %>
+                                        </span>
+                                        <% }); %>
+                                </div>
+                            </div>
+                            <% } %>
+
+                                <div style="overflow-x: auto;">
+                                    <table class="measurement-table">
+                                        <thead>
+                                            <tr>
+                                                <th>POM Code</th>
+                                                <th>Measurement Point</th>
+                                                <th>-Tol</th>
+                                                <th>+Tol</th>
+                                                <% if (measurements.sizeRange) { measurements.sizeRange.forEach(size=> {
+                                                    %>
+                                                    <th>
+                                                        <%= size %>
+                                                    </th>
+                                                    <% }); } %>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <% measurements.rows.forEach((row, index)=> {
+                                                // Highlight specific rows (body length, chest, etc.)
+                                                const highlightCodes = ['BL20', 'BL21', 'AB11', 'AB30', 'AB70', 'AH10',
+                                                'SL10'];
+                                                const shouldHighlight = highlightCodes.some(code =>
+                                                row.pomCode?.includes(code));
+                                                %>
+                                                <tr <% if (shouldHighlight) { %>style="background: #ffe !important;"<% }
+                                                        %>>
+                                                        <td>
+                                                            <%= row.pomCode || '-' %>
+                                                        </td>
+                                                        <td>
+                                                            <%= row.pomName || '-' %>
+                                                        </td>
+                                                        <td>
+                                                            <%= row.minusTolerance || '0' %>
+                                                        </td>
+                                                        <td>
+                                                            <%= row.plusTolerance || '0' %>
+                                                        </td>
+                                                        <% if (measurements.sizeRange) {
+                                                            measurements.sizeRange.forEach(size=> { %>
+                                                            <td>
+                                                                <%= row.sizes?.[size] || '-' %>
+                                                            </td>
+                                                            <% }); } %>
+                                                </tr>
+                                                <% }); %>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <% if (measurements.notes || measurements.comments) { %>
+                                    <div class="notes">
+                                        <strong>NOTES:</strong>
+                                        <%= measurements.notes || measurements.comments %>
+                                    </div>
+                                    <% } %>
+                    </div>
+                    <% } %>
+
+                        <!-- ============================================ -->
+                        <!-- 4. HOW TO MEASURE -->
+                        <!-- ============================================ -->
+                        <% if (howToMeasures && howToMeasures.length> 0) { %>
+                            <div class="section page-break-before">
+                                <div class="section-title">How To Measure</div>
+
+                                <% howToMeasures.forEach((item, index)=> { %>
+                                    <div style="margin-bottom: 20px; page-break-inside: avoid;">
+                                        <h3>
+                                            <%= item.pomCode %> - <%= item.pomName %>
+                                        </h3>
+                                        <% if (item.imageUrl) { %>
+                                            <div style="text-align: center; margin: 10px 0;">
+                                                <img src="<%= item.imageUrl %>"
+                                                    style="max-width: 400px; border: 1px solid #ddd;"
+                                                    alt="<%= item.pomName %>" onerror="this.style.display='none'" />
+                                            </div>
+                                            <% } %>
+                                                <p style="margin: 8px 0;">
+                                                    <%= item.description %>
+                                                </p>
+                                                <% if (item.steps && item.steps.length> 0) { %>
+                                                    <div style="margin: 8px 0;">
+                                                        <strong>Steps:</strong>
+                                                        <ol style="margin-left: 20px; margin-top: 5px;">
+                                                            <% item.steps.forEach(step=> { %>
+                                                                <li style="margin: 3px 0;">
+                                                                    <%= step %>
+                                                                </li>
+                                                                <% }); %>
+                                                        </ol>
+                                                    </div>
+                                                    <% } %>
+                                                        <% if (item.tips && item.tips.length> 0) { %>
+                                                            <div class="notes">
+                                                                <strong>TIPS:</strong>
+                                                                <ul style="margin-left: 20px; margin-top: 5px;">
+                                                                    <% item.tips.forEach(tip=> { %>
+                                                                        <li style="margin: 3px 0;">
+                                                                            <%= tip %>
+                                                                        </li>
+                                                                        <% }); %>
+                                                                </ul>
+                                                            </div>
+                                                            <% } %>
+                                    </div>
+                                    <% }); %>
+                            </div>
+                            <% } %>
+
+                                <!-- ============================================ -->
+                                <!-- 5. COLORWAYS -->
+                                <!-- ============================================ -->
+                                <% if (colorways && colorways.length> 0) { %>
+                                    <div class="section page-break-before">
+                                        <div class="section-title">Colorways</div>
+
+                                        <!-- Summary of all colorways -->
+                                        <div class="info-grid" style="margin-bottom: 20px;">
+                                            <% colorways.forEach(color=> { %>
+                                                <div class="info-item">
+                                                    <strong>
+                                                        <%= color.name || 'Color' %>
+                                                    </strong>
+                                                    <span>
+                                                        <span class="color-swatch"
+                                                            style="background: <%= color.hexColor || '#FFFFFF' %>;"></span>
+                                                        Code: <%= color.code || '000' %><br>
+                                                            <% if (color.pantoneCode) { %>Pantone: <%= color.pantoneCode
+                                                                    %><br>
+                                                                    <% } %>
+                                                                        Hex: <%= color.hexColor || '#FFFFFF' %>
+                                                    </span>
+                                                </div>
+                                                <% }); %>
+                                        </div>
+
+                                        <!-- Detailed breakdown by colorway -->
+                                        <% colorways.forEach(colorway=> { %>
+                                            <% if (colorway.parts && colorway.parts.length> 0) { %>
+                                                <div style="margin-top: 25px; page-break-inside: avoid;">
+                                                    <h3>
+                                                        <%= colorway.name %> (<%= colorway.code %>) - Part Breakdown
+                                                    </h3>
+                                                    <table>
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Part Name</th>
+                                                                <th>Color</th>
+                                                                <th>Pantone Code</th>
+                                                                <th>Hex Code</th>
+                                                                <th>Supplier</th>
+                                                                <th>Type</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <% colorway.parts.forEach(part=> { %>
+                                                                <tr>
+                                                                    <td>
+                                                                        <%= part.partName || '-' %>
+                                                                    </td>
+                                                                    <td>
+                                                                        <span class="color-swatch"
+                                                                            style="background: <%= part.hexCode || '#FFFFFF' %>;"></span>
+                                                                        <%= part.colorName || '-' %>
+                                                                    </td>
+                                                                    <td>
+                                                                        <%= part.pantoneCode || '-' %>
+                                                                    </td>
+                                                                    <td>
+                                                                        <%= part.hexCode || '-' %>
+                                                                    </td>
+                                                                    <td>
+                                                                        <%= part.supplier || '-' %>
+                                                                    </td>
+                                                                    <td>
+                                                                        <%= part.colorType || 'Solid' %>
+                                                                    </td>
+                                                                </tr>
+                                                                <% }); %>
+                                                        </tbody>
+                                                    </table>
+
+                                                    <% if (colorway.notes && colorway.notes !=='—' ) { %>
+                                                        <div class="notes">
+                                                            <strong>NOTES:</strong>
+                                                            <%= colorway.notes %>
+                                                        </div>
+                                                        <% } %>
+                                                </div>
+                                                <% } %>
+                                                    <% }); %>
+                                    </div>
+                                    <% } %>
+
+                                        <!-- ============================================ -->
+                                        <!-- 6. CARE INSTRUCTIONS -->
+                                        <!-- ============================================ -->
+                                        <% if (meta.fabricDescription ||
+                                            articleSummary?.fabricAndComposition?.fabricDescription) { %>
+                                            <div class="section page-break-before">
+                                                <div class="section-title">Care Instructions</div>
+
+                                                <div
+                                                    style="display: grid; grid-template-columns: auto 1fr; gap: 20px; align-items: start;">
+                                                    <div>
+                                                        <strong style="display: block; margin-bottom: 8px;">Care
+                                                            Symbols:</strong>
+                                                        <div style="font-size: 24px; line-height: 1.8;">
+                                                            ⚿ Machine Wash Warm<br>
+                                                            ⃠ Do Not Bleach<br>
+                                                            ◎ Tumble Dry Low<br>
+                                                            ▽ Cool Iron
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <strong style="display: block; margin-bottom: 8px;">Fiber
+                                                            Content & Instructions:</strong>
+                                                        <% if (meta.fabricDescription ||
+                                                            articleSummary?.fabricAndComposition?.materialInfo) { %>
+                                                            <p style="margin-bottom: 8px;"><strong>
+                                                                    <%= meta.fabricDescription ||
+                                                                        articleSummary.fabricAndComposition.materialInfo
+                                                                        %>
+                                                                </strong></p>
+                                                            <% } %>
+                                                                <p style="margin-bottom: 5px;">MACHINE WASH WARM, DO NOT
+                                                                    BLEACH, TUMBLE DRY LOW, COOL IRON.</p>
+                                                                <p style="margin-bottom: 5px;">LAVAR A MÁQUINA TIBIO, NO
+                                                                    BLANQUEADOR, SECADO TEMP BAJA, PLANCHA FRIA.</p>
+                                                                <p>LAVAGE EN MACHINE CHAUD, NE PAS JAVELLISER,
+                                                                    SÈCHE-LINGE À FAIBLE, FER REFROIDIR.</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <% } %>
+
+                                                <!-- ============================================ -->
+                                                <!-- 7. REVISION HISTORY -->
+                                                <!-- ============================================ -->
+                                                <% if (revisionHistory && revisionHistory.length> 0) { %>
+                                                    <div class="section">
+                                                        <div class="section-title">Revision History</div>
+                                                        <table>
+                                                            <thead>
+                                                                <tr>
+                                                                    <th style="width: 10%;">Version</th>
+                                                                    <th style="width: 20%;">Modified By</th>
+                                                                    <th style="width: 15%;">Date</th>
+                                                                    <th style="width: 55%;">Description</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                <% revisionHistory.forEach(r=> { %>
+                                                                    <tr>
+                                                                        <td>
+                                                                            <%= r.version || '-' %>
+                                                                        </td>
+                                                                        <td>
+                                                                            <%= r.modifiedBy || '-' %>
+                                                                        </td>
+                                                                        <td>
+                                                                            <%= r.modifiedAt || r.date || '-' %>
+                                                                        </td>
+                                                                        <td>
+                                                                            <%= r.description || '-' %>
+                                                                        </td>
+                                                                    </tr>
+                                                                    <% }); %>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                    <% } %>
+
+                                                        <!-- ============================================ -->
+                                                        <!-- FOOTER -->
+                                                        <!-- ============================================ -->
+                                                        <div
+                                                            style="margin-top: 30px; padding-top: 15px; border-top: 2px solid #ddd; text-align: center; font-size: 9px; color: #666;">
+                                                            <strong>Powered by WFX</strong> | All rights reserved<br>
+                                                            Printed on <%= generatedAt %> by <%= printedBy %>
+                                                        </div>
+
+    </div>
+</body>
+
+</html>

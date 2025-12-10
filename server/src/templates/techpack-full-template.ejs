@@ -1,1297 +1,1034 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TechPack - <%= meta.productName %> - <%= meta.articleCode %></title>
+  <title>
+    Tech Pack - <%= meta.productName || meta.articleName || 'Product' %>
+  </title>
   <style>
+    /* ===== CRITICAL OPTIMIZATION: Simplified styles for faster rendering ===== */
     @page {
       size: A4 landscape;
-      margin: 0;
-    }
-
-    @page :first {
-      margin-top: 0;
-    }
-
-    html, body {
-      width: 100%;
-      margin: 0;
-      padding: 0;
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 11px;
-      line-height: 1.3;
-      color: #1f2933;
-      background: white;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
+      margin: 15mm 10mm;
     }
 
     * {
-      font-size: 11px;
-      line-height: 1.3;
-      -webkit-hyphens: none;
-      -moz-hyphens: none;
-      hyphens: none;
-    }
-
-    h1, h2, h3, h4, h5 {
-      font-weight: 600;
-      color: #111827;
       margin: 0;
-    }
-
-    .page {
-      width: 100% !important;
-      max-width: 100% !important;
-      min-height: 210mm;
-      margin: 0;
-      padding: 0 8mm;
-      background: white;
-      position: relative;
-      page-break-after: always;
+      padding: 0;
       box-sizing: border-box;
     }
 
-    .page:last-child {
-      page-break-after: auto;
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      line-height: 1.4;
+      background: white;
+      /* Changed from #f5f5f5 */
+      padding: 20px;
     }
 
-    .page.landscape {
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+    }
+
+    .page-header {
+      background: white;
+      border: 2px solid #000;
       width: 100%;
-      max-width: 100%;
-      min-height: 210mm;
-    }
-
-    .section-title {
-      font-size: 14px;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      border-bottom: 2px solid #111827;
-      padding-bottom: 8px;
-      margin: 20px 0 15px 0;
-      page-break-after: avoid;
-      color: #0f172a;
-    }
-
-    .section-subtitle {
-      font-size: 11px;
-      font-weight: 600;
-      color: #475569;
-      margin: 15px 0 10px 0;
-    }
-
-    table {
-      width: 100% !important;
-      max-width: 100% !important;
       border-collapse: collapse;
-      margin-bottom: 15px;
-      background: #ffffff;
+      margin-bottom: 20px;
+    }
+
+    .page-header table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .page-header td {
+      border: 1px solid #000;
+      padding: 8px 12px;
       font-size: 11px;
-      line-height: 1.3;
-      table-layout: fixed;
-      page-break-inside: auto;
-    }
-
-    thead {
-      display: table-header-group;
-    }
-
-    tbody {
-      display: table-row-group;
-    }
-
-    th, td {
-      border: 1px solid #cbd5e1;
-      padding: 4px 6px;
       vertical-align: top;
-      text-align: left;
-      word-wrap: break-word;
-      hyphens: none;
-      overflow: hidden;
     }
 
-    th {
-      background: #f1f5f9;
-      text-transform: uppercase;
-      font-size: 8px;
-      letter-spacing: 0.4px;
-      color: #0f172a;
-      font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    td {
-      word-break: break-word;
-      white-space: normal;
-    }
-
-    tr:nth-child(even) td {
-      background: #f9fafb;
-    }
-
-    .text-right { text-align: right; }
-    .text-center { text-align: center; }
-    .text-left { text-align: left; }
-    .text-muted { color: #6b7280; }
-    .avoid-break { page-break-inside: avoid; break-inside: avoid; }
-    .page-break { page-break-before: always; }
-    .keep-together { page-break-inside: avoid; }
-
-    /* Cover Page Styles */
-    .cover-page {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+    .page-title {
       text-align: center;
-      min-height: 100%;
+      font-weight: bold;
+      font-size: 14px;
+      padding: 8px;
+      border-bottom: 2px solid #000;
+      background: #fff;
     }
 
-    .cover-logo {
-      max-width: 200px;
-      max-height: 100px;
-      margin-bottom: 30px;
-      object-fit: contain;
+    .version-text {
+      float: right;
+      font-weight: normal;
     }
 
-    .cover-title {
-      font-size: 32px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      margin-bottom: 10px;
-      color: #0f172a;
+    .label {
+      font-weight: bold;
+      background: #e8e8e8;
+      white-space: nowrap;
+      width: 150px;
     }
 
-    .cover-article-code {
-      font-size: 18px;
-      color: #475569;
-      margin-bottom: 30px;
+    .value {
+      background: #fff;
     }
 
-    .cover-image {
-      max-width: 80%;
-      max-height: 400px;
-      object-fit: contain;
-      margin: 30px 0;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
+    .logo-cell {
+      width: 100px;
+      text-align: center;
+      vertical-align: middle;
+      background: #fff;
+      border-left: 2px solid #000;
     }
 
-    .cover-description {
-      font-size: 11px;
-      color: #64748b;
-      line-height: 1.6;
-      max-width: 80%;
-      margin-top: 20px;
+    .product-images {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      align-items: center;
     }
 
-    /* Article Summary Styles */
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 15px;
-      margin-top: 15px;
+    .product-images img {
+      width: 60px;
+      height: 80px;
+      border: 1px solid #ccc;
+      background: #f9f9f9;
     }
 
-    .summary-card {
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      padding: 12px;
-      background: #f8fafc;
-    }
-
-    .summary-card h4 {
-      font-size: 10px;
-      text-transform: uppercase;
-      margin-bottom: 8px;
-      color: #0f172a;
-    }
-
-    .summary-card p {
-      margin-bottom: 4px;
-      font-size: 9px;
-    }
-
-    .info-table {
-      width: 100%;
-      margin-bottom: 15px;
-    }
-
-    .info-table th {
-      width: 30%;
-      background: #f8fafc;
-    }
-
-    /* Article Summary Tables */
-    .article-summary {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 12px;
-      font-family: Arial, Helvetica, sans-serif;
-      line-height: 1.35;
-    }
-
-    .article-summary td {
-      padding: 8px 12px;
-      border: 1px solid #E1E7EE;
-      font-size: 11px;
-      vertical-align: top;
-    }
-
-    .article-summary td.label {
-      width: 40%;
-      background: #f8fafc;
-      font-weight: 600;
-      color: #0f172a;
-    }
-
-    .article-summary td.value {
-      width: 60%;
-      background: #ffffff;
-      color: #1f2933;
-    }
-
-    .section-heading {
-      background: #F7F9FB;
-      font-weight: 600;
-      padding: 8px 12px;
-      margin-top: 18px;
-      margin-bottom: 0;
-      border-top: 2px solid #2C3E50;
-      font-size: 12px;
-      color: #0f172a;
-      font-family: Arial, Helvetica, sans-serif;
-    }
-
-    .article-image-img {
-      max-width: 260px;
-      width: 100%;
-      height: auto;
-      display: block;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-    }
-
-    .article-image-placeholder {
-      width: 260px;
-      height: auto;
-    }
-
-    /* BOM Part Grouping */
-    .bom-part {
+    /* Section styles */
+    .section {
       margin-bottom: 25px;
       page-break-inside: avoid;
     }
 
-    .bom-part-header {
-      background: #f7f9fb;
-      font-weight: 600;
-      padding: 10px 12px;
-      border: 1px solid #e1e7ee;
-      border-bottom: 2px solid #cbd5e1;
-      font-size: 12px;
-      color: #0f172a;
-      margin-bottom: 0;
-    }
-
-    /* BOM Table Styles */
-    .bom-table {
-      font-size: 11px;
-      line-height: 1.3;
-      table-layout: fixed;
-      width: 100% !important;
-      border-collapse: collapse;
-      margin-bottom: 0;
-    }
-
-    .bom-table th,
-    .bom-table td {
-      padding: 8px 10px;
-      border: 1px solid #dfe7ee;
-      vertical-align: middle;
-      font-size: 11px;
-      font-family: Arial, Helvetica, sans-serif;
-      writing-mode: horizontal-tb !important;
-      word-break: normal !important;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      hyphens: none;
-      -webkit-hyphens: none;
-      -moz-hyphens: none;
-    }
-
-    .bom-table th {
-      background: #f1f5f9;
-      font-weight: 600;
+    .section-title {
+      background: #333;
+      color: white;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 10px;
       text-transform: uppercase;
-      font-size: 9px;
-      color: #0f172a;
     }
 
-    /* Material Name column - allow word wrap */
-    .bom-table td.col-name {
-      white-space: normal !important;
-      word-break: break-word;
-      overflow-wrap: break-word;
-      width: 240px;
-    }
-
-    /* Image column */
-    .bom-table td.col-image {
-      text-align: center;
-      width: 80px;
-    }
-
-    .bom-table td.col-image img {
-      max-width: 64px;
-      height: auto;
-      display: block;
-      margin: 0 auto;
-      object-fit: contain;
-    }
-
-    /* Colorways chips */
-    .color-chip {
-      display: inline-block;
-      padding: 4px 8px;
-      border-radius: 6px;
-      border: 1px dashed #d0d7df;
-      margin-right: 6px;
-      margin-bottom: 4px;
-      font-size: 9px;
-      background: #f8fafc;
-      color: #475569;
-    }
-
-    /* Fixed column widths for BOM table - Optimized for landscape A4 */
-    .bom-table th:nth-child(1),
-    .bom-table td:nth-child(1) { width: 3%; } /* # */
-    .bom-table th:nth-child(2),
-    .bom-table td:nth-child(2) { width: 5%; } /* Part */
-    .bom-table th:nth-child(3),
-    .bom-table td:nth-child(3) { width: 7%; } /* Material Name */
-    .bom-table th:nth-child(4),
-    .bom-table td:nth-child(4) { width: 6%; } /* Material Code */
-    .bom-table th:nth-child(5),
-    .bom-table td:nth-child(5) { width: 5%; } /* Placement */
-    .bom-table th:nth-child(6),
-    .bom-table td:nth-child(6) { width: 3.5%; } /* Size */
-    .bom-table th:nth-child(7),
-    .bom-table td:nth-child(7) { width: 3.5%; } /* Quantity */
-    .bom-table th:nth-child(8),
-    .bom-table td:nth-child(8) { width: 3%; } /* UOM */
-    .bom-table th:nth-child(9),
-    .bom-table td:nth-child(9) { width: 4.5%; } /* Color */
-    .bom-table th:nth-child(10),
-    .bom-table td:nth-child(10) { width: 4.5%; } /* Color Code */
-    .bom-table th:nth-child(11),
-    .bom-table td:nth-child(11) { width: 4.5%; } /* Pantone */
-    .bom-table th:nth-child(12),
-    .bom-table td:nth-child(12) { width: 5.5%; } /* Supplier */
-    .bom-table th:nth-child(13),
-    .bom-table td:nth-child(13) { width: 4.5%; } /* Supplier Code */
-    .bom-table th:nth-child(14),
-    .bom-table td:nth-child(14) { width: 7%; } /* Composition */
-    .bom-table th:nth-child(15),
-    .bom-table td:nth-child(15) { width: 3.5%; } /* Width */
-    .bom-table th:nth-child(16),
-    .bom-table td:nth-child(16) { width: 3.5%; } /* Weight */
-    .bom-table th:nth-child(17),
-    .bom-table td:nth-child(17) { width: 3.5%; } /* Shrinkage */
-    .bom-table th:nth-child(18),
-    .bom-table td:nth-child(18) { width: 3%; } /* Image */
-    .bom-table th:nth-child(19),
-    .bom-table td:nth-child(19) { width: 5.5%; } /* Testing */
-    .bom-table th:nth-child(20),
-    .bom-table td:nth-child(20) { width: 5.5%; } /* Care */
-    .bom-table th:nth-child(21),
-    .bom-table td:nth-child(21) { width: 4%; } /* Unit Price */
-    .bom-table th:nth-child(22),
-    .bom-table td:nth-child(22) { width: 4%; } /* Total Price */
-    .bom-table th:nth-child(23),
-    .bom-table td:nth-child(23) { width: 3.5%; } /* Lead Time */
-    .bom-table th:nth-child(24),
-    .bom-table td:nth-child(24) { width: 3.5%; } /* MOQ */
-    .bom-table th:nth-child(25),
-    .bom-table td:nth-child(25) { width: 3%; } /* Approved */
-    .bom-table th:nth-child(26),
-    .bom-table td:nth-child(26) { width: 4.5%; } /* Approved By */
-    .bom-table th:nth-child(27),
-    .bom-table td:nth-child(27) { width: 7%; } /* Comments */
-
-    /* Code-type fields: no wrap */
-    .bom-table td.material-code,
-    .bom-table td.supplier-code,
-    .bom-table td.color-code,
-    .bom-table td.pantone-code {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    /* Allow wrapping for long text fields */
-    .bom-table td.material-name,
-    .bom-table td.composition,
-    .bom-table td.comments,
-    .bom-table td.notes {
-      white-space: normal !important;
-      word-break: break-word;
-      overflow-wrap: break-word;
-    }
-
-    .bom-image {
-      width: 50px;
-      height: auto;
-      max-height: 50px;
-      object-fit: contain;
-      border: 1px solid #d1d5db;
-      border-radius: 4px;
-      display: block;
-      margin: 0 auto;
-    }
-
-    /* Measurement Table Styles */
-    .measurement-table {
-      font-size: 11px;
-      line-height: 1.3;
-      table-layout: fixed;
-      width: 100% !important;
-      max-width: 100% !important;
-    }
-
-    .measurement-table th,
-    .measurement-table td {
-      padding: 4px 6px;
-      word-wrap: break-word;
-      word-break: break-word;
-      white-space: normal;
-      hyphens: none;
-    }
-
-    .measurement-table th {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .measurement-table th.size-col,
-    .measurement-table td.size-col {
-      text-align: center;
-      font-weight: 600;
-      width: 4%;
-    }
-
-    .measurement-table td.tol-minus {
-      color: #b91c1c;
-      text-align: center;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-
-    .measurement-table td.tol-plus {
-      color: #15803d;
-      text-align: center;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-
-    .measurement-table td.critical {
-      background: #fee2e2 !important;
-    }
-
-    .measurement-table td.base-size {
-      background: #dbeafe !important;
-      font-weight: 700;
-    }
-
-    /* Sample Measurement Rounds */
-    .round-info {
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 15px;
       margin-bottom: 15px;
     }
 
-    .round-info .info-table {
+    .info-item {
+      border: 1px solid #ddd;
+      padding: 10px;
+    }
+
+    .info-item strong {
+      display: block;
+      color: #666;
+      font-size: 8px;
+      margin-bottom: 3px;
+      text-transform: uppercase;
+    }
+
+    .info-item span {
+      display: block;
       font-size: 10px;
     }
 
-    .sample-round-table {
-      font-size: 11px;
-      line-height: 1.3;
-      table-layout: fixed;
-      width: 100% !important;
-      max-width: 100% !important;
-      border-collapse: collapse;
-    }
-
-    .sample-round-table th,
-    .sample-round-table td {
-      padding: 6px 8px;
-      border: 1px solid #CDD5DF;
-      vertical-align: top;
-      writing-mode: horizontal-tb !important;
-      hyphens: none;
-      -webkit-hyphens: none;
-      -moz-hyphens: none;
-    }
-
-    .sample-round-table th {
-      background: #f1f5f9;
-      text-transform: uppercase;
-      font-size: 9px;
-      font-weight: 600;
-      color: #0f172a;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      word-break: keep-all;
-    }
-
-    .sample-round-table td {
-      word-break: keep-all;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    /* Allow wrapping only for POM Name column */
-    .sample-round-table td.pom-name {
-      white-space: normal !important;
-      word-break: break-word;
-      overflow-wrap: break-word;
-      width: 15%;
-    }
-
-    /* Allow wrapping for Comments column */
-    .sample-round-table td.comments {
-      white-space: normal !important;
-      word-break: break-word;
-      overflow-wrap: break-word;
-    }
-
-    .sample-round-table td.pom-code {
-      white-space: nowrap;
-      font-weight: 600;
-    }
-
-    .sample-round-table td.tol-minus {
-      color: #b91c1c;
-      font-weight: 600;
-    }
-
-    .sample-round-table td.tol-plus {
-      color: #15803d;
-      font-weight: 600;
-    }
-
-    /* How To Measure Styles */
-    .howto-item {
-      display: flex;
-      gap: 15px;
-      padding: 12px;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      background: #f8fafc;
-      margin-bottom: 15px;
-      page-break-inside: avoid;
-    }
-
-    .howto-image {
-      flex: 0 0 200px;
-      max-width: 200px;
-    }
-
-    .howto-image img {
+    /* Table styles - optimized */
+    table {
       width: 100%;
-      max-height: 200px;
-      object-fit: contain;
-      border: 1px solid #cbd5e1;
-      border-radius: 4px;
-      background: white;
-    }
-
-    .howto-content {
-      flex: 1;
-    }
-
-    .howto-content h3 {
-      font-size: 11px;
-      margin-bottom: 8px;
-      text-transform: uppercase;
-      color: #0f172a;
-    }
-
-    .howto-content p {
-      font-size: 9px;
-      line-height: 1.5;
-      margin-bottom: 6px;
-    }
-
-    .howto-content ul,
-    .howto-content ol {
-      margin-left: 18px;
-      margin-top: 6px;
+      border-collapse: collapse;
+      margin-bottom: 15px;
       font-size: 9px;
     }
 
-    .howto-content li {
-      margin-bottom: 4px;
-      line-height: 1.4;
-    }
-
-    /* Colorway Styles */
-    .colorway-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 15px;
-      margin-bottom: 20px;
-    }
-
-    .colorway-item {
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      padding: 12px;
-      background: white;
-      page-break-inside: avoid;
-    }
-
-    .colorway-swatch {
-      width: 60px;
-      height: 60px;
-      border: 2px solid #9ca3af;
-      border-radius: 6px;
-      margin-bottom: 10px;
-      display: block;
-    }
-
-    .colorway-info {
-      font-size: 9px;
-      line-height: 1.4;
-    }
-
-    .colorway-info p {
-      margin-bottom: 3px;
-    }
-
-    .colorway-info strong {
-      color: #0f172a;
-      font-weight: 600;
-    }
-
-    .colorway-parts {
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid #e5e7eb;
-    }
-
-    .colorway-part-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
+    th {
+      background: #e8e8e8;
+      padding: 6px;
+      text-align: left;
+      border: 1px solid #999;
+      font-weight: bold;
       font-size: 8px;
     }
 
-    .colorway-part-swatch {
-      width: 20px;
-      height: 20px;
-      border: 1px solid #9ca3af;
-      border-radius: 3px;
-      flex-shrink: 0;
+    td {
+      padding: 6px;
+      border: 1px solid #ccc;
+      vertical-align: top;
     }
 
-    /* Packing Instructions */
-    .packing-notes {
-      background: #f8fafc;
-      border: 1px solid #e1e7ee;
-      border-radius: 6px;
-      padding: 20px;
-      margin-top: 15px;
-      font-size: 11px;
-      line-height: 1.6;
-      color: #1f2933;
+    /* Remove nth-child for better performance */
+    .alt-row {
+      background: #fafafa;
     }
 
-    .packing-notes ul {
-      margin: 10px 0;
-      padding-left: 25px;
+    .measurement-table td {
+      text-align: center;
+      font-size: 9px;
     }
 
-    .packing-notes li {
-      margin-bottom: 8px;
-      font-size: 11px;
-      line-height: 1.5;
+    .measurement-table td:first-child,
+    .measurement-table td:nth-child(2) {
+      text-align: left;
+      font-weight: bold;
     }
 
-    .packing-notes p {
-      margin: 10px 0;
-      font-size: 11px;
-      line-height: 1.6;
-    }
-
-    /* Revision History */
-    .revision-table {
-      font-size: 11px;
-      line-height: 1.3;
-      table-layout: fixed;
-      width: 100%;
-    }
-
-    .revision-table th,
-    .revision-table td {
-      padding: 4px 6px;
-      word-wrap: break-word;
-      word-break: normal;
-      white-space: normal;
-      hyphens: none;
-    }
-
-    .revision-table th {
-      white-space: nowrap;
-    }
-
-    /* Status Badges */
-    .status-badge {
+    .color-swatch {
       display: inline-block;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 7px;
+      width: 40px;
+      height: 20px;
+      border: 1px solid #999;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    .notes {
+      background: #fffacd;
+      border-left: 4px solid #ffd700;
+      padding: 12px;
+      margin: 15px 0;
+    }
+
+    .notes strong {
+      display: block;
+      margin-bottom: 5px;
       font-weight: 600;
-      text-transform: uppercase;
     }
 
-    .status-approved {
-      background: #dcfce7;
-      color: #166534;
+    .size-badge {
+      background: #666;
+      color: white;
+      padding: 4px 10px;
+      border-radius: 3px;
+      font-size: 10px;
+      display: inline-block;
+      margin: 2px;
     }
 
-    .status-pending {
-      background: #fef3c7;
-      color: #92400e;
+    h3 {
+      margin: 15px 0 10px 0;
+      font-size: 12px;
+      font-weight: bold;
     }
 
-    .status-critical {
-      background: #fee2e2;
-      color: #dc2626;
-    }
-
-    @media print {
-      .page {
-        page-break-after: always;
-      }
-
-      .avoid-break,
-      .keep-together {
-        break-inside: avoid;
-        page-break-inside: avoid;
-      }
-
-      table {
-        page-break-inside: auto;
-      }
-
-      thead {
-        display: table-header-group;
-      }
-
-      tbody {
-        display: table-row-group;
-      }
-
-      tr {
-        page-break-inside: avoid;
-        page-break-after: auto;
-      }
-
-      /* Repeat header on each page */
-      .bom-table thead {
-        display: table-header-group;
-      }
-
-      .measurement-table thead {
-        display: table-header-group;
-      }
-
-      /* Prevent breaking inside cells */
-      td, th {
-        page-break-inside: avoid;
-      }
-    }
+    /* CRITICAL: Remove heavy box-shadow for performance */
+    /* CRITICAL: Minimize complex selectors */
+    /* CRITICAL: Remove unnecessary print-specific styles if not printing */
   </style>
 </head>
+
 <body>
-  <!-- I. Cover Page -->
-  <div class="page cover-page">
-    <% if (images && images.companyLogo) { %>
-      <img src="<%= images.companyLogo %>" alt="Company Logo" class="cover-logo" onerror="this.style.display='none';" />
-    <% } %>
-    <h1 class="cover-title"><%= meta.productName %></h1>
-    <div class="cover-article-code">
-      <strong>Article Code:</strong> <%= meta.articleCode %> | <strong>Version:</strong> <%= meta.version %>
-    </div>
-    <% if (images && images.coverImage) { %>
-      <img src="<%= images.coverImage %>" alt="Product Design" class="cover-image" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';" />
-    <% } else { %>
-      <div class="cover-image-placeholder">
-        <svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
-          <rect width="400" height="300" fill="#f3f4f6"/>
-          <text x="50%" y="50%" font-family="Arial" font-size="14" fill="#9ca3af" text-anchor="middle" dy=".3em">No Image</text>
-        </svg>
+  <div class="container">
+    <div class="page-header">
+      <div class="page-title">
+        Article Summary
+        <span class="version-text">Version <%= meta.version || '1' %></span>
       </div>
-    <% } %>
-    <div class="cover-description">
-      <p><strong>Season:</strong> <%= meta.season %> | <strong>Brand:</strong> <%= meta.brand %> | <strong>Collection:</strong> <%= meta.collectionName %></p>
-      <p><strong>Supplier:</strong> <%= meta.supplier %> | <strong>Category:</strong> <%= meta.category %> | <strong>Gender:</strong> <%= meta.gender %></p>
-      <p><strong>Fit Type:</strong> <%= meta.fitType %> | <strong>Lifecycle:</strong> <%= meta.lifecycleStage %></p>
-      <p style="margin-top: 15px;"><%= meta.productDescription %></p>
-      <p style="margin-top: 10px; font-size: 10px; color: #64748b;">
-        Created: <%= articleSummary.tracking.createdDate %> | Updated: <%= articleSummary.tracking.updatedAt %><br/>
-        Created By: <%= articleSummary.tracking.createdBy %>
-      </p>
-    </div>
-  </div>
 
-  <!-- II. Article Summary -->
-  <div class="page">
-    <h2 class="section-title" style="font-size: 18px; font-weight: 700; margin-bottom: 20px; padding-top: 15px; border-top: 2px solid #2C3E50;">Article Summary</h2>
-    
-    <div class="article-header" style="display: flex; gap: 25px; align-items: flex-start;">
-      <div class="article-info" style="flex: 1;">
-        <!-- General Info -->
-        <div class="section-heading">General Info</div>
-        <table class="article-summary">
-          <tr><td class="label">Article Code</td><td class="value"><%= articleSummary.generalInfo.articleCode %></td></tr>
-          <tr><td class="label">Product Name</td><td class="value"><%= articleSummary.generalInfo.productName %></td></tr>
-          <tr><td class="label">Version</td><td class="value"><%= articleSummary.generalInfo.version %></td></tr>
-          <tr><td class="label">Status</td><td class="value"><%= articleSummary.generalInfo.status %></td></tr>
-          <tr><td class="label">Lifecycle Stage</td><td class="value"><%= articleSummary.generalInfo.lifecycleStage %></td></tr>
-          <tr><td class="label">Brand</td><td class="value"><%= articleSummary.generalInfo.brand %></td></tr>
-          <tr><td class="label">Season</td><td class="value"><%= articleSummary.generalInfo.season %></td></tr>
-          <tr><td class="label">Collection</td><td class="value"><%= articleSummary.generalInfo.collection %></td></tr>
-          <tr><td class="label">Target Market</td><td class="value"><%= articleSummary.generalInfo.targetMarket %></td></tr>
-          <tr><td class="label">Price Point</td><td class="value"><%= articleSummary.generalInfo.pricePoint %></td></tr>
-          <tr><td class="label">Retail Price</td><td class="value"><%= articleSummary.generalInfo.retailPrice %></td></tr>
-        </table>
-
-        <!-- Technical Info -->
-        <div class="section-heading">Technical Info</div>
-        <table class="article-summary">
-          <tr><td class="label">Fit Type</td><td class="value"><%= articleSummary.technicalInfo.fitType %></td></tr>
-          <tr><td class="label">Product Class / Category</td><td class="value"><%= articleSummary.technicalInfo.productClass %></td></tr>
-          <tr><td class="label">Supplier</td><td class="value"><%= articleSummary.technicalInfo.supplier %></td></tr>
-          <tr><td class="label">Technical Designer</td><td class="value"><%= articleSummary.technicalInfo.technicalDesignerId %></td></tr>
-          <tr><td class="label">Customer ID</td><td class="value"><%= articleSummary.technicalInfo.customerId %></td></tr>
-          <tr><td class="label">Owner</td><td class="value"><%= articleSummary.technicalInfo.ownerId %></td></tr>
-        </table>
-
-        <!-- Fabric & Composition -->
-        <div class="section-heading">Fabric & Composition</div>
-        <table class="article-summary">
-          <tr><td class="label">Fabric Description</td><td class="value"><%= articleSummary.fabricAndComposition.fabricDescription %></td></tr>
-          <tr><td class="label">Material Info</td><td class="value"><%= articleSummary.fabricAndComposition.materialInfo %></td></tr>
-        </table>
-
-        <!-- Tracking -->
-        <div class="section-heading">Tracking</div>
-        <table class="article-summary">
-          <tr><td class="label">Created Date</td><td class="value"><%= articleSummary.tracking.createdDate %></td></tr>
-          <tr><td class="label">Updated At</td><td class="value"><%= articleSummary.tracking.updatedAt %></td></tr>
-          <tr><td class="label">Created By</td><td class="value"><%= articleSummary.tracking.createdBy %></td></tr>
-          <tr><td class="label">Updated By</td><td class="value"><%= articleSummary.tracking.updatedBy %></td></tr>
-        </table>
-      </div>
-      
-      <div class="article-image" style="flex: 0 0 280px; position: sticky; top: 0;">
-        <% if (images && images.coverImage && images.coverImage !== 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=') { %>
-          <img src="<%= images.coverImage %>" alt="Article Image" class="article-image-img" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';" />
-        <% } else { %>
-          <div class="article-image-placeholder">
-            <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=" alt="No Image" class="article-image-img" />
-          </div>
-        <% } %>
-      </div>
-    </div>
-  </div>
-
-  <!-- III. Bill of Materials (BOM) -->
-  <% if (bom && bom.parts && bom.parts.length > 0) { %>
-    <div class="page">
-      <h2 class="section-title">Bill of Materials (BOM)</h2>
-      
-      <% bom.parts.forEach((part) => { %>
-        <div class="bom-part">
-          <div class="bom-part-header">PART: <%= part.partName %></div>
-          
-          <table class="bom-table">
-            <thead>
-              <tr>
-                <th style="width: 20%;">Material Name</th>
-                <th style="width: 8%;">Image</th>
-                <th style="width: 10%;">Placement</th>
-                <th style="width: 12%;">Size/Width/Usage</th>
-                <th style="width: 6%;">Qty</th>
-                <th style="width: 6%;">UOM</th>
-                <th style="width: 12%;">Supplier</th>
-                <th style="width: 8%;">Unit Price</th>
-                <th style="width: 8%;">Total Price</th>
-                <th style="width: 10%;">Comments</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% part.items.forEach((item) => { %>
-                <tr>
-                  <td class="col-name"><%= item.materialName %></td>
-                  <td class="col-image">
-                    <img src="<%= item.imageUrl %>" alt="Material" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMCIgZmlsbD0iIzljYTNhZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';" />
-                  </td>
-                  <td><%= item.placement %></td>
-                  <td><%= item.sizeWidthUsage %></td>
-                  <td class="text-center"><%= item.quantity %></td>
-                  <td><%= item.uom %></td>
-                  <td><%= item.supplier %></td>
-                  <td><%= item.unitPrice %></td>
-                  <td><%= item.totalPrice %></td>
-                  <td>
-                    <% if (item.colorways && item.colorways.length > 0) { %>
-                      <% item.colorways.forEach((colorway) => { %>
-                        <span class="color-chip"><%= colorway %></span>
-                      <% }); %>
-                      <% if (item.comments && item.comments !== '—') { %>
-                        <br/><%= item.comments %>
-                      <% } %>
-                    <% } else { %>
-                      <%= item.comments %>
-                    <% } %>
-                  </td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
-      <% }); %>
-    </div>
-  <% } %>
-
-  <!-- IV. Measurement Specification -->
-  <% if (measurements && measurements.rows && measurements.rows.length > 0) { %>
-    <div class="page">
-      <h2 class="section-title">Garment Measurement Specification</h2>
-      <table class="measurement-table">
-        <thead>
-          <tr>
-            <th>POM Code</th>
-            <th>POM Name</th>
-            <th>Type</th>
-            <th>Category</th>
-            <th>-Tol</th>
-            <th>+Tol</th>
-            <% measurements.sizeRange.forEach((size) => { %>
-              <th class="size-col <%= size === measurements.baseSize ? 'base-size' : '' %>"><%= size %></th>
-            <% }); %>
-            <th>Unit</th>
-            <th>Notes</th>
-            <th>Critical</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% measurements.rows.forEach((row) => { %>
-            <tr class="<%= row.critical ? 'critical' : '' %>">
-              <td><strong><%= row.pomCode %></strong></td>
-              <td><%= row.pomName %></td>
-              <td><%= row.measurementType %></td>
-              <td><%= row.category %></td>
-              <td class="tol-minus"><%= row.minusTolerance %></td>
-              <td class="tol-plus"><%= row.plusTolerance %></td>
-              <% measurements.sizeRange.forEach((size) => { %>
-                <td class="size-col <%= size === measurements.baseSize ? 'base-size' : '' %>">
-                  <%= row.sizes[size] %>
-                </td>
-              <% }); %>
-              <td><%= row.unit %></td>
-              <td><%= row.notes %></td>
-              <td class="text-center">
-                <% if (row.critical) { %>
-                  <span class="status-badge status-critical">●</span>
+      <table>
+        <tr>
+          <td class="logo-cell" rowspan="5">
+            <strong>
+              <%= meta.brand || 'Edwards' %>
+            </strong><br>
+            <small>Garment</small>
+          </td>
+          <td class="label">Article Code</td>
+          <td class="value">
+            <%= meta.articleCode || '-' %>
+          </td>
+          <td class="label">Description</td>
+          <td class="value" colspan="2">
+            <%= meta.description || meta.productDescription || '' %>
+          </td>
+          <td class="label">Product Group</td>
+          <td class="value">
+            <%= meta.category || 'Tops' %>
+          </td>
+          <td class="logo-cell" rowspan="5">
+            <div class="product-images">
+              <% if (meta.designSketchUrl && meta.designSketchUrl !=='—' ) { %>
+                <img src="<%= meta.designSketchUrl %>" alt="Product"
+                  style="width: 60px; height: 80px; border: 1px solid #ccc; background: #f9f9f9;" />
                 <% } else { %>
-                  —
-                <% } %>
-              </td>
-            </tr>
-          <% }); %>
-        </tbody>
+                  <div style="width: 60px; height: 80px; border: 1px solid #ccc; background: #f9f9f9;"></div>
+                  <% } %>
+                    <div style="width: 60px; height: 80px; border: 1px solid #ccc; background: #f9f9f9;"></div>
+            </div>
+          </td>
+        </tr>
+
+        <tr>
+          <td class="label">Article Name</td>
+          <td class="value" colspan="3">
+            <%= meta.productName || meta.articleName || '-' %>
+          </td>
+          <td class="label">Product Sub-Category</td>
+          <td class="value">
+            <%= meta.productSubCategory || 'Short Sleeve' %>
+          </td>
+        </tr>
+
+        <tr>
+          <td class="label">Created On</td>
+          <td class="value">
+            <%= meta.createdAt || '-' %>
+          </td>
+          <td class="label" rowspan="2">Material<br>Description</td>
+          <td class="value" rowspan="2">
+            <%= meta.fabricDescription || '-' %>
+              <% if (meta.materialComposition) { %><br>
+                <%= meta.materialComposition %>
+                  <% } %>
+                    <% if (meta.supplier) { %><br>Supplier: <%= meta.supplier %>
+                        <% } %>
+          </td>
+          <td class="label">Season</td>
+          <td class="value">
+            <%= meta.season || 'Active Development' %>
+          </td>
+        </tr>
+
+        <tr>
+          <td class="label">Last Modified</td>
+          <td class="value">
+            <%= meta.updatedAt || '-' %>
+          </td>
+          <td class="label">Life Cycle Stage</td>
+          <td class="value">
+            <%= meta.lifecycleStage || meta.status || 'Production' %>
+          </td>
+        </tr>
+
+        <tr>
+          <td class="label">Gender</td>
+          <td class="value">
+            <%= meta.gender || 'Unisex' %>
+          </td>
+          <td class="label">Legacy Product Class</td>
+          <td class="value" colspan="2">
+            <%= meta.productClass || meta.category || '-' %>
+          </td>
+          <td class="label">Fit Type</td>
+          <td class="value">
+            <%= meta.fitType || 'Relaxed' %>
+          </td>
+        </tr>
+
+        <tr>
+          <td class="label" colspan="2">Technical Designer</td>
+          <td class="value" colspan="7">
+            <%= meta.designer || meta.technicalDesigner || '-' %>
+          </td>
+        </tr>
       </table>
     </div>
-  <% } %>
 
-  <!-- V. Sample Measurement Rounds -->
-  <% if (sampleMeasurementRounds && sampleMeasurementRounds.length > 0) { %>
-    <% sampleMeasurementRounds.forEach((round) => { %>
-      <div class="page">
-        <h2 class="section-title">Sample Measurement Round: <%= round.name %></h2>
-        
-        <!-- Round Information -->
-        <div class="round-info">
-          <table class="info-table" style="margin-bottom: 15px;">
-            <tr>
-              <th style="width: 20%;">Round Name</th>
-              <td><%= round.name %></td>
-              <th style="width: 20%;">Measurement Date</th>
-              <td><%= round.measurementDate %></td>
-            </tr>
-            <tr>
-              <th>Reviewer</th>
-              <td><%= round.reviewer %></td>
-              <th>Requested Source</th>
-              <td><%= round.requestedSource %></td>
-            </tr>
-            <% if (round.overallComments && round.overallComments !== '—') { %>
-              <tr>
-                <th>Overall Comments</th>
-                <td colspan="3"><%= round.overallComments %></td>
-              </tr>
-            <% } %>
-          </table>
+    <!-- 1. ARTICLE SUMMARY -->
+    <div class="section">
+      <div class="section-title">Article Summary</div>
+      <div class="info-grid">
+        <div class="info-item">
+          <strong>Article Code</strong>
+          <span>
+            <%= meta.articleCode || '-' %>
+          </span>
         </div>
-
-        <!-- Sample Measurement Table - One row per POM -->
-        <table class="sample-round-table">
-          <thead>
-            <tr>
-              <th style="width: 12%;">POM Code</th>
-              <th style="width: 15%;">Measurement Point</th>
-              <th style="width: 6%;">Base Size</th>
-              <th style="width: 5%;">-Tol</th>
-              <th style="width: 5%;">+Tol</th>
-              <th style="width: 8%;">Requested</th>
-              <th style="width: 8%;">Measured</th>
-              <th style="width: 8%;">Diff</th>
-              <th style="width: 8%;">Revised</th>
-              <th style="width: 25%;">Comments</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% round.measurements.forEach((entry) => { %>
-              <tr>
-                <td class="pom-code"><strong><%= entry.pomCode %></strong></td>
-                <td class="pom-name"><%= entry.pomName %></td>
-                <td class="text-center"><%= measurements.baseSize || '—' %></td>
-                <td class="text-center tol-minus"><%= entry.toleranceMinus || '—' %></td>
-                <td class="text-center tol-plus"><%= entry.tolerancePlus || '—' %></td>
-                <td class="text-center">
-                  <% 
-                    // Get requested value for base size or first available size
-                    const requestedValue = entry.requested && measurements.sizeRange 
-                      ? (entry.requested[measurements.baseSize] || entry.requested[measurements.sizeRange[0]] || '—')
-                      : '—';
-                  %>
-                  <%= requestedValue %>
-                </td>
-                <td class="text-center">
-                  <% 
-                    const measuredValue = entry.measured && measurements.sizeRange 
-                      ? (entry.measured[measurements.baseSize] || entry.measured[measurements.sizeRange[0]] || '—')
-                      : '—';
-                  %>
-                  <%= measuredValue %>
-                </td>
-                <td class="text-center">
-                  <% 
-                    const diffValue = entry.diff && measurements.sizeRange 
-                      ? (entry.diff[measurements.baseSize] || entry.diff[measurements.sizeRange[0]] || '—')
-                      : '—';
-                  %>
-                  <%= diffValue %>
-                </td>
-                <td class="text-center">
-                  <% 
-                    const revisedValue = entry.revised && measurements.sizeRange 
-                      ? (entry.revised[measurements.baseSize] || entry.revised[measurements.sizeRange[0]] || '—')
-                      : '—';
-                  %>
-                  <%= revisedValue %>
-                </td>
-                <td class="comments">
-                  <% 
-                    const commentsValue = entry.comments && measurements.sizeRange 
-                      ? (entry.comments[measurements.baseSize] || entry.comments[measurements.sizeRange[0]] || '—')
-                      : '—';
-                  %>
-                  <%= commentsValue %>
-                </td>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
+        <div class="info-item">
+          <strong>Article Name</strong>
+          <span>
+            <%= meta.productName || meta.articleName || '-' %>
+          </span>
+        </div>
+        <div class="info-item">
+          <strong>Brand</strong>
+          <span>
+            <%= meta.brand || '-' %>
+          </span>
+        </div>
+        <div class="info-item">
+          <strong>Season</strong>
+          <span>
+            <%= meta.season || '-' %>
+          </span>
+        </div>
+        <div class="info-item">
+          <strong>Category</strong>
+          <span>
+            <%= meta.category || meta.productClass || '-' %>
+          </span>
+        </div>
+        <div class="info-item">
+          <strong>Target Market</strong>
+          <span>
+            <%= meta.targetMarket || '-' %>
+          </span>
+        </div>
+        <div class="info-item">
+          <strong>Price Point</strong>
+          <span>
+            <%= meta.pricePoint || '-' %>
+          </span>
+        </div>
+        <div class="info-item">
+          <strong>Retail Price</strong>
+          <span>
+            <%= meta.retailPrice ? meta.retailPrice + ' ' + (meta.currency || 'USD' ) : '-' %>
+          </span>
+        </div>
       </div>
-    <% }); %>
-  <% } %>
 
-  <!-- VI. How To Measure -->
-  <% if (howToMeasures && howToMeasures.length > 0) { %>
-    <div class="page">
-      <h2 class="section-title">How To Measure</h2>
-      <% howToMeasures.forEach((item) => { %>
-        <div class="howto-item keep-together">
-          <% if (item.imageUrl) { %>
-            <div class="howto-image">
-              <img src="<%= item.imageUrl %>" alt="<%= item.pomName %>" />
-            </div>
-          <% } %>
-          <div class="howto-content">
-            <h3>Step <%= item.stepNumber %>: <%= item.pomCode %> - <%= item.pomName %></h3>
-            <p><strong>Description:</strong> <%= item.description %></p>
-            <% if (item.steps && item.steps.length > 0) { %>
-              <p><strong>Steps:</strong></p>
-              <ol>
-                <% item.steps.forEach((step) => { %>
-                  <li><%= step %></li>
-                <% }); %>
-              </ol>
-            <% } %>
-            <% if (item.tips && item.tips.length > 0) { %>
-              <p><strong>Tips:</strong></p>
-              <ul>
-                <% item.tips.forEach((tip) => { %>
-                  <li><%= tip %></li>
-                <% }); %>
-              </ul>
-            <% } %>
-            <% if (item.commonMistakes && item.commonMistakes.length > 0) { %>
-              <p><strong>Common Mistakes:</strong></p>
-              <ul>
-                <% item.commonMistakes.forEach((mistake) => { %>
-                  <li><%= mistake %></li>
-                <% }); %>
-              </ul>
-            <% } %>
-            <% if (item.relatedMeasurements && item.relatedMeasurements.length > 0) { %>
-              <p><strong>Related Measurements:</strong> <%= item.relatedMeasurements.join(', ') %></p>
-            <% } %>
-          </div>
+      <% if (meta.productDescription || meta.description) { %>
+        <div style="margin-top: 15px">
+          <strong>DESCRIPTION:</strong>
+          <p style="margin-top: 5px; line-height: 1.6">
+            <%= meta.productDescription || meta.description %>
+          </p>
         </div>
-      <% }); %>
+        <% } %>
     </div>
-  <% } %>
 
-  <!-- VII. Colorways & Color Allocation -->
-  <% if (colorways && colorways.length > 0) { %>
-    <div class="page">
-      <h2 class="section-title">Colorways & Color Allocation</h2>
-      <div class="colorway-grid">
-        <% colorways.forEach((colorway) => { %>
-          <div class="colorway-item keep-together">
-            <h3 style="font-size: 11px; margin-bottom: 8px;"><%= colorway.name %> (<%= colorway.code %>)</h3>
-            <% if (colorway.hexColor) { %>
-              <span class="colorway-swatch" style="background-color: <%= colorway.hexColor %>;"></span>
+    <!-- 2. BILL OF MATERIALS -->
+    <% if (bom && bom.parts && bom.parts.length> 0) { %>
+      <div class="section">
+        <div class="section-title">Bill of Materials</div>
+
+        <% const fabrics=[]; const trims=[]; const labels=[]; const packaging=[]; bom.parts.forEach(part=> {
+          part.items.forEach(item => {
+          const partName = (part.partName || '').toLowerCase();
+          const materialName = (item.materialName || '').toLowerCase();
+
+          if (partName.includes('fabric') || partName.includes('main') || materialName.includes('fabric')) {
+          fabrics.push({...item, part: part.partName});
+          } else if (partName.includes('label') || materialName.includes('label') || materialName.includes('hang')) {
+          labels.push({...item, part: part.partName});
+          } else if (partName.includes('packaging') || materialName.includes('polybag') || materialName.includes('clip')
+          || materialName.includes('bag')) {
+          packaging.push({...item, part: part.partName});
+          } else {
+          trims.push({...item, part: part.partName});
+          }
+          });
+          });
+          %>
+
+          <!-- Fabric -->
+          <% if (fabrics.length> 0) { %>
+            <h3>Fabric</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 10%">Part</th>
+                  <th style="width: 25%">Material</th>
+                  <th style="width: 15%">Placement</th>
+                  <th style="width: 8%">Size</th>
+                  <th style="width: 8%">Qty</th>
+                  <th style="width: 8%">UOM</th>
+                  <th style="width: 12%">Supplier</th>
+                  <th style="width: 14%">Comments</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% fabrics.forEach((item, idx)=> { %>
+                  <tr class="<%= idx % 2 === 1 ? 'alt-row' : '' %>">
+                    <td>
+                      <%= item.part || '-' %>
+                    </td>
+                    <td>
+                      <%= item.materialName || '-' %>
+                        <% if (item.sizeWidthUsage && item.sizeWidthUsage !=='—' ) { %><br /><small>
+                            <%= item.sizeWidthUsage %>
+                          </small>
+                          <% } %>
+                    </td>
+                    <td>
+                      <%= item.placement || 'None' %>
+                    </td>
+                    <td>
+                      <%= item.size || '-' %>
+                    </td>
+                    <td>
+                      <%= item.quantity || '0' %>
+                    </td>
+                    <td>
+                      <%= item.uom || 'Yards' %>
+                    </td>
+                    <td>
+                      <%= item.supplier || '-' %>
+                    </td>
+                    <td>
+                      <%= item.comments || '-' %>
+                    </td>
+                  </tr>
+                  <% }); %>
+              </tbody>
+            </table>
             <% } %>
-            <div class="colorway-info">
-              <p><strong>Pantone:</strong> <%= colorway.pantoneCode || '—' %></p>
-              <p><strong>Hex:</strong> <%= colorway.hexColor || '—' %></p>
-              <p><strong>RGB:</strong> <%= colorway.rgbColor || '—' %></p>
-              <p><strong>Supplier:</strong> <%= colorway.supplier || '—' %></p>
-              <p><strong>Status:</strong> 
-                <span class="status-badge <%= colorway.approvalStatus === 'Approved' ? 'status-approved' : 'status-pending' %>">
-                  <%= colorway.approvalStatus %>
-                </span>
-              </p>
-              <p><strong>Season:</strong> <%= colorway.season %></p>
-              <p><strong>Collection:</strong> <%= colorway.collectionName %></p>
-              <p><strong>Notes:</strong> <%= colorway.notes %></p>
-            </div>
-            <% if (colorway.parts && colorway.parts.length > 0) { %>
-              <div class="colorway-parts">
-                <p style="font-weight: 600; margin-bottom: 6px;">Parts:</p>
-                <% colorway.parts.forEach((part) => { %>
-                  <div class="colorway-part-item">
-                    <% if (part.hexCode) { %>
-                      <span class="colorway-part-swatch" style="background-color: <%= part.hexCode %>;"></span>
+
+              <!-- Trims -->
+              <% if (trims.length> 0) { %>
+                <h3>Trims</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width: 10%">Part</th>
+                      <th style="width: 25%">Material</th>
+                      <th style="width: 15%">Placement</th>
+                      <th style="width: 10%">Size</th>
+                      <th style="width: 8%">Qty</th>
+                      <th style="width: 8%">UOM</th>
+                      <th style="width: 12%">Supplier</th>
+                      <th style="width: 12%">Comments</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% trims.forEach((item, idx)=> { %>
+                      <tr class="<%= idx % 2 === 1 ? 'alt-row' : '' %>">
+                        <td>
+                          <%= item.part || '-' %>
+                        </td>
+                        <td>
+                          <%= item.materialName || '-' %>
+                        </td>
+                        <td>
+                          <%= item.placement || '-' %>
+                        </td>
+                        <td>
+                          <%= item.sizeWidthUsage || item.size || '-' %>
+                        </td>
+                        <td>
+                          <%= item.quantity || '0' %>
+                        </td>
+                        <td>
+                          <%= item.uom || 'Each' %>
+                        </td>
+                        <td>
+                          <%= item.supplier || '-' %>
+                        </td>
+                        <td>
+                          <%= item.comments || '-' %>
+                        </td>
+                      </tr>
+                      <% }); %>
+                  </tbody>
+                </table>
+                <% } %>
+
+                  <!-- Labels -->
+                  <% if (labels.length> 0) { %>
+                    <h3>Labels</h3>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th style="width: 12%">Part</th>
+                          <th style="width: 28%">Material</th>
+                          <th style="width: 22%">Placement</th>
+                          <th style="width: 8%">Qty</th>
+                          <th style="width: 8%">UOM</th>
+                          <th style="width: 22%">Comments</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <% labels.forEach((item, idx)=> { %>
+                          <tr class="<%= idx % 2 === 1 ? 'alt-row' : '' %>">
+                            <td>
+                              <%= item.part || '-' %>
+                            </td>
+                            <td>
+                              <%= item.materialName || '-' %>
+                            </td>
+                            <td>
+                              <%= item.placement || '-' %>
+                            </td>
+                            <td>
+                              <%= item.quantity || '1' %>
+                            </td>
+                            <td>
+                              <%= item.uom || 'Each' %>
+                            </td>
+                            <td>
+                              <%= item.comments || '-' %>
+                            </td>
+                          </tr>
+                          <% }); %>
+                      </tbody>
+                    </table>
                     <% } %>
-                    <div>
-                      <strong><%= part.partName %></strong>: <%= part.colorName %>
-                      <% if (part.pantoneCode) { %> (<%= part.pantoneCode %>)<% } %>
+
+                      <!-- Packaging -->
+                      <% if (packaging.length> 0) { %>
+                        <h3>Packaging</h3>
+                        <table>
+                          <thead>
+                            <tr>
+                              <th style="width: 12%">Part</th>
+                              <th style="width: 28%">Material</th>
+                              <th style="width: 10%">Qty</th>
+                              <th style="width: 10%">UOM</th>
+                              <th style="width: 18%">Supplier</th>
+                              <th style="width: 22%">Comments</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <% packaging.forEach((item, idx)=> { %>
+                              <tr class="<%= idx % 2 === 1 ? 'alt-row' : '' %>">
+                                <td>
+                                  <%= item.part || '-' %>
+                                </td>
+                                <td>
+                                  <%= item.materialName || '-' %>
+                                </td>
+                                <td>
+                                  <%= item.quantity || '1' %>
+                                </td>
+                                <td>
+                                  <%= item.uom || 'Each' %>
+                                </td>
+                                <td>
+                                  <%= item.supplier || '-' %>
+                                </td>
+                                <td>
+                                  <%= item.comments || '-' %>
+                                </td>
+                              </tr>
+                              <% }); %>
+                          </tbody>
+                        </table>
+                        <% } %>
+      </div>
+      <% } %>
+
+        <!-- 3. MEASUREMENTS -->
+        <% if (measurements && measurements.rows && measurements.rows.length> 0) {
+          %>
+          <div class="section">
+            <div class="section-title">Measurement Chart</div>
+
+            <% if (measurements.sizeRange && measurements.sizeRange.length> 0) { %>
+              <div style="margin-bottom: 15px">
+                <strong>SIZE RANGE:</strong>
+                <div style="margin-top: 8px">
+                  <% measurements.sizeRange.forEach(size=> { %>
+                    <span class="size-badge">
+                      <%= size %>
+                    </span>
+                    <% }); %>
+                </div>
+              </div>
+              <% } %>
+
+                <div style="overflow-x: auto">
+                  <table class="measurement-table">
+                    <thead>
+                      <tr>
+                        <th>POM Code</th>
+                        <th>Measurement Point</th>
+                        <th>-Tol</th>
+                        <th>+Tol</th>
+                        <% if (measurements.sizeRange) { measurements.sizeRange.forEach(size=> { %>
+                          <th>
+                            <%= size %>
+                          </th>
+                          <% }); } %>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% measurements.rows.forEach((row, index)=> { const highlightCodes
+                        = ['BL20', 'BL21', 'AB11', 'AB30', 'AB70', 'AH10', 'SL10']; const
+                        shouldHighlight = highlightCodes.some(code =>
+                        row.pomCode?.includes(code)); %>
+                        <tr
+                          style="<%= shouldHighlight ? 'background: #ffe;' : (index % 2 === 1 ? 'background: #fafafa;' : '') %>">
+                          <td>
+                            <%= row.pomCode || '-' %>
+                          </td>
+                          <td>
+                            <%= row.pomName || '-' %>
+                          </td>
+                          <td>
+                            <%= row.minusTolerance || '0' %>
+                          </td>
+                          <td>
+                            <%= row.plusTolerance || '0' %>
+                          </td>
+                          <% if (measurements.sizeRange) { measurements.sizeRange.forEach(size=> { %>
+                            <td>
+                              <%= row.sizes?.[size] || '-' %>
+                            </td>
+                            <% }); } %>
+                        </tr>
+                        <% }); %>
+                    </tbody>
+                  </table>
+                </div>
+
+                <% if (measurements.notes || measurements.comments) { %>
+                  <div class="notes">
+                    <strong>NOTES:</strong>
+                    <%= measurements.notes || measurements.comments %>
+                  </div>
+                  <% } %>
+          </div>
+          <% } %>
+
+            <!-- 3B. SAMPLE MEASUREMENT ROUNDS -->
+            <% if (sampleMeasurementRounds && sampleMeasurementRounds.length> 0) { %>
+              <% sampleMeasurementRounds.forEach((round, roundIndex)=> { %>
+                <div class="section" style="page-break-before: <%= roundIndex > 0 ? 'always' : 'auto' %>;">
+                  <div class="section-title">Sample Measurements - <%= round.name %>
+                  </div>
+
+                  <div class="info-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 15px">
+                    <div class="info-item">
+                      <strong>Measurement Date</strong>
+                      <span>
+                        <%= round.measurementDate || '-' %>
+                      </span>
+                    </div>
+                    <div class="info-item">
+                      <strong>Reviewer</strong>
+                      <span>
+                        <%= round.reviewer || '-' %>
+                      </span>
+                    </div>
+                    <div class="info-item">
+                      <strong>Requested Source</strong>
+                      <span style="text-transform: capitalize">
+                        <%= round.requestedSource || 'original' %>
+                      </span>
                     </div>
                   </div>
+
+                  <% if (round.measurements && round.measurements.length> 0) { %>
+                    <div style="overflow-x: auto">
+                      <table class="measurement-table" style="font-size: 8px">
+                        <thead>
+                          <tr>
+                            <th style="width: 8%">POM</th>
+                            <th style="width: 12%">Point</th>
+                            <th style="width: 5%">-Tol</th>
+                            <th style="width: 5%">+Tol</th>
+                            <th style="width: 8%">Requested</th>
+                            <th style="width: 8%">Measured</th>
+                            <th style="width: 7%">Diff</th>
+                            <th style="width: 8%">Revised</th>
+                            <th style="width: 39%">Comments</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <% round.measurements.forEach((entry, idx)=> { %>
+                            <tr style="<%= idx % 2 === 1 ? 'background: #fafafa;' : '' %>">
+                              <td>
+                                <%= entry.pomCode || '-' %>
+                              </td>
+                              <td style="text-align: left">
+                                <%= entry.pomName || '-' %>
+                              </td>
+                              <td>
+                                <%= entry.toleranceMinus || '0' %>
+                              </td>
+                              <td>
+                                <%= entry.tolerancePlus || '0' %>
+                              </td>
+                              <td>
+                                <% const baseSize=measurements?.baseSize || 'M' ; %>
+                                  <%= entry.requested?.[baseSize] || '-' %>
+                              </td>
+                              <td>
+                                <%= entry.measured?.[baseSize] || '-' %>
+                              </td>
+                              <td
+                                style="<%= parseFloat(entry.diff?.[baseSize] || 0) > 0 ? 'color: red; font-weight: bold;' : '' %>">
+                                <%= entry.diff?.[baseSize] || '-' %>
+                              </td>
+                              <td>
+                                <%= entry.revised?.[baseSize] || '-' %>
+                              </td>
+                              <td style="text-align: left; font-size: 7px">
+                                <%= entry.comments?.[baseSize] || '-' %>
+                              </td>
+                            </tr>
+                            <% }); %>
+                        </tbody>
+                      </table>
+                    </div>
+                    <% } %>
+                      <% if (round.overallComments && round.overallComments !=='—' ) { %>
+                        <div class="notes" style="margin-top: 10px">
+                          <strong>OVERALL COMMENTS:</strong>
+                          <%= round.overallComments %>
+                        </div>
+                        <% } %>
+                </div>
                 <% }); %>
-              </div>
-            <% } %>
-            <% if (colorway.imageUrl) { %>
-              <img src="<%= colorway.imageUrl %>" alt="<%= colorway.name %>" style="width: 100%; max-height: 150px; object-fit: contain; margin-top: 10px; border: 1px solid #d1d5db; border-radius: 4px;" />
-            <% } %>
-          </div>
-        <% }); %>
-      </div>
-    </div>
-  <% } %>
+                  <% } %>
 
-  <!-- VIII. Packing Instructions -->
-  <div class="page">
-    <h2 class="section-title">Packing Instructions</h2>
-    <div class="packing-notes">
-      <% if (packingNotes && packingNotes !== '—' && packingNotes.trim()) { %>
-        <% 
-          // Normalize and split packing notes
-          const normalizedNotes = packingNotes.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-          const notes = normalizedNotes.split('\n').filter(n => n.trim());
-        %>
-        <% if (notes.length > 0) { %>
-          <ul>
-            <% notes.forEach((note) => { %>
-              <li><%= note.trim() %></li>
-            <% }); %>
-          </ul>
-        <% } else { %>
-          <p><%= packingNotes %></p>
-        <% } %>
-      <% } else { %>
-        <p style="color: #64748b; font-style: italic;">No packing instructions provided.</p>
-      <% } %>
-    </div>
-  </div>
+                    <!-- 4. COLORWAYS -->
+                    <% if (colorways && colorways.length> 0) { %>
+                      <div class="section">
+                        <div class="section-title">Colorways</div>
+                        <div class="info-grid" style="margin-bottom: 20px">
+                          <% colorways.forEach(color=> { %>
+                            <div class="info-item">
+                              <strong>
+                                <%= color.name || 'Color' %>
+                              </strong>
+                              <span>
+                                <span class="color-swatch"
+                                  style="background: <%= color.hexColor || '#FFFFFF' %>"></span>
+                                Code: <%= color.code || '000' %><br />
+                                  <% if (color.pantoneCode) { %>Pantone: <%= color.pantoneCode %><br />
+                                      <% } %> Hex: <%= color.hexColor || '#FFFFFF' %>
+                              </span>
+                            </div>
+                            <% }); %>
+                        </div>
+                      </div>
+                      <% } %>
 
-  <!-- IX. Revision History -->
-  <% if (revisionHistory && revisionHistory.length > 0) { %>
-    <div class="page">
-      <h2 class="section-title">Revision History</h2>
-      <table class="revision-table">
-        <thead>
-          <tr>
-            <th>Version</th>
-            <th>Modified By</th>
-            <th>Modified At</th>
-            <th>Description</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% revisionHistory.forEach((revision) => { %>
-            <tr>
-              <td><%= revision.version %></td>
-              <td><%= revision.modifiedBy %></td>
-              <td><%= revision.modifiedAt %></td>
-              <td><%= revision.description %></td>
-              <td><%= revision.status %></td>
-            </tr>
-          <% }); %>
-        </tbody>
-      </table>
-    </div>
-  <% } %>
+                        <!-- 5. HOW TO MEASURE (CONSTRUCTION) -->
+                        <% if (howToMeasures && howToMeasures.length> 0) { %>
+                          <div class="section" style="page-break-before: always">
+                            <div class="section-title">Construction & How To Measure</div>
 
-  <!-- X. Appendix (Optional) -->
-  <div class="page">
-    <h2 class="section-title">Appendix</h2>
-    <table class="info-table">
-      <tr><th>Completeness</th><td><%= summary ? 'Complete' : 'Incomplete' %></td></tr>
-      <tr><th>Total BOM Items</th><td><%= summary ? summary.bomCount : 0 %></td></tr>
-      <tr><th>Total Measurements</th><td><%= summary ? summary.measurementCount : 0 %></td></tr>
-      <tr><th>Total Colorways</th><td><%= colorways ? colorways.length : 0 %></td></tr>
-      <tr><th>Generated At</th><td><%= generatedAt %></td></tr>
-      <tr><th>Printed By</th><td><%= printedBy %></td></tr>
-    </table>
+                            <% howToMeasures.forEach((item, index)=> { %>
+                              <div style="
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+          ">
+                                <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 15px">
+                                  <div>
+                                    <h3 style="margin: 0 0 10px 0; font-size: 12px; color: #333">
+                                      <%= item.stepNumber || (index + 1) %>. <%= item.pomName || item.pomCode
+                                          || 'Measurement Point' %>
+                                    </h3>
+
+                                    <% if (item.pomCode) { %>
+                                      <p style="margin: 5px 0; font-size: 9px; color: #666">
+                                        <strong>Code:</strong>
+                                        <%= item.pomCode %>
+                                      </p>
+                                      <% } %>
+                                        <% if (item.description) { %>
+                                          <p style="margin: 10px 0; font-size: 10px; line-height: 1.5">
+                                            <%= item.description %>
+                                          </p>
+                                          <% } %>
+                                            <% if (item.steps && item.steps.length> 0) { %>
+                                              <div style="margin-top: 10px">
+                                                <strong style="font-size: 10px">Steps:</strong>
+                                                <ol style="
+                    margin: 5px 0;
+                    padding-left: 20px;
+                    font-size: 9px;
+                    line-height: 1.5;
+                  ">
+                                                  <% item.steps.forEach(step=> { %>
+                                                    <li style="margin-bottom: 5px">
+                                                      <%= step %>
+                                                    </li>
+                                                    <% }); %>
+                                                </ol>
+                                              </div>
+                                              <% } %>
+                                                <% if (item.tips && item.tips.length> 0) { %>
+                                                  <div style="
+                  margin-top: 10px;
+                  background: #fffbeb;
+                  padding: 8px;
+                  border-left: 3px solid #f59e0b;
+                ">
+                                                    <strong style="font-size: 9px; color: #92400e">💡 Tips:</strong>
+                                                    <ul style="
+                    margin: 5px 0;
+                    padding-left: 20px;
+                    font-size: 9px;
+                    line-height: 1.4;
+                  ">
+                                                      <% item.tips.forEach(tip=> { %>
+                                                        <li style="margin-bottom: 3px">
+                                                          <%= tip %>
+                                                        </li>
+                                                        <% }); %>
+                                                    </ul>
+                                                  </div>
+                                                  <% } %>
+                                                    <% if (item.commonMistakes && item.commonMistakes.length>
+                                                      0) { %>
+                                                      <div style="
+                  margin-top: 10px;
+                  background: #fef2f2;
+                  padding: 8px;
+                  border-left: 3px solid #ef4444;
+                ">
+                                                        <strong style="font-size: 9px; color: #991b1b">⚠️ Common
+                                                          Mistakes:</strong>
+                                                        <ul style="
+                    margin: 5px 0;
+                    padding-left: 20px;
+                    font-size: 9px;
+                    line-height: 1.4;
+                  ">
+                                                          <% item.commonMistakes.forEach(mistake=> { %>
+                                                            <li style="margin-bottom: 3px">
+                                                              <%= mistake %>
+                                                            </li>
+                                                            <% }); %>
+                                                        </ul>
+                                                      </div>
+                                                      <% } %>
+                                  </div>
+
+                                  <% if (item.imageUrl) { %>
+                                    <div style="text-align: center">
+                                      <img src="<%= item.imageUrl %>" alt="<%= item.pomName || 'Measurement' %>" style="
+                  max-width: 100%;
+                  height: auto;
+                  border: 1px solid #ddd;
+                  border-radius: 4px;
+                " />
+                                    </div>
+                                    <% } %>
+                                </div>
+                              </div>
+                              <% }); %>
+                          </div>
+                          <% } %>
+
+                            <!-- 6. PACKING & FOLDING INSTRUCTIONS -->
+                            <% if (packingNotes && packingNotes !=='—' ) { %>
+                              <div class="section" style="page-break-before: always">
+                                <div class="section-title">Packing & Folding Instructions</div>
+
+                                <div style="
+            background: #f8fafc;
+            border: 1px solid #e1e7ee;
+            border-radius: 6px;
+            padding: 20px;
+            font-size: 10px;
+            line-height: 1.6;
+          ">
+                                  <%- packingNotes %>
+                                </div>
+                              </div>
+                              <% } %>
+
+                                <!-- 7. REVISION HISTORY -->
+                                <% if (revisionHistory && revisionHistory.length> 0) { %>
+                                  <div class="section" style="page-break-before: always">
+                                    <div class="section-title">Revision History</div>
+
+                                    <table>
+                                      <thead>
+                                        <tr>
+                                          <th style="width: 10%">Version</th>
+                                          <th style="width: 20%">Modified By</th>
+                                          <th style="width: 15%">Date</th>
+                                          <th style="width: 45%">Description</th>
+                                          <th style="width: 10%">Status</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        <% revisionHistory.forEach((rev, idx)=> { %>
+                                          <tr class="<%= idx % 2 === 1 ? 'alt-row' : '' %>">
+                                            <td style="text-align: center; font-weight: bold">
+                                              <%= rev.version || '-' %>
+                                            </td>
+                                            <td>
+                                              <%= rev.modifiedBy || '-' %>
+                                            </td>
+                                            <td>
+                                              <%= rev.modifiedAt || '-' %>
+                                            </td>
+                                            <td style="font-size: 9px">
+                                              <%= rev.description || '-' %>
+                                            </td>
+                                            <td style="text-align: center">
+                                              <span
+                                                style="padding: 3px 8px; border-radius: 3px; font-size: 8px; background: <%= rev.status === 'Approved' ? '#d1fae5' : '#fee2e2' %>; color: <%= rev.status === 'Approved' ? '#065f46' : '#991b1b' %>;">
+                                                <%= rev.status || 'Draft' %>
+                                              </span>
+                                            </td>
+                                          </tr>
+                                          <% }); %>
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                  <% } %>
+
+                                    <!-- 8. CARE INSTRUCTIONS -->
+                                    <% if (meta.fabricDescription ||
+                                      articleSummary?.fabricAndComposition?.fabricDescription) { %>
+                                      <div class="section">
+                                        <div class="section-title">Care Instructions</div>
+                                        <div style="
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 20px;
+            align-items: start;
+          ">
+                                          <div>
+                                            <strong style="display: block; margin-bottom: 8px">Care Symbols:</strong>
+                                            <div style="font-size: 24px; line-height: 1.8">
+                                              ⚿ Machine Wash Warm<br />
+                                              ⃠ Do Not Bleach<br />
+                                              ◎ Tumble Dry Low<br />
+                                              ▽ Cool Iron
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <strong style="display: block; margin-bottom: 8px">Fiber Content &
+                                              Instructions:</strong>
+                                            <% if (meta.fabricDescription ||
+                                              articleSummary?.fabricAndComposition?.materialInfo) { %>
+                                              <p style="margin-bottom: 8px">
+                                                <strong>
+                                                  <%= meta.fabricDescription ||
+                                                    articleSummary.fabricAndComposition.materialInfo %>
+                                                </strong>
+                                              </p>
+                                              <% } %>
+                                                <p style="margin-bottom: 5px">
+                                                  MACHINE WASH WARM, DO NOT BLEACH, TUMBLE DRY LOW, COOL IRON.
+                                                </p>
+                                                <p style="margin-bottom: 5px">
+                                                  LAVAR A MÁQUINA TIBIO, NO BLANQUEADOR, SECADO TEMP BAJA, PLANCHA
+                                                  FRIA.
+                                                </p>
+                                                <p>
+                                                  LAVAGE EN MACHINE CHAUD, NE PAS JAVELLISER, SÈCHE-LINGE À FAIBLE,
+                                                  FER REFROIDIR.
+                                                </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <% } %>
+
+                                        <!-- FOOTER -->
+                                        <div style="
+          margin-top: 30px;
+          padding-top: 15px;
+          border-top: 2px solid #ddd;
+          text-align: center;
+          font-size: 9px;
+          color: #666;
+        ">
+                                          <strong>Powered by WFX</strong> | All rights reserved<br />
+                                          Printed on <%= generatedAt %> by <%= printedBy %>
+                                        </div>
   </div>
 </body>
-</html>
 
+</html>
