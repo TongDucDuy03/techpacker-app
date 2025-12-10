@@ -1539,6 +1539,10 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
+      // Set loading state
+      setState(prev => ({ ...prev, isExportingPDF: true }));
+      showSuccess('Đang tạo PDF... Vui lòng đợi', { duration: 2000 });
+
       // Call PDF export API
       const blob = await api.exportTechPackPDF(state.techpack.id, {
         orientation: 'portrait',
@@ -1566,6 +1570,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
       console.error('PDF export error:', error);
       const errorMessage = error?.response?.data?.message || error?.message || 'Failed to export PDF';
       showError(`PDF export failed: ${errorMessage}`);
+    } finally {
+      setState(prev => ({ ...prev, isExportingPDF: false }));
     }
   };
 
