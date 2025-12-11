@@ -335,9 +335,9 @@
         </div>
         <% } %>
 
-          <%# 1. ARTICLE SUMMARY %>
+          <%# 1. ARTICLE INFORMATION %>
             <div class="section">
-              <% renderSectionHeader('Article Summary'); %>
+              <% renderSectionHeader('Article Information'); %>
                 <div class="section-content">
                   <div class="info-grid">
                     <div class="info-item">
@@ -601,7 +601,7 @@
                   <%# 3. MEASUREMENTS %>
                     <% if (measurements && measurements.rows && measurements.rows.length> 0) { %>
                       <div class="section">
-                        <% renderSectionHeader('Measurement Chart'); %>
+                        <% renderSectionHeader('Measurement'); %>
                           <div class="section-content">
                             <% if (measurements.sizeRange && measurements.sizeRange.length> 0) { %>
                               <div style="margin-bottom: 15px">
@@ -754,132 +754,145 @@
           <%= round.overallComments %>
         </div>
         <% } %>
-          </div>
-          </div>
-          <% }); %>
+          <% if (round.editorContent && round.editorContent.trim() !=='' ) { %>
+            <div class="notes" style="margin-top: 10px">
+              <strong>DETAILS:</strong>
+              <%- round.editorContent %>
+            </div>
             <% } %>
+              </div>
+              </div>
+              <% }); %>
+                <% } %>
 
-              <%# 4. COLORWAYS %>
-                <% if (colorways && colorways.length> 0) { %>
-                  <div class="section">
-                    <% renderSectionHeader('Colorways'); %>
-                      <div class="section-content">
-                        <div class="info-grid" style="margin-bottom: 20px">
-                          <% colorways.forEach(color=> { %>
-                            <div class="info-item">
-                              <strong>
-                                <%= color.name || 'Color' %>
-                              </strong>
-                              <span>
-                                <span class="color-swatch"
-                                  style="background: <%= color.hexColor || '#FFFFFF' %>"></span>
-                                Code: <%= color.code || '000' %><br />
-                                  <% if (color.pantoneCode) { %>Pantone: <%= color.pantoneCode %><br />
-                                      <% } %>
-                                        Hex: <%= color.hexColor || '#FFFFFF' %>
-                              </span>
+                  <%# 4. COLORWAYS %>
+                    <% if (colorways && colorways.length> 0) { %>
+                      <div class="section">
+                        <% renderSectionHeader('Colorways'); %>
+                          <div class="section-content">
+                            <div class="info-grid" style="margin-bottom: 20px">
+                              <% colorways.forEach(color=> { %>
+                                <div class="info-item">
+                                  <strong>
+                                    <%= color.name || 'Color' %>
+                                  </strong>
+                                  <span>
+                                    <span class="color-swatch"
+                                      style="background: <%= color.hexColor || '#FFFFFF' %>"></span>
+                                    Code: <%= color.code || '000' %><br />
+                                      <% if (color.pantoneCode) { %>Pantone: <%= color.pantoneCode %><br />
+                                          <% } %>
+                                            Hex: <%= color.hexColor || '#FFFFFF' %>
+                                              <% if (color.imageUrl) { %>
+                                                <br />
+                                                <img src="<%= color.imageUrl %>" alt="Colorway Image"
+                                                  style="margin-top:6px; max-width:80px; max-height:80px; border:1px solid #ccc; border-radius:4px; object-fit:contain;" />
+                                                <% } %>
+                                  </span>
+                                </div>
+                                <% }); %>
                             </div>
-                            <% }); %>
-                        </div>
+                          </div>
                       </div>
-                  </div>
-                  <% } %>
+                      <% } %>
 
-                    <%# 5. HOW TO MEASURE (CONSTRUCTION) %>
-                      <% if (howToMeasures && howToMeasures.length> 0) { %>
-                        <div class="section">
-                          <% renderSectionHeader('Construction & How To Measure'); %>
-                            <div class="section-content">
-                              <% howToMeasures.forEach((item, index)=> { %>
-                                <div
-                                  style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; page-break-inside: avoid;">
-                                  <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 15px">
-                                    <div>
-                                      <h3 style="margin: 0 0 10px 0; font-size: 12px; color: #333">
-                                        <%= item.stepNumber || (index + 1) %>. <%= item.pomName || item.pomCode
-                                            || 'Measurement Point' %>
-                                      </h3>
-                                      <% if (item.pomCode) { %>
-                                        <p style="margin: 5px 0; font-size: 9px; color: #666">
-                                          <strong>Code:</strong>
-                                          <%= item.pomCode %>
-                                        </p>
-                                        <% } %>
-                                          <% if (item.description) { %>
-                                            <p style="margin: 10px 0; font-size: 10px; line-height: 1.5">
-                                              <%= item.description %>
+                        <%# 5. CONSTRUCTION %>
+                          <% if (howToMeasures && howToMeasures.length> 0) { %>
+                            <div class="section">
+                              <% renderSectionHeader('Construction'); %>
+                                <div class="section-content">
+                                  <% howToMeasures.forEach((item, index)=> { %>
+                                    <div
+                                      style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; page-break-inside: avoid;">
+                                      <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 15px">
+                                        <div>
+                                          <h3 style="margin: 0 0 10px 0; font-size: 12px; color: #333">
+                                            <%= item.stepNumber || (index + 1) %>. <%= item.pomName || item.pomCode
+                                                || 'Measurement Point' %>
+                                          </h3>
+                                          <% if (item.pomCode) { %>
+                                            <p style="margin: 5px 0; font-size: 9px; color: #666">
+                                              <strong>Code:</strong>
+                                              <%= item.pomCode %>
                                             </p>
                                             <% } %>
-                                              <% if (item.steps && item.steps.length> 0) { %>
-                                                <div style="margin-top: 10px">
-                                                  <strong style="font-size: 10px">Steps:</strong>
-                                                  <ol
-                                                    style="margin: 5px 0; padding-left: 20px; font-size: 9px; line-height: 1.5;">
-                                                    <% item.steps.forEach(step=> { %>
-                                                      <li style="margin-bottom: 5px">
-                                                        <%= step %>
-                                                      </li>
-                                                      <% }); %>
-                                                  </ol>
-                                                </div>
+                                              <% if (item.description) { %>
+                                                <p style="margin: 10px 0; font-size: 10px; line-height: 1.5">
+                                                  <%= item.description %>
+                                                </p>
                                                 <% } %>
-                                                  <% if (item.tips && item.tips.length> 0) { %>
-                                                    <div
-                                                      style="margin-top: 10px; background: #fffbeb; padding: 8px; border-left: 3px solid #f59e0b;">
-                                                      <strong style="font-size: 9px; color: #92400e">💡 Tips:</strong>
-                                                      <ul
-                                                        style="margin: 5px 0; padding-left: 20px; font-size: 9px; line-height: 1.4;">
-                                                        <% item.tips.forEach(tip=> { %>
-                                                          <li style="margin-bottom: 3px">
-                                                            <%= tip %>
+                                                  <% if (item.steps && item.steps.length> 0) { %>
+                                                    <div style="margin-top: 10px">
+                                                      <strong style="font-size: 10px">Steps:</strong>
+                                                      <ol
+                                                        style="margin: 5px 0; padding-left: 20px; font-size: 9px; line-height: 1.5;">
+                                                        <% item.steps.forEach(step=> { %>
+                                                          <li style="margin-bottom: 5px">
+                                                            <%= step %>
                                                           </li>
                                                           <% }); %>
-                                                      </ul>
+                                                      </ol>
                                                     </div>
                                                     <% } %>
-                                                      <% if (item.commonMistakes && item.commonMistakes.length> 0) { %>
+                                                      <% if (item.tips && item.tips.length> 0) { %>
                                                         <div
-                                                          style="margin-top: 10px; background: #fef2f2; padding: 8px; border-left: 3px solid #ef4444;">
-                                                          <strong style="font-size: 9px; color: #991b1b">⚠️ Common
-                                                            Mistakes:</strong>
+                                                          style="margin-top: 10px; background: #fffbeb; padding: 8px; border-left: 3px solid #f59e0b;">
+                                                          <strong style="font-size: 9px; color: #92400e">💡
+                                                            Tips:</strong>
                                                           <ul
                                                             style="margin: 5px 0; padding-left: 20px; font-size: 9px; line-height: 1.4;">
-                                                            <% item.commonMistakes.forEach(mistake=> { %>
+                                                            <% item.tips.forEach(tip=> { %>
                                                               <li style="margin-bottom: 3px">
-                                                                <%= mistake %>
+                                                                <%= tip %>
                                                               </li>
                                                               <% }); %>
                                                           </ul>
                                                         </div>
                                                         <% } %>
-                                    </div>
-                                    <% if (item.imageUrl) { %>
-                                      <div style="text-align: center">
-                                        <img src="<%= item.imageUrl %>" alt="<%= item.pomName || 'Measurement' %>"
-                                          style="max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px;" />
+                                                          <% if (item.commonMistakes && item.commonMistakes.length> 0) {
+                                                            %>
+                                                            <div
+                                                              style="margin-top: 10px; background: #fef2f2; padding: 8px; border-left: 3px solid #ef4444;">
+                                                              <strong style="font-size: 9px; color: #991b1b">⚠️ Common
+                                                                Mistakes:</strong>
+                                                              <ul
+                                                                style="margin: 5px 0; padding-left: 20px; font-size: 9px; line-height: 1.4;">
+                                                                <% item.commonMistakes.forEach(mistake=> { %>
+                                                                  <li style="margin-bottom: 3px">
+                                                                    <%= mistake %>
+                                                                  </li>
+                                                                  <% }); %>
+                                                              </ul>
+                                                            </div>
+                                                            <% } %>
+                                        </div>
+                                        <% if (item.imageUrl) { %>
+                                          <div style="text-align: center">
+                                            <img src="<%= item.imageUrl %>" alt="<%= item.pomName || 'Measurement' %>"
+                                              style="max-width: 320px; max-height: 220px; width: auto; height: auto; border: 1px solid #ddd; border-radius: 4px; object-fit: contain;" />
+                                          </div>
+                                          <% } %>
                                       </div>
-                                      <% } %>
-                                  </div>
-                                </div>
-                                <% }); %>
-                            </div>
-                        </div>
-                        <% } %>
-
-                          <%# 6. PACKING & FOLDING INSTRUCTIONS %>
-                            <% if (packingNotes && packingNotes !=='—' ) { %>
-                              <div class="section">
-                                <% renderSectionHeader('Packing & Folding Instructions'); %>
-                                  <div class="section-content">
-                                    <div
-                                      style="background: #f8fafc; border: 1px solid #e1e7ee; border-radius: 6px; padding: 20px; font-size: 10px; line-height: 1.6;">
-                                      <%- packingNotes %>
                                     </div>
-                                  </div>
-                              </div>
-                              <% } %>
+                                    <% }); %>
+                                </div>
+                            </div>
+                            <% } %>
 
-                                <%# 7. REVISION HISTORY %>
+                              <%# 6. PACKING %>
+                                <% if (packingNotes && packingNotes !=='—' ) { %>
+                                  <div class="section">
+                                    <% renderSectionHeader('Packing'); %>
+                                      <div class="section-content">
+                                        <div
+                                          style="background: #f8fafc; border: 1px solid #e1e7ee; border-radius: 6px; padding: 20px; font-size: 10px; line-height: 1.6;">
+                                          <%- packingNotes %>
+                                        </div>
+                                      </div>
+                                  </div>
+                                  <% } %>
+
+                                    <!-- <%# 7. REVISION HISTORY %>
                                   <% if (revisionHistory && revisionHistory.length> 0) { %>
                                     <div class="section">
                                       <% renderSectionHeader('Revision History'); %>
@@ -921,57 +934,57 @@
                                           </table>
                                         </div>
                                     </div>
-                                    <% } %>
+                                    <% } %> -->
 
-                                      <%# 8. CARE INSTRUCTIONS %>
-                                        <% if (meta.fabricDescription ||
-                                          articleSummary?.fabricAndComposition?.fabricDescription) { %>
-                                          <div class="section">
-                                            <% renderSectionHeader('Care Instructions'); %>
-                                              <div class="section-content">
-                                                <div
-                                                  style="display: grid; grid-template-columns: auto 1fr; gap: 20px; align-items: start;">
-                                                  <div>
-                                                    <strong style="display: block; margin-bottom: 8px">Care
-                                                      Symbols:</strong>
-                                                    <div style="font-size: 24px; line-height: 1.8">
-                                                      ⚿ Machine Wash Warm<br />
-                                                      ⃠ Do Not Bleach<br />
-                                                      ◎ Tumble Dry Low<br />
-                                                      ▽ Cool Iron
-                                                    </div>
-                                                  </div>
-                                                  <div>
-                                                    <strong style="display: block; margin-bottom: 8px">Fiber Content &
-                                                      Instructions:</strong>
-                                                    <% if (meta.fabricDescription ||
-                                                      articleSummary?.fabricAndComposition?.materialInfo) { %>
-                                                      <p style="margin-bottom: 8px">
-                                                        <strong>
-                                                          <%= meta.fabricDescription ||
-                                                            articleSummary.fabricAndComposition.materialInfo %>
-                                                        </strong>
-                                                      </p>
-                                                      <% } %>
-                                                        <p style="margin-bottom: 5px">MACHINE WASH WARM, DO NOT BLEACH,
-                                                          TUMBLE DRY LOW, COOL IRON.</p>
-                                                        <p style="margin-bottom: 5px">LAVAR A MÁQUINA TIBIO, NO
-                                                          BLANQUEADOR, SECADO TEMP BAJA, PLANCHA FRIA.</p>
-                                                        <p>LAVAGE EN MACHINE CHAUD, NE PAS JAVELLISER, SÈCHE-LINGE À
-                                                          FAIBLE, FER REFROIDIR.</p>
+                                    <%# 8. CARE INSTRUCTIONS %>
+                                      <% if (meta.fabricDescription ||
+                                        articleSummary?.fabricAndComposition?.fabricDescription) { %>
+                                        <div class="section">
+                                          <% renderSectionHeader('Care Instructions'); %>
+                                            <div class="section-content">
+                                              <div
+                                                style="display: grid; grid-template-columns: auto 1fr; gap: 20px; align-items: start;">
+                                                <div>
+                                                  <strong style="display: block; margin-bottom: 8px">Care
+                                                    Symbols:</strong>
+                                                  <div style="font-size: 24px; line-height: 1.8">
+                                                    ⚿ Machine Wash Warm<br />
+                                                    ⃠ Do Not Bleach<br />
+                                                    ◎ Tumble Dry Low<br />
+                                                    ▽ Cool Iron
                                                   </div>
                                                 </div>
+                                                <div>
+                                                  <strong style="display: block; margin-bottom: 8px">Fiber Content &
+                                                    Instructions:</strong>
+                                                  <% if (meta.fabricDescription ||
+                                                    articleSummary?.fabricAndComposition?.materialInfo) { %>
+                                                    <p style="margin-bottom: 8px">
+                                                      <strong>
+                                                        <%= meta.fabricDescription ||
+                                                          articleSummary.fabricAndComposition.materialInfo %>
+                                                      </strong>
+                                                    </p>
+                                                    <% } %>
+                                                      <p style="margin-bottom: 5px">MACHINE WASH WARM, DO NOT BLEACH,
+                                                        TUMBLE DRY LOW, COOL IRON.</p>
+                                                      <p style="margin-bottom: 5px">LAVAR A MÁQUINA TIBIO, NO
+                                                        BLANQUEADOR, SECADO TEMP BAJA, PLANCHA FRIA.</p>
+                                                      <p>LAVAGE EN MACHINE CHAUD, NE PAS JAVELLISER, SÈCHE-LINGE À
+                                                        FAIBLE, FER REFROIDIR.</p>
+                                                </div>
                                               </div>
-                                          </div>
-                                          <% } %>
+                                            </div>
+                                        </div>
+                                        <% } %>
 
-                                            <%# FOOTER %>
-                                              <div
-                                                style="margin-top: 30px; padding-top: 15px; border-top: 2px solid #ddd; text-align: center; font-size: 9px; color: #666;">
-                                                <strong>Powered by WFX</strong> | All rights reserved<br />
-                                                Printed on <%= generatedAt %> by <%= printedBy %>
-                                              </div>
-                                              </div>
+                                          <%# FOOTER %>
+                                            <div
+                                              style="margin-top: 30px; padding-top: 15px; border-top: 2px solid #ddd; text-align: center; font-size: 9px; color: #666;">
+                                              <strong>Powered by WFX</strong> | All rights reserved<br />
+                                              Printed on <%= generatedAt %> by <%= printedBy %>
+                                            </div>
+                                            </div>
 </body>
 
 </html>
