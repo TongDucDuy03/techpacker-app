@@ -109,7 +109,8 @@ class PDFService {
   private prepareTechPackData(techpack: TechPackForPDF): any {
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     const uploadsBaseUrl = process.env.UPLOADS_BASE_URL || baseUrl;
-    const serverUrl = process.env.SERVER_URL || baseUrl;
+    // SERVER_URL should point to backend server (where uploads are served)
+    const serverUrl = process.env.SERVER_URL || `http://localhost:${process.env.PORT || 4001}`;
 
     // Helper to prepare image URL - handles base64, absolute URLs, relative URLs, and provides placeholder
     const prepareImageUrl = (url?: string, placeholder?: string): string => {
@@ -450,6 +451,14 @@ class PDFService {
           const absoluteUrl = toAbsoluteUrl(url);
           return absoluteUrl || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjYwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Y2EzYWYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
         };
+        
+        // Debug log
+        console.log('🖼️  PDF Logo Debug:', {
+          companyLogoUrl: techpack.companyLogoUrl,
+          companyLogoProcessed: prepareImageUrl(techpack.companyLogoUrl),
+          designSketchUrl: techpack.designSketchUrl
+        });
+        
         return {
           companyLogo: prepareImageUrl(techpack.companyLogoUrl),
           coverImage: prepareImageUrl(techpack.designSketchUrl),
