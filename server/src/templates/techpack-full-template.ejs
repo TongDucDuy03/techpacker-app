@@ -397,6 +397,57 @@
                       </p>
                     </div>
                     <% } %>
+
+                      <!-- CHÈN NỘI DUNG CARE INSTRUCTIONS Ở ĐÂY -->
+
+                      <%# 8. CARE INSTRUCTIONS %>
+                        <% if (meta.fabricDescription || articleSummary?.fabricAndComposition?.fabricDescription) { %>
+                          <div class="section">
+                            <% renderSectionHeader('Care Instructions'); %>
+                              <div class="section-content">
+                                <table style="width: 100%; border-collapse: collapse;">
+                                  <tr>
+                                    <td
+                                      style="width: 280px; vertical-align: top; border: 1px solid #ddd; padding: 15px; background: #f9fafb;">
+                                      <strong style="display: block; margin-bottom: 12px; font-size: 10px;">Care
+                                        Symbols:</strong>
+                                      <div style="font-size: 10px; line-height: 1.8;">
+                                        <div style="padding: 4px 0; border-bottom: 1px solid #e5e7eb;">⊞ Machine Wash
+                                          Warm</div>
+                                        <div style="padding: 4px 0; border-bottom: 1px solid #e5e7eb;">⊗ Do Not Bleach
+                                        </div>
+                                        <div style="padding: 4px 0; border-bottom: 1px solid #e5e7eb;">◉ Tumble Dry Low
+                                        </div>
+                                        <div style="padding: 4px 0;">▽ Cool Iron</div>
+                                      </div>
+                                    </td>
+                                    <td style="vertical-align: top; border: 1px solid #ddd; padding: 15px;">
+                                      <strong style="display: block; margin-bottom: 10px; font-size: 10px;">Fiber
+                                        Content & Instructions:</strong>
+                                      <% if (meta.fabricDescription ||
+                                        articleSummary?.fabricAndComposition?.materialInfo) { %>
+                                        <p style="margin-bottom: 10px; font-size: 11px; font-weight: bold;">
+                                          <%= meta.fabricDescription || articleSummary.fabricAndComposition.materialInfo
+                                            %>
+                                        </p>
+                                        <% } %>
+                                          <p style="margin-bottom: 6px; font-size: 9px; line-height: 1.5;">
+                                            MACHINE WASH WARM, DO NOT BLEACH, TUMBLE DRY LOW, COOL IRON.
+                                          </p>
+                                          <p style="margin-bottom: 6px; font-size: 9px; line-height: 1.5;">
+                                            LAVAR A MÁQUINA TIBIO, NO BLANQUEADOR, SECADO TEMP BAJA, PLANCHA FRIA.
+                                          </p>
+                                          <p style="font-size: 9px; line-height: 1.5;">
+                                            LAVAGE EN MACHINE CHAUD, NE PAS JAVELLISER, SÈCHE-LINGE À FAIBLE, FER
+                                            REFROIDIR.
+                                          </p>
+                                    </td>
+                                  </tr>
+                                </table>
+                              </div>
+                          </div>
+                          <% } %>
+                            <!-- KẾT THÚC NỘI DUNG CARE INSTRUCTIONS -->
                 </div>
             </div>
 
@@ -751,7 +802,7 @@
       <% if (round.overallComments && round.overallComments !=='—' ) { %>
         <div class="notes" style="margin-top: 10px">
           <strong>OVERALL COMMENTS:</strong>
-          <%= round.overallComments %>
+          <%- round.overallComments %>
         </div>
         <% } %>
           <% if (round.editorContent && round.editorContent.trim() !=='' ) { %>
@@ -936,7 +987,7 @@
                                     </div>
                                     <% } %> -->
 
-                                    <%# 8. CARE INSTRUCTIONS %>
+                                    <!-- <%# 8. CARE INSTRUCTIONS %>
                                       <% if (meta.fabricDescription ||
                                         articleSummary?.fabricAndComposition?.fabricDescription) { %>
                                         <div class="section">
@@ -976,15 +1027,15 @@
                                               </div>
                                             </div>
                                         </div>
-                                        <% } %>
+                                        <% } %> -->
 
-                                          <%# FOOTER %>
-                                            <div
-                                              style="margin-top: 30px; padding-top: 15px; border-top: 2px solid #ddd; text-align: center; font-size: 9px; color: #666;">
-                                              <strong>Powered by WFX</strong> | All rights reserved<br />
-                                              Printed on <%= generatedAt %> by <%= printedBy %>
-                                            </div>
-                                            </div>
+                                    <%# FOOTER %>
+                                      <div
+                                        style="margin-top: 30px; padding-top: 15px; border-top: 2px solid #ddd; text-align: center; font-size: 9px; color: #666;">
+                                        <strong>Powered by WFX</strong> | All rights reserved<br />
+                                        Printed on <%= generatedAt %> by <%= printedBy %>
+                                      </div>
+                                      </div>
 </body>
 
 </html>
