@@ -5,18 +5,20 @@
     font-family: 'Roboto', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif;
     font-size: 10pt;
     color: #475569;
-    padding: 10px 0;
+    padding: 0 0 10px 0;
     border-bottom: 1px solid #E0E0E0;
     display: flex;
     justify-content: space-between;
     align-items: center;
     box-sizing: border-box;
   }
+
   .pdf-header__brand {
     display: flex;
     align-items: center;
     gap: 12px;
   }
+
   .pdf-header__title {
     font-weight: 700;
     color: #0f172a;
@@ -24,17 +26,20 @@
     letter-spacing: 0.5px;
     font-size: 14pt;
   }
+
   .pdf-header__subtitle {
     font-size: 9pt;
     color: #64748b;
     margin-top: 2px;
   }
+
   .pdf-header__logo img {
     max-height: 32px;
     max-width: 160px;
     object-fit: contain;
     display: block;
   }
+
   .pdf-header__meta {
     text-align: right;
     font-size: 9pt;
@@ -46,10 +51,12 @@
       <div class="pdf-header__logo">
         <img src="<%= meta.companyLogo %>" alt="Company Logo" />
       </div>
-    <% } %>
-    <div>
-      <div class="pdf-header__title"><%= meta.articleCode %> — <%= meta.productName %> — <%= meta.version %></div>
-    </div>
+      <% } %>
+        <div>
+          <div class="pdf-header__title">
+            <%= meta.articleCode %> — <%= meta.productName %> — <%= meta.version %>
+          </div>
+        </div>
   </div>
   <div class="pdf-header__meta">
     <div>Page <span class="pageNumber"></span> / <span class="totalPages"></span> — Confidential</div>
