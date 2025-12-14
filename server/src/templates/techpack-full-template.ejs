@@ -172,7 +172,8 @@
     }
 
     .alt-row {
-      background: #fafafa;
+      /* background: #fafafa; */
+      background: #e8e8e8;
     }
 
     .measurement-table td {
@@ -683,11 +684,14 @@
                                       </tr>
                                     </thead>
                                     <tbody>
-                                      <% measurements.rows.forEach((row, index)=> { const highlightCodes = ['BL20',
-                                        'BL21', 'AB11', 'AB30', 'AB70', 'AH10', 'SL10']; const shouldHighlight =
-                                        highlightCodes.some(code => row.pomCode?.includes(code)); %>
+                                      <% measurements.rows.forEach((row, index)=> {
+                                        const highlightCodes = ['BL20', 'BL21', 'AB11', 'AB30', 'AB70', 'AH10', 'SL10'];
+                                        const shouldHighlight = highlightCodes.some(code =>
+                                        row.pomCode?.includes(code));
+                                        const baseSize = measurements.baseSize;
+                                        %>
                                         <tr
-                                          style="<%= shouldHighlight ? 'background: #ffe;' : (index % 2 === 1 ? 'background: #fafafa;' : '') %>">
+                                          style="<%= shouldHighlight ? 'background: #ffe;' : (index % 2 === 1 ? 'background: #e8e8e8;' : '') %>">
                                           <td>
                                             <%= row.pomCode || '-' %>
                                           </td>
@@ -701,7 +705,7 @@
                                             <%= row.plusTolerance || '0' %>
                                           </td>
                                           <% if (measurements.sizeRange) { measurements.sizeRange.forEach(size=> { %>
-                                            <td>
+                                            <td style="<%= size === baseSize ? 'background: #79e5a5;' : '' %>">
                                               <%= row.sizes?.[size] || '-' %>
                                             </td>
                                             <% }); } %>
@@ -764,7 +768,7 @@
         </thead>
         <tbody>
           <% round.measurements.forEach((entry, idx)=> { %>
-            <tr style="<%= idx % 2 === 1 ? 'background: #fafafa;' : '' %>">
+            <tr style="<%= idx % 2 === 1 ? 'background: #e8e8e8;' : '' %>">
               <td>
                 <%= entry.pomCode || '-' %>
               </td>
