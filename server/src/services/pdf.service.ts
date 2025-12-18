@@ -18,7 +18,7 @@ export interface PDFOptions {
   includeImages?: boolean;
   imageQuality?: number;
   displayHeaderFooter?: boolean;
-  chunkSize?: number; // New: for chunked processing
+  chunkSize?: number;
 }
 
 export interface PDFGenerationResult {
@@ -31,15 +31,15 @@ export interface PDFGenerationResult {
 class PDFService {
   private browser: Browser | null = null;
   private readonly templateDir: string;
-  private readonly maxConcurrent: number = 2; // Reduced from 3
+  private readonly maxConcurrent: number = 2;
   private activeGenerations: number = 0;
   
   // Optimized timeout configurations (in milliseconds)
-  private readonly BROWSER_LAUNCH_TIMEOUT = parseInt(process.env.PDF_BROWSER_LAUNCH_TIMEOUT || '180000', 10); // 3 minutes
-  private readonly PAGE_SET_CONTENT_TIMEOUT = parseInt(process.env.PDF_PAGE_SET_CONTENT_TIMEOUT || '300000', 10); // 5 minutes
-  private readonly PDF_GENERATION_TIMEOUT = parseInt(process.env.PDF_GENERATION_TIMEOUT || '300000', 10); // 5 minutes
-  private readonly IMAGE_LOAD_TIMEOUT = parseInt(process.env.PDF_IMAGE_LOAD_TIMEOUT || '10000', 10); // 10 seconds per image
-  private readonly MAX_IMAGES_PARALLEL = parseInt(process.env.PDF_MAX_IMAGES_PARALLEL || '5', 10); // Load max 5 images at a time
+  private readonly BROWSER_LAUNCH_TIMEOUT = parseInt(process.env.PDF_BROWSER_LAUNCH_TIMEOUT || '180000', 10);
+  private readonly PAGE_SET_CONTENT_TIMEOUT = parseInt(process.env.PDF_PAGE_SET_CONTENT_TIMEOUT || '300000', 10);
+  private readonly PDF_GENERATION_TIMEOUT = parseInt(process.env.PDF_GENERATION_TIMEOUT || '300000', 10);
+  private readonly IMAGE_LOAD_TIMEOUT = parseInt(process.env.PDF_IMAGE_LOAD_TIMEOUT || '10000', 10);
+  private readonly MAX_IMAGES_PARALLEL = parseInt(process.env.PDF_MAX_IMAGES_PARALLEL || '5', 10);
 
   // Cache for processed images
   private imageCache: Map<string, string> = new Map();
@@ -64,7 +64,7 @@ class PDFService {
         // this.browser = await puppeteer.launch({
          const launchOptions: any = {
           headless: 'new',
-           //executablePath: process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+         // executablePath: process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -75,12 +75,11 @@ class PDFService {
             '--font-render-hinting=none',
             '--disable-features=IsolateOrigins,site-per-process',
             '--disable-blink-features=AutomationControlled',
-            // Memory optimizations
             '--disable-software-rasterizer',
             '--disable-extensions',
             '--disable-plugins',
-            '--js-flags=--max-old-space-size=4096', // Increase Node.js heap size
-            '--single-process', // Use single process for better memory management
+            '--js-flags=--max-old-space-size=4096',
+            '--single-process',
           ],
           timeout: this.BROWSER_LAUNCH_TIMEOUT,
           protocolTimeout: this.BROWSER_LAUNCH_TIMEOUT,
@@ -118,7 +117,6 @@ class PDFService {
   private normalizeText(text: any): string {
     if (!text) return '—';
     const str = String(text);
-    // Single regex for better performance
     return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|\r\n|\r|\n/g, ' ')
               .replace(/\s+/g, ' ')
               .trim() || '—';
@@ -132,7 +130,6 @@ class PDFService {
       return placeholder || this.getPlaceholderSVG();
     }
 
-    // Check cache first
     if (this.imageCache.has(url)) {
       return this.imageCache.get(url)!;
     }
@@ -159,7 +156,6 @@ class PDFService {
       }
     }
 
-    // Cache the result
     this.imageCache.set(url, result);
     return result;
   }
@@ -202,50 +198,49 @@ class PDFService {
   }
 
   /**
-   * Prepare BOM data with chunking for large datasets
+   * Optimized BOM data preparation
    */
-  private prepareBOMData(bom: IBOMItem[], currency: string): any {
-    const bomByPart: { [key: string]: any[] } = {};
-    const chunkSize = 50; // Process 50 items at a time
+  private prepareBOMDataOptimized(bom: IBOMItem[], currency: string): any[] {
+    if (!bom || bom.length === 0) return [];
     
-    for (let i = 0; i < bom.length; i += chunkSize) {
-      const chunk = bom.slice(i, i + chunkSize);
+    console.log(`📋 Processing ${bom.length} BOM items...`);
+    const bomByPart: { [key: string]: any[] } = {};
+    
+    for (const item of bom) {
+      const partName = this.normalizeText(item.part) || 'Unassigned';
       
-      chunk.forEach((item: IBOMItem) => {
-        const partName = this.normalizeText(item.part) || 'Unassigned';
-        if (!bomByPart[partName]) {
-          bomByPart[partName] = [];
+      if (!bomByPart[partName]) {
+        bomByPart[partName] = [];
+      }
+      
+      const colorways: string[] = [];
+      if (item.color) {
+        const colorText = this.normalizeText(item.color);
+        if (item.colorCode) {
+          colorways.push(`${colorText} (${this.normalizeText(item.colorCode)})`);
+        } else if (item.pantoneCode) {
+          colorways.push(`${colorText} (Pantone: ${this.normalizeText(item.pantoneCode)})`);
+        } else {
+          colorways.push(colorText);
         }
-        
-        const colorways: string[] = [];
-        if (item.color) {
-          const colorText = this.normalizeText(item.color);
-          if (item.colorCode) {
-            colorways.push(`${colorText} (${this.normalizeText(item.colorCode)})`);
-          } else if (item.pantoneCode) {
-            colorways.push(`${colorText} (Pantone: ${this.normalizeText(item.pantoneCode)})`);
-          } else {
-            colorways.push(colorText);
-          }
-        }
+      }
 
-        const sizeInfo: string[] = [];
-        if (item.size) sizeInfo.push(`Size: ${this.normalizeText(item.size)}`);
-        if (item.width) sizeInfo.push(`Width: ${this.normalizeText(item.width)}`);
+      const sizeInfo: string[] = [];
+      if (item.size) sizeInfo.push(`Size: ${this.normalizeText(item.size)}`);
+      if (item.width) sizeInfo.push(`Width: ${this.normalizeText(item.width)}`);
 
-        bomByPart[partName].push({
-          materialName: this.normalizeText(item.materialName),
-          imageUrl: this.prepareImageUrl(item.imageUrl, this.getPlaceholderSVG(64, 64)),
-          placement: this.normalizeText(item.placement),
-          sizeWidthUsage: sizeInfo.length > 0 ? sizeInfo.join(' / ') : '—',
-          quantity: item.quantity || 0,
-          uom: this.normalizeText(item.uom),
-          supplier: this.normalizeText(item.supplier),
-          unitPrice: item.unitPrice ? `${item.unitPrice} ${currency}` : '—',
-          totalPrice: item.totalPrice ? `${item.totalPrice} ${currency}` : '—',
-          comments: this.normalizeText(item.comments),
-          colorways: colorways.length > 0 ? colorways : [],
-        });
+      bomByPart[partName].push({
+        materialName: this.normalizeText(item.materialName),
+        imageUrl: this.prepareImageUrl(item.imageUrl, this.getPlaceholderSVG(64, 64)),
+        placement: this.normalizeText(item.placement),
+        sizeWidthUsage: sizeInfo.length > 0 ? sizeInfo.join(' / ') : '—',
+        quantity: item.quantity || 0,
+        uom: this.normalizeText(item.uom),
+        supplier: this.normalizeText(item.supplier),
+        unitPrice: item.unitPrice ? `${item.unitPrice} ${currency}` : '—',
+        totalPrice: item.totalPrice ? `${item.totalPrice} ${currency}` : '—',
+        comments: this.normalizeText(item.comments),
+        colorways,
       });
     }
 
@@ -256,22 +251,196 @@ class PDFService {
   }
 
   /**
-   * Prepare techpack data with optimizations
+   * Optimized measurements preparation
    */
-  private prepareTechPackData(techpack: TechPackForPDF): any {
-    console.log('📦 Starting data preparation...');
+  private prepareMeasurementsOptimized(techpack: any): any {
+    console.log('📏 Processing measurements...');
+    const sizeRange = techpack.measurementSizeRange || ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+    const baseSize = techpack.measurementBaseSize || sizeRange[0] || 'M';
+    
+    const rows = (techpack.measurements || []).map((measurement: IMeasurement) => {
+      const row: any = {
+        pomCode: measurement.pomCode || '—',
+        pomName: measurement.pomName || '—',
+        measurementType: measurement.measurementType || '—',
+        category: measurement.category || '—',
+        minusTolerance: measurement.toleranceMinus || 0,
+        plusTolerance: measurement.tolerancePlus || 0,
+        notes: measurement.notes || '—',
+        critical: measurement.critical || false,
+        unit: measurement.unit || 'cm',
+        sizes: {},
+      };
+
+      sizeRange.forEach((size: string) => {
+        row.sizes[size] = measurement.sizes?.[size] || '—';
+      });
+
+      return row;
+    });
+
+    return {
+      rows,
+      sizeRange,
+      baseSize,
+      baseHighlightColor: techpack.measurementBaseHighlightColor || '#dbeafe',
+      rowStripeColor: techpack.measurementRowStripeColor || '#f3f4f6',
+    };
+  }
+
+  /**
+   * Optimized sample rounds preparation
+   */
+  private prepareSampleRoundsOptimized(techpack: any): any[] {
+    console.log('🔬 Processing sample rounds...');
+    const sizeRange = techpack.measurementSizeRange || ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+    
+    const measurementMap = new Map<string, IMeasurement>();
+    (techpack.measurements || []).forEach((m: IMeasurement) => {
+      measurementMap.set(m.pomCode, m);
+    });
+
+    return (techpack.sampleMeasurementRounds || []).map((round: ISampleMeasurementRound) => ({
+      name: round.name || '—',
+      measurementDate: round.measurementDate ? this.formatDate(round.measurementDate) : '—',
+      reviewer: (round.createdBy as any)?.firstName && (round.createdBy as any)?.lastName
+        ? `${(round.createdBy as any).firstName} ${(round.createdBy as any).lastName}`
+        : '—',
+      requestedSource: round.requestedSource || 'original',
+      overallComments: round.overallComments || '—',
+      measurements: (round.measurements || []).map((entry: any) => {
+        const correspondingMeasurement = measurementMap.get(entry.pomCode);
+        const entryRow: any = {
+          pomCode: entry.pomCode || '—',
+          pomName: entry.pomName || '—',
+          toleranceMinus: entry.toleranceMinus !== undefined ? entry.toleranceMinus : (correspondingMeasurement?.toleranceMinus || '—'),
+          tolerancePlus: entry.tolerancePlus !== undefined ? entry.tolerancePlus : (correspondingMeasurement?.tolerancePlus || '—'),
+          requested: {},
+          measured: {},
+          diff: {},
+          revised: {},
+          comments: {},
+        };
+
+        sizeRange.forEach((size: string) => {
+          entryRow.requested[size] = entry.requested?.[size] || '—';
+          entryRow.measured[size] = entry.measured?.[size] || '—';
+          entryRow.diff[size] = entry.diff?.[size] || '—';
+          entryRow.revised[size] = entry.revised?.[size] || '—';
+          entryRow.comments[size] = entry.comments?.[size] || '—';
+        });
+
+        return entryRow;
+      }),
+    }));
+  }
+
+  /**
+   * Optimized how to measure preparation
+   */
+  private prepareHowToMeasureOptimized(techpack: any): any[] {
+    console.log('📐 Processing how to measure...');
+    return (techpack.howToMeasure || []).map((item: IHowToMeasure) => ({
+      stepNumber: item.stepNumber || 0,
+      pomCode: item.pomCode || '—',
+      pomName: item.pomName || '—',
+      description: item.description || '—',
+      imageUrl: this.prepareImageUrl(item.imageUrl),
+      steps: item.instructions || [],
+      tips: item.tips || [],
+      commonMistakes: item.commonMistakes || [],
+      relatedMeasurements: item.relatedMeasurements || [],
+    }));
+  }
+
+  /**
+   * Optimized colorways preparation
+   */
+  private prepareColorwaysOptimized(techpack: any): any[] {
+    console.log('🎨 Processing colorways...');
+    return (techpack.colorways || []).map((colorway: IColorway) => ({
+      name: colorway.name || '—',
+      code: colorway.code || '—',
+      pantoneCode: colorway.pantoneCode || '—',
+      hexColor: colorway.hexColor || '—',
+      rgbColor: colorway.rgbColor ? `rgb(${colorway.rgbColor.r}, ${colorway.rgbColor.g}, ${colorway.rgbColor.b})` : '—',
+      supplier: colorway.supplier || '—',
+      productionStatus: '—',
+      approved: colorway.approved ? 'Yes' : 'No',
+      approvalStatus: colorway.approved ? 'Approved' : 'Pending',
+      season: colorway.season || techpack.season || '—',
+      collectionName: colorway.collectionName || techpack.collectionName || '—',
+      notes: colorway.notes || '—',
+      imageUrl: this.prepareImageUrl(colorway.imageUrl),
+      parts: (colorway.parts || []).map((part: IColorwayPart) => ({
+        partName: part.partName || '—',
+        colorName: part.colorName || '—',
+        pantoneCode: part.pantoneCode || '—',
+        hexCode: part.hexCode || '—',
+        rgbCode: part.rgbCode || '—',
+        imageUrl: this.prepareImageUrl(part.imageUrl),
+        supplier: part.supplier || '—',
+        colorType: part.colorType || 'Solid',
+      })),
+    }));
+  }
+
+  /**
+   * Fetch revision history with timeout protection
+   */
+  private async fetchRevisionHistoryAsync(techPackId: any): Promise<any[]> {
+    const timeoutMs = 5000;
+    
+    try {
+      const Revision = (await import('../models/revision.model')).default;
+      
+      const queryPromise = Revision.find({ techPackId })
+        .select('version createdBy createdByName createdAt description changes statusAtChange')
+        .populate('createdBy', 'firstName lastName')
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .maxTimeMS(4000)
+        .lean()
+        .exec();
+      
+      const revisions = await Promise.race([
+        queryPromise,
+        new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Revision query timeout')), timeoutMs)
+        )
+      ]);
+      
+      return revisions.map((rev: any) => ({
+        version: rev.version || '—',
+        modifiedBy: rev.createdByName || 
+          (rev.createdBy?.firstName && rev.createdBy?.lastName 
+            ? `${rev.createdBy.firstName} ${rev.createdBy.lastName}` 
+            : '—'),
+        modifiedAt: this.formatDate(rev.createdAt),
+        description: rev.description || (rev.changes?.summary) || '—',
+        status: rev.statusAtChange || '—',
+      }));
+    } catch (error: any) {
+      console.warn('⚠️ Revision fetch failed:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Prepare techpack data with parallel processing
+   */
+  private async prepareTechPackDataAsync(techpack: TechPackForPDF): Promise<any> {
+    console.log('📦 Starting ASYNC data preparation...');
     const startTime = Date.now();
 
     const currency = techpack.currency || 'USD';
     
-    // Prepare metadata first
     const technicalDesignerName = 
       (techpack.technicalDesignerId as any)?.firstName && 
       (techpack.technicalDesignerId as any)?.lastName
         ? `${(techpack.technicalDesignerId as any).firstName} ${(techpack.technicalDesignerId as any).lastName}`
         : '—';
 
-    // Article Summary
     const articleSummary = {
       generalInfo: {
         articleCode: techpack.articleCode || '—',
@@ -310,145 +479,50 @@ class PDFService {
       },
     };
 
-    // Prepare BOM with optimization
-    console.log('📋 Preparing BOM data...');
-    const bomParts = this.prepareBOMData(techpack.bom || [], currency);
+    console.log('🚀 Processing data in parallel...');
+    const parallelStart = Date.now();
+    
+    const [bomParts, measurementData, sampleRounds, howToMeasures, colorways] = await Promise.all([
+      Promise.resolve(this.prepareBOMDataOptimized(techpack.bom || [], currency)),
+      Promise.resolve(this.prepareMeasurementsOptimized(techpack)),
+      Promise.resolve(this.prepareSampleRoundsOptimized(techpack)),
+      Promise.resolve(this.prepareHowToMeasureOptimized(techpack)),
+      Promise.resolve(this.prepareColorwaysOptimized(techpack)),
+    ]);
+    
+    console.log(`✅ Parallel processing completed in ${Date.now() - parallelStart}ms`);
 
-    // Prepare Measurements
-    console.log('📏 Preparing measurements...');
-    const sizeRange = techpack.measurementSizeRange || ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
-    const baseSize = techpack.measurementBaseSize || sizeRange[0] || 'M';
-    const measurementRows = (techpack.measurements || []).map((measurement: IMeasurement) => {
-      const row: any = {
-        pomCode: measurement.pomCode || '—',
-        pomName: measurement.pomName || '—',
-        measurementType: measurement.measurementType || '—',
-        category: measurement.category || '—',
-        minusTolerance: measurement.toleranceMinus || 0,
-        plusTolerance: measurement.tolerancePlus || 0,
-        notes: measurement.notes || '—',
-        critical: measurement.critical || false,
-        unit: measurement.unit || 'cm',
-        sizes: {},
-      };
-
-      sizeRange.forEach((size: string) => {
-        row.sizes[size] = measurement.sizes?.[size] || '—';
+    const uniqueSuppliers = new Set<string>();
+    let approvedCount = 0;
+    
+    bomParts.forEach((part: any) => {
+      part.items.forEach((item: any) => {
+        if (item.supplier && item.supplier !== '—') {
+          uniqueSuppliers.add(item.supplier);
+        }
+        if (item.approved === 'Yes') {
+          approvedCount++;
+        }
       });
-
-      return row;
     });
-
-    // Prepare Sample Measurement Rounds
-    console.log('🔬 Preparing sample rounds...');
-    const measurementMap = new Map();
-    (techpack.measurements || []).forEach((m: IMeasurement) => {
-      measurementMap.set(m.pomCode, m);
-    });
-
-    const sampleRounds = (techpack.sampleMeasurementRounds || []).map((round: ISampleMeasurementRound) => ({
-      name: round.name || '—',
-      measurementDate: round.measurementDate ? this.formatDate(round.measurementDate) : '—',
-      reviewer: (round.createdBy as any)?.firstName && (round.createdBy as any)?.lastName
-        ? `${(round.createdBy as any).firstName} ${(round.createdBy as any).lastName}`
-        : '—',
-      requestedSource: round.requestedSource || 'original',
-      overallComments: round.overallComments || '—',
-      measurements: (round.measurements || []).map((entry: any) => {
-        const correspondingMeasurement = measurementMap.get(entry.pomCode);
-        const toleranceMinus = entry.toleranceMinus !== undefined 
-          ? entry.toleranceMinus 
-          : (correspondingMeasurement?.toleranceMinus || '—');
-        const tolerancePlus = entry.tolerancePlus !== undefined 
-          ? entry.tolerancePlus 
-          : (correspondingMeasurement?.tolerancePlus || '—');
-
-        const entryRow: any = {
-          pomCode: entry.pomCode || '—',
-          pomName: entry.pomName || '—',
-          toleranceMinus,
-          tolerancePlus,
-          requested: {},
-          measured: {},
-          diff: {},
-          revised: {},
-          comments: {},
-        };
-
-        sizeRange.forEach((size: string) => {
-          entryRow.requested[size] = entry.requested?.[size] || '—';
-          entryRow.measured[size] = entry.measured?.[size] || '—';
-          entryRow.diff[size] = entry.diff?.[size] || '—';
-          entryRow.revised[size] = entry.revised?.[size] || '—';
-          entryRow.comments[size] = entry.comments?.[size] || '—';
-        });
-
-        return entryRow;
-      }),
-    }));
-
-    // Prepare How To Measure
-    console.log('📐 Preparing how to measure...');
-    const howToMeasures = (techpack.howToMeasure || []).map((item: IHowToMeasure) => ({
-      stepNumber: item.stepNumber || 0,
-      pomCode: item.pomCode || '—',
-      pomName: item.pomName || '—',
-      description: item.description || '—',
-      imageUrl: this.prepareImageUrl(item.imageUrl),
-      steps: item.instructions || [],
-      tips: item.tips || [],
-      commonMistakes: item.commonMistakes || [],
-      relatedMeasurements: item.relatedMeasurements || [],
-    }));
-
-    // Prepare Colorways
-    console.log('🎨 Preparing colorways...');
-    const colorways = (techpack.colorways || []).map((colorway: IColorway) => ({
-      name: colorway.name || '—',
-      code: colorway.code || '—',
-      pantoneCode: colorway.pantoneCode || '—',
-      hexColor: colorway.hexColor || '—',
-      rgbColor: colorway.rgbColor ? `rgb(${colorway.rgbColor.r}, ${colorway.rgbColor.g}, ${colorway.rgbColor.b})` : '—',
-      supplier: colorway.supplier || '—',
-      productionStatus: '—',
-      approved: colorway.approved ? 'Yes' : 'No',
-      approvalStatus: colorway.approved ? 'Approved' : 'Pending',
-      season: colorway.season || techpack.season || '—',
-      collectionName: colorway.collectionName || techpack.collectionName || '—',
-      notes: colorway.notes || '—',
-      imageUrl: this.prepareImageUrl(colorway.imageUrl),
-      parts: (colorway.parts || []).map((part: IColorwayPart) => ({
-        partName: part.partName || '—',
-        colorName: part.colorName || '—',
-        pantoneCode: part.pantoneCode || '—',
-        hexCode: part.hexCode || '—',
-        rgbCode: part.rgbCode || '—',
-        imageUrl: this.prepareImageUrl(part.imageUrl),
-        supplier: part.supplier || '—',
-        colorType: part.colorType || 'Solid',
-      })),
-    }));
 
     const summary = {
-  bomCount: bomParts.reduce((sum: number, part: any) => sum + part.items.length, 0),
-  uniqueSuppliers: new Set(bomParts.flatMap((part: any) => 
-    part.items.map((item: any) => item.supplier).filter((s: string) => s && s !== '—')
-  )).size,
-  approvedMaterials: bomParts.reduce((sum: number, part: any) => 
-    sum + part.items.filter((item: any) => item.approved === 'Yes').length, 0),
-  measurementCount: measurementRows.length,
-  criticalMeasurements: measurementRows.filter((r: any) => r.critical).length,
-  sizeRange: sizeRange.join(', '),
-  howToMeasureCount: howToMeasures.length,
-  howToMeasureWithImage: howToMeasures.filter((h: any) => h.imageUrl && !h.imageUrl.includes('No Image')).length,
-  howToMeasureTips: howToMeasures.reduce((sum: number, h: any) => sum + (h.tips?.length || 0), 0),
-  notesCount: 0,
-  careSymbolCount: 0,
-  lastExport: this.formatDate(new Date()),
-};
+      bomCount: bomParts.reduce((sum: number, part: any) => sum + part.items.length, 0),
+      uniqueSuppliers: uniqueSuppliers.size,
+      approvedMaterials: approvedCount,
+      measurementCount: measurementData.rows.length,
+      criticalMeasurements: measurementData.rows.filter((r: any) => r.critical).length,
+      sizeRange: measurementData.sizeRange.join(', '),
+      howToMeasureCount: howToMeasures.length,
+      howToMeasureWithImage: howToMeasures.filter((h: any) => h.imageUrl && !h.imageUrl.includes('No Image')).length,
+      howToMeasureTips: howToMeasures.reduce((sum: number, h: any) => sum + (h.tips?.length || 0), 0),
+      notesCount: 0,
+      careSymbolCount: 0,
+      lastExport: this.formatDate(new Date()),
+    };
 
     const prepTime = Date.now() - startTime;
-    console.log(`✅ Data preparation completed in ${prepTime}ms`);
+    console.log(`✅ ASYNC data preparation completed in ${prepTime}ms`);
 
     return {
       meta: {
@@ -484,23 +558,14 @@ class PDFService {
       },
       articleSummary,
       bom: {
-  parts: bomParts,
-  stats: {
-    bomCount: bomParts.reduce((sum: number, part: any) => sum + part.items.length, 0),
-    uniqueSuppliers: new Set(bomParts.flatMap((part: any) => 
-      part.items.map((item: any) => item.supplier).filter((s: string) => s && s !== '—')
-    )).size,
-    approvedMaterials: bomParts.reduce((sum: number, part: any) => 
-      sum + part.items.filter((item: any) => item.approved === 'Yes').length, 0),
-  },
-},
-      measurements: {
-        rows: measurementRows,
-        sizeRange,
-        baseSize,
-        baseHighlightColor: techpack.measurementBaseHighlightColor || '#dbeafe',
-        rowStripeColor: techpack.measurementRowStripeColor || '#f3f4f6',
+        parts: bomParts,
+        stats: {
+          bomCount: summary.bomCount,
+          uniqueSuppliers: summary.uniqueSuppliers,
+          approvedMaterials: summary.approvedMaterials,
+        },
       },
+      measurements: measurementData,
       sampleMeasurementRounds: sampleRounds,
       howToMeasures,
       colorways,
@@ -537,7 +602,6 @@ class PDFService {
             }
           };
 
-          // Process images in batches
           const processBatch = (batch: HTMLImageElement[]) => {
             batch.forEach(img => {
               const timeoutId = setTimeout(() => {
@@ -560,13 +624,11 @@ class PDFService {
             });
           };
 
-          // Split into batches
           for (let i = 0; i < images.length; i += maxParallel) {
             const batch = images.slice(i, i + maxParallel);
             processBatch(batch);
           }
 
-          // Global timeout
           setTimeout(() => {
             if (loaded + timedOut < total) {
               console.warn(`Global image timeout: ${loaded + timedOut}/${total} processed`);
@@ -581,7 +643,7 @@ class PDFService {
   }
 
   /**
-   * Generate PDF with optimized processing
+   * Generate PDF with full async optimization
    */
   async generatePDF(techpack: TechPackForPDF, options: PDFOptions = {}): Promise<PDFGenerationResult> {
     if (this.activeGenerations >= this.maxConcurrent) {
@@ -593,48 +655,32 @@ class PDFService {
     let page: Page | null = null;
 
     try {
-      console.log('🚀 Starting PDF generation...');
+      console.log('🚀 Starting ASYNC PDF generation...');
+      console.log('📊 Data sizes:', {
+        bom: techpack.bom?.length || 0,
+        measurements: techpack.measurements?.length || 0,
+        sampleRounds: techpack.sampleMeasurementRounds?.length || 0,
+      });
       
-      // Get browser
       const browser = await this.getBrowser();
       page = await browser.newPage();
-
-      // Set viewport for better rendering
       await page.setViewport({ width: 1920, height: 1080 });
 
-      // Prepare data
-      const templateData = this.prepareTechPackData(techpack);
+      // PARALLEL: Prepare data AND fetch revisions at the same time
+      console.log('🔄 Running parallel operations...');
+      const [templateData, revisionHistory] = await Promise.all([
+        this.prepareTechPackDataAsync(techpack),
+        this.fetchRevisionHistoryAsync(techpack._id)
+      ]);
       
-      // Fetch revision history
-      console.log('📚 Fetching revision history...');
-      try {
-        const Revision = (await import('../models/revision.model')).default;
-        const revisions = await Revision.find({ techPackId: techpack._id })
-          .populate('createdBy', 'firstName lastName')
-          .sort({ createdAt: -1 })
-          .limit(20) // Limit to recent 20 revisions
-          .lean();
-        
-        templateData.revisionHistory = revisions.map((rev: any) => ({
-          version: rev.version || '—',
-          modifiedBy: rev.createdByName || 
-            (rev.createdBy?.firstName && rev.createdBy?.lastName 
-              ? `${rev.createdBy.firstName} ${rev.createdBy.lastName}` 
-              : '—'),
-          modifiedAt: this.formatDate(rev.createdAt),
-          description: rev.description || (rev.changes?.summary) || '—',
-          status: rev.statusAtChange || '—',
-        }));
-      } catch (error) {
-        console.warn('Could not fetch revision history:', error);
-        templateData.revisionHistory = [];
-      }
+      templateData.revisionHistory = revisionHistory;
+      console.log(`✅ Got ${revisionHistory.length} revisions`);
 
-      // Load and render template
+      // Load template
       console.log('📄 Loading template...');
       const templatePath = path.join(this.templateDir, 'techpack-full-template.ejs');
-      
       let templateContent: string;
+      
       if (this.templateCache.has(templatePath)) {
         templateContent = this.templateCache.get(templatePath)!;
       } else {
@@ -642,6 +688,7 @@ class PDFService {
         this.templateCache.set(templatePath, templateContent);
       }
 
+      // Render HTML
       console.log('🎨 Rendering HTML...');
       const renderStart = Date.now();
       const html = await ejs.render(templateContent, templateData, {
@@ -650,7 +697,7 @@ class PDFService {
       });
       console.log(`✅ HTML rendered in ${Date.now() - renderStart}ms`);
 
-      // Set content with optimized loading
+      // Load content
       console.log('📥 Loading content into page...');
       const contentStart = Date.now();
       await page.setContent(html, {
@@ -659,11 +706,11 @@ class PDFService {
       });
       console.log(`✅ Content loaded in ${Date.now() - contentStart}ms`);
 
-      // Wait for critical rendering
+      // Wait for layout
       console.log('⏳ Waiting for layout to settle...');
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Optimized image loading
+      // Load images
       console.log('🖼️  Loading images (with timeout)...');
       const imageStart = Date.now();
       await this.waitForImagesOptimized(page);
@@ -708,7 +755,12 @@ class PDFService {
       const filename = `Techpack_${techpack.articleCode}_${sampleType}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_');
 
       const totalTime = Date.now() - totalStartTime;
-      console.log(`✅ Total PDF generation time: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s)`);
+      console.log('═══════════════════════════════════════════════════════');
+      console.log(`✅ PDF GENERATION SUCCESSFUL`);
+      console.log(`📊 Total time: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s)`);
+      console.log(`📄 File: ${filename}`);
+      console.log(`📦 Size: ${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB`);
+      console.log('═══════════════════════════════════════════════════════');
 
       return {
         buffer: pdfBuffer,
@@ -717,12 +769,15 @@ class PDFService {
         pages: Math.ceil(pdfBuffer.length / 10000),
       };
     } catch (error: any) {
-      console.error('❌ PDF generation error:', error);
-      console.error('Error stack:', error.stack);
+      const failedTime = Date.now() - totalStartTime;
+      console.error('═══════════════════════════════════════════════════════');
+      console.error('❌ PDF GENERATION FAILED');
+      console.error(`⏱️  Failed after: ${failedTime}ms (${(failedTime / 1000).toFixed(2)}s)`);
+      console.error('📋 Error:', error.message);
+      console.error('═══════════════════════════════════════════════════════');
       
       throw new Error(`Failed to generate PDF: ${error.message}`);
     } finally {
-      // Cleanup
       if (page) {
         try {
           await page.close();
