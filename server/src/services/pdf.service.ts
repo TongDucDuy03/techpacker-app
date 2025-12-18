@@ -61,8 +61,10 @@ class PDFService {
   private async getBrowser(): Promise<Browser> {
     if (!this.browser) {
       try {
-        const launchOptions: any = {
+        // this.browser = await puppeteer.launch({
+         const launchOptions: any = {
           headless: 'new',
+           //executablePath: process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -428,22 +430,22 @@ class PDFService {
     }));
 
     const summary = {
-      bomCount: bomParts.reduce((sum: number, part: any) => sum + part.items.length, 0),
-      uniqueSuppliers: new Set(bomParts.flatMap((part: any) => 
-        part.items.map((item: any) => item.supplier).filter((s: string) => s && s !== '—')
-      )).size,
-      approvedMaterials: bomParts.reduce((sum: number, part: any) => 
-        sum + part.items.filter((item: any) => item.approved === 'Yes').length, 0),
-      measurementCount: measurementRows.length,
-      criticalMeasurements: measurementRows.filter((r: any) => r.critical).length,
-      sizeRange: sizeRange.join(', '),
-      howToMeasureCount: howToMeasures.length,
-      howToMeasureWithImage: howToMeasures.filter((h: any) => h.imageUrl && !h.imageUrl.includes('No Image')).length,
-      howToMeasureTips: howToMeasures.reduce((sum: number, h: any) => sum + (h.tips?.length || 0), 0),
-      notesCount: 0,
-      careSymbolCount: 0,
-      lastExport: this.formatDate(new Date()),
-    };
+  bomCount: bomParts.reduce((sum: number, part: any) => sum + part.items.length, 0),
+  uniqueSuppliers: new Set(bomParts.flatMap((part: any) => 
+    part.items.map((item: any) => item.supplier).filter((s: string) => s && s !== '—')
+  )).size,
+  approvedMaterials: bomParts.reduce((sum: number, part: any) => 
+    sum + part.items.filter((item: any) => item.approved === 'Yes').length, 0),
+  measurementCount: measurementRows.length,
+  criticalMeasurements: measurementRows.filter((r: any) => r.critical).length,
+  sizeRange: sizeRange.join(', '),
+  howToMeasureCount: howToMeasures.length,
+  howToMeasureWithImage: howToMeasures.filter((h: any) => h.imageUrl && !h.imageUrl.includes('No Image')).length,
+  howToMeasureTips: howToMeasures.reduce((sum: number, h: any) => sum + (h.tips?.length || 0), 0),
+  notesCount: 0,
+  careSymbolCount: 0,
+  lastExport: this.formatDate(new Date()),
+};
 
     const prepTime = Date.now() - startTime;
     console.log(`✅ Data preparation completed in ${prepTime}ms`);
@@ -482,16 +484,16 @@ class PDFService {
       },
       articleSummary,
       bom: {
-        parts: bomParts,
-        stats: {
-          bomCount: bomParts.reduce((sum, part) => sum + part.items.length, 0),
-          uniqueSuppliers: new Set(bomParts.flatMap(part => 
-            part.items.map((item: any) => item.supplier).filter((s: string) => s && s !== '—')
-          )).size,
-          approvedMaterials: bomParts.reduce((sum, part) => 
-            sum + part.items.filter((item: any) => item.approved === 'Yes').length, 0),
-        },
-      },
+  parts: bomParts,
+  stats: {
+    bomCount: bomParts.reduce((sum: number, part: any) => sum + part.items.length, 0),
+    uniqueSuppliers: new Set(bomParts.flatMap((part: any) => 
+      part.items.map((item: any) => item.supplier).filter((s: string) => s && s !== '—')
+    )).size,
+    approvedMaterials: bomParts.reduce((sum: number, part: any) => 
+      sum + part.items.filter((item: any) => item.approved === 'Yes').length, 0),
+  },
+},
       measurements: {
         rows: measurementRows,
         sizeRange,
