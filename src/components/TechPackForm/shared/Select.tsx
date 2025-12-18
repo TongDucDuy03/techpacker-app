@@ -30,13 +30,13 @@ const Select: React.FC<SelectProps> = ({
   return (
     <div className={`flex flex-col space-y-1 ${className}`}>
       {label && (
-        <label 
-          htmlFor={selectId}
-          className="text-sm font-medium text-gray-700 flex items-center"
-        >
-          {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
-        </label>
+      <label 
+        htmlFor={selectId}
+        className="text-sm font-medium text-gray-700 flex items-center"
+      >
+        {label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
       )}
       
       <select

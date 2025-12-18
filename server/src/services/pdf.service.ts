@@ -55,9 +55,9 @@ class PDFService {
   private async getBrowser(): Promise<Browser> {
     if (!this.browser) {
       try {
-        this.browser = await puppeteer.launch({
+        // Build launch options
+        const launchOptions: any = {
           headless: 'new',
-          executablePath: process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -68,10 +68,26 @@ class PDFService {
             '--font-render-hinting=none',
           ],
           timeout: 60000, // 60 seconds timeout for browser launch
-        });
+        };
+
+        // Only set executablePath if CHROME_PATH is explicitly provided
+        // Otherwise, let Puppeteer use the bundled Chromium
+        if (process.env.CHROME_PATH) {
+          launchOptions.executablePath = process.env.CHROME_PATH;
+          console.log(`Using Chrome/Chromium from: ${process.env.CHROME_PATH}`);
+        } else {
+          console.log('Using Puppeteer bundled Chromium');
+        }
+
+        this.browser = await puppeteer.launch(launchOptions);
         console.log('Browser launched successfully');
       } catch (error: any) {
         console.error('Failed to launch browser:', error);
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          CHROME_PATH: process.env.CHROME_PATH || 'not set',
+        });
         throw new Error(`Failed to launch Puppeteer browser: ${error.message}`);
       }
     }
