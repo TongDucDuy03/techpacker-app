@@ -1543,6 +1543,10 @@ export class TechPackController {
    * GET /api/techpacks/:id/pdf
    */
   async exportPDF(req: AuthRequest, res: Response): Promise<void> {
+    // Set a longer timeout for PDF generation (5 minutes)
+    req.setTimeout(300000); // 5 minutes
+    res.setTimeout(300000); // 5 minutes
+    
     try {
       const { id } = req.params;
       const { orientation, format } = req.query;

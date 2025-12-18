@@ -34,6 +34,10 @@ class PDFService {
   private readonly templateDir: string;
   private readonly maxConcurrent: number = 3;
   private activeGenerations: number = 0;
+  // Timeout configurations (in milliseconds)
+  private readonly BROWSER_LAUNCH_TIMEOUT = parseInt(process.env.PDF_BROWSER_LAUNCH_TIMEOUT || '120000', 10); // 2 minutes
+  private readonly PAGE_SET_CONTENT_TIMEOUT = parseInt(process.env.PDF_PAGE_SET_CONTENT_TIMEOUT || '180000', 10); // 3 minutes
+  private readonly PDF_GENERATION_TIMEOUT = parseInt(process.env.PDF_GENERATION_TIMEOUT || '120000', 10); // 2 minutes
 
   constructor() {
     // Handle both dev (src/) and production (dist/) paths
@@ -67,7 +71,7 @@ class PDFService {
             '--disable-web-security',
             '--font-render-hinting=none',
           ],
-          timeout: 60000, // 60 seconds timeout for browser launch
+          timeout: this.BROWSER_LAUNCH_TIMEOUT,
         };
 
         // Only set executablePath if CHROME_PATH is explicitly provided
@@ -589,24 +593,41 @@ class PDFService {
         }
       );
 
-      // Set content
-      // Changed from 'networkidle0' to 'domcontentloaded' to avoid waiting for all images
+      // Set content with optimized loading strategy
+      // Use 'domcontentloaded' instead of 'networkidle0' to avoid waiting for all images
       // This significantly improves performance for templates with many external images
       await page.setContent(html, {
         waitUntil: 'domcontentloaded',
-        timeout: 120000, // 120 seconds
+        timeout: this.PAGE_SET_CONTENT_TIMEOUT,
       });
 
-      // Wait a bit for critical styles and layout to settle
-      // Using setTimeout instead of deprecated waitForTimeout
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait for critical styles and layout to settle (reduced from 2000ms to 1000ms)
+      // Also wait for any critical images to load
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Wait for images to load (with timeout) - but don't block if they fail
+      try {
+        await page.evaluate(() => {
+          return Promise.all(
+            Array.from(document.images)
+              .filter(img => !img.complete)
+              .map(img => new Promise((resolve) => {
+                img.onload = resolve;
+                img.onerror = resolve; // Don't fail on image errors
+                setTimeout(resolve, 5000); // Max 5s per image
+              }))
+          );
+        });
+      } catch (imageLoadError) {
+        console.warn('Some images failed to load, continuing with PDF generation:', imageLoadError);
+      }
 
       // Generate PDF - Default to landscape for better table display
       const pdfOptions: any = {
         format: options.format || 'A4',
         landscape: options.orientation !== 'portrait', // Default to landscape
         printBackground: true,
-        timeout: 60000, // 60 seconds for PDF generation
+        timeout: this.PDF_GENERATION_TIMEOUT,
         margin: {
           top: options.margin?.top || '10mm',
           bottom: options.margin?.bottom || '10mm',
