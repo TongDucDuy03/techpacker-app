@@ -490,6 +490,7 @@ class ApiClient {
     const response = await this.axiosInstance.get(`/techpacks/${id}/pdf`, {
       params,
       responseType: 'blob',
+      timeout: 300000, // 5 minutes for PDF export (increased from default 30s)
     });
     return response.data;
   }
