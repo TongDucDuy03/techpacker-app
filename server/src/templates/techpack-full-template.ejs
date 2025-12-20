@@ -26,6 +26,49 @@
       padding: 20px;
     }
 
+    /* Image optimization for PDF size reduction */
+    img {
+      max-width: 100%;
+      height: auto;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+      /* Limit maximum dimensions to reduce PDF size */
+      max-width: 1200px;
+      max-height: 800px;
+      object-fit: contain;
+    }
+
+    /* Specific constraints for different image types */
+    .logo-cell img,
+    .page-header img {
+      max-width: 400px;
+      max-height: 200px;
+    }
+
+    .product-images img {
+      max-width: 500px;
+      max-height: 600px;
+    }
+
+    /* BOM thumbnail images */
+    .bom-image img,
+    .grid-item img {
+      max-width: 800px;
+      max-height: 600px;
+    }
+
+    /* How to measure images */
+    .how-to-measure img {
+      max-width: 1000px;
+      max-height: 700px;
+    }
+
+    /* Colorway images */
+    .colorway-image img {
+      max-width: 1000px;
+      max-height: 700px;
+    }
+
     .container {
       max-width: 1200px;
       margin: 0 auto;

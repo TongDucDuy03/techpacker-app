@@ -1575,12 +1575,15 @@ export class TechPackController {
       const pdfService = (await import('../services/pdf.service')).default;
 
       // Prepare PDF options - Default to landscape for better table display
+      // Reduced image quality and size limits for smaller PDF files
       const pdfOptions = {
         format: (format as 'A4' | 'Letter' | 'Legal') || 'A4',
         orientation: (orientation as 'portrait' | 'landscape') || 'landscape',
         displayHeaderFooter: true,
         includeImages: true,
-        imageQuality: 90,
+        imageQuality: 65, // Reduced from 90 to 65 for better compression (target: <10MB)
+        imageMaxWidth: 1200, // Max width in pixels
+        imageMaxHeight: 800, // Max height in pixels
         margin: {
           top: '10mm',
           bottom: '10mm',

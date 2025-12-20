@@ -3,6 +3,7 @@ import path from 'path';
 import ejs from 'ejs';
 import { ITechPack, IBOMItem, IMeasurement, ISampleMeasurementRound, IHowToMeasure, IColorway, IColorwayPart } from '../models/techpack.model';
 import fs from 'fs/promises';
+import { compressImageToDataURI, compressImagesBatch } from '../utils/image-compression.util';
 
 type TechPackForPDF = ITechPack | any;
 
@@ -16,7 +17,9 @@ export interface PDFOptions {
     right?: string;
   };
   includeImages?: boolean;
-  imageQuality?: number;
+  imageQuality?: number; // 0-100, lower = smaller file
+  imageMaxWidth?: number; // Max width in pixels
+  imageMaxHeight?: number; // Max height in pixels
   displayHeaderFooter?: boolean;
   chunkSize?: number;
 }
@@ -124,40 +127,75 @@ class PDFService {
 
   /**
    * Optimized image URL preparation with caching
+   * Now returns compressed data URIs for better PDF size
    */
-  private prepareImageUrl(url?: string, placeholder?: string): string {
+  private async prepareImageUrlCompressed(
+    url?: string, 
+    placeholder?: string,
+    options?: { quality?: number; maxWidth?: number; maxHeight?: number }
+  ): Promise<string> {
     if (!url || url.trim() === '') {
       return placeholder || this.getPlaceholderSVG();
     }
 
-    if (this.imageCache.has(url)) {
-      return this.imageCache.get(url)!;
+    // Check cache first
+    const cacheKey = `${url}_${options?.quality || 65}_${options?.maxWidth || 1200}`;
+    if (this.imageCache.has(cacheKey)) {
+      return this.imageCache.get(cacheKey)!;
     }
 
     const trimmedUrl = url.trim();
-    let result: string;
-
+    
+    // If already a data URI, try to compress it
     if (trimmedUrl.startsWith('data:image/')) {
-      result = trimmedUrl;
-    } else if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
-      result = trimmedUrl;
+      try {
+        const compressed = await compressImageToDataURI(trimmedUrl, {
+          quality: options?.quality || 65,
+          maxWidth: options?.maxWidth || 1200,
+          maxHeight: options?.maxHeight || 800,
+        });
+        this.imageCache.set(cacheKey, compressed);
+        return compressed;
+      } catch {
+        // If compression fails, return original
+        this.imageCache.set(cacheKey, trimmedUrl);
+        return trimmedUrl;
+      }
+    }
+
+    // For URLs, resolve and compress
+    let resolvedUrl: string;
+    if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
+      resolvedUrl = trimmedUrl;
     } else {
       const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       const serverUrl = process.env.SERVER_URL || `http://localhost:${process.env.PORT || 4001}`;
       
       if (trimmedUrl.startsWith('/uploads/') || trimmedUrl.startsWith('/api/uploads/')) {
-        result = `${serverUrl}${trimmedUrl}`;
+        resolvedUrl = `${serverUrl}${trimmedUrl}`;
       } else if (trimmedUrl.startsWith('/static/')) {
-        result = `${baseUrl}${trimmedUrl}`;
+        resolvedUrl = `${baseUrl}${trimmedUrl}`;
       } else if (trimmedUrl.startsWith('/')) {
-        result = `${baseUrl}${trimmedUrl}`;
+        resolvedUrl = `${baseUrl}${trimmedUrl}`;
       } else {
-        result = `${baseUrl}/${trimmedUrl}`;
+        resolvedUrl = `${baseUrl}/${trimmedUrl}`;
       }
     }
 
-    this.imageCache.set(url, result);
-    return result;
+    // Compress the image
+    try {
+      const compressed = await compressImageToDataURI(resolvedUrl, {
+        quality: options?.quality || 65,
+        maxWidth: options?.maxWidth || 1200,
+        maxHeight: options?.maxHeight || 800,
+      });
+      this.imageCache.set(cacheKey, compressed);
+      return compressed;
+    } catch (error) {
+      console.warn(`Image compression failed for ${resolvedUrl}, using original URL`);
+      this.imageCache.set(cacheKey, resolvedUrl);
+      return resolvedUrl;
+    }
   }
 
   /**
@@ -198,13 +236,43 @@ class PDFService {
   }
 
   /**
-   * Optimized BOM data preparation
+   * Optimized BOM data preparation with image compression
    */
-  private prepareBOMDataOptimized(bom: IBOMItem[], currency: string): any[] {
+  private async prepareBOMDataOptimized(
+    bom: IBOMItem[], 
+    currency: string,
+    imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number }
+  ): Promise<any[]> {
     if (!bom || bom.length === 0) return [];
     
     console.log(`📋 Processing ${bom.length} BOM items...`);
     const bomByPart: { [key: string]: any[] } = {};
+    
+    // Collect all image URLs for batch compression
+    const imageUrls: string[] = [];
+    const imageIndices: number[] = [];
+    
+    for (let i = 0; i < bom.length; i++) {
+      const item = bom[i];
+      if (item.imageUrl) {
+        imageUrls.push(item.imageUrl);
+        imageIndices.push(i);
+      }
+    }
+    
+    // Compress all images in parallel
+    console.log(`🖼️  Compressing ${imageUrls.length} BOM images...`);
+    const compressedImages = await compressImagesBatch(imageUrls, {
+      quality: imageOptions?.quality || 65,
+      maxWidth: imageOptions?.maxWidth || 800, // Smaller for thumbnails
+      maxHeight: imageOptions?.maxHeight || 600,
+    }, 5);
+    
+    // Create a map of original URL to compressed data URI
+    const imageMap = new Map<string, string>();
+    imageIndices.forEach((_idx, i) => {
+      imageMap.set(imageUrls[i], compressedImages[i]);
+    });
     
     for (const item of bom) {
       const partName = this.normalizeText(item.part) || 'Unassigned';
@@ -229,9 +297,14 @@ class PDFService {
       if (item.size) sizeInfo.push(`Size: ${this.normalizeText(item.size)}`);
       if (item.width) sizeInfo.push(`Width: ${this.normalizeText(item.width)}`);
 
+      // Use compressed image if available
+      const imageUrl = item.imageUrl 
+        ? (imageMap.get(item.imageUrl) || await this.prepareImageUrlCompressed(item.imageUrl, this.getPlaceholderSVG(64, 64), imageOptions))
+        : this.getPlaceholderSVG(64, 64);
+
       bomByPart[partName].push({
         materialName: this.normalizeText(item.materialName),
-        imageUrl: this.prepareImageUrl(item.imageUrl, this.getPlaceholderSVG(64, 64)),
+        imageUrl,
         placement: this.normalizeText(item.placement),
         sizeWidthUsage: sizeInfo.length > 0 ? sizeInfo.join(' / ') : '—',
         quantity: item.quantity || 0,
@@ -336,16 +409,53 @@ class PDFService {
   }
 
   /**
-   * Optimized how to measure preparation
+   * Optimized how to measure preparation with image compression
    */
-  private prepareHowToMeasureOptimized(techpack: any): any[] {
+  private async prepareHowToMeasureOptimized(
+    techpack: any,
+    imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number }
+  ): Promise<any[]> {
     console.log('📐 Processing how to measure...');
-    return (techpack.howToMeasure || []).map((item: IHowToMeasure) => ({
+    const items = techpack.howToMeasure || [];
+    
+    // Collect image URLs
+    const imageUrls = items.map((item: IHowToMeasure) => item.imageUrl).filter(Boolean);
+    
+    // Compress images in batch
+    if (imageUrls.length > 0) {
+      console.log(`🖼️  Compressing ${imageUrls.length} how-to-measure images...`);
+      const compressedImages = await compressImagesBatch(imageUrls, {
+        quality: imageOptions?.quality || 65,
+        maxWidth: imageOptions?.maxWidth || 1000,
+        maxHeight: imageOptions?.maxHeight || 700,
+      }, 5);
+      
+      const imageMap = new Map<string, string>();
+      imageUrls.forEach((url: string, i: number) => {
+        imageMap.set(url, compressedImages[i]);
+      });
+      
+      return items.map((item: IHowToMeasure) => ({
+        stepNumber: item.stepNumber || 0,
+        pomCode: item.pomCode || '—',
+        pomName: item.pomName || '—',
+        description: item.description || '—',
+        imageUrl: item.imageUrl 
+          ? (imageMap.get(item.imageUrl) || this.getPlaceholderSVG())
+          : this.getPlaceholderSVG(),
+        steps: item.instructions || [],
+        tips: item.tips || [],
+        commonMistakes: item.commonMistakes || [],
+        relatedMeasurements: item.relatedMeasurements || [],
+      }));
+    }
+    
+    return items.map((item: IHowToMeasure) => ({
       stepNumber: item.stepNumber || 0,
       pomCode: item.pomCode || '—',
       pomName: item.pomName || '—',
       description: item.description || '—',
-      imageUrl: this.prepareImageUrl(item.imageUrl),
+      imageUrl: this.getPlaceholderSVG(),
       steps: item.instructions || [],
       tips: item.tips || [],
       commonMistakes: item.commonMistakes || [],
@@ -354,11 +464,78 @@ class PDFService {
   }
 
   /**
-   * Optimized colorways preparation
+   * Optimized colorways preparation with image compression
    */
-  private prepareColorwaysOptimized(techpack: any): any[] {
+  private async prepareColorwaysOptimized(
+    techpack: any,
+    imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number }
+  ): Promise<any[]> {
     console.log('🎨 Processing colorways...');
-    return (techpack.colorways || []).map((colorway: IColorway) => ({
+    const colorways = techpack.colorways || [];
+    
+    // Collect all image URLs (colorway images + part images)
+    const imageUrls: string[] = [];
+    const urlToIndex: Map<string, { type: 'colorway' | 'part'; colorwayIdx: number; partIdx?: number }> = new Map();
+    
+    colorways.forEach((colorway: IColorway, cIdx: number) => {
+      if (colorway.imageUrl) {
+        imageUrls.push(colorway.imageUrl);
+        urlToIndex.set(colorway.imageUrl, { type: 'colorway', colorwayIdx: cIdx });
+      }
+      (colorway.parts || []).forEach((part: IColorwayPart, pIdx: number) => {
+        if (part.imageUrl) {
+          imageUrls.push(part.imageUrl);
+          urlToIndex.set(part.imageUrl, { type: 'part', colorwayIdx: cIdx, partIdx: pIdx });
+        }
+      });
+    });
+    
+    // Compress all images
+    if (imageUrls.length > 0) {
+      console.log(`🖼️  Compressing ${imageUrls.length} colorway images...`);
+      const compressedImages = await compressImagesBatch(imageUrls, {
+        quality: imageOptions?.quality || 65,
+        maxWidth: imageOptions?.maxWidth || 1000,
+        maxHeight: imageOptions?.maxHeight || 700,
+      }, 5);
+      
+      const imageMap = new Map<string, string>();
+      imageUrls.forEach((url, i) => {
+        imageMap.set(url, compressedImages[i]);
+      });
+      
+      return colorways.map((colorway: IColorway) => ({
+        name: colorway.name || '—',
+        code: colorway.code || '—',
+        pantoneCode: colorway.pantoneCode || '—',
+        hexColor: colorway.hexColor || '—',
+        rgbColor: colorway.rgbColor ? `rgb(${colorway.rgbColor.r}, ${colorway.rgbColor.g}, ${colorway.rgbColor.b})` : '—',
+        supplier: colorway.supplier || '—',
+        productionStatus: '—',
+        approved: colorway.approved ? 'Yes' : 'No',
+        approvalStatus: colorway.approved ? 'Approved' : 'Pending',
+        season: colorway.season || techpack.season || '—',
+        collectionName: colorway.collectionName || techpack.collectionName || '—',
+        notes: colorway.notes || '—',
+        imageUrl: colorway.imageUrl 
+          ? (imageMap.get(colorway.imageUrl) || this.getPlaceholderSVG())
+          : this.getPlaceholderSVG(),
+        parts: (colorway.parts || []).map((part: IColorwayPart) => ({
+          partName: part.partName || '—',
+          colorName: part.colorName || '—',
+          pantoneCode: part.pantoneCode || '—',
+          hexCode: part.hexCode || '—',
+          rgbCode: part.rgbCode || '—',
+          imageUrl: part.imageUrl 
+            ? (imageMap.get(part.imageUrl) || this.getPlaceholderSVG())
+            : this.getPlaceholderSVG(),
+          supplier: part.supplier || '—',
+          colorType: part.colorType || 'Solid',
+        })),
+      }));
+    }
+    
+    return colorways.map((colorway: IColorway) => ({
       name: colorway.name || '—',
       code: colorway.code || '—',
       pantoneCode: colorway.pantoneCode || '—',
@@ -371,14 +548,14 @@ class PDFService {
       season: colorway.season || techpack.season || '—',
       collectionName: colorway.collectionName || techpack.collectionName || '—',
       notes: colorway.notes || '—',
-      imageUrl: this.prepareImageUrl(colorway.imageUrl),
+      imageUrl: this.getPlaceholderSVG(),
       parts: (colorway.parts || []).map((part: IColorwayPart) => ({
         partName: part.partName || '—',
         colorName: part.colorName || '—',
         pantoneCode: part.pantoneCode || '—',
         hexCode: part.hexCode || '—',
         rgbCode: part.rgbCode || '—',
-        imageUrl: this.prepareImageUrl(part.imageUrl),
+        imageUrl: this.getPlaceholderSVG(),
         supplier: part.supplier || '—',
         colorType: part.colorType || 'Solid',
       })),
@@ -427,13 +604,19 @@ class PDFService {
   }
 
   /**
-   * Prepare techpack data with parallel processing
+   * Prepare techpack data with parallel processing and image compression
    */
-  private async prepareTechPackDataAsync(techpack: TechPackForPDF): Promise<any> {
-    console.log('📦 Starting ASYNC data preparation...');
+  private async prepareTechPackDataAsync(
+    techpack: TechPackForPDF,
+    imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number }
+  ): Promise<any> {
+    console.log('📦 Starting ASYNC data preparation with image compression...');
     const startTime = Date.now();
 
     const currency = techpack.currency || 'USD';
+    const imageQuality = imageOptions?.quality || 65;
+    const imageMaxWidth = imageOptions?.maxWidth || 1200;
+    const imageMaxHeight = imageOptions?.maxHeight || 800;
     
     const technicalDesignerName = 
       (techpack.technicalDesignerId as any)?.firstName && 
@@ -479,15 +662,47 @@ class PDFService {
       },
     };
 
-    console.log('🚀 Processing data in parallel...');
+    // Compress main images (logo and cover) first
+    console.log('🖼️  Compressing main images (logo, cover)...');
+    const [compressedLogo, compressedCover, compressedDesignSketch] = await Promise.all([
+      this.prepareImageUrlCompressed(techpack.companyLogoUrl, undefined, {
+        quality: imageQuality,
+        maxWidth: 400, // Logo is smaller
+        maxHeight: 200,
+      }),
+      this.prepareImageUrlCompressed(techpack.designSketchUrl, undefined, {
+        quality: imageQuality,
+        maxWidth: imageMaxWidth,
+        maxHeight: imageMaxHeight,
+      }),
+      this.prepareImageUrlCompressed(techpack.designSketchUrl, undefined, {
+        quality: imageQuality,
+        maxWidth: imageMaxWidth,
+        maxHeight: imageMaxHeight,
+      }),
+    ]);
+
+    console.log('🚀 Processing data in parallel with image compression...');
     const parallelStart = Date.now();
     
     const [bomParts, measurementData, sampleRounds, howToMeasures, colorways] = await Promise.all([
-      Promise.resolve(this.prepareBOMDataOptimized(techpack.bom || [], currency)),
+      this.prepareBOMDataOptimized(techpack.bom || [], currency, {
+        quality: imageQuality,
+        maxWidth: 800, // Smaller for BOM thumbnails
+        maxHeight: 600,
+      }),
       Promise.resolve(this.prepareMeasurementsOptimized(techpack)),
       Promise.resolve(this.prepareSampleRoundsOptimized(techpack)),
-      Promise.resolve(this.prepareHowToMeasureOptimized(techpack)),
-      Promise.resolve(this.prepareColorwaysOptimized(techpack)),
+      this.prepareHowToMeasureOptimized(techpack, {
+        quality: imageQuality,
+        maxWidth: imageMaxWidth,
+        maxHeight: imageMaxHeight,
+      }),
+      this.prepareColorwaysOptimized(techpack, {
+        quality: imageQuality,
+        maxWidth: imageMaxWidth,
+        maxHeight: imageMaxHeight,
+      }),
     ]);
     
     console.log(`✅ Parallel processing completed in ${Date.now() - parallelStart}ms`);
@@ -540,7 +755,7 @@ class PDFService {
         updatedAt: this.formatDate(techpack.updatedAt),
         createdAt: this.formatDate(techpack.createdAt),
         createdByName: techpack.createdByName || '—',
-        designSketchUrl: this.prepareImageUrl(techpack.designSketchUrl),
+        designSketchUrl: compressedDesignSketch,
         productDescription: techpack.productDescription || techpack.description || '—',
         fabricDescription: techpack.fabricDescription || '—',
         lifecycleStage: techpack.lifecycleStage || '—',
@@ -553,8 +768,8 @@ class PDFService {
         designer: technicalDesignerName,
       },
       images: {
-        companyLogo: this.prepareImageUrl(techpack.companyLogoUrl),
-        coverImage: this.prepareImageUrl(techpack.designSketchUrl),
+        companyLogo: compressedLogo,
+        coverImage: compressedCover,
       },
       articleSummary,
       bom: {
@@ -666,10 +881,17 @@ class PDFService {
       page = await browser.newPage();
       await page.setViewport({ width: 1920, height: 1080 });
 
+      // Get image compression options from PDF options
+      const imageOptions = {
+        quality: options.imageQuality || 65, // Default to 65 for better compression
+        maxWidth: options.imageMaxWidth || 1200,
+        maxHeight: options.imageMaxHeight || 800,
+      };
+
       // PARALLEL: Prepare data AND fetch revisions at the same time
       console.log('🔄 Running parallel operations...');
       const [templateData, revisionHistory] = await Promise.all([
-        this.prepareTechPackDataAsync(techpack),
+        this.prepareTechPackDataAsync(techpack, imageOptions),
         this.fetchRevisionHistoryAsync(techpack._id)
       ]);
       
@@ -714,6 +936,53 @@ class PDFService {
       console.log('🖼️  Loading images (with timeout)...');
       const imageStart = Date.now();
       await this.waitForImagesOptimized(page);
+      
+      // Additional image optimization: compress any remaining large images
+      console.log('🔧 Optimizing images in page...');
+      await page.evaluate((maxWidth: number, maxHeight: number) => {
+        const images = Array.from(document.querySelectorAll('img')) as HTMLImageElement[];
+        images.forEach((img) => {
+          // Skip if already a data URI (already compressed)
+          if (img.src.startsWith('data:image/')) {
+            return;
+          }
+          
+          // Create canvas to compress image
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
+          
+          const originalWidth = img.naturalWidth || img.width;
+          const originalHeight = img.naturalHeight || img.height;
+          
+          // Calculate new dimensions
+          let newWidth = originalWidth;
+          let newHeight = originalHeight;
+          
+          if (originalWidth > maxWidth || originalHeight > maxHeight) {
+            const ratio = Math.min(maxWidth / originalWidth, maxHeight / originalHeight);
+            newWidth = originalWidth * ratio;
+            newHeight = originalHeight * ratio;
+          }
+          
+          // Only compress if size reduction is significant
+          if (newWidth < originalWidth * 0.9 || newHeight < originalHeight * 0.9) {
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+            
+            // Draw and compress
+            ctx.drawImage(img, 0, 0, newWidth, newHeight);
+            try {
+              const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.65);
+              img.src = compressedDataUrl;
+            } catch (e) {
+              // If compression fails, keep original
+              console.warn('Image compression failed:', e);
+            }
+          }
+        });
+      }, imageOptions.maxWidth, imageOptions.maxHeight);
+      
       console.log(`✅ Images processed in ${Date.now() - imageStart}ms`);
 
       // Generate PDF
