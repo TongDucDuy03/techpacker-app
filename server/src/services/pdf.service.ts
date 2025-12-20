@@ -1,4 +1,4 @@
-import puppeteer, { Browser, Page } from 'puppeteer';
+import puppeteer, { Browser, Page, BrowserContext } from 'puppeteer';
 import path from 'path';
 import ejs from 'ejs';
 import { ITechPack, IBOMItem, IMeasurement, ISampleMeasurementRound, IHowToMeasure, IColorway, IColorwayPart } from '../models/techpack.model';
@@ -37,6 +37,11 @@ class PDFService {
   private readonly maxConcurrent: number = 2;
   private activeGenerations: number = 0;
   
+  // Export locks per techpackId to prevent concurrent exports
+  // Auto-release locks older than 5 minutes to prevent stuck locks
+  private exportLocks: Map<string, { requestId: string; startTime: number }> = new Map();
+  private readonly LOCK_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+  
   // Optimized timeout configurations (in milliseconds)
   private readonly BROWSER_LAUNCH_TIMEOUT = parseInt(process.env.PDF_BROWSER_LAUNCH_TIMEOUT || '300000', 10); // 5 minutes
   private readonly PAGE_SET_CONTENT_TIMEOUT = parseInt(process.env.PDF_PAGE_SET_CONTENT_TIMEOUT || '600000', 10); // 10 minutes
@@ -61,14 +66,24 @@ class PDFService {
 
   /**
    * Initialize browser with optimized settings for large data
+   * Auto-relaunch when disconnected
    */
   private async getBrowser(): Promise<Browser> {
+    // ✅ Check if browser exists but is disconnected - reset it
+    if (this.browser && !this.browser.isConnected()) {
+      try {
+        await this.browser.close();
+      } catch (closeError) {
+        // Ignore close errors
+      }
+      this.browser = null;
+      console.warn('⚠️  Browser was disconnected, resetting...');
+    }
+
     if (!this.browser) {
       try {
-        // this.browser = await puppeteer.launch({
-         const launchOptions: any = {
+        const launchOptions: any = {
           headless: 'new',
-         // executablePath: process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -77,13 +92,13 @@ class PDFService {
             '--disable-gpu',
             '--disable-web-security',
             '--font-render-hinting=none',
-            '--disable-features=IsolateOrigins,site-per-process',
+            // ❌ BỎ: '--disable-features=IsolateOrigins,site-per-process', // Không cần, đôi khi làm frame khó đoán
             '--disable-blink-features=AutomationControlled',
             '--disable-software-rasterizer',
             '--disable-extensions',
             '--disable-plugins',
             '--js-flags=--max-old-space-size=4096',
-            '--single-process',
+            // ❌ BỎ: '--single-process', // BẮT BUỘC bỏ - thủ phạm gây detach/crash
           ],
           timeout: this.BROWSER_LAUNCH_TIMEOUT,
           protocolTimeout: 600000, // 10 minutes for protocol operations
@@ -97,7 +112,15 @@ class PDFService {
         }
 
         this.browser = await puppeteer.launch(launchOptions);
-        console.log('Browser launched successfully with optimized settings');
+        console.log('✅ Browser launched successfully with optimized settings');
+
+        // ✅ Add disconnected listener ONCE when browser is launched
+        this.browser.on('disconnected', () => {
+          console.error('❌ Puppeteer browser disconnected. Will relaunch on next request.');
+          this.browser = null; // Quan trọng: lần sau getBrowser() sẽ launch lại
+          this.imageCache.clear();
+          this.templateCache.clear();
+        });
       } catch (error: any) {
         console.error('Failed to launch browser:', error);
         throw new Error(`Failed to launch Puppeteer browser: ${error.message}`);
@@ -683,14 +706,17 @@ class PDFService {
     };
 
     // Compress main images (logo and cover) first with timeout protection
-    console.log('🖼️  Compressing main images (logo, cover)...');
+    console.log('🖼️  Compressing main images (logo, cover, design sketch)...');
+    // ✅ FIX: compressedCover và compressedDesignSketch đều dùng designSketchUrl (cover = design sketch trong model này)
+    // Nếu có coverImageUrl riêng thì dùng, không thì dùng designSketchUrl cho cả 2
+    const coverImageUrl = (techpack as any).coverImageUrl || techpack.designSketchUrl;
     const [compressedLogo, compressedCover, compressedDesignSketch] = await Promise.allSettled([
       this.prepareImageUrlCompressed(techpack.companyLogoUrl, undefined, {
         quality: imageQuality,
         maxWidth: 400, // Logo is smaller
         maxHeight: 200,
       }).catch(() => this.getPlaceholderSVG(400, 200)),
-      this.prepareImageUrlCompressed(techpack.designSketchUrl, undefined, {
+      this.prepareImageUrlCompressed(coverImageUrl, undefined, {
         quality: imageQuality,
         maxWidth: imageMaxWidth,
         maxHeight: imageMaxHeight,
@@ -817,80 +843,132 @@ class PDFService {
    */
   private async waitForImagesOptimized(page: Page): Promise<void> {
     try {
+      // Check if page is still available and ready
+      if (page.isClosed()) {
+        console.warn('Page is closed, skipping image loading');
+        return;
+      }
+
+      // Wait a bit more to ensure page is fully ready
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Check again after wait
+      if (page.isClosed()) {
+        console.warn('Page closed during wait, skipping image loading');
+        return;
+      }
+
       await page.evaluate((timeout: number, maxParallel: number) => {
         return new Promise<void>((resolve) => {
-          const images = Array.from(document.images).filter(img => !img.complete);
-          
-          if (images.length === 0) {
-            resolve();
-            return;
-          }
-
-          let loaded = 0;
-          let timedOut = 0;
-          const total = images.length;
-
-          const checkComplete = () => {
-            if (loaded + timedOut >= total) {
-              console.log(`Images loaded: ${loaded}/${total}, timed out: ${timedOut}`);
+          try {
+            const images = Array.from(document.images).filter(img => !img.complete);
+            
+            if (images.length === 0) {
               resolve();
+              return;
             }
-          };
 
-          const processBatch = (batch: HTMLImageElement[]) => {
-            batch.forEach(img => {
-              const timeoutId = setTimeout(() => {
-                timedOut++;
-                console.warn(`Image timeout: ${img.src.substring(0, 50)}...`);
-                checkComplete();
-              }, timeout);
+            let loaded = 0;
+            let timedOut = 0;
+            const total = images.length;
 
-              const cleanup = () => {
-                clearTimeout(timeoutId);
-                loaded++;
-                checkComplete();
-              };
+            const checkComplete = () => {
+              if (loaded + timedOut >= total) {
+                console.log(`Images loaded: ${loaded}/${total}, timed out: ${timedOut}`);
+                resolve();
+              }
+            };
 
-              img.onload = cleanup;
-              img.onerror = () => {
-                console.warn(`Image load error: ${img.src.substring(0, 50)}...`);
-                cleanup();
-              };
-            });
-          };
+            const processBatch = (batch: HTMLImageElement[]) => {
+              batch.forEach(img => {
+                const timeoutId = setTimeout(() => {
+                  timedOut++;
+                  console.warn(`Image timeout: ${img.src.substring(0, 50)}...`);
+                  checkComplete();
+                }, timeout);
 
-          for (let i = 0; i < images.length; i += maxParallel) {
-            const batch = images.slice(i, i + maxParallel);
-            processBatch(batch);
+                const cleanup = () => {
+                  clearTimeout(timeoutId);
+                  loaded++;
+                  checkComplete();
+                };
+
+                img.onload = cleanup;
+                img.onerror = () => {
+                  console.warn(`Image load error: ${img.src.substring(0, 50)}...`);
+                  cleanup();
+                };
+              });
+            };
+
+            for (let i = 0; i < images.length; i += maxParallel) {
+              const batch = images.slice(i, i + maxParallel);
+              processBatch(batch);
+            }
+
+            setTimeout(() => {
+              if (loaded + timedOut < total) {
+                console.warn(`Global image timeout: ${loaded + timedOut}/${total} processed`);
+                resolve();
+              }
+            }, timeout * 2);
+          } catch (error) {
+            console.warn('Error in image loading evaluation:', error);
+            resolve(); // Resolve anyway to continue
           }
-
-          setTimeout(() => {
-            if (loaded + timedOut < total) {
-              console.warn(`Global image timeout: ${loaded + timedOut}/${total} processed`);
-              resolve();
-            }
-          }, timeout * 2);
         });
       }, this.IMAGE_LOAD_TIMEOUT, this.MAX_IMAGES_PARALLEL);
-    } catch (error) {
-      console.warn('Image loading error (continuing):', error);
+    } catch (error: any) {
+      // If page.evaluate fails, it's likely page is closed or not ready
+      // Continue anyway as images might already be loaded
+      console.warn('Image loading error (continuing):', error.message || error);
     }
   }
 
   /**
    * Generate PDF with full async optimization
+   * Each export uses isolated incognito context and page
    */
   async generatePDF(techpack: TechPackForPDF, options: PDFOptions = {}): Promise<PDFGenerationResult> {
     if (this.activeGenerations >= this.maxConcurrent) {
       throw new Error('Maximum concurrent PDF generations reached. Please try again later.');
     }
 
+    // Generate unique request ID for tracking
+    const requestId = `pdf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const techpackId = (techpack._id || techpack.id)?.toString() || 'unknown';
+    
+    // Clean up stale locks (older than LOCK_TIMEOUT)
+    const now = Date.now();
+    for (const [id, lock] of this.exportLocks.entries()) {
+      if (now - lock.startTime > this.LOCK_TIMEOUT) {
+        console.warn(`🧹 Removing stale lock for TechPack ${id} (age: ${Math.round((now - lock.startTime) / 1000)}s)`);
+        this.exportLocks.delete(id);
+      }
+    }
+    
+    // Check and set lock for this techpack
+    if (this.exportLocks.has(techpackId)) {
+      const existingLock = this.exportLocks.get(techpackId)!;
+      const lockAge = Date.now() - existingLock.startTime;
+      throw new Error(
+        `PDF export already in progress for this TechPack (requestId: ${existingLock.requestId}, started ${Math.round(lockAge / 1000)}s ago). Please wait for the current export to complete.`
+      );
+    }
+
+    // Set lock
+    this.exportLocks.set(techpackId, { requestId, startTime: Date.now() });
+    console.log(`🔒 Set export lock for TechPack ${techpackId} [${requestId}]`);
+
     this.activeGenerations++;
     const totalStartTime = Date.now();
     let page: Page | null = null;
+    let context: BrowserContext | null = null;
 
     try {
-      console.log('🚀 Starting ASYNC PDF generation...');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log(`🚀 Starting ASYNC PDF generation [${requestId}]`);
+      console.log(`📦 TechPack ID: ${techpackId}`);
       console.log('📊 Data sizes:', {
         bom: techpack.bom?.length || 0,
         measurements: techpack.measurements?.length || 0,
@@ -898,11 +976,88 @@ class PDFService {
       });
       
       const browser = await this.getBrowser();
-      page = await browser.newPage();
+      
+      // Check browser is still connected
+      if (!browser.isConnected()) {
+        throw new Error(`Browser is not connected [${requestId}]`);
+      }
+      
+      // ✅ REQUIREMENT 1: Create isolated incognito context for each export
+      try {
+        context = await browser.createIncognitoBrowserContext();
+        console.log(`🔒 Created isolated incognito context [${requestId}]`);
+      } catch (error: any) {
+        throw new Error(`Failed to create incognito context [${requestId}]: ${error.message}`);
+      }
+      
+      // Check context is valid
+      if (!context) {
+        throw new Error(`Context creation returned null [${requestId}]`);
+      }
+      
+      // ✅ REQUIREMENT 1: Create fresh page in isolated context
+      let pageId: string = 'unknown';
+      try {
+        page = await context.newPage();
+        pageId = page.url(); // Use URL as page identifier
+        console.log(`📄 Created new page in isolated context [${requestId}] [pageId: ${pageId}]`);
+      } catch (error: any) {
+        // Clean up context if page creation fails
+        if (context) {
+          try {
+            await context.close();
+          } catch (closeError) {
+            // Ignore close errors
+          }
+          context = null;
+        }
+        throw new Error(`Failed to create page in context [${requestId}]: ${error.message}`);
+      }
+      
+      // Set up event listeners for debugging
+      // Capture pageId in closure for event listeners
+      const capturedPageId = pageId;
+      page.on('close', () => {
+        console.log(`⚠️  Page closed event [${requestId}] [pageId: ${capturedPageId}]`);
+      });
+      
+      page.on('framedetached', (frame) => {
+        console.error(`❌ Frame detached event [${requestId}] [pageId: ${capturedPageId}] [frame: ${frame.url()}]`);
+      });
+      
+      // ✅ Add page error handlers for crash detection
+      page.on('error', (err) => {
+        console.error(`❌ Page crashed [${requestId}] [pageId: ${capturedPageId}]:`, err);
+      });
+      
+      page.on('pageerror', (err) => {
+        console.error(`❌ Page runtime error [${requestId}] [pageId: ${capturedPageId}]:`, err);
+      });
+      
+      // ❌ BỎ: browser.on('disconnected') - đã đưa lên getBrowser() để tránh leak listener
       
       // Set timeouts for page operations
       page.setDefaultTimeout(this.PAGE_SET_CONTENT_TIMEOUT);
       page.setDefaultNavigationTimeout(this.PAGE_SET_CONTENT_TIMEOUT);
+      
+      // ✅ REQUIREMENT 3: Navigate to blank page first (no waitForNavigation after setContent)
+      console.log(`🔄 Navigating to blank page [${requestId}]`);
+      if (page.isClosed()) {
+        throw new Error(`Page already closed before navigation [${requestId}]`);
+      }
+      
+      await page.goto('about:blank', { 
+        waitUntil: 'domcontentloaded', 
+        timeout: 10000 
+      });
+      
+      // Wait a bit to ensure page is fully ready
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // ✅ REQUIREMENT 2: Check page state before operations
+      if (page.isClosed()) {
+        throw new Error(`Page was closed after navigation [${requestId}]`);
+      }
       
       await page.setViewport({ width: 1920, height: 1080 });
 
@@ -945,26 +1100,58 @@ class PDFService {
       console.log(`✅ HTML rendered in ${Date.now() - renderStart}ms`);
 
       // Load content
-      console.log('📥 Loading content into page...');
+      console.log(`📥 Loading content into page [${requestId}]`);
       const contentStart = Date.now();
+      
+      // ✅ REQUIREMENT 2: Check page state before setContent
+      if (page.isClosed()) {
+        throw new Error(`Page was closed before setContent [${requestId}]`);
+      }
+      
+      // ✅ REQUIREMENT 3: Use domcontentloaded (not networkidle0) - networkidle0 hay gây treo/dao động với nhiều ảnh
+      // Images sẽ được đợi riêng bằng waitForImagesOptimized()
       await page.setContent(html, {
-        waitUntil: 'domcontentloaded',
+        waitUntil: 'domcontentloaded', // Chỉ đợi DOM ready, không đợi network idle
         timeout: this.PAGE_SET_CONTENT_TIMEOUT,
       });
-      console.log(`✅ Content loaded in ${Date.now() - contentStart}ms`);
+      console.log(`✅ Content loaded in ${Date.now() - contentStart}ms [${requestId}]`);
 
-      // Wait for layout
-      console.log('⏳ Waiting for layout to settle...');
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Wait for layout to settle and ensure page is stable
+      console.log(`⏳ Waiting for layout to settle [${requestId}]`);
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Increased wait time
+      
+      // ✅ REQUIREMENT 2: Check if page is still available
+      if (page.isClosed()) {
+        throw new Error(`Page was closed unexpectedly after setContent [${requestId}]`);
+      }
+      
+      // Additional check: wait for page to be fully ready
+      try {
+        await page.evaluate(() => {
+          // Simple check to ensure page is ready
+          return document.readyState;
+        });
+      } catch (error: any) {
+        if (error.message?.includes('closed') || error.message?.includes('Session') || error.message?.includes('detached')) {
+          throw new Error(`Page session was closed/detached during initialization [${requestId}]: ${error.message}`);
+        }
+        // Other errors are OK, continue
+      }
       
       // Load images
       console.log('🖼️  Loading images (with timeout)...');
       const imageStart = Date.now();
       await this.waitForImagesOptimized(page);
       
+      // Check again before additional optimization
+      if (page.isClosed()) {
+        throw new Error('Page was closed during image loading');
+      }
+      
       // Additional image optimization: compress any remaining large images
       console.log('🔧 Optimizing images in page...');
-      await page.evaluate((maxWidth: number, maxHeight: number) => {
+      try {
+        await page.evaluate((maxWidth: number, maxHeight: number) => {
         const images = Array.from(document.querySelectorAll('img')) as HTMLImageElement[];
         images.forEach((img) => {
           // Skip if already a data URI (already compressed)
@@ -1007,6 +1194,10 @@ class PDFService {
           }
         });
       }, imageOptions.maxWidth, imageOptions.maxHeight);
+      } catch (error: any) {
+        // If page.evaluate fails, continue anyway - images are already compressed
+        console.warn('Page image optimization failed (continuing):', error.message || error);
+      }
       
       console.log(`✅ Images processed in ${Date.now() - imageStart}ms`);
 
@@ -1031,18 +1222,46 @@ class PDFService {
       // Add header/footer if needed
       if (options.displayHeaderFooter !== false) {
         try {
+          // Check page is still open before getting templates
+          if (page.isClosed()) {
+            throw new Error('Page was closed before getting header/footer templates');
+          }
           pdfOptions.headerTemplate = await this.getHeaderTemplate(templateData);
           pdfOptions.footerTemplate = await this.getFooterTemplate(templateData);
-        } catch (error) {
-          console.warn('Could not load header/footer templates:', error);
+        } catch (error: any) {
+          console.warn('Could not load header/footer templates:', error.message || error);
+          // Continue without header/footer if there's an error
         }
       }
 
-      const pdfBuffer = await page.pdf(pdfOptions);
-      console.log(`✅ PDF generated in ${Date.now() - pdfStart}ms`);
+      // ✅ REQUIREMENT 2: Final check before generating PDF - ensure page is still open
+      if (page.isClosed()) {
+        throw new Error(`Page was closed before PDF generation [${requestId}]. This may happen if the page takes too long to load.`);
+      }
 
-      await page.close();
-      page = null;
+      // Wait a bit more to ensure everything is stable
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // ✅ REQUIREMENT 2: Final check - if page is closed, we can't generate PDF
+      if (page.isClosed()) {
+        throw new Error(`Page was closed during final wait before PDF generation [${requestId}]. This usually happens when the page takes too long or encounters an error.`);
+      }
+
+      // Try to verify page is still responsive
+      try {
+        await page.evaluate(() => document.body);
+      } catch (error: any) {
+        if (error.message?.includes('closed') || error.message?.includes('Session') || error.message?.includes('detached')) {
+          throw new Error(`Page session was closed/detached before PDF generation [${requestId}]: ${error.message}`);
+        }
+      }
+
+      console.log(`📄 Generating PDF [${requestId}]`);
+      const pdfBuffer = await page.pdf(pdfOptions);
+      console.log(`✅ PDF generated in ${Date.now() - pdfStart}ms [${requestId}]`);
+
+      // ✅ REQUIREMENT 2: Close page only after PDF is successfully generated
+      // Don't close here - will be closed in finally block
 
       // Generate filename
       const sampleType = (techpack as any).sampleType || (techpack as any).version || 'V1';
@@ -1050,7 +1269,8 @@ class PDFService {
 
       const totalTime = Date.now() - totalStartTime;
       console.log('═══════════════════════════════════════════════════════');
-      console.log(`✅ PDF GENERATION SUCCESSFUL`);
+      console.log(`✅ PDF GENERATION SUCCESSFUL [${requestId}]`);
+      console.log(`📦 TechPack ID: ${techpackId}`);
       console.log(`📊 Total time: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s)`);
       console.log(`📄 File: ${filename}`);
       console.log(`📦 Size: ${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB`);
@@ -1065,20 +1285,48 @@ class PDFService {
     } catch (error: any) {
       const failedTime = Date.now() - totalStartTime;
       console.error('═══════════════════════════════════════════════════════');
-      console.error('❌ PDF GENERATION FAILED');
+      console.error(`❌ PDF GENERATION FAILED [${requestId}]`);
+      console.error(`📦 TechPack ID: ${techpackId}`);
       console.error(`⏱️  Failed after: ${failedTime}ms (${(failedTime / 1000).toFixed(2)}s)`);
       console.error('📋 Error:', error.message);
+      console.error('📋 Page closed:', page?.isClosed() || 'N/A');
+      console.error('📋 Context exists:', context ? 'Yes' : 'No');
       console.error('═══════════════════════════════════════════════════════');
       
       throw new Error(`Failed to generate PDF: ${error.message}`);
     } finally {
-      if (page) {
+      // ✅ REQUIREMENT 2: Cleanup an toàn - chỉ đóng trong finally
+      // Close page first
+      if (page && !page.isClosed()) {
         try {
+          console.log(`🧹 Closing page [${requestId}]`);
           await page.close();
-        } catch (cleanupError) {
-          console.error('Page cleanup error:', cleanupError);
+        } catch (cleanupError: any) {
+          // Ignore cleanup errors if page is already closed
+          if (!cleanupError.message?.includes('closed') && !cleanupError.message?.includes('detached')) {
+            console.error(`Page cleanup error [${requestId}]:`, cleanupError.message || cleanupError);
+          }
         }
       }
+      page = null;
+      
+      // Close context (incognito browser context)
+      if (context) {
+        try {
+          console.log(`🧹 Closing incognito context [${requestId}]`);
+          await context.close();
+        } catch (cleanupError: any) {
+          console.error(`Context cleanup error [${requestId}]:`, cleanupError.message || cleanupError);
+        }
+      }
+      context = null;
+      
+      // ✅ REQUIREMENT 2: Always remove lock in finally, even if error occurs early
+      if (this.exportLocks.has(techpackId)) {
+        this.exportLocks.delete(techpackId);
+        console.log(`🔓 Released export lock for TechPack ${techpackId} [${requestId}]`);
+      }
+      
       this.activeGenerations--;
     }
   }
