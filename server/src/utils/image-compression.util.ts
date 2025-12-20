@@ -132,50 +132,72 @@ async function compressImageBuffer(
 
 /**
  * Compress image from URL and return as base64 data URI
+ * With timeout protection
  */
 export async function compressImageToDataURI(
   imageUrl: string | undefined | null,
-  options: ImageCompressionOptions = {}
+  options: ImageCompressionOptions = {},
+  timeout: number = 30000 // 30 seconds default
 ): Promise<string> {
   if (!imageUrl || imageUrl.trim() === '') {
     return getPlaceholderSVG();
   }
 
   try {
-    // Download image
-    const imageBuffer = await downloadImage(imageUrl);
-    
-    // Compress image
-    const compressedBuffer = await compressImageBuffer(imageBuffer, options);
-    
-    // Convert to base64 data URI
-    const base64 = compressedBuffer.toString('base64');
-    const format = options.format || 'jpeg';
-    return `data:image/${format};base64,${base64}`;
+    // Add timeout wrapper
+    const compressionPromise = (async () => {
+      // Download image
+      const imageBuffer = await downloadImage(imageUrl!);
+      
+      // Compress image
+      const compressedBuffer = await compressImageBuffer(imageBuffer, options);
+      
+      // Convert to base64 data URI
+      const base64 = compressedBuffer.toString('base64');
+      const format = options.format || 'jpeg';
+      return `data:image/${format};base64,${base64}`;
+    })();
+
+    // Race between compression and timeout
+    const timeoutPromise = new Promise<string>((_, reject) => {
+      setTimeout(() => reject(new Error('Image compression timeout')), timeout);
+    });
+
+    return await Promise.race([compressionPromise, timeoutPromise]);
   } catch (error: any) {
-    console.warn(`Failed to compress image ${imageUrl}: ${error.message}`);
-    // Return placeholder on error
+    console.warn(`Failed to compress image ${imageUrl?.substring(0, 50)}...: ${error.message}`);
+    // Return placeholder on error or timeout
     return getPlaceholderSVG();
   }
 }
 
 /**
- * Compress multiple images in parallel (with concurrency limit)
+ * Compress multiple images in parallel (with concurrency limit and timeout)
  */
 export async function compressImagesBatch(
   imageUrls: (string | undefined | null)[],
   options: ImageCompressionOptions = {},
-  concurrency: number = 5
+  concurrency: number = 3, // Reduced default for stability
+  timeout: number = 30000 // 30 seconds per image
 ): Promise<string[]> {
   const results: string[] = [];
   
   // Process in batches to avoid overwhelming the system
   for (let i = 0; i < imageUrls.length; i += concurrency) {
     const batch = imageUrls.slice(i, i + concurrency);
-    const batchResults = await Promise.all(
-      batch.map(url => compressImageToDataURI(url, options))
+    const batchResults = await Promise.allSettled(
+      batch.map(url => compressImageToDataURI(url, options, timeout))
     );
-    results.push(...batchResults);
+    
+    // Extract results, using placeholder for failed compressions
+    batchResults.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        results.push(result.value);
+      } else {
+        console.warn(`Image compression failed in batch: ${result.reason}`);
+        results.push(getPlaceholderSVG());
+      }
+    });
   }
   
   return results;

@@ -38,11 +38,12 @@ class PDFService {
   private activeGenerations: number = 0;
   
   // Optimized timeout configurations (in milliseconds)
-  private readonly BROWSER_LAUNCH_TIMEOUT = parseInt(process.env.PDF_BROWSER_LAUNCH_TIMEOUT || '180000', 10);
-  private readonly PAGE_SET_CONTENT_TIMEOUT = parseInt(process.env.PDF_PAGE_SET_CONTENT_TIMEOUT || '300000', 10);
-  private readonly PDF_GENERATION_TIMEOUT = parseInt(process.env.PDF_GENERATION_TIMEOUT || '300000', 10);
-  private readonly IMAGE_LOAD_TIMEOUT = parseInt(process.env.PDF_IMAGE_LOAD_TIMEOUT || '10000', 10);
-  private readonly MAX_IMAGES_PARALLEL = parseInt(process.env.PDF_MAX_IMAGES_PARALLEL || '5', 10);
+  private readonly BROWSER_LAUNCH_TIMEOUT = parseInt(process.env.PDF_BROWSER_LAUNCH_TIMEOUT || '300000', 10); // 5 minutes
+  private readonly PAGE_SET_CONTENT_TIMEOUT = parseInt(process.env.PDF_PAGE_SET_CONTENT_TIMEOUT || '600000', 10); // 10 minutes
+  private readonly PDF_GENERATION_TIMEOUT = parseInt(process.env.PDF_GENERATION_TIMEOUT || '600000', 10); // 10 minutes
+  private readonly IMAGE_LOAD_TIMEOUT = parseInt(process.env.PDF_IMAGE_LOAD_TIMEOUT || '30000', 10); // 30 seconds
+  private readonly MAX_IMAGES_PARALLEL = parseInt(process.env.PDF_MAX_IMAGES_PARALLEL || '3', 10); // Reduced for stability
+  private readonly IMAGE_COMPRESSION_TIMEOUT = parseInt(process.env.PDF_IMAGE_COMPRESSION_TIMEOUT || '30000', 10); // 30 seconds per image
 
   // Cache for processed images
   private imageCache: Map<string, string> = new Map();
@@ -85,7 +86,7 @@ class PDFService {
             '--single-process',
           ],
           timeout: this.BROWSER_LAUNCH_TIMEOUT,
-          protocolTimeout: this.BROWSER_LAUNCH_TIMEOUT,
+          protocolTimeout: 600000, // 10 minutes for protocol operations
         };
 
         if (process.env.CHROME_PATH) {
@@ -128,6 +129,7 @@ class PDFService {
   /**
    * Optimized image URL preparation with caching
    * Now returns compressed data URIs for better PDF size
+   * With timeout protection
    */
   private async prepareImageUrlCompressed(
     url?: string, 
@@ -153,7 +155,7 @@ class PDFService {
           quality: options?.quality || 65,
           maxWidth: options?.maxWidth || 1200,
           maxHeight: options?.maxHeight || 800,
-        });
+        }, this.IMAGE_COMPRESSION_TIMEOUT);
         this.imageCache.set(cacheKey, compressed);
         return compressed;
       } catch {
@@ -182,17 +184,17 @@ class PDFService {
       }
     }
 
-    // Compress the image
+    // Compress the image with timeout
     try {
       const compressed = await compressImageToDataURI(resolvedUrl, {
         quality: options?.quality || 65,
         maxWidth: options?.maxWidth || 1200,
         maxHeight: options?.maxHeight || 800,
-      });
+      }, this.IMAGE_COMPRESSION_TIMEOUT);
       this.imageCache.set(cacheKey, compressed);
       return compressed;
     } catch (error) {
-      console.warn(`Image compression failed for ${resolvedUrl}, using original URL`);
+      console.warn(`Image compression failed for ${resolvedUrl?.substring(0, 50)}..., using original URL`);
       this.imageCache.set(cacheKey, resolvedUrl);
       return resolvedUrl;
     }
@@ -260,13 +262,13 @@ class PDFService {
       }
     }
     
-    // Compress all images in parallel
+    // Compress all images in parallel with timeout
     console.log(`🖼️  Compressing ${imageUrls.length} BOM images...`);
     const compressedImages = await compressImagesBatch(imageUrls, {
       quality: imageOptions?.quality || 65,
       maxWidth: imageOptions?.maxWidth || 800, // Smaller for thumbnails
       maxHeight: imageOptions?.maxHeight || 600,
-    }, 5);
+    }, this.MAX_IMAGES_PARALLEL, this.IMAGE_COMPRESSION_TIMEOUT);
     
     // Create a map of original URL to compressed data URI
     const imageMap = new Map<string, string>();
@@ -297,10 +299,28 @@ class PDFService {
       if (item.size) sizeInfo.push(`Size: ${this.normalizeText(item.size)}`);
       if (item.width) sizeInfo.push(`Width: ${this.normalizeText(item.width)}`);
 
-      // Use compressed image if available
-      const imageUrl = item.imageUrl 
-        ? (imageMap.get(item.imageUrl) || await this.prepareImageUrlCompressed(item.imageUrl, this.getPlaceholderSVG(64, 64), imageOptions))
-        : this.getPlaceholderSVG(64, 64);
+      // Use compressed image if available (with fallback)
+      let imageUrl: string;
+      if (item.imageUrl) {
+        const cached = imageMap.get(item.imageUrl);
+        if (cached) {
+          imageUrl = cached;
+        } else {
+          // Fallback with timeout protection
+          try {
+            imageUrl = await Promise.race([
+              this.prepareImageUrlCompressed(item.imageUrl, this.getPlaceholderSVG(64, 64), imageOptions),
+              new Promise<string>((resolve) => 
+                setTimeout(() => resolve(this.getPlaceholderSVG(64, 64)), this.IMAGE_COMPRESSION_TIMEOUT)
+              ),
+            ]);
+          } catch {
+            imageUrl = this.getPlaceholderSVG(64, 64);
+          }
+        }
+      } else {
+        imageUrl = this.getPlaceholderSVG(64, 64);
+      }
 
       bomByPart[partName].push({
         materialName: this.normalizeText(item.materialName),
@@ -421,14 +441,14 @@ class PDFService {
     // Collect image URLs
     const imageUrls = items.map((item: IHowToMeasure) => item.imageUrl).filter(Boolean);
     
-    // Compress images in batch
+    // Compress images in batch with timeout
     if (imageUrls.length > 0) {
       console.log(`🖼️  Compressing ${imageUrls.length} how-to-measure images...`);
       const compressedImages = await compressImagesBatch(imageUrls, {
         quality: imageOptions?.quality || 65,
         maxWidth: imageOptions?.maxWidth || 1000,
         maxHeight: imageOptions?.maxHeight || 700,
-      }, 5);
+      }, this.MAX_IMAGES_PARALLEL, this.IMAGE_COMPRESSION_TIMEOUT);
       
       const imageMap = new Map<string, string>();
       imageUrls.forEach((url: string, i: number) => {
@@ -490,14 +510,14 @@ class PDFService {
       });
     });
     
-    // Compress all images
+    // Compress all images with timeout
     if (imageUrls.length > 0) {
       console.log(`🖼️  Compressing ${imageUrls.length} colorway images...`);
       const compressedImages = await compressImagesBatch(imageUrls, {
         quality: imageOptions?.quality || 65,
         maxWidth: imageOptions?.maxWidth || 1000,
         maxHeight: imageOptions?.maxHeight || 700,
-      }, 5);
+      }, this.MAX_IMAGES_PARALLEL, this.IMAGE_COMPRESSION_TIMEOUT);
       
       const imageMap = new Map<string, string>();
       imageUrls.forEach((url, i) => {
@@ -662,25 +682,25 @@ class PDFService {
       },
     };
 
-    // Compress main images (logo and cover) first
+    // Compress main images (logo and cover) first with timeout protection
     console.log('🖼️  Compressing main images (logo, cover)...');
-    const [compressedLogo, compressedCover, compressedDesignSketch] = await Promise.all([
+    const [compressedLogo, compressedCover, compressedDesignSketch] = await Promise.allSettled([
       this.prepareImageUrlCompressed(techpack.companyLogoUrl, undefined, {
         quality: imageQuality,
         maxWidth: 400, // Logo is smaller
         maxHeight: 200,
-      }),
+      }).catch(() => this.getPlaceholderSVG(400, 200)),
       this.prepareImageUrlCompressed(techpack.designSketchUrl, undefined, {
         quality: imageQuality,
         maxWidth: imageMaxWidth,
         maxHeight: imageMaxHeight,
-      }),
+      }).catch(() => this.getPlaceholderSVG()),
       this.prepareImageUrlCompressed(techpack.designSketchUrl, undefined, {
         quality: imageQuality,
         maxWidth: imageMaxWidth,
         maxHeight: imageMaxHeight,
-      }),
-    ]);
+      }).catch(() => this.getPlaceholderSVG()),
+    ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : this.getPlaceholderSVG()));
 
     console.log('🚀 Processing data in parallel with image compression...');
     const parallelStart = Date.now();
@@ -879,6 +899,11 @@ class PDFService {
       
       const browser = await this.getBrowser();
       page = await browser.newPage();
+      
+      // Set timeouts for page operations
+      page.setDefaultTimeout(this.PAGE_SET_CONTENT_TIMEOUT);
+      page.setDefaultNavigationTimeout(this.PAGE_SET_CONTENT_TIMEOUT);
+      
       await page.setViewport({ width: 1920, height: 1080 });
 
       // Get image compression options from PDF options
