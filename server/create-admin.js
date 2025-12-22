@@ -63,7 +63,7 @@ async function createAdminAccount() {
     console.log('✅ Đã kết nối đến MongoDB\n');
 
     // Admin credentials
-    const adminEmail = 'duytongduc510@gmail.com';
+    const adminEmail = 'tongducduy4@gmail.com';
     const adminPassword = process.env.ADMIN_PASSWORD || 'Admin123!';
     const firstName = process.env.ADMIN_FIRST_NAME || 'Admin';
     const lastName = process.env.ADMIN_LAST_NAME || 'User';

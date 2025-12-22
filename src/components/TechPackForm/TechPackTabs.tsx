@@ -155,7 +155,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
         id: initialTechPack._id,
         articleInfo: {
           articleCode: (initialTechPack as any).articleCode || '',
-          productName: (initialTechPack as any).productName || (initialTechPack as any).name || '',
+          articleName: (initialTechPack as any).articleName || (initialTechPack as any).productName || (initialTechPack as any).name || '',
           version: (() => {
             const v = (initialTechPack as any).version;
             if (!v) return 1;
@@ -323,7 +323,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
     switch (tabId) {
       case 0: // Article Info
         return !!(techpack.articleInfo.articleCode &&
-                 techpack.articleInfo.productName &&
+                 techpack.articleInfo.articleName &&
                  techpack.articleInfo.fabricDescription);
       case 1: // BOM
         return techpack.bom.length > 0;
@@ -560,7 +560,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
               <div className="border-l border-gray-300 h-6"></div>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">
-                  {techpack.articleInfo.productName || 'New Tech Pack'}
+                  {techpack.articleInfo.articleName || 'New Tech Pack'}
                 </h1>
                 <div className="flex items-center space-x-4 text-sm text-gray-600">
                   <span>{techpack.articleInfo.articleCode || 'No Article Code'}</span>

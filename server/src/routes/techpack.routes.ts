@@ -16,32 +16,28 @@ const techpackValidation = [
     .withMessage('Mode must be either "new" or "clone"'),
   
   // Only require articleInfo fields when mode is not 'clone'
-  // Support both articleName (new) and productName (old) for backward compatibility
+  // articleName is required, productName is optional (for backward compatibility only)
   body('articleInfo.articleName')
     .custom((value, { req }) => {
       if (req.body.mode === 'clone') {
         return true; // Skip validation for clone mode
       }
-      // If articleName is not provided, check for productName (backward compatibility)
-      const productName = req.body.articleInfo?.productName || req.body.productName;
-      if (!value && !productName) {
+      // articleName is required
+      if (!value || value.trim().length === 0) {
         throw new Error('Article name is required');
       }
-      if (value && value.length > 255) {
+      if (value.length > 255) {
         throw new Error('Article name must be less than 255 characters');
       }
       return true;
     }),
   body('articleInfo.productName')
+    .optional() // productName is now optional, only for backward compatibility
     .custom((value, { req }) => {
       if (req.body.mode === 'clone') {
         return true; // Skip validation for clone mode
       }
-      // Only validate if articleName is not provided (backward compatibility)
-      const articleName = req.body.articleInfo?.articleName || req.body.articleName;
-      if (!articleName && (!value || value.trim().length === 0)) {
-        throw new Error('Product name is required');
-      }
+      // Only validate length if provided
       if (value && value.length > 100) {
         throw new Error('Product name must be less than 100 characters');
       }

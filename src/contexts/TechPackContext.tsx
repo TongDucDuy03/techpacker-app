@@ -770,11 +770,194 @@ const buildMeasurementPayloads = (techpackData: TechPackFormState['techpack']) =
   };
 };
 
+/**
+ * Map API TechPack response to form state format
+ * This ensures form state is synchronized with backend data after save
+ * Uses the same mapping logic as TechPackTabs.tsx
+ */
+const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPack> => {
+  const resolvedGender = ((apiTechPack as any).gender || 'Unisex') as 'Men' | 'Women' | 'Unisex' | 'Kids';
+  const resolvedProductClass = (apiTechPack as any).category || (apiTechPack as any).productClass || '';
+  const resolvedBaseSize = (apiTechPack as any).measurementBaseSize || 
+    ((apiTechPack as any).measurementSizeRange && (apiTechPack as any).measurementSizeRange[0]) || 
+    SIZE_RANGES[resolvedGender]?.[0] || 'M';
+  const normalizedSizeRange = Array.isArray((apiTechPack as any).measurementSizeRange) && 
+    (apiTechPack as any).measurementSizeRange.length > 0
+    ? (apiTechPack as any).measurementSizeRange
+    : SIZE_RANGES[resolvedGender] || SIZE_RANGES['Unisex'];
+  const resolvedBaseHighlight = (apiTechPack as any).measurementBaseHighlightColor || DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR;
+  const resolvedRowStripe = (apiTechPack as any).measurementRowStripeColor || DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR;
+
+  // Map colorways (same logic as TechPackTabs.tsx)
+  const rawColorways = (apiTechPack as any).colorways || [];
+  const mappedColorways = rawColorways.map((colorway: any, index: number) => {
+    const parts = Array.isArray(colorway?.parts)
+      ? colorway.parts.map((part: any, partIndex: number) => ({
+          id: part?.id || part?._id || `part_${index}_${partIndex}`,
+          partName: part?.partName || part?.name || '',
+          colorName: part?.colorName || part?.color || '',
+          pantoneCode: part?.pantoneCode || part?.pantone || '',
+          hexCode: part?.hexCode || part?.hex || '',
+          rgbCode: part?.rgbCode || '',
+          imageUrl: part?.imageUrl,
+          supplier: part?.supplier,
+          colorType: (part?.colorType || 'Solid') as any,
+        }))
+      : [];
+
+    const fallbackPart = parts[0];
+    const rawHex = (colorway?.hexColor || fallbackPart?.hexCode || '').trim();
+    const normalizedHex = rawHex
+      ? rawHex.startsWith('#')
+        ? rawHex
+        : `#${rawHex}`
+      : '';
+
+    return {
+      id: colorway?.id || colorway?._id || `colorway_${index}`,
+      _id: typeof colorway?._id === 'string' ? colorway._id : undefined,
+      name: (colorway?.name || colorway?.colorwayName || '').trim(),
+      code: (colorway?.code || colorway?.colorwayCode || '').trim(),
+      placement: (colorway?.placement || fallbackPart?.partName || '').trim(),
+      materialType: (colorway?.materialType || '').trim(),
+      season: (colorway?.season || '').trim(),
+      isDefault: !!colorway?.isDefault,
+      approvalStatus: (colorway?.approvalStatus || (colorway?.approved ? 'Approved' : 'Pending')) as Colorway['approvalStatus'],
+      productionStatus: (colorway?.productionStatus || 'Lab Dip') as Colorway['productionStatus'],
+      pantoneCode: (colorway?.pantoneCode || fallbackPart?.pantoneCode || '').trim(),
+      hexColor: normalizedHex,
+      supplier: (colorway?.supplier || '').trim(),
+      notes: (colorway?.notes || '').trim(),
+      collectionName: (colorway?.collectionName || '').trim(),
+      imageUrl: (colorway?.imageUrl || '').trim(),
+      parts,
+    };
+  });
+
+  // Map howToMeasures (same logic as TechPackTabs.tsx)
+  const rawHowToMeasures = ((apiTechPack as any).howToMeasure || []).map((item: any, index: number) => ({
+    id: item._id ? String(item._id) : (item.id || `howto_${index}`),
+    pomCode: item.pomCode || '',
+    pomName: item.pomName || '',
+    description: item.description || '',
+    imageUrl: item.imageUrl || '',
+    stepNumber: typeof item.stepNumber === 'number' ? item.stepNumber : index + 1,
+    steps: Array.isArray(item.steps) && item.steps.length > 0 ? item.steps : (item.instructions || []),
+    instructions: Array.isArray(item.steps) && item.steps.length > 0 ? item.steps : (item.instructions || []),
+    tips: item.tips || [],
+    commonMistakes: item.commonMistakes || [],
+    relatedMeasurements: item.relatedMeasurements || [],
+    videoUrl: item.videoUrl || '',
+    note: item.note || '',
+    language: item.language || 'en-US',
+  }));
+
+  return {
+    id: (apiTechPack as any)._id || apiTechPack.id || '',
+    articleInfo: {
+      articleCode: (apiTechPack as any).articleCode || '',
+      articleName: (apiTechPack as any).articleName || (apiTechPack as any).productName || (apiTechPack as any).name || '',
+      sampleType: (apiTechPack as any).sampleType || (apiTechPack as any).version?.toString() || '', // ✅ FIXED: Add required sampleType field
+      version: (() => {
+        const v = (apiTechPack as any).version || (apiTechPack as any).sampleType;
+        if (!v) return 1;
+        const digits = String(v).replace(/[^0-9]/g, '');
+        const parsed = parseInt(digits, 10);
+        return Number.isNaN(parsed) ? 1 : parsed;
+      })(),
+      gender: resolvedGender,
+      productClass: resolvedProductClass,
+      fitType: 'Regular' as const,
+      supplier: (apiTechPack as any).supplier || '',
+      technicalDesignerId: typeof (apiTechPack as any).technicalDesignerId === 'object'
+        ? (apiTechPack as any).technicalDesignerId?._id || ''
+        : (apiTechPack as any).technicalDesignerId || '',
+      fabricDescription: (apiTechPack as any).fabricDescription || '',
+      productDescription: (apiTechPack as any).productDescription || '',
+      designSketchUrl: (apiTechPack as any).designSketchUrl || '',
+      companyLogoUrl: (apiTechPack as any).companyLogoUrl || '',
+      season: ((apiTechPack as any).season || 'SS25') as any,
+      brand: (apiTechPack as any).brand || '',
+      collection: (apiTechPack as any).collectionName || (apiTechPack as any).collection || '',
+      targetMarket: (apiTechPack as any).targetMarket || '',
+      pricePoint: (apiTechPack as any).pricePoint || undefined,
+      notes: (apiTechPack as any).notes || (apiTechPack as any).description || '',
+      lifecycleStage: (apiTechPack as any).lifecycleStage || undefined,
+      status: (apiTechPack as any).status || 'Draft',
+      category: resolvedProductClass,
+      currency: (apiTechPack as any).currency || 'USD',
+      retailPrice: (apiTechPack as any).retailPrice || undefined,
+      createdDate: (apiTechPack as any).createdAt,
+      lastModified: (apiTechPack as any).updatedAt,
+      createdAt: (apiTechPack as any).createdAt,
+      updatedAt: (apiTechPack as any).updatedAt,
+      createdBy: typeof (apiTechPack as any).createdBy === 'object'
+        ? (apiTechPack as any).createdBy?._id || ''
+        : (apiTechPack as any).createdBy || '',
+      createdByName: typeof (apiTechPack as any).createdBy === 'object'
+        ? `${(apiTechPack as any).createdBy?.firstName || ''} ${(apiTechPack as any).createdBy?.lastName || ''}`.trim()
+        : (apiTechPack as any).createdByName || '',
+      updatedBy: typeof (apiTechPack as any).updatedBy === 'object'
+        ? (apiTechPack as any).updatedBy?._id || ''
+        : (apiTechPack as any).updatedBy || '',
+      updatedByName: typeof (apiTechPack as any).updatedBy === 'object'
+        ? `${(apiTechPack as any).updatedBy?.firstName || ''} ${(apiTechPack as any).updatedBy?.lastName || ''}`.trim()
+        : (apiTechPack as any).updatedByName || '',
+    },
+    bom: Array.isArray((apiTechPack as any).bom) 
+      ? ((apiTechPack as any).bom || []).map((item: any, index: number) => ({
+          id: item._id ? String(item._id) : (item.id || `bom_${index}`),
+          part: item.part || '',
+          materialName: item.materialName || '',
+          placement: item.placement || '',
+          size: item.size || '',
+          quantity: item.quantity || 0,
+          uom: item.uom || 'm',
+          supplier: item.supplier || '',
+          comments: item.comments || '',
+          materialComposition: item.materialComposition || '',
+          colorCode: item.colorCode || '',
+          supplierCode: item.supplierCode || '',
+          weight: item.weight || '',
+          width: item.width || '',
+          shrinkage: item.shrinkage || '',
+          careInstructions: item.careInstructions || '',
+          testingRequirements: item.testingRequirements || '',
+          imageUrl: item.imageUrl || '',
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+        }))
+      : [],
+    measurements: (apiTechPack as any).measurements || [],
+    sampleMeasurementRounds: (apiTechPack as any).sampleMeasurementRounds || [],
+    measurementSizeRange: normalizedSizeRange,
+    measurementBaseSize: resolvedBaseSize,
+    measurementUnit: (apiTechPack as any).measurementUnit || DEFAULT_MEASUREMENT_UNIT,
+    measurementBaseHighlightColor: resolvedBaseHighlight,
+    measurementRowStripeColor: resolvedRowStripe,
+    howToMeasures: rawHowToMeasures,
+    colorways: mappedColorways,
+    revisionHistory: (apiTechPack as any).revisions || [],
+    status: (apiTechPack as any).status,
+    packingNotes: (apiTechPack as any).packingNotes || '',
+    completeness: {
+      isComplete: false,
+      missingItems: [],
+      completionPercentage: 0,
+    },
+    createdBy: (apiTechPack as any).createdBy || (apiTechPack as any).ownerId || '',
+    updatedBy: (apiTechPack as any).updatedBy || (apiTechPack as any).ownerId || '',
+    createdAt: (apiTechPack as any).createdAt,
+    updatedAt: (apiTechPack as any).updatedAt,
+  };
+};
+
 const createEmptyTechpack = (): TechPackFormState['techpack'] => ({
   id: '',
   articleInfo: {
     articleCode: '',
-    productName: '',
+    articleName: '', // ✅ FIXED: Use articleName instead of productName
+    sampleType: '', // Required field
     version: 1,
     gender: 'Unisex',
     productClass: '',
@@ -1165,14 +1348,30 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const getTechPack = async (id: string) => {
-    setLoading(true);
+  const getTechPack = async (id: string, skipLoading = false) => {
+    if (!skipLoading) {
+      setLoading(true);
+    }
     try {
-      return await api.getTechPack(id);
+      const result = await api.getTechPack(id);
+      console.log('📥 getTechPack result:', {
+        id,
+        hasData: !!result,
+        articleName: (result as any)?.articleName || (result as any)?.productName,
+        hasBom: Array.isArray((result as any)?.bom) && (result as any)?.bom.length > 0,
+        hasMeasurements: Array.isArray((result as any)?.measurements) && (result as any)?.measurements.length > 0,
+      });
+      return result;
     } catch (error: any) {
-      showError(error.message || 'Failed to fetch tech pack');
+      console.error('❌ getTechPack error:', error);
+      if (!skipLoading) {
+        showError(error.message || 'Failed to fetch tech pack');
+      }
+      return undefined;
     } finally {
-      setLoading(false);
+      if (!skipLoading) {
+        setLoading(false);
+      }
     }
   };
 
@@ -1291,23 +1490,23 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
 
   const saveTechPack = async (techpackOverride?: TechPackFormState['techpack']) => {
     setState(prev => ({ ...prev, isSaving: true }));
+    
     try {
-      // Get the latest state to ensure we have the most up-to-date measurementUnit
       const latestState = state;
       const techpackData = techpackOverride ?? latestState.techpack;
-
+  
       const {
         measurementsWithBase,
         measurementsPayload,
         sampleMeasurementRoundsPayload,
         measurementNameMap,
       } = buildMeasurementPayloads(techpackData);
-
+  
       const howToMeasuresPayload = (techpackData.howToMeasures || []).map((howToMeasure: any, index: number) => {
         const steps = Array.isArray(howToMeasure?.steps) && howToMeasure.steps.length > 0
           ? howToMeasure.steps
           : (howToMeasure?.instructions || []);
-
+  
         const mapped: any = {
           pomCode: howToMeasure?.pomCode || '',
           pomName: howToMeasure?.pomName || measurementNameMap.get(howToMeasure?.pomCode) || '',
@@ -1322,27 +1521,16 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           videoUrl: howToMeasure?.videoUrl || '',
           note: howToMeasure?.note || '',
         };
-
+  
         const existingId = (howToMeasure as any)._id || howToMeasure?.id;
         if (existingId && typeof existingId === 'string' && objectIdPattern.test(existingId)) {
           mapped._id = existingId;
         }
-
+  
         return mapped;
       });
-
+  
       const colorwaysForSave = sanitizeColorwayList(techpackData.colorways as Array<PartialColorway>, techpackData.bom);
-
-      if (JSON.stringify(colorwaysForSave) !== JSON.stringify(techpackData.colorways)) {
-        setState(prev => ({
-          ...prev,
-          techpack: {
-            ...prev.techpack,
-            colorways: colorwaysForSave,
-          },
-        }));
-      }
-
       const colorwaysPayload = colorwaysForSave.map(colorway => {
         const partsPayload = (colorway.parts || []).map(part => {
           const normalizedHex = part.hexCode?.trim();
@@ -1351,29 +1539,29 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
             colorName: part.colorName.trim(),
             colorType: part.colorType,
           };
-
+  
           const partObjectId =
             (part as any)?._id && typeof (part as any)._id === 'string' && objectIdPattern.test((part as any)._id)
               ? (part as any)._id
               : undefined;
           const partIdIsObjectId = typeof part.id === 'string' && objectIdPattern.test(part.id);
-
+  
           if (partIdIsObjectId) {
             payload._id = part.id;
           } else if (partObjectId) {
             payload._id = partObjectId;
           }
-
+  
           if (part.bomItemId) payload.bomItemId = part.bomItemId;
           if (part.pantoneCode) payload.pantoneCode = part.pantoneCode.trim();
           if (normalizedHex) payload.hexCode = normalizedHex;
           if (part.rgbCode) payload.rgbCode = part.rgbCode.trim();
           if (part.supplier) payload.supplier = part.supplier.trim();
           if (part.imageUrl) payload.imageUrl = part.imageUrl.trim();
-
+  
           return payload;
         });
-
+  
         const normalizedPlacement = colorway.placement?.trim();
         const normalizedMaterialType = colorway.materialType?.trim();
         return {
@@ -1395,19 +1583,16 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           parts: partsPayload,
         };
       });
-
+  
       const incompleteColorway = colorwaysPayload.find(cw => !cw.name || !cw.code);
       if (incompleteColorway) {
         setState(prev => ({ ...prev, isSaving: false }));
         showError('Please complete all required colorway fields (name, code).');
         return;
       }
-
-      // If techpack has an ID, update existing; otherwise create new
+  
+      // ===== UPDATE EXISTING TECHPACK =====
       if (techpackData.id && techpackData.id !== '') {
-        // For updates, use PATCH with flat fields expected by backend patch handler
-        // Get measurementUnit from techpackData or latest state, ensuring we use the actual selected value
-        // Priority: techpackData.measurementUnit > latestState.techpack.measurementUnit > DEFAULT
         const currentMeasurementUnit = techpackData.measurementUnit || latestState.techpack.measurementUnit || DEFAULT_MEASUREMENT_UNIT;
         const updatePayload = {
           articleName: techpackData.articleInfo.articleName || (techpackData.articleInfo as any).productName || '',
@@ -1444,15 +1629,50 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           measurementRowStripeColor: techpackData.measurementRowStripeColor || DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR,
           packingNotes: techpackData.packingNotes || '',
         };
+        
         const updatedTP = await updateTechPack(techpackData.id, updatePayload);
-
-        // After a successful save, reload the revisions
+  
         if (updatedTP) {
           await loadRevisions(techpackData.id);
-
-          // KHÔNG reload lại toàn bộ data từ server sau khi save để tránh mất dữ liệu
-          // Chỉ cập nhật trạng thái saved và giữ nguyên dữ liệu hiện tại
-          // Dữ liệu đã được lưu lên server, state hiện tại đã đúng
+          // ✅ FIXED: Skip loading state to avoid UI flicker/reset
+          const refreshedTechPack = await getTechPack(techpackData.id, true);
+          
+          if (refreshedTechPack) {
+            const mappedTechPack = mapApiTechPackToFormState(refreshedTechPack) as any;
+            
+            // ✅ FIXED: Use mappedTechPack as source of truth (from server)
+            // This ensures form shows complete data from backend
+            console.log('🔄 Reloading TechPack after update:', {
+              id: techpackData.id,
+              articleName: mappedTechPack.articleInfo?.articleName,
+              hasBom: Array.isArray(mappedTechPack.bom) && mappedTechPack.bom.length > 0,
+              hasMeasurements: Array.isArray(mappedTechPack.measurements) && mappedTechPack.measurements.length > 0,
+            });
+            
+            setState(prev => ({
+              ...prev,
+              techpack: {
+                ...mappedTechPack,
+                id: techpackData.id, // Ensure ID is set
+              },
+              isSaving: false,
+              hasUnsavedChanges: false,
+              lastSaved: new Date().toISOString(),
+            }));
+            
+            // Clear draft AFTER state update
+            clearDraftFromStorage(techpackData.id);
+          } else {
+            // ✅ FIXED: If reload fails, keep current data and just update flags
+            console.warn('⚠️ Failed to reload TechPack after update, keeping current state');
+            setState(prev => ({
+              ...prev,
+              isSaving: false,
+              hasUnsavedChanges: false,
+              lastSaved: new Date().toISOString(),
+            }));
+          }
+        } else {
           setState(prev => ({
             ...prev,
             isSaving: false,
@@ -1460,73 +1680,145 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
             lastSaved: new Date().toISOString(),
           }));
         }
-      } else {
-        // For create, send nested articleInfo to satisfy route validation
-        // Get measurementUnit from techpackData or latest state, ensuring we use the actual selected value
-        const currentMeasurementUnitForCreate = techpackData.measurementUnit || latestState.techpack.measurementUnit || DEFAULT_MEASUREMENT_UNIT;
-        const createPayload: CreateTechPackInput = {
-          articleInfo: {
-            productName: techpackData.articleInfo.productName,
-            articleCode: techpackData.articleInfo.articleCode,
-            version: techpackData.articleInfo.version,
-            supplier: techpackData.articleInfo.supplier || '',
-            season: techpackData.articleInfo.season,
-            fabricDescription: techpackData.articleInfo.fabricDescription || '',
-            productDescription: (techpackData.articleInfo as any).productDescription || '',
-            designSketchUrl: (techpackData.articleInfo as any).designSketchUrl || '',
+        
+        return; // Exit early for update
+      }
+  
+      // ===== CREATE NEW TECHPACK =====
+      const currentMeasurementUnitForCreate = techpackData.measurementUnit || latestState.techpack.measurementUnit || DEFAULT_MEASUREMENT_UNIT;
+      const createPayload: CreateTechPackInput = {
+        articleInfo: {
+          articleName: techpackData.articleInfo.articleName || '',
+          articleCode: techpackData.articleInfo.articleCode,
+          version: techpackData.articleInfo.version,
+          supplier: techpackData.articleInfo.supplier || '',
+          season: techpackData.articleInfo.season,
+          fabricDescription: techpackData.articleInfo.fabricDescription || '',
+          productDescription: (techpackData.articleInfo as any).productDescription || '',
+          designSketchUrl: (techpackData.articleInfo as any).designSketchUrl || '',
           companyLogoUrl: (techpackData.articleInfo as any).companyLogoUrl || '',
-            productClass: techpackData.articleInfo.productClass,
-            gender: techpackData.articleInfo.gender,
-            technicalDesignerId: techpackData.articleInfo.technicalDesignerId,
-            lifecycleStage: techpackData.articleInfo.lifecycleStage as any,
-            collection: (techpackData.articleInfo as any).collection,
-            targetMarket: (techpackData.articleInfo as any).targetMarket,
-            pricePoint: (techpackData.articleInfo as any).pricePoint,
-            notes: techpackData.articleInfo.notes,
-          },
-          bom: techpackData.bom,
-          measurements: measurementsPayload,
-          colorways: colorwaysPayload,
-          howToMeasures: howToMeasuresPayload,
-          sampleMeasurementRounds: sampleMeasurementRoundsPayload,
-          status: techpackData.status as any,
-          measurementSizeRange: techpackData.measurementSizeRange || [],
-          measurementBaseSize: techpackData.measurementBaseSize || techpackData.measurementSizeRange?.[0],
-          measurementUnit: currentMeasurementUnitForCreate,
-          measurementBaseHighlightColor: techpackData.measurementBaseHighlightColor || DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR,
-          measurementRowStripeColor: techpackData.measurementRowStripeColor || DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR,
-          packingNotes: techpackData.packingNotes || '',
-        } as unknown as CreateTechPackInput;
-
-        const newTechPack = await createTechPack(createPayload);
-
-        // Update the state with the new ID
+          productClass: techpackData.articleInfo.productClass,
+          gender: techpackData.articleInfo.gender,
+          technicalDesignerId: techpackData.articleInfo.technicalDesignerId,
+          lifecycleStage: techpackData.articleInfo.lifecycleStage as any,
+          collection: (techpackData.articleInfo as any).collection,
+          targetMarket: (techpackData.articleInfo as any).targetMarket,
+          pricePoint: (techpackData.articleInfo as any).pricePoint,
+          notes: techpackData.articleInfo.notes,
+        },
+        bom: techpackData.bom,
+        measurements: measurementsPayload,
+        colorways: colorwaysPayload,
+        howToMeasures: howToMeasuresPayload,
+        sampleMeasurementRounds: sampleMeasurementRoundsPayload,
+        status: techpackData.status as any,
+        measurementSizeRange: techpackData.measurementSizeRange || [],
+        measurementBaseSize: techpackData.measurementBaseSize || techpackData.measurementSizeRange?.[0],
+        measurementUnit: currentMeasurementUnitForCreate,
+        measurementBaseHighlightColor: techpackData.measurementBaseHighlightColor || DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR,
+        measurementRowStripeColor: techpackData.measurementRowStripeColor || DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR,
+        packingNotes: techpackData.packingNotes || '',
+      } as unknown as CreateTechPackInput;
+  
+      const newTechPack = await createTechPack(createPayload);
+  
+      if (!newTechPack) {
+        // Create failed, keep current state
         setState(prev => ({
           ...prev,
-          techpack: { ...prev.techpack, id: newTechPack?._id || newTechPack?.id || '' }
+          isSaving: false,
         }));
-
-        // After creating a new TechPack, load revisions to show the initial revision
-        if (newTechPack) {
-          const techPackId = newTechPack._id || newTechPack.id;
-          if (techPackId) {
-            await loadRevisions(techPackId);
-          }
-        }
+        return;
       }
-
-      clearDraftFromStorage(techpackData.id);
-      if (!techpackData.id) {
+  
+      // Get the new TechPack ID
+      const techPackId = newTechPack._id || newTechPack.id;
+      
+      if (!techPackId) {
+        // No ID returned, something went wrong
+        setState(prev => ({
+          ...prev,
+          isSaving: false,
+        }));
+        return;
+      }
+  
+      // === FIX: Load complete data from server BEFORE updating state ===
+      try {
+        // 1. Load revisions
+        await loadRevisions(techPackId);
+        
+        // 2. Fetch complete TechPack data from server (skip loading to avoid UI flicker)
+        const refreshedTechPack = await getTechPack(techPackId, true);
+        
+        if (!refreshedTechPack) {
+          // Fallback: use newTechPack data if fetch fails
+          console.warn('⚠️ Failed to reload TechPack after create, using newTechPack data');
+          const mappedTechPack = mapApiTechPackToFormState(newTechPack) as any;
+          setState(prev => ({
+            ...prev,
+            techpack: {
+              ...mappedTechPack,
+              id: techPackId, // Ensure ID is set
+            },
+            isSaving: false,
+            hasUnsavedChanges: false,
+            lastSaved: new Date().toISOString(),
+          }));
+        } else {
+          // 3. Map server data to form state format
+          const mappedTechPack = mapApiTechPackToFormState(refreshedTechPack) as any;
+          
+          // 4. Update form state with complete server data
+          // ✅ FIXED: Use mappedTechPack as source of truth (from server)
+          console.log('🔄 Reloading TechPack after create:', {
+            id: techPackId,
+            articleName: mappedTechPack.articleInfo?.articleName,
+            hasBom: Array.isArray(mappedTechPack.bom) && mappedTechPack.bom.length > 0,
+            hasMeasurements: Array.isArray(mappedTechPack.measurements) && mappedTechPack.measurements.length > 0,
+          });
+          
+          setState(prev => ({
+            ...prev,
+            techpack: {
+              ...mappedTechPack,
+              id: techPackId, // Ensure ID is set
+            },
+            isSaving: false,
+            hasUnsavedChanges: false,
+            lastSaved: new Date().toISOString(),
+          }));
+        }
+        
+        // 5. Clear draft storage AFTER successful state update
+        clearDraftFromStorage(techPackId);
+        clearDraftFromStorage(); // Clear "new" draft
+        
+      } catch (error) {
+        console.error('Failed to refresh TechPack after create:', error);
+        
+        // Fallback: use newTechPack data
+        const mappedTechPack = mapApiTechPackToFormState(newTechPack) as any;
+        setState(prev => ({
+          ...prev,
+          techpack: {
+            ...mappedTechPack,
+            id: techPackId, // Ensure ID is set
+            // Preserve UI-related state that shouldn't be overwritten
+            currentTab: prev.currentTab,
+          },
+          isSaving: false,
+          hasUnsavedChanges: false,
+          lastSaved: new Date().toISOString(),
+        }));
+        
+        // Still clear draft even on error
+        clearDraftFromStorage(techPackId);
         clearDraftFromStorage();
       }
-
-      setState(prev => ({
-        ...prev,
-        isSaving: false,
-        hasUnsavedChanges: false,
-        lastSaved: new Date().toISOString()
-      }));
+  
     } catch (error) {
+      console.error('Save TechPack error:', error);
       setState(prev => ({ ...prev, isSaving: false }));
       showError('Failed to save tech pack');
     }

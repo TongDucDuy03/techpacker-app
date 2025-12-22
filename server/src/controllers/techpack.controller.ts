@@ -268,6 +268,8 @@ export class TechPackController {
       try {
         techpack = await TechPack.findById(id)
           .populate('technicalDesignerId createdBy updatedBy sharedWith.userId', 'firstName lastName email')
+          // Note: nested arrays (bom, measurements, colorways, howToMeasure) are embedded, not references
+          // They are already included in the document, no need for additional populate
           .lean();
       } catch (error) {
         techpack = null;
