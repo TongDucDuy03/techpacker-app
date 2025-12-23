@@ -135,14 +135,14 @@ export const formatMeasurementValue = (value?: number): string => {
   const integerPart = Math.floor(absValue);
   const decimalPart = absValue - integerPart;
 
-  const fraction = findNearestFraction(decimalPart);
-  if (fraction) {
-    const fractionText = `${fraction.numerator}/${fraction.denominator}`;
-    if (integerPart === 0) {
-      return `${sign}${fractionText}`;
-    }
-    return `${sign}${integerPart} ${fractionText}`;
-  }
+  // const fraction = findNearestFraction(decimalPart);
+  // if (fraction) {
+  //   const fractionText = `${fraction.numerator}/${fraction.denominator}`;
+  //   if (integerPart === 0) {
+  //     return `${sign}${fractionText}`;
+  //   }
+  //   return `${sign}${integerPart} ${fractionText}`;
+  // }
 
   return `${sign}${absValue % 1 === 0 ? absValue.toFixed(0) : absValue.toFixed(2)}`;
 };
