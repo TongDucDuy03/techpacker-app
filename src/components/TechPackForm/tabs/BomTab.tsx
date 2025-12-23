@@ -148,6 +148,9 @@ const validateBomItem = (item: Partial<BomItem>, index?: number): { isValid: boo
   
   // Validate using schema
   Object.keys(bomItemValidationSchema).forEach(field => {
+
+    if (field==='size') return;
+
     const rule = bomItemValidationSchema[field as keyof typeof bomItemValidationSchema];
     const value = item[field as keyof BomItem];
     
@@ -1452,7 +1455,6 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               min={0}
               step={0.0000001}
               placeholder="e.g., 1.50"
-              required
               error={validation.getFieldProps('quantity').error}
               helperText={validation.getFieldProps('quantity').helperText}
               data-error={validation.getFieldProps('quantity').error ? 'true' : 'false'}

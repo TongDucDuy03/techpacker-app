@@ -785,15 +785,15 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 helperText={validation.getFieldProps('supplier').helperText}
               />
 
-              <Select
+              <Input
                 label="Technical Designer"
                 value={safeArticleInfo.technicalDesignerId}
                 onChange={handleInputChange('technicalDesignerId')}
                 onBlur={() => validation.setFieldTouched('technicalDesignerId')}
-                options={designers}
-                placeholder={loadingDesigners ? 'Loading...' : 'Select a designer'}
+                placeholder="Enter designer name"
                 required
-                disabled={mode === 'view' || loadingDesigners}
+                maxLength={100}
+                disabled={mode === 'view'}
                 error={validation.getFieldProps('technicalDesignerId').error}
                 helperText={validation.getFieldProps('technicalDesignerId').helperText}
               />

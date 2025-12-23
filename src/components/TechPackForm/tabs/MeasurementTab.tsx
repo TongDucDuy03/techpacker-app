@@ -1484,10 +1484,20 @@ type RoundModalFormState = {
             <Input
               label={`Minus Tolerance (${getMeasurementUnitSuffix(tableUnit)}) *`}
               value={formData.minusTolerance ?? ''}
-              onChange={(value) => handleInputChange('minusTolerance')(typeof value === 'string' ? parseFloat(value) || 0 : value)}
+              onChange={(value) => {
+                // value là string, giữ nguyên nếu là chuỗi rỗng hoặc số hợp lệ
+                if (typeof value === 'string') {
+                  // Cho phép nhập số thập phân, số âm, chuỗi rỗng
+                  if (/^-?\d*\.?\d*$/.test(value) || value === '') {
+                    handleInputChange('minusTolerance')(value);
+                  }
+                } else {
+                  handleInputChange('minusTolerance')(value);
+                }
+              }}
               onBlur={() => validation.setFieldTouched('minusTolerance')}
               type="number"
-              step="0.0000001"
+              step="0.01"
               min="0"
               max="50"
               placeholder="e.g., 1.0"
@@ -1502,10 +1512,20 @@ type RoundModalFormState = {
             <Input
               label={`Plus Tolerance (${getMeasurementUnitSuffix(tableUnit)}) *`}
               value={formData.plusTolerance ?? ''}
-              onChange={(value) => handleInputChange('plusTolerance')(typeof value === 'string' ? parseFloat(value) || 0 : value)}
+              onChange={(value) => {
+                // value là string, giữ nguyên nếu là chuỗi rỗng hoặc số hợp lệ
+                if (typeof value === 'string') {
+                  // Cho phép nhập số thập phân, số âm, chuỗi rỗng
+                  if (/^-?\d*\.?\d*$/.test(value) || value === '') {
+                    handleInputChange('plusTolerance')(value);
+                  }
+                } else {
+                  handleInputChange('plusTolerance')(value);
+                }
+              }}
               onBlur={() => validation.setFieldTouched('plusTolerance')}
               type="number"
-              step="0.0000001"
+              step="0.01"
               min="0"
               max="50"
               placeholder="e.g., 1.0"

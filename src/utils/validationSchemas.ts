@@ -120,7 +120,7 @@ export const bomItemValidationSchema: FormValidationConfig = {
     }
   },
   quantity: {
-    required: true,
+    // required: true,
     min: 0.01,
     max: 100000,
     custom: (value: number) => {
