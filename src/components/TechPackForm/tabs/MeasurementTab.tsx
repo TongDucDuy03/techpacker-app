@@ -24,6 +24,8 @@ import { SIZE_PRESET_OPTIONS, getPresetById } from '../../../constants/sizePrese
 import ConfirmationDialog from '../../ConfirmationDialog';
 import { DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR, DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR } from '../../../constants/measurementDisplay';
 import { normalizeMeasurementBaseSizes } from '../../../utils/measurements';
+import Quill from 'quill';
+import ImageUploader from 'quill-image-uploader';
 
 // Progression validation result
 interface ProgressionValidation {
@@ -31,7 +33,9 @@ interface ProgressionValidation {
   errors: string[];
   warnings: string[];
 }
-
+Quill.register('modules/imageUploader', ImageUploader);
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
+const API_UPLOAD_BASE = API_BASE_URL.replace(/\/api\/v1$/, '');
 const sampleRoundQuillModules = {
   toolbar: [
     [{ header: [1, 2, 3, 4, 5, false] }],
@@ -43,9 +47,35 @@ const sampleRoundQuillModules = {
     [{ list: 'ordered' }, { list: 'bullet' }],
     [{ indent: '-1' }, { indent: '+1' }],
     [{ align: [] }],
-    ['link'],
+    ['link', 'image'],
     ['clean'],
   ],
+  imageUploader: {
+    upload: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/upload-image`, {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          throw new Error('Upload failed');
+        }
+        
+        const data = await response.json();
+        const imageUrl = data.url.startsWith('/') 
+          ? `${window.location.origin}${data.url}`
+          : data.url;
+        return imageUrl;
+      } catch (error) {
+        console.error('Image upload error:', error);
+        throw error;
+      }
+    }
+  },
   clipboard: {
     matchVisual: false,
   },
@@ -72,6 +102,7 @@ const sampleRoundQuillFormats = [
   'indent',
   'align',
   'link',
+  'image',
 ];
 
 const MeasurementTab: React.FC = () => {

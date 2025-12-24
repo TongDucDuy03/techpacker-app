@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import { config } from './config/config';
 import connectDatabase from './config/database';
 import { sendSuccess, sendError } from './utils/response.util';
+import { uploadImageHandler } from './controllers/upload.controller';
 
 // Routes
 import authRoutes from './routes/auth.routes';
@@ -164,6 +165,9 @@ v1Router.use('/admin', adminRoutes);
 v1Router.use('/', revisionRoutes); // Revision routes
 
 app.use('/api/v1', v1Router);
+
+// Image upload route
+app.post('/api/upload-image', uploadImageHandler);
 
 // Health check
 app.get('/health', (_req, res) => {
