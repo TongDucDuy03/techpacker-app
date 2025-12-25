@@ -198,12 +198,16 @@ const MeasurementTab: React.FC = () => {
     if (!selectedSizes.length) return;
     setFormData(prev => {
       let changed = false;
-      let nextBaseSize = measurementBaseSize && selectedSizes.includes(measurementBaseSize)
-        ? measurementBaseSize
-        : prev.baseSize;
-      if (!nextBaseSize || !selectedSizes.includes(nextBaseSize)) {
+      // Always prioritize measurementBaseSize (global base size) when it changes
+      let nextBaseSize: string;
+      if (measurementBaseSize && selectedSizes.includes(measurementBaseSize)) {
+        nextBaseSize = measurementBaseSize;
+      } else if (prev.baseSize && selectedSizes.includes(prev.baseSize)) {
+        nextBaseSize = prev.baseSize;
+      } else {
         nextBaseSize = selectedSizes[0];
       }
+      
       if (nextBaseSize !== prev.baseSize) {
         changed = true;
       }
@@ -1193,11 +1197,15 @@ type RoundModalFormState = {
       : (measurement.plusTolerance ?? 1.0);
 
     const measurementSizes = measurement.sizes ? Object.keys(measurement.sizes) : [];
-    const resolvedBaseSize =
-      measurement.baseSize ||
-      measurementSizes[0] ||
-      formData.baseSize ||
-      selectedSizes[0];
+    // Priority: measurementBaseSize (global) > measurement.baseSize > measurementSizes[0] > selectedSizes[0]
+    const resolvedBaseSize = 
+      (measurementBaseSize && selectedSizes.includes(measurementBaseSize))
+        ? measurementBaseSize
+        : (measurement.baseSize && selectedSizes.includes(measurement.baseSize))
+          ? measurement.baseSize
+          : measurementSizes[0] && selectedSizes.includes(measurementSizes[0])
+            ? measurementSizes[0]
+            : selectedSizes[0];
 
     setFormData({
       ...measurement,
