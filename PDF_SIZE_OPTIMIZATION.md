@@ -113,3 +113,4 @@ Nếu vẫn cần giảm thêm dung lượng:
 
 4. **Sử dụng WebP format** thay vì JPEG (cần update code)
 
+

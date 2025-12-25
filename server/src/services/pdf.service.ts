@@ -345,6 +345,15 @@ class PDFService {
         imageUrl = this.getPlaceholderSVG(64, 64);
       }
 
+      // Extract hexCode from colorCode if it's a hex color (starts with #)
+      let hexCode: string | undefined;
+      if (item.colorCode) {
+        const colorCodeStr = String(item.colorCode).trim();
+        if (colorCodeStr.startsWith('#') && (colorCodeStr.length === 4 || colorCodeStr.length === 7)) {
+          hexCode = colorCodeStr;
+        }
+      }
+
       bomByPart[partName].push({
         materialName: this.normalizeText(item.materialName),
         imageUrl,
@@ -357,6 +366,15 @@ class PDFService {
         totalPrice: item.totalPrice ? `${item.totalPrice} ${currency}` : '—',
         comments: this.normalizeText(item.comments),
         colorways,
+        // Add color fields for template compatibility
+        color: item.color ? this.normalizeText(item.color) : undefined,
+        hexCode: hexCode,
+        pantone: item.pantoneCode ? this.normalizeText(item.pantoneCode) : undefined,
+        pantoneCode: item.pantoneCode ? this.normalizeText(item.pantoneCode) : undefined,
+        materialCode: item.materialCode ? this.normalizeText(item.materialCode) : undefined,
+        size: item.size ? this.normalizeText(item.size) : undefined,
+        part: item.part ? this.normalizeText(item.part) : undefined,
+        thumbnail: imageUrl,
       });
     }
 
@@ -572,6 +590,9 @@ class PDFService {
           imageUrl: part.imageUrl 
             ? (imageMap.get(part.imageUrl) || this.getPlaceholderSVG())
             : this.getPlaceholderSVG(),
+          image: part.imageUrl 
+            ? (imageMap.get(part.imageUrl) || this.getPlaceholderSVG())
+            : this.getPlaceholderSVG(), // Add 'image' field for template compatibility
           supplier: part.supplier || '—',
           colorType: part.colorType || 'Solid',
         })),
@@ -599,6 +620,7 @@ class PDFService {
         hexCode: part.hexCode || '—',
         rgbCode: part.rgbCode || '—',
         imageUrl: this.getPlaceholderSVG(),
+        image: this.getPlaceholderSVG(), // Add 'image' field for template compatibility
         supplier: part.supplier || '—',
         colorType: part.colorType || 'Solid',
       })),
@@ -812,6 +834,7 @@ class PDFService {
         currency: currency,
         description: techpack.description || techpack.productDescription || '—',
         designer: technicalDesignerName,
+        companyLogo: compressedLogo, // Add companyLogo to meta for header template
       },
       images: {
         companyLogo: compressedLogo,

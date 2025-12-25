@@ -212,6 +212,12 @@
           </div>
         </div>
 
+        <% if (colorway.imageUrl && colorway.imageUrl !== '—' && !colorway.imageUrl.includes('No Image')) { %>
+          <div style="margin-bottom: 12px; text-align: center;">
+            <img src="<%= colorway.imageUrl %>" alt="Colorway Image" style="max-width: 200px; max-height: 200px; object-fit: contain; border: 1px solid #E0E0E0; border-radius: 6px; padding: 8px; background: #ffffff;" />
+          </div>
+        <% } %>
+
         <div class="colorway-info">
           <div class="info-item">
             <span class="info-label">Placement</span>
