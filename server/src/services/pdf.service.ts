@@ -171,45 +171,14 @@ class PDFService {
 
     const trimmedUrl = url.trim();
     
-    // If already a data URI, try to compress it
-    if (trimmedUrl.startsWith('data:image/')) {
-      try {
-        const compressed = await compressImageToDataURI(trimmedUrl, {
-          quality: options?.quality || 65,
-          maxWidth: options?.maxWidth || 1200,
-          maxHeight: options?.maxHeight || 800,
-        }, this.IMAGE_COMPRESSION_TIMEOUT);
-        this.imageCache.set(cacheKey, compressed);
-        return compressed;
-      } catch {
-        // If compression fails, return original
-        this.imageCache.set(cacheKey, trimmedUrl);
-        return trimmedUrl;
-      }
-    }
-
-    // For URLs, resolve and compress
-    let resolvedUrl: string;
-    if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
-      resolvedUrl = trimmedUrl;
-    } else {
-      const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      const serverUrl = process.env.SERVER_URL || `http://localhost:${process.env.PORT || 4001}`;
-      
-      if (trimmedUrl.startsWith('/uploads/') || trimmedUrl.startsWith('/api/uploads/')) {
-        resolvedUrl = `${serverUrl}${trimmedUrl}`;
-      } else if (trimmedUrl.startsWith('/static/')) {
-        resolvedUrl = `${baseUrl}${trimmedUrl}`;
-      } else if (trimmedUrl.startsWith('/')) {
-        resolvedUrl = `${baseUrl}${trimmedUrl}`;
-      } else {
-        resolvedUrl = `${baseUrl}/${trimmedUrl}`;
-      }
-    }
-
-    // Compress the image with timeout
+    // Use compressImageToDataURI directly - it will handle URL resolution
+    // Same logic as construction (HowToMeasure) images via downloadImage function
+    // This ensures all images use the same URL resolution logic:
+    // - /uploads/ → ${SERVER_URL}/uploads/...
+    // - http:// or https:// → keep as is
+    // - other paths → try to read from local file system
     try {
-      const compressed = await compressImageToDataURI(resolvedUrl, {
+      const compressed = await compressImageToDataURI(trimmedUrl, {
         quality: options?.quality || 65,
         maxWidth: options?.maxWidth || 1200,
         maxHeight: options?.maxHeight || 800,
@@ -217,9 +186,10 @@ class PDFService {
       this.imageCache.set(cacheKey, compressed);
       return compressed;
     } catch (error) {
-      console.warn(`Image compression failed for ${resolvedUrl?.substring(0, 50)}..., using original URL`);
-      this.imageCache.set(cacheKey, resolvedUrl);
-      return resolvedUrl;
+      console.warn(`Image compression failed for ${trimmedUrl?.substring(0, 50)}..., using placeholder`);
+      const placeholderResult = placeholder || this.getPlaceholderSVG();
+      this.imageCache.set(cacheKey, placeholderResult);
+      return placeholderResult;
     }
   }
 
