@@ -245,9 +245,9 @@ const getDiffToneClass = (value: string): string => {
             ))}
           </tr>
           <tr>
-            <th className="sticky left-0 z-30 bg-gray-50 border-t border-r border-gray-200 px-4 py-2" />
-            <th className="sticky left-[220px] z-30 bg-gray-50 border-t border-r border-gray-200 px-3 py-2" />
-            <th className="sticky left-[290px] z-30 bg-gray-50 border-t border-r border-gray-200 px-3 py-2" />
+            <th key="empty-1" className="sticky left-0 z-30 bg-gray-50 border-t border-r border-gray-200 px-4 py-2" />
+            <th key="empty-2" className="sticky left-[220px] z-30 bg-gray-50 border-t border-r border-gray-200 px-3 py-2" />
+            <th key="empty-3" className="sticky left-[290px] z-30 bg-gray-50 border-t border-r border-gray-200 px-3 py-2" />
             {sampleRounds.flatMap(round =>
               FIELD_SEQUENCE.map(fieldKey => (
                 <th
@@ -261,7 +261,7 @@ const getDiffToneClass = (value: string): string => {
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-100">
-          {measurementRows.map((row, rowIndex) => {
+          {measurementRows.flatMap((row, rowIndex) => {
             const rawSizeKeys = getSizeKeysForRow(row, sampleRounds, availableSizes, getEntryForRound);
             const sizeKeys = getVisibleSampleSizes(rawSizeKeys, baseSize);
             const tolerance = getToleranceDisplay(row, tableUnit);
@@ -271,6 +271,7 @@ const getDiffToneClass = (value: string): string => {
             const rowBgColor = isEvenRow ? '#ffffff' : '#f9fafb';
 
             return sizeKeys.map((size, index) => {
+              const rowSizeKey = `${row.key}-${size}-${rowIndex}`;
               const entryCells = sampleRounds.flatMap(round => {
                 const entry = getEntryForRound(round, row);
                 const entryId = entry?.id || '';
@@ -454,11 +455,12 @@ const getDiffToneClass = (value: string): string => {
 
               return (
                 <tr 
-                  key={`${row.key}-${size}`}
+                  key={`${row.key}-${size}-${rowIndex}-${index}`}
                   style={{ backgroundColor: rowBgColor }}
                 >
                   {index === 0 && (
                     <td
+                      key={`${rowSizeKey}-pom`}
                       rowSpan={sizeKeys.length}
                       className="sticky left-0 border-r border-gray-200 px-4 py-3 align-top z-20 shadow-[4px_0_6px_-4px_rgba(0,0,0,0.1)] min-w-[220px]"
                       style={{ backgroundColor: rowBgColor }}
@@ -474,12 +476,14 @@ const getDiffToneClass = (value: string): string => {
                     </td>
                   )}
                   <td 
+                    key={`${rowSizeKey}-size`}
                     className="sticky left-[220px] border-r border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 z-10 min-w-[70px]"
                     style={{ backgroundColor: rowBgColor }}
                   >
                     {size}
                   </td>
                   <td 
+                    key={`${rowSizeKey}-tolerance`}
                     className="sticky left-[290px] border-r border-gray-200 px-3 py-2 text-xs text-gray-600 z-10 min-w-[100px]"
                     style={{ backgroundColor: rowBgColor }}
                   >

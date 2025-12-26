@@ -26,6 +26,7 @@ import { DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR, DEFAULT_MEASUREMENT_ROW_STRIP
 import { normalizeMeasurementBaseSizes } from '../../../utils/measurements';
 import Quill from 'quill';
 import ImageUploader from 'quill-image-uploader';
+import { api } from '../../../lib/api';
 
 // Progression validation result
 interface ProgressionValidation {
@@ -34,8 +35,30 @@ interface ProgressionValidation {
   warnings: string[];
 }
 Quill.register('modules/imageUploader', ImageUploader);
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
-const API_UPLOAD_BASE = API_BASE_URL.replace(/\/api\/v1$/, '');
+
+// Helper to resolve image URL for Quill editor (needs full URL)
+// Use same pattern as other tabs (ConstructionTab, ColorwayTab, etc.)
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001/api/v1';
+const FILE_BASE_URL = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+
+const resolveImageUrlForQuill = (url: string): string => {
+  if (!url) return '';
+  const trimmed = url.trim();
+  
+  // Already absolute URL
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) {
+    return trimmed;
+  }
+  
+  // Relative path: /uploads/image.jpg
+  if (trimmed.startsWith('/')) {
+    return `${FILE_BASE_URL}${trimmed}`;
+  }
+  
+  // Fallback: prepend FILE_BASE_URL
+  return `${FILE_BASE_URL}/${trimmed}`;
+};
+
 const sampleRoundQuillModules = {
   toolbar: [
     [{ header: [1, 2, 3, 4, 5, false] }],
@@ -53,26 +76,37 @@ const sampleRoundQuillModules = {
   imageUploader: {
     upload: async (file: File) => {
       const formData = new FormData();
-      formData.append('file', file);
+      // Backend expects 'constructionImage' field name for /techpacks/upload-construction-image
+      formData.append('constructionImage', file);
       
       try {
-        const response = await fetch(`${API_BASE_URL}/api/upload-image`, {
-          method: 'POST',
-          body: formData,
+        // Use api client (axios) with proper baseURL configured in src/lib/api.ts
+        // This ensures correct URL resolution: /techpacks/upload-construction-image
+        // Will resolve to: http://host:4001/api/v1/techpacks/upload-construction-image
+        const response = await api.post('/techpacks/upload-construction-image', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
         });
         
-        if (!response.ok) {
-          throw new Error('Upload failed');
+        if (response.data.success) {
+          // Backend returns { success: true, data: { url: '/uploads/...' } }
+          const imageUrl = response.data.data.url;
+          
+          if (!imageUrl) {
+            throw new Error('No image URL returned from server');
+          }
+          
+          // Convert relative URL to full URL for Quill imageUploader
+          // Quill needs absolute URL to display images in the editor
+          return resolveImageUrlForQuill(imageUrl);
+        } else {
+          throw new Error(response.data.message || 'Upload failed');
         }
-        
-        const data = await response.json();
-        const imageUrl = data.url.startsWith('/') 
-          ? `${window.location.origin}${data.url}`
-          : data.url;
-        return imageUrl;
-      } catch (error) {
+      } catch (error: any) {
         console.error('Image upload error:', error);
-        throw error;
+        const errorMessage = error.response?.data?.message || error.message || 'Upload failed';
+        throw new Error(errorMessage);
       }
     }
   },
