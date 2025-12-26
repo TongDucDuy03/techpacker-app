@@ -3,7 +3,7 @@ import path from 'path';
 import ejs from 'ejs';
 import { ITechPack, IBOMItem, IMeasurement, ISampleMeasurementRound, IHowToMeasure, IColorway, IColorwayPart } from '../models/techpack.model';
 import fs from 'fs/promises';
-import { compressImageToDataURI, compressImagesBatch } from '../utils/image-compression.util';
+import { compressImagesBatch } from '../utils/image-compression.util';
 
 type TechPackForPDF = ITechPack | any;
 
@@ -150,50 +150,6 @@ class PDFService {
   }
 
   /**
-   * Optimized image URL preparation with caching
-   * Now returns compressed data URIs for better PDF size
-   * With timeout protection
-   */
-  private async prepareImageUrlCompressed(
-    url?: string, 
-    placeholder?: string,
-    options?: { quality?: number; maxWidth?: number; maxHeight?: number }
-  ): Promise<string> {
-    if (!url || url.trim() === '') {
-      return placeholder || this.getPlaceholderSVG();
-    }
-
-    // Check cache first
-    const cacheKey = `${url}_${options?.quality || 65}_${options?.maxWidth || 1200}`;
-    if (this.imageCache.has(cacheKey)) {
-      return this.imageCache.get(cacheKey)!;
-    }
-
-    const trimmedUrl = url.trim();
-    
-    // Use compressImageToDataURI directly - it will handle URL resolution
-    // Same logic as construction (HowToMeasure) images via downloadImage function
-    // This ensures all images use the same URL resolution logic:
-    // - /uploads/ → ${SERVER_URL}/uploads/...
-    // - http:// or https:// → keep as is
-    // - other paths → try to read from local file system
-    try {
-      const compressed = await compressImageToDataURI(trimmedUrl, {
-        quality: options?.quality || 65,
-        maxWidth: options?.maxWidth || 1200,
-        maxHeight: options?.maxHeight || 800,
-      }, this.IMAGE_COMPRESSION_TIMEOUT);
-      this.imageCache.set(cacheKey, compressed);
-      return compressed;
-    } catch (error) {
-      console.warn(`Image compression failed for ${trimmedUrl?.substring(0, 50)}..., using placeholder`);
-      const placeholderResult = placeholder || this.getPlaceholderSVG();
-      this.imageCache.set(cacheKey, placeholderResult);
-      return placeholderResult;
-    }
-  }
-
-  /**
    * Generate placeholder SVG (cached)
    */
   private getPlaceholderSVG(width: number = 260, height: number = 200): string {
@@ -336,28 +292,10 @@ class PDFService {
       if (item.size) sizeInfo.push(`Size: ${this.normalizeText(item.size)}`);
       if (item.width) sizeInfo.push(`Width: ${this.normalizeText(item.width)}`);
 
-      // Use compressed image if available (with fallback)
-      let imageUrl: string;
-      if (item.imageUrl) {
-        const cached = imageMap.get(item.imageUrl);
-        if (cached) {
-          imageUrl = cached;
-        } else {
-          // Fallback with timeout protection
-          try {
-            imageUrl = await Promise.race([
-              this.prepareImageUrlCompressed(item.imageUrl, this.getPlaceholderSVG(64, 64), imageOptions),
-              new Promise<string>((resolve) => 
-                setTimeout(() => resolve(this.getPlaceholderSVG(64, 64)), this.IMAGE_COMPRESSION_TIMEOUT)
-              ),
-            ]);
-          } catch {
-            imageUrl = this.getPlaceholderSVG(64, 64);
-          }
-        }
-      } else {
-        imageUrl = this.getPlaceholderSVG(64, 64);
-      }
+      // Use compressed image from batch (same approach as Construction)
+      const imageUrl = item.imageUrl
+        ? (imageMap.get(item.imageUrl) || this.getPlaceholderSVG(64, 64))
+        : this.getPlaceholderSVG(64, 64);
 
       // Extract hexCode: prioritize colorway assignment, then try to parse from colorCode
       let hexCode: string | undefined = resolvedHexCode;
@@ -742,28 +680,50 @@ class PDFService {
       },
     };
 
-    // Compress main images (logo and cover) first with timeout protection
+    // Compress main images (logo, cover, design sketch) using batch compression
+    // ✅ UNIFIED: Same approach as Construction - collect URLs and use compressImagesBatch()
     console.log('🖼️  Compressing main images (logo, cover, design sketch)...');
-    // ✅ FIX: compressedCover và compressedDesignSketch đều dùng designSketchUrl (cover = design sketch trong model này)
-    // Nếu có coverImageUrl riêng thì dùng, không thì dùng designSketchUrl cho cả 2
     const coverImageUrl = (techpack as any).coverImageUrl || techpack.designSketchUrl;
-    const [compressedLogo, compressedCover, compressedDesignSketch] = await Promise.allSettled([
-      this.prepareImageUrlCompressed(techpack.companyLogoUrl, undefined, {
+    
+    // Collect all Article image URLs
+    const articleImageUrls: Array<{ url: string; type: 'logo' | 'cover' | 'designSketch'; width?: number; height?: number }> = [];
+    if (techpack.companyLogoUrl) {
+      articleImageUrls.push({ url: techpack.companyLogoUrl, type: 'logo', width: 400, height: 200 });
+    }
+    if (coverImageUrl) {
+      articleImageUrls.push({ url: coverImageUrl, type: 'cover', width: imageMaxWidth, height: imageMaxHeight });
+    }
+    if (techpack.designSketchUrl) {
+      articleImageUrls.push({ url: techpack.designSketchUrl, type: 'designSketch', width: imageMaxWidth, height: imageMaxHeight });
+    }
+    
+    // Compress all images in batch (same as Construction)
+    const articleImageUrlStrings = articleImageUrls.map(item => item.url);
+    let articleImageMap = new Map<string, string>();
+    
+    if (articleImageUrlStrings.length > 0) {
+      // Use default options for batch (logo will be resized by sharp based on actual dimensions)
+      const compressedArticleImages = await compressImagesBatch(articleImageUrlStrings, {
         quality: imageQuality,
-        maxWidth: 400, // Logo is smaller
-        maxHeight: 200,
-      }).catch(() => this.getPlaceholderSVG(400, 200)),
-      this.prepareImageUrlCompressed(coverImageUrl, undefined, {
-        quality: imageQuality,
-        maxWidth: imageMaxWidth,
+        maxWidth: imageMaxWidth, // Will be applied, sharp will resize logo appropriately
         maxHeight: imageMaxHeight,
-      }).catch(() => this.getPlaceholderSVG()),
-      this.prepareImageUrlCompressed(techpack.designSketchUrl, undefined, {
-        quality: imageQuality,
-        maxWidth: imageMaxWidth,
-        maxHeight: imageMaxHeight,
-      }).catch(() => this.getPlaceholderSVG()),
-    ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : this.getPlaceholderSVG()));
+      }, this.MAX_IMAGES_PARALLEL, this.IMAGE_COMPRESSION_TIMEOUT);
+      
+      articleImageUrlStrings.forEach((url, i) => {
+        articleImageMap.set(url, compressedArticleImages[i]);
+      });
+    }
+    
+    // Extract compressed images by type
+    const compressedLogo = techpack.companyLogoUrl 
+      ? (articleImageMap.get(techpack.companyLogoUrl) || this.getPlaceholderSVG(400, 200))
+      : this.getPlaceholderSVG(400, 200);
+    const compressedCover = coverImageUrl
+      ? (articleImageMap.get(coverImageUrl) || this.getPlaceholderSVG())
+      : this.getPlaceholderSVG();
+    const compressedDesignSketch = techpack.designSketchUrl
+      ? (articleImageMap.get(techpack.designSketchUrl) || this.getPlaceholderSVG())
+      : this.getPlaceholderSVG();
 
     console.log('🚀 Processing data in parallel with image compression...');
     const parallelStart = Date.now();

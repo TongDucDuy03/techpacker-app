@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import axios from 'axios';
 import fs from 'fs/promises';
 import path from 'path';
+import { config } from '../config/config';
 
 /**
  * Image compression utility for PDF generation
@@ -24,6 +25,7 @@ const DEFAULT_OPTIONS: Required<ImageCompressionOptions> = {
 
 /**
  * Download image from URL and return buffer
+ * Priority: local filesystem > HTTP request (for /uploads/ paths)
  */
 async function downloadImage(url: string): Promise<Buffer> {
   try {
@@ -33,36 +35,86 @@ async function downloadImage(url: string): Promise<Buffer> {
       return Buffer.from(base64Data, 'base64');
     }
 
-    // Handle local file paths
-    if (url.startsWith('/uploads/') || url.startsWith('/api/uploads/')) {
-      const serverUrl = process.env.SERVER_URL || `http://localhost:${process.env.PORT || 4001}`;
-      const fullUrl = url.startsWith('http') ? url : `${serverUrl}${url}`;
-      const response = await axios.get(fullUrl, {
-        responseType: 'arraybuffer',
-        timeout: 10000,
-        maxRedirects: 5,
-      });
-      return Buffer.from(response.data);
-    }
-
-    // Handle absolute URLs
+    // Handle absolute URLs (http/https) - always use HTTP
     if (url.startsWith('http://') || url.startsWith('https://')) {
-      const response = await axios.get(url, {
-        responseType: 'arraybuffer',
-        timeout: 10000,
-        maxRedirects: 5,
-      });
-      return Buffer.from(response.data);
+      console.log(`[downloadImage] Downloading from HTTP: ${url.substring(0, 80)}...`);
+      try {
+        const response = await axios.get(url, {
+          responseType: 'arraybuffer',
+          timeout: 10000,
+          maxRedirects: 5,
+        });
+        return Buffer.from(response.data);
+      } catch (error: any) {
+        console.warn(`[downloadImage] HTTP download failed for ${url.substring(0, 50)}...: ${error.message}`);
+        throw error;
+      }
     }
 
-    // Try as local file path
+    // Handle /uploads/ and /api/uploads/ paths
+    // Priority 1: Try to read from local filesystem (for production stability)
+    // Priority 2: Fallback to HTTP request (for cases where file might be on different server)
+    if (url.startsWith('/uploads/') || url.startsWith('/api/uploads/')) {
+      // Normalize path: remove /api prefix if present
+      const normalizedPath = url.startsWith('/api/uploads/') 
+        ? url.replace('/api/uploads/', '/uploads/') 
+        : url;
+      
+      // Determine upload directory
+      const uploadPath = config.uploadPath || './uploads';
+      const uploadDir = path.isAbsolute(uploadPath) 
+        ? uploadPath 
+        : path.join(__dirname, '../../', uploadPath);
+      
+      // Extract filename from path (e.g., /uploads/image.jpg -> image.jpg)
+      const filename = normalizedPath.replace('/uploads/', '');
+      const localFilePath = path.join(uploadDir, filename);
+      
+      console.log(`[downloadImage] Trying local file for ${url.substring(0, 50)}... → ${localFilePath}`);
+      
+      // Try reading from local filesystem first
+      try {
+        await fs.access(localFilePath); // Check if file exists
+        const buffer = await fs.readFile(localFilePath);
+        console.log(`[downloadImage] ✅ Successfully read local file: ${localFilePath}`);
+        return buffer;
+      } catch (localError: any) {
+        console.warn(`[downloadImage] ⚠️  Local file not found: ${localFilePath}, falling back to HTTP`);
+        
+        // Fallback to HTTP request
+        try {
+          const serverUrl = process.env.SERVER_URL || `http://localhost:${process.env.PORT || 4001}`;
+          const fullUrl = `${serverUrl}${normalizedPath}`;
+          console.log(`[downloadImage] Attempting HTTP fallback: ${fullUrl}`);
+          const response = await axios.get(fullUrl, {
+            responseType: 'arraybuffer',
+            timeout: 10000,
+            maxRedirects: 5,
+          });
+          console.log(`[downloadImage] ✅ HTTP fallback succeeded`);
+          return Buffer.from(response.data);
+        } catch (httpError: any) {
+          console.error(`[downloadImage] ❌ HTTP fallback also failed: ${httpError.message}`);
+          throw new Error(`Cannot read image from local filesystem or HTTP: ${localError.message}`);
+        }
+      }
+    }
+
+    // Handle other relative paths - try as local file
     try {
-      const filePath = path.isAbsolute(url) ? url : path.join(__dirname, '../../uploads', url);
+      const uploadPath = config.uploadPath || './uploads';
+      const uploadDir = path.isAbsolute(uploadPath) 
+        ? uploadPath 
+        : path.join(__dirname, '../../', uploadPath);
+      const filePath = path.isAbsolute(url) ? url : path.join(uploadDir, url);
+      console.log(`[downloadImage] Trying local file path: ${filePath}`);
       return await fs.readFile(filePath);
-    } catch {
-      throw new Error(`Cannot resolve image URL: ${url}`);
+    } catch (localError: any) {
+      console.error(`[downloadImage] ❌ Cannot resolve image URL: ${url}`);
+      throw new Error(`Cannot resolve image URL: ${url} (${localError.message})`);
     }
   } catch (error: any) {
+    console.error(`[downloadImage] ❌ Failed to download image: ${error.message}`);
     throw new Error(`Failed to download image: ${error.message}`);
   }
 }
