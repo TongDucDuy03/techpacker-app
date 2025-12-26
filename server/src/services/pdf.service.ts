@@ -796,7 +796,7 @@ class PDFService {
         category: techpack.category || '—',
         productClass: techpack.category || '—',
         gender: techpack.gender || '—',
-        fitType: '—',
+        fitType: techpack.fitType || '—',
         collectionName: techpack.collectionName || '—',
         supplier: techpack.supplier || '—',
         updatedAt: this.formatDate(techpack.updatedAt),
@@ -818,6 +818,7 @@ class PDFService {
       images: {
         companyLogo: compressedLogo,
         coverImage: compressedCover,
+        designSketch: compressedDesignSketch, // Add design sketch for Article Information section
       },
       articleSummary,
       bom: {

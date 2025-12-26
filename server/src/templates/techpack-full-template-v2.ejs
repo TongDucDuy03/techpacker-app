@@ -803,83 +803,47 @@
                                     <div class="section page-break-before">
                                         <div class="section-title">Colorways</div>
 
-                                        <!-- Summary of all colorways -->
                                         <div class="info-grid" style="margin-bottom: 20px;">
-                                            <% colorways.forEach(color=> { %>
+                                            <% colorways.forEach((color) => { %>
+                                                <% const img = (color.imageUrl || '').trim(); %>
+                                                <% const hasImg =
+                                                    img &&
+                                                    img !== '—' &&
+                                                    !/no image/i.test(img) &&
+                                                    (img.startsWith('data:image/') || img.startsWith('http') || img.startsWith('/uploads/') || img.startsWith('/api/uploads/'));
+                                                %>
+
                                                 <div class="info-item">
-                                                    <strong>
+                                                    <!-- Name -->
+                                                    <div style="font-weight: 700; text-transform: uppercase; font-size: 11px; margin-bottom: 4px;">
                                                         <%= color.name || 'Color' %>
-                                                    </strong>
-                                                    <span>
-                                                        <span class="color-swatch"
-                                                            style="background: <%= color.hexColor || '#FFFFFF' %>;"></span>
-                                                        Code: <%= color.code || '000' %><br>
-                                                            <% if (color.pantoneCode) { %>Pantone: <%= color.pantoneCode
-                                                                    %><br>
-                                                                    <% } %>
-                                                                        Hex: <%= color.hexColor || '#FFFFFF' %>
-                                                    </span>
+                                                    </div>
+
+                                                    <!-- Code -->
+                                                    <div style="font-size: 11px; margin-bottom: 8px;">
+                                                        Code: <%= color.code || '000' %>
+                                                    </div>
+
+                                                    <!-- Image -->
+                                                    <% if (hasImg) { %>
+                                                        <div style="text-align: left;">
+                                                            <img
+                                                                src="<%= img %>"
+                                                                alt="<%= color.name || 'Colorway' %>"
+                                                                style="max-width: 80px; max-height: 80px; border: 1px solid #d1d5db; border-radius: 4px; object-fit: contain;"
+                                                            />
+                                                        </div>
+                                                    <% } else { %>
+                                                        <div style="width: 80px; height: 80px; border: 1px dashed #d1d5db; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #9ca3af;">
+                                                            No image
+                                                        </div>
+                                                    <% } %>
                                                 </div>
-                                                <% }); %>
+                                            <% }); %>
                                         </div>
 
-                                        <!-- Detailed breakdown by colorway -->
-                                        <% colorways.forEach(colorway=> { %>
-                                            <% if (colorway.parts && colorway.parts.length> 0) { %>
-                                                <div style="margin-top: 25px; page-break-inside: avoid;">
-                                                    <h3>
-                                                        <%= colorway.name %> (<%= colorway.code %>) - Part Breakdown
-                                                    </h3>
-                                                    <table>
-                                                        <thead>
-                                                            <tr>
-                                                                <th>Part Name</th>
-                                                                <th>Color</th>
-                                                                <th>Pantone Code</th>
-                                                                <th>Hex Code</th>
-                                                                <th>Supplier</th>
-                                                                <th>Type</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            <% colorway.parts.forEach(part=> { %>
-                                                                <tr>
-                                                                    <td>
-                                                                        <%= part.partName || '-' %>
-                                                                    </td>
-                                                                    <td>
-                                                                        <span class="color-swatch"
-                                                                            style="background: <%= part.hexCode || '#FFFFFF' %>;"></span>
-                                                                        <%= part.colorName || '-' %>
-                                                                    </td>
-                                                                    <td>
-                                                                        <%= part.pantoneCode || '-' %>
-                                                                    </td>
-                                                                    <td>
-                                                                        <%= part.hexCode || '-' %>
-                                                                    </td>
-                                                                    <td>
-                                                                        <%= part.supplier || '-' %>
-                                                                    </td>
-                                                                    <td>
-                                                                        <%= part.colorType || 'Solid' %>
-                                                                    </td>
-                                                                </tr>
-                                                                <% }); %>
-                                                        </tbody>
-                                                    </table>
-
-                                                    <% if (colorway.notes && colorway.notes !=='—' ) { %>
-                                                        <div class="notes">
-                                                            <strong>NOTES:</strong>
-                                                            <%= colorway.notes %>
-                                                        </div>
-                                                        <% } %>
-                                                </div>
-                                                <% } %>
-                                                    <% }); %>
                                     </div>
-                                    <% } %>
+                                <% } %>
 
                                         <!-- ============================================ -->
                                         <!-- 6. CARE INSTRUCTIONS -->

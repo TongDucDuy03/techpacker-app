@@ -1179,46 +1179,42 @@
   <!-- VII. Colorways & Color Allocation -->
   <% if (colorways && colorways.length > 0) { %>
     <div class="page">
-      <h2 class="section-title">Colorways & Color Allocation</h2>
+      <h2 class="section-title">Colorways</h2>
+
       <div class="colorway-grid">
         <% colorways.forEach((colorway) => { %>
+          <% const img = (colorway.imageUrl || '').trim(); %>
+          <% const hasImg =
+            img &&
+            img !== '—' &&
+            !/no image/i.test(img) &&
+            (img.startsWith('data:image/') || img.startsWith('http') || img.startsWith('/uploads/') || img.startsWith('/api/uploads/'));
+          %>
+
           <div class="colorway-item keep-together">
-            <h3 style="font-size: 11px; margin-bottom: 8px;"><%= colorway.name %> (<%= colorway.code %>)</h3>
-            <% if (colorway.hexColor) { %>
-              <span class="colorway-swatch" style="background-color: <%= colorway.hexColor %>;"></span>
-            <% } %>
-            <div class="colorway-info">
-              <p><strong>Pantone:</strong> <%= colorway.pantoneCode || '—' %></p>
-              <p><strong>Hex:</strong> <%= colorway.hexColor || '—' %></p>
-              <p><strong>RGB:</strong> <%= colorway.rgbColor || '—' %></p>
-              <p><strong>Supplier:</strong> <%= colorway.supplier || '—' %></p>
-              <p><strong>Status:</strong> 
-                <span class="status-badge <%= colorway.approvalStatus === 'Approved' ? 'status-approved' : 'status-pending' %>">
-                  <%= colorway.approvalStatus %>
-                </span>
-              </p>
-              <p><strong>Season:</strong> <%= colorway.season %></p>
-              <p><strong>Collection:</strong> <%= colorway.collectionName %></p>
-              <p><strong>Notes:</strong> <%= colorway.notes %></p>
+            <!-- Name -->
+            <div style="font-weight: 700; text-transform: uppercase; font-size: 11px; margin-bottom: 4px;">
+              <%= colorway.name || 'Color' %>
             </div>
-            <% if (colorway.parts && colorway.parts.length > 0) { %>
-              <div class="colorway-parts">
-                <p style="font-weight: 600; margin-bottom: 6px;">Parts:</p>
-                <% colorway.parts.forEach((part) => { %>
-                  <div class="colorway-part-item">
-                    <% if (part.hexCode) { %>
-                      <span class="colorway-part-swatch" style="background-color: <%= part.hexCode %>;"></span>
-                    <% } %>
-                    <div>
-                      <strong><%= part.partName %></strong>: <%= part.colorName %>
-                      <% if (part.pantoneCode) { %> (<%= part.pantoneCode %>)<% } %>
-                    </div>
-                  </div>
-                <% }); %>
+
+            <!-- Code -->
+            <div style="font-size: 11px; margin-bottom: 8px;">
+              Code: <%= colorway.code || '000' %>
+            </div>
+
+            <!-- Image -->
+            <% if (hasImg) { %>
+              <div style="text-align: left;">
+                <img
+                  src="<%= img %>"
+                  alt="<%= colorway.name || 'Colorway' %>"
+                  style="max-width: 80px; max-height: 80px; border: 1px solid #d1d5db; border-radius: 4px; object-fit: contain;"
+                />
               </div>
-            <% } %>
-            <% if (colorway.imageUrl) { %>
-              <img src="<%= colorway.imageUrl %>" alt="<%= colorway.name %>" style="width: 100%; max-height: 150px; object-fit: contain; margin-top: 10px; border: 1px solid #d1d5db; border-radius: 4px;" />
+            <% } else { %>
+              <div style="width: 80px; height: 80px; border: 1px dashed #d1d5db; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #9ca3af;">
+                No image
+              </div>
             <% } %>
           </div>
         <% }); %>
