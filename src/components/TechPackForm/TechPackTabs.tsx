@@ -509,6 +509,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
           console.log('[TechPackTabs] Calling saveTechPack (confirmed)...');
           await saveTechPack();
           console.log('[TechPackTabs] saveTechPack completed');
+           onBackToList();
         }
       });
       return;
@@ -518,6 +519,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
     console.log('[TechPackTabs] Calling saveTechPack (create)...');
     await saveTechPack();
     console.log('[TechPackTabs] saveTechPack completed');
+     onBackToList();
   };
 
   const handleExportPDF = async () => {
