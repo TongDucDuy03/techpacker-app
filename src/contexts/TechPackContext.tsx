@@ -703,8 +703,17 @@ const buildMeasurementPayloads = (techpackData: TechPackFormState['techpack']) =
       ...rest
     } = measurement || {};
 
-    const resolvedMinus = toleranceMinus ?? minusTolerance ?? 0;
-    const resolvedPlus = tolerancePlus ?? plusTolerance ?? 0;
+    // Priority: UI field names (minusTolerance/plusTolerance) > backend field names (toleranceMinus/tolerancePlus) > default 1.0
+    // This ensures that when user edits tolerance in UI, the new values are preserved
+    // Use explicit check for undefined/null to allow 0 as a valid value
+    const resolvedMinus = 
+      (minusTolerance !== undefined && minusTolerance !== null) ? minusTolerance :
+      (toleranceMinus !== undefined && toleranceMinus !== null) ? toleranceMinus :
+      1.0;
+    const resolvedPlus = 
+      (plusTolerance !== undefined && plusTolerance !== null) ? plusTolerance :
+      (tolerancePlus !== undefined && tolerancePlus !== null) ? tolerancePlus :
+      1.0;
     const resolvedUnit = (measurement?.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT;
 
     return {
@@ -928,7 +937,34 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
           totalPrice: item.totalPrice,
         }))
       : [],
-    measurements: (apiTechPack as any).measurements || [],
+    measurements: Array.isArray((apiTechPack as any).measurements)
+      ? ((apiTechPack as any).measurements || []).map((measurement: any) => {
+          // Map toleranceMinus/tolerancePlus to minusTolerance/plusTolerance for UI consistency
+          const {
+            toleranceMinus,
+            tolerancePlus,
+            minusTolerance,
+            plusTolerance,
+            ...rest
+          } = measurement || {};
+          
+          // When loading from API, backend returns toleranceMinus/tolerancePlus
+          // Map to both field names for consistency
+          // Use explicit check for undefined/null to allow 0 as a valid value
+          const loadedMinus = (toleranceMinus !== undefined && toleranceMinus !== null) ? toleranceMinus : 1.0;
+          const loadedPlus = (tolerancePlus !== undefined && tolerancePlus !== null) ? tolerancePlus : 1.0;
+          
+          return {
+            ...rest,
+            // Map backend field names to UI field names
+            minusTolerance: loadedMinus,
+            plusTolerance: loadedPlus,
+            // Also keep toleranceMinus/tolerancePlus for backward compatibility
+            toleranceMinus: loadedMinus,
+            tolerancePlus: loadedPlus,
+          };
+        })
+      : [],
     sampleMeasurementRounds: (apiTechPack as any).sampleMeasurementRounds || [],
     measurementSizeRange: normalizedSizeRange,
     measurementBaseSize: resolvedBaseSize,
@@ -2072,10 +2108,37 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         prev.techpack.measurementBaseSize ||
         (prev.techpack.measurementSizeRange && prev.techpack.measurementSizeRange[0]) ||
         '';
-      const normalizedMeasurement =
-        baseSize && measurement.baseSize !== baseSize
-          ? { ...measurement, baseSize }
-          : measurement;
+      
+      // Ensure both tolerance field names are synchronized
+      // UI uses minusTolerance/plusTolerance, backend expects toleranceMinus/tolerancePlus
+      const {
+        minusTolerance,
+        plusTolerance,
+        toleranceMinus,
+        tolerancePlus,
+        ...rest
+      } = measurement;
+      
+      // Prioritize values from UI fields (minusTolerance/plusTolerance), but sync to both
+      // Use explicit check for undefined/null to allow 0 as a valid value
+      const resolvedMinus = 
+        (minusTolerance !== undefined && minusTolerance !== null) ? minusTolerance :
+        (toleranceMinus !== undefined && toleranceMinus !== null) ? toleranceMinus :
+        1.0;
+      const resolvedPlus = 
+        (plusTolerance !== undefined && plusTolerance !== null) ? plusTolerance :
+        (tolerancePlus !== undefined && tolerancePlus !== null) ? tolerancePlus :
+        1.0;
+      
+      const normalizedMeasurement = {
+        ...rest,
+        minusTolerance: resolvedMinus,
+        plusTolerance: resolvedPlus,
+        toleranceMinus: resolvedMinus, // Sync to backend field name
+        tolerancePlus: resolvedPlus,   // Sync to backend field name
+        baseSize: baseSize && measurement.baseSize !== baseSize ? baseSize : measurement.baseSize,
+      };
+      
       const nextMeasurements = prev.techpack.measurements.map((m, i) => (i === index ? normalizedMeasurement : m));
       const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
       return {

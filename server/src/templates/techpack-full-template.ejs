@@ -16,6 +16,9 @@
       margin: 0;
       padding: 0;
       box-sizing: border-box;
+      /* Ensure colors print correctly in PDF */
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
 
     body {
@@ -24,6 +27,9 @@
       line-height: 1.4;
       background: white;
       padding: 20px;
+      /* Ensure colors print correctly in PDF */
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
 
     /* Image optimization for PDF size reduction */
@@ -196,7 +202,7 @@
       width: 100%;
       border-collapse: collapse;
       margin-bottom: 15px;
-      font-size: 9px;
+      font-size: 11px; /* Match body font-size for consistency */
     }
 
     th {
@@ -556,21 +562,22 @@
                                   </td>
                                   <td>
                                     <%= item.comments || '-' %>
-                                      <% if (item.hexCode || item.pantone) { %>
-                                        <div style="margin-top:6px; font-size:9pt;">
-                                          <% if (item.hexCode) { %>
-                                            <span
-                                              style="display:inline-block; width:12px; height:12px; border:1px solid #E0E0E0; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
-                                            <%= item.hexCode %>
-                                              <% } %>
-                                                <% if (item.pantone) { %>
-                                                  <% if (item.hexCode) { %> / <% } %>Pantone: <%= item.pantone %>
-                                                        <% } %>
-                                        </div>
-                                        <% } %>
                                   </td>
-                                  <td>
-                                    <%= item.colorCode || '-' %>
+                                  <td style="font-size: 11px; line-height: 1.4; vertical-align: top;">
+                                    <% if (item.color || item.pantone || item.hexCode) { %>
+                                      <% if (item.color) { %>
+                                        <span style="font-weight: 600; font-size: 11px;"><%= item.color %></span>
+                                        <% if (item.pantone || item.hexCode) { %><br/><% } %>
+                                      <% } %>
+                                      <% if (item.pantone) { %>
+                                        <span style="font-size: 11px;"><%= item.pantone %></span><br/>
+                                      <% } %>
+                                      <% if (item.hexCode) { %>
+                                        <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span><span style="font-size: 11px;"><%= item.hexCode %></span>
+                                      <% } %>
+                                    <% } else { %>
+                                      -
+                                    <% } %>
                                   </td>
                                 </tr>
                                 <% }); %>
@@ -589,7 +596,7 @@
                                     <th style="width: 10%">Size</th>
                                     <th style="width: 8%">Qty</th>
                                     <th style="width: 8%">UOM</th>
-                                    <th style="width: 12%">Supplier</th>
+                                    <th style="width: 10%">Supplier</th>
                                     <th style="width: 12%">Comments</th>
                                     <th style="width: 12%">Color Code</th>
                                   </tr>
@@ -620,21 +627,22 @@
                                       </td>
                                       <td>
                                         <%= item.comments || '-' %>
-                                          <% if (item.hexCode || item.pantone) { %>
-                                            <div style="margin-top:6px; font-size:9pt;">
-                                              <% if (item.hexCode) { %>
-                                                <span
-                                                  style="display:inline-block; width:12px; height:12px; border:1px solid #E0E0E0; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
-                                                <%= item.hexCode %>
-                                                  <% } %>
-                                                    <% if (item.pantone) { %>
-                                                      <% if (item.hexCode) { %> / <% } %>Pantone: <%= item.pantone %>
-                                                            <% } %>
-                                            </div>
-                                            <% } %>
                                       </td>
-                                      <td>
-                                        <%= item.colorCode || '-' %>
+                                      <td style="font-size: 11px; line-height: 1.4; vertical-align: top;">
+                                        <% if (item.color || item.pantone || item.hexCode) { %>
+                                          <% if (item.color) { %>
+                                            <span style="font-weight: 600; font-size: 11px;"><%= item.color %></span>
+                                            <% if (item.pantone || item.hexCode) { %><br/><% } %>
+                                          <% } %>
+                                          <% if (item.pantone) { %>
+                                            <span style="font-size: 11px;"><%= item.pantone %></span><br/>
+                                          <% } %>
+                                          <% if (item.hexCode) { %>
+                                            <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span><span style="font-size: 11px;"><%= item.hexCode %></span>
+                                          <% } %>
+                                        <% } else { %>
+                                          -
+                                        <% } %>
                                       </td>
                                     </tr>
                                     <% }); %>
@@ -676,22 +684,22 @@
                                           </td>
                                           <td>
                                             <%= item.comments || '-' %>
-                                              <% if (item.hexCode || item.pantone) { %>
-                                                <div style="margin-top:6px; font-size:9pt;">
-                                                  <% if (item.hexCode) { %>
-                                                    <span
-                                                      style="display:inline-block; width:12px; height:12px; border:1px solid #E0E0E0; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
-                                                    <%= item.hexCode %>
-                                                      <% } %>
-                                                        <% if (item.pantone) { %>
-                                                          <% if (item.hexCode) { %> / <% } %>Pantone: <%= item.pantone
-                                                                %>
-                                                                <% } %>
-                                                </div>
-                                                <% } %>
                                           </td>
-                                          <td>
-                                            <%= item.colorCode || '-' %>
+                                          <td style="font-size: 11px; line-height: 1.4; vertical-align: top;">
+                                            <% if (item.color || item.pantone || item.hexCode) { %>
+                                              <% if (item.color) { %>
+                                                <span style="font-weight: 600; font-size: 11px;"><%= item.color %></span>
+                                                <% if (item.pantone || item.hexCode) { %><br/><% } %>
+                                              <% } %>
+                                              <% if (item.pantone) { %>
+                                                <span style="font-size: 11px;"><%= item.pantone %></span><br/>
+                                              <% } %>
+                                              <% if (item.hexCode) { %>
+                                                <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span><span style="font-size: 11px;"><%= item.hexCode %></span>
+                                              <% } %>
+                                            <% } else { %>
+                                              -
+                                            <% } %>
                                           </td>
                                         </tr>
                                         <% }); %>
@@ -733,22 +741,22 @@
                                               </td>
                                               <td>
                                                 <%= item.comments || '-' %>
-                                                  <% if (item.hexCode || item.pantone) { %>
-                                                    <div style="margin-top:6px; font-size:9pt;">
-                                                      <% if (item.hexCode) { %>
-                                                        <span
-                                                          style="display:inline-block; width:12px; height:12px; border:1px solid #E0E0E0; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
-                                                        <%= item.hexCode %>
-                                                          <% } %>
-                                                            <% if (item.pantone) { %>
-                                                              <% if (item.hexCode) { %> / <% } %>Pantone: <%=
-                                                                    item.pantone %>
-                                                                    <% } %>
-                                                    </div>
-                                                    <% } %>
                                               </td>
-                                              <td>
-                                                <%= item.colorCode || '-' %>
+                                              <td style="font-size: 11px; line-height: 1.4; vertical-align: top;">
+                                                <% if (item.color || item.pantone || item.hexCode) { %>
+                                                  <% if (item.color) { %>
+                                                    <span style="font-weight: 600; font-size: 11px;"><%= item.color %></span>
+                                                    <% if (item.pantone || item.hexCode) { %><br/><% } %>
+                                                  <% } %>
+                                                  <% if (item.pantone) { %>
+                                                    <span style="font-size: 11px;"><%= item.pantone %></span><br/>
+                                                  <% } %>
+                                                  <% if (item.hexCode) { %>
+                                                    <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span><span style="font-size: 11px;"><%= item.hexCode %></span>
+                                                  <% } %>
+                                                <% } else { %>
+                                                  -
+                                                <% } %>
                                               </td>
                                             </tr>
                                             <% }); %>

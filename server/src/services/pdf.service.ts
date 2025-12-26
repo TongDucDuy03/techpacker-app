@@ -262,16 +262,49 @@ class PDFService {
 
   /**
    * Optimized BOM data preparation with image compression
+   * Maps colorway assignments to BOM items for proper color display
    */
   private async prepareBOMDataOptimized(
     bom: IBOMItem[], 
     currency: string,
+    colorways?: any[], // Add colorways parameter to map colors
     imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number }
   ): Promise<any[]> {
     if (!bom || bom.length === 0) return [];
     
     console.log(`📋 Processing ${bom.length} BOM items...`);
     const bomByPart: { [key: string]: any[] } = {};
+    
+    // Build a map of bomItemId -> colorway parts for fast lookup
+    // This maps colors assigned via colorways to BOM items
+    const bomItemColorMap = new Map<string, {
+      colorName?: string;
+      hexCode?: string;
+      pantoneCode?: string;
+      colorCode?: string;
+      rgbCode?: string;
+    }>();
+    
+    if (colorways && colorways.length > 0) {
+      colorways.forEach((colorway: any) => {
+        if (colorway.parts && Array.isArray(colorway.parts)) {
+          colorway.parts.forEach((part: any) => {
+            if (part.bomItemId) {
+              // Use the first matching part (or could aggregate if multiple colorways assign to same item)
+              if (!bomItemColorMap.has(part.bomItemId)) {
+                bomItemColorMap.set(part.bomItemId, {
+                  colorName: part.colorName,
+                  hexCode: part.hexCode,
+                  pantoneCode: part.pantoneCode,
+                  colorCode: part.hexCode || part.pantoneCode, // Use hexCode or pantoneCode as colorCode
+                  rgbCode: part.rgbCode,
+                });
+              }
+            }
+          });
+        }
+      });
+    }
     
     // Collect all image URLs for batch compression
     const imageUrls: string[] = [];
@@ -306,13 +339,24 @@ class PDFService {
         bomByPart[partName] = [];
       }
       
+      // Try to get color from colorway assignment first, then fallback to item fields
+      // IBOMItem has _id (MongoDB ObjectId), but may also have id when populated
+      const itemId = (item._id || (item as any).id)?.toString();
+      const colorwayColor = itemId ? bomItemColorMap.get(itemId) : null;
+      
+      // Priority: colorway assignment > item.color/colorCode/pantoneCode
+      const resolvedColorName = colorwayColor?.colorName || item.color;
+      const resolvedHexCode = colorwayColor?.hexCode;
+      const resolvedPantoneCode = colorwayColor?.pantoneCode || item.pantoneCode;
+      const resolvedColorCode = colorwayColor?.colorCode || item.colorCode;
+      
       const colorways: string[] = [];
-      if (item.color) {
-        const colorText = this.normalizeText(item.color);
-        if (item.colorCode) {
-          colorways.push(`${colorText} (${this.normalizeText(item.colorCode)})`);
-        } else if (item.pantoneCode) {
-          colorways.push(`${colorText} (Pantone: ${this.normalizeText(item.pantoneCode)})`);
+      if (resolvedColorName) {
+        const colorText = this.normalizeText(resolvedColorName);
+        if (resolvedColorCode) {
+          colorways.push(`${colorText} (${this.normalizeText(resolvedColorCode)})`);
+        } else if (resolvedPantoneCode) {
+          colorways.push(`${colorText} (Pantone: ${this.normalizeText(resolvedPantoneCode)})`);
         } else {
           colorways.push(colorText);
         }
@@ -345,10 +389,10 @@ class PDFService {
         imageUrl = this.getPlaceholderSVG(64, 64);
       }
 
-      // Extract hexCode from colorCode if it's a hex color (starts with #)
-      let hexCode: string | undefined;
-      if (item.colorCode) {
-        const colorCodeStr = String(item.colorCode).trim();
+      // Extract hexCode: prioritize colorway assignment, then try to parse from colorCode
+      let hexCode: string | undefined = resolvedHexCode;
+      if (!hexCode && resolvedColorCode) {
+        const colorCodeStr = String(resolvedColorCode).trim();
         if (colorCodeStr.startsWith('#') && (colorCodeStr.length === 4 || colorCodeStr.length === 7)) {
           hexCode = colorCodeStr;
         }
@@ -366,11 +410,12 @@ class PDFService {
         totalPrice: item.totalPrice ? `${item.totalPrice} ${currency}` : '—',
         comments: this.normalizeText(item.comments),
         colorways,
-        // Add color fields for template compatibility
-        color: item.color ? this.normalizeText(item.color) : undefined,
+        // Add color fields for template compatibility - prioritize colorway assignments
+        color: resolvedColorName ? this.normalizeText(resolvedColorName) : undefined,
         hexCode: hexCode,
-        pantone: item.pantoneCode ? this.normalizeText(item.pantoneCode) : undefined,
-        pantoneCode: item.pantoneCode ? this.normalizeText(item.pantoneCode) : undefined,
+        colorCode: resolvedColorCode ? this.normalizeText(resolvedColorCode) : (hexCode || (resolvedPantoneCode ? this.normalizeText(resolvedPantoneCode) : undefined)),
+        pantone: resolvedPantoneCode ? this.normalizeText(resolvedPantoneCode) : undefined,
+        pantoneCode: resolvedPantoneCode ? this.normalizeText(resolvedPantoneCode) : undefined,
         materialCode: item.materialCode ? this.normalizeText(item.materialCode) : undefined,
         size: item.size ? this.normalizeText(item.size) : undefined,
         part: item.part ? this.normalizeText(item.part) : undefined,
@@ -753,8 +798,12 @@ class PDFService {
     console.log('🚀 Processing data in parallel with image compression...');
     const parallelStart = Date.now();
     
-    const [bomParts, measurementData, sampleRounds, howToMeasures, colorways] = await Promise.all([
-      this.prepareBOMDataOptimized(techpack.bom || [], currency, {
+    // Prepare BOM with raw colorways data for mapping colors
+    // We pass raw colorways (not prepared) to access bomItemId mapping
+    const rawColorways = techpack.colorways || [];
+    
+    const [bomParts, measurementData, sampleRounds, howToMeasures, preparedColorways] = await Promise.all([
+      this.prepareBOMDataOptimized(techpack.bom || [], currency, rawColorways, {
         quality: imageQuality,
         maxWidth: 800, // Smaller for BOM thumbnails
         maxHeight: 600,
@@ -852,7 +901,7 @@ class PDFService {
       measurements: measurementData,
       sampleMeasurementRounds: sampleRounds,
       howToMeasures,
-      colorways,
+      colorways: preparedColorways,
       packingNotes: techpack.packingNotes || '—',
       revisionHistory: [],
       summary,

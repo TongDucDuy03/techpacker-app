@@ -1188,13 +1188,17 @@ type RoundModalFormState = {
   };
 
   const handleEdit = (measurement: MeasurementPoint, index: number) => {
+    // Handle both UI field names (minusTolerance/plusTolerance) and backend field names (toleranceMinus/tolerancePlus)
+    const minusTolRaw = measurement.minusTolerance ?? (measurement as any).toleranceMinus;
+    const plusTolRaw = measurement.plusTolerance ?? (measurement as any).tolerancePlus;
+    
     // Convert tolerance from string to number if needed (backward compatibility)
-    const minusTol = typeof measurement.minusTolerance === 'string' 
-      ? parseTolerance(measurement.minusTolerance) 
-      : (measurement.minusTolerance ?? 1.0);
-    const plusTol = typeof measurement.plusTolerance === 'string'
-      ? parseTolerance(measurement.plusTolerance)
-      : (measurement.plusTolerance ?? 1.0);
+    const minusTol = typeof minusTolRaw === 'string' 
+      ? parseTolerance(minusTolRaw) 
+      : (minusTolRaw !== undefined && minusTolRaw !== null ? minusTolRaw : 1.0);
+    const plusTol = typeof plusTolRaw === 'string'
+      ? parseTolerance(plusTolRaw)
+      : (plusTolRaw !== undefined && plusTolRaw !== null ? plusTolRaw : 1.0);
 
     const measurementSizes = measurement.sizes ? Object.keys(measurement.sizes) : [];
     // Priority: measurementBaseSize (global) > measurement.baseSize > measurementSizes[0] > selectedSizes[0]
@@ -1827,12 +1831,17 @@ type RoundModalFormState = {
                   const hasIssues = validationResult.errors.length > 0 || validationResult.warnings.length > 0;
                   
                   // Format tolerance for display
-                  const minusTol = typeof measurement.minusTolerance === 'string' 
-                    ? parseTolerance(measurement.minusTolerance) 
-                    : (measurement.minusTolerance ?? 1.0);
-                  const plusTol = typeof measurement.plusTolerance === 'string'
-                    ? parseTolerance(measurement.plusTolerance)
-                    : (measurement.plusTolerance ?? 1.0);
+                  // Handle both UI field names (minusTolerance/plusTolerance) and backend field names (toleranceMinus/tolerancePlus)
+                  const minusTolRaw = measurement.minusTolerance ?? (measurement as any).toleranceMinus;
+                  const plusTolRaw = measurement.plusTolerance ?? (measurement as any).tolerancePlus;
+                  
+                  const minusTol = typeof minusTolRaw === 'string' 
+                    ? parseTolerance(minusTolRaw) 
+                    : (minusTolRaw !== undefined && minusTolRaw !== null ? minusTolRaw : 1.0);
+                  const plusTol = typeof plusTolRaw === 'string'
+                    ? parseTolerance(plusTolRaw)
+                    : (plusTolRaw !== undefined && plusTolRaw !== null ? plusTolRaw : 1.0);
+                  
                   const toleranceDisplay = minusTol === plusTol 
                     ? formatTolerance(minusTol, tableUnit).replace(/\s*(cm|inch)/gi, '')
                     : `-${minusTol.toFixed(1)} / +${plusTol.toFixed(1)}`;
