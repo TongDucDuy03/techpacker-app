@@ -636,11 +636,7 @@ class PDFService {
     const imageMaxWidth = imageOptions?.maxWidth || 1200;
     const imageMaxHeight = imageOptions?.maxHeight || 800;
     
-    const technicalDesignerName = 
-      (techpack.technicalDesignerId as any)?.firstName && 
-      (techpack.technicalDesignerId as any)?.lastName
-        ? `${(techpack.technicalDesignerId as any).firstName} ${(techpack.technicalDesignerId as any).lastName}`
-        : '—';
+    const technicalDesignerName = techpack.technicalDesignerId || '—';
 
     const articleSummary = {
       generalInfo: {

@@ -50,13 +50,12 @@ export function hasEditAccess(techpack: any, user: any): boolean {
 export function hasViewAccess(techpack: any, user: any): boolean {
   if (user.role === UserRole.Admin) return true; // Admin toàn quyền
   const isOwner = techpack.createdBy?.toString() === user._id.toString();
-  const isTechnicalDesigner = techpack.technicalDesignerId?.toString() === user._id.toString();
   const sharedAccess = techpack.sharedWith?.find((s: any) => s.userId?.toString() === user._id.toString());
   if (sharedAccess) {
     const effective = getEffectiveRole(user.role, sharedAccess.role);
-    return isOwner || isTechnicalDesigner || ['owner', 'admin', 'editor', 'viewer', 'factory'].includes(effective);
+    return isOwner || ['owner', 'admin', 'editor', 'viewer', 'factory'].includes(effective);
   }
-  return isOwner || isTechnicalDesigner;
+  return isOwner;
 }
 
 /**

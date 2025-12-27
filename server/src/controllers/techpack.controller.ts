@@ -142,10 +142,10 @@ export class TechPackController {
         // Admins can view all TechPacks without restriction
         query = {};
       } else if (user.role === UserRole.Designer) {
-        // Designers can see TechPacks they created, are technical designer for, or are shared with
+        // Designers can see TechPacks they created or are shared with
+        // Note: technicalDesignerId is now a string (name), not a user reference, so we can't filter by it
         query.$or = [
           { createdBy: user._id },
-          { technicalDesignerId: user._id },
           { 'sharedWith.userId': user._id }
         ];
       } else if (user.role === UserRole.Viewer) {
@@ -186,7 +186,6 @@ export class TechPackController {
       // Optimize: Only select fields needed for list view, exclude heavy nested arrays
       const [techpacks, total] = await Promise.all([
         TechPack.find(query)
-          .populate('technicalDesignerId', 'firstName lastName')
           .populate('createdBy', 'firstName lastName')
           .sort(sortOptions)
           .skip(skip)
@@ -254,9 +253,8 @@ export class TechPackController {
       if (cachedTechpack) {
         // Kiểm tra quyền truy cập từ cached data
         const isOwner = cachedTechpack.createdBy?._id?.toString() === requestUser._id.toString();
-        const isTechnicalDesigner = cachedTechpack.technicalDesignerId?._id?.toString() === requestUser._id.toString();
         const sharedAccess = cachedTechpack.sharedWith?.find((s: any) => s.userId._id?.toString() === requestUser._id.toString());
-        const hasAccess = requestUser.role === UserRole.Admin || isOwner || isTechnicalDesigner || sharedAccess;
+        const hasAccess = requestUser.role === UserRole.Admin || isOwner || sharedAccess;
 
         if (hasAccess) {
           return sendSuccess(res, cachedTechpack, 'TechPack retrieved from cache');
@@ -267,7 +265,7 @@ export class TechPackController {
       let techpack;
       try {
         techpack = await TechPack.findById(id)
-          .populate('technicalDesignerId createdBy updatedBy sharedWith.userId', 'firstName lastName email')
+          .populate('createdBy updatedBy sharedWith.userId', 'firstName lastName email')
           // Note: nested arrays (bom, measurements, colorways, howToMeasure) are embedded, not references
           // They are already included in the document, no need for additional populate
           .lean();
@@ -350,12 +348,8 @@ export class TechPackController {
           } else if (req.body[field] !== undefined && req.body[field] !== null && req.body[field] !== '') {
             (newTechPackData as any)[field] = req.body[field];
           } else {
-            // If field is technicalDesignerId and missing, use current user
-            if (field === 'technicalDesignerId') {
-              (newTechPackData as any)[field] = user._id;
-            } else {
-              missingFields.push(field);
-            }
+            // technicalDesignerId is now a required string field, must be provided by frontend
+            missingFields.push(field);
           }
         }
 
@@ -527,7 +521,7 @@ export class TechPackController {
           productDescription: articleInfo?.productDescription || req.body.productDescription,
           designSketchUrl: articleInfo?.designSketchUrl || req.body.designSketchUrl,
           companyLogoUrl: articleInfo?.companyLogoUrl || req.body.companyLogoUrl,
-          technicalDesignerId: articleInfo?.technicalDesignerId || req.body.technicalDesignerId || user._id,
+          technicalDesignerId: articleInfo?.technicalDesignerId || req.body.technicalDesignerId,
           status: TechPackStatus.Draft,
           // Additional fields from articleInfo
           category: articleInfo?.productClass || req.body.category || req.body.productClass,
@@ -619,7 +613,6 @@ export class TechPackController {
       try {
         // First try as ObjectId
         techpack = await TechPack.findById(id)
-          .populate('technicalDesignerId', 'firstName lastName email')
           .populate('createdBy', 'firstName lastName email')
           .populate('sharedWith.userId', 'firstName lastName email');
       } catch (error) {
@@ -627,7 +620,6 @@ export class TechPackController {
         try {
           // Use findOne with mixed type to handle string IDs
           techpack = await TechPack.findOne({ _id: id } as any)
-            .populate('technicalDesignerId', 'firstName lastName email')
             .populate('createdBy', 'firstName lastName email')
             .populate('sharedWith.userId', 'firstName lastName email');
         } catch (secondError) {
@@ -639,9 +631,10 @@ export class TechPackController {
         return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
       }
 
-      // Data integrity patch: If createdBy is missing, assign it from technical designer or current user
+      // Data integrity patch: If createdBy is missing, assign it from current user
+      // Note: technicalDesignerId is now a string (name), not a user reference
       if (!techpack.createdBy) {
-        techpack.createdBy = techpack.technicalDesignerId || user._id;
+        techpack.createdBy = user._id;
       }
 
       // Check access permissions using centralized helper
@@ -1095,8 +1088,10 @@ export class TechPackController {
       }
 
       const query: any = { _id: { $in: ids } };
+      // Note: technicalDesignerId is now a string (name), not a user reference, so we can't filter by it
+      // Designers can only operate on techpacks they created
       if (user.role === UserRole.Designer) {
-        query.technicalDesignerId = user._id;
+        query.createdBy = user._id;
       }
 
       let modifiedCount = 0;
@@ -1178,9 +1173,10 @@ export class TechPackController {
         return sendError(res, 'Cannot share with yourself.', 400, 'BAD_REQUEST');
       }
 
-      // Prevent sharing with system admin or technical designer
-      if (targetUser.role === UserRole.Admin || techpack.technicalDesignerId?.toString() === userId) {
-        return sendError(res, 'Cannot share with system admin or the assigned technical designer.', 400, 'BAD_REQUEST');
+      // Prevent sharing with system admin
+      // Note: technicalDesignerId is now a string (name), not a user reference, so we don't check it
+      if (targetUser.role === UserRole.Admin) {
+        return sendError(res, 'Cannot share with system admin.', 400, 'BAD_REQUEST');
       }
 
       const existingShareIndex = techpack.sharedWith?.findIndex(s => s.userId.toString() === userId) || -1;
@@ -1354,12 +1350,11 @@ export class TechPackController {
 
       // Get all users except:
       // - System admins
-      // - The technical designer
       // - Users already shared with
       // - The current user
+      // Note: technicalDesignerId is now a string (name), not a user reference, so we don't exclude it
       const excludedUserIds = [
         user._id.toString(),
-        techpack.technicalDesignerId?.toString(),
         ...(techpack.sharedWith?.map(s => s.userId.toString()) || [])
       ].filter(Boolean);
 
@@ -1556,7 +1551,6 @@ export class TechPackController {
 
       // Get techpack
       const techpack = await TechPack.findById(id)
-        .populate('technicalDesignerId', 'firstName lastName')
         .populate('createdBy', 'firstName lastName')
         .populate('updatedBy', 'firstName lastName')
         .lean();

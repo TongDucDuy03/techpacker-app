@@ -90,7 +90,7 @@ export const createTechPackSchema = z.object({
     articleName: z.string().min(1, 'Article name is required'),
     articleCode: z.string().min(1, 'Article code is required').transform(val => val.toUpperCase()),
     sampleType: z.string().max(120, 'Sample type must be 120 characters or less').optional(),
-    technicalDesignerId: objectIdSchema,
+    technicalDesignerId: z.string().min(1, 'Technical designer is required'),
     customerId: z.string().optional(),
     supplier: z.string().min(1, 'Supplier is required'),
     season: z.string().min(1, 'Season is required'),
@@ -135,7 +135,7 @@ export const updateTechPackSchema = z.object({
     articleName: z.string().min(1, 'Article name is required').optional(),
     articleCode: z.string().min(1, 'Article code is required').transform(val => val.toUpperCase()).optional(),
     sampleType: z.string().max(120, 'Sample type must not exceed 120 characters').optional(),
-    technicalDesignerId: objectIdSchema.optional(),
+    technicalDesignerId: z.string().min(1, 'Technical designer is required').optional(),
     customerId: z.string().optional(),
     supplier: z.string().min(1, 'Supplier is required').optional(),
     season: z.string().min(1, 'Season is required').optional(),
@@ -176,7 +176,7 @@ export const listTechPacksSchema = z.object({
     limit: z.string().transform(val => parseInt(val, 10)).refine(val => val > 0 && val <= 100, 'Limit must be between 1 and 100').optional(),
     q: z.string().optional(),
     status: z.nativeEnum(TechPackStatus).optional(),
-    technicalDesignerId: objectIdSchema.optional()
+    technicalDesignerId: z.string().optional()
   })
 });
 

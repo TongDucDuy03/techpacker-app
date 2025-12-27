@@ -53,7 +53,6 @@ export class NotificationService {
     try {
       const techpack = await TechPack.findById(techPackId)
         .populate('createdBy', 'email')
-        .populate('technicalDesignerId', 'email')
         .populate('sharedWith.userId', 'email');
 
       const userIds: string[] = [];
@@ -63,10 +62,7 @@ export class NotificationService {
         userIds.push(String(techpack.createdBy._id || techpack.createdBy));
       }
 
-      // Add technical designer
-      if (techpack?.technicalDesignerId) {
-        userIds.push(String(techpack.technicalDesignerId._id || techpack.technicalDesignerId));
-      }
+      // Note: technicalDesignerId is now a string (name), not a user reference, so we don't add it to userIds
 
       // Add shared users (editors and viewers)
       if (techpack?.sharedWith) {

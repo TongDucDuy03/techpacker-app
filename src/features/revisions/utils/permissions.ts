@@ -11,7 +11,7 @@ export const useRevisionPermissions = (techPack: TechPack | undefined) => {
   const isOwner = techPack.createdBy === user._id || techPack.createdBy?._id === user._id;
   const isAdmin = user.role === 'admin';
   const isMerchandiser = user.role === 'merchandiser';
-  const isTechnicalDesigner = techPack.technicalDesignerId === user._id || techPack.technicalDesignerId?._id === user._id;
+  // Note: technicalDesignerId is now a string (name), not a user reference
 
   // Check shared access
   const sharedAccess = techPack.sharedWith?.find((share: any) => {
@@ -22,10 +22,10 @@ export const useRevisionPermissions = (techPack: TechPack | undefined) => {
   const hasSharedViewAccess = !!sharedAccess && ['owner', 'admin', 'editor', 'viewer', 'factory'].includes(sharedAccess.role);
   const hasSharedEditAccess = !!sharedAccess && ['owner', 'admin', 'editor'].includes(sharedAccess.role);
 
-  // View access: Admin, Owner, Technical Designer, or Shared users (all roles)
-  const canView = isAdmin || isOwner || isTechnicalDesigner || hasSharedViewAccess;
+  // View access: Admin, Owner, or Shared users (all roles)
+  const canView = isAdmin || isOwner || hasSharedViewAccess;
 
-  // Edit access: Admin, Owner, or Shared Editor (Technical Designer excluded)
+  // Edit access: Admin, Owner, or Shared Editor
   const canEdit = isAdmin || isOwner || hasSharedEditAccess;
 
   // Approve/Reject access: Admin or Merchandiser

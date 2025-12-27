@@ -173,7 +173,7 @@ export interface ITechPack extends Document {
   articleName: string; // Renamed from productName
   articleCode: string;
   sampleType: string; // Renamed from version
-  technicalDesignerId: Types.ObjectId;
+  technicalDesignerId: string;
   customerId?: string;
   supplier: string;
   season: string;
@@ -378,9 +378,9 @@ const TechPackSchema = new Schema<ITechPack>(
       maxlength: 120
     },
     technicalDesignerId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
+      type: String,
+      required: [true, 'Technical designer is required'],
+      trim: true
     },
     customerId: { type: String, trim: true },
     sharedWith: [SharedAccessSchema],
