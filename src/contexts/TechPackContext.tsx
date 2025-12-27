@@ -2054,14 +2054,28 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
 
   const addMeasurement = (measurement: MeasurementPoint) => {
     setState(prev => {
-      const baseSize =
-        prev.techpack.measurementBaseSize ||
-        (prev.techpack.measurementSizeRange && prev.techpack.measurementSizeRange[0]) ||
-        '';
-      const normalizedMeasurement =
-        baseSize && measurement.baseSize !== baseSize
-          ? { ...measurement, baseSize }
-          : measurement;
+      // Use the baseSize from the measurement if provided, otherwise fallback to global baseSize
+      // This ensures user-selected baseSize is preserved
+      const sizeRange = prev.techpack.measurementSizeRange || [];
+      const globalBaseSize = prev.techpack.measurementBaseSize;
+      
+      // Determine the baseSize for the new measurement:
+      // 1. Use measurement.baseSize if it exists and is valid
+      // 2. Otherwise use globalBaseSize if it exists and is valid
+      // 3. Otherwise use first size in range
+      let resolvedBaseSize = measurement.baseSize;
+      if (!resolvedBaseSize || !sizeRange.includes(resolvedBaseSize)) {
+        if (globalBaseSize && sizeRange.includes(globalBaseSize)) {
+          resolvedBaseSize = globalBaseSize;
+        } else if (sizeRange.length > 0) {
+          resolvedBaseSize = sizeRange[0];
+        }
+      }
+      
+      const normalizedMeasurement = resolvedBaseSize
+        ? { ...measurement, baseSize: resolvedBaseSize }
+        : measurement;
+      
       const nextMeasurements = [...prev.techpack.measurements, normalizedMeasurement];
       const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
       return {
@@ -2078,14 +2092,28 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
 
   const insertMeasurementAt = (index: number, measurement: MeasurementPoint) => {
     setState(prev => {
-      const baseSize =
-        prev.techpack.measurementBaseSize ||
-        (prev.techpack.measurementSizeRange && prev.techpack.measurementSizeRange[0]) ||
-        '';
-      const normalizedMeasurement =
-        baseSize && measurement.baseSize !== baseSize
-          ? { ...measurement, baseSize }
-          : measurement;
+      // Use the baseSize from the measurement if provided, otherwise fallback to global baseSize
+      // This ensures user-selected baseSize is preserved
+      const sizeRange = prev.techpack.measurementSizeRange || [];
+      const globalBaseSize = prev.techpack.measurementBaseSize;
+      
+      // Determine the baseSize for the new measurement:
+      // 1. Use measurement.baseSize if it exists and is valid
+      // 2. Otherwise use globalBaseSize if it exists and is valid
+      // 3. Otherwise use first size in range
+      let resolvedBaseSize = measurement.baseSize;
+      if (!resolvedBaseSize || !sizeRange.includes(resolvedBaseSize)) {
+        if (globalBaseSize && sizeRange.includes(globalBaseSize)) {
+          resolvedBaseSize = globalBaseSize;
+        } else if (sizeRange.length > 0) {
+          resolvedBaseSize = sizeRange[0];
+        }
+      }
+      
+      const normalizedMeasurement = resolvedBaseSize
+        ? { ...measurement, baseSize: resolvedBaseSize }
+        : measurement;
+      
       const nextMeasurements = [...prev.techpack.measurements];
       const insertIndex = Math.min(Math.max(index + 1, 0), nextMeasurements.length);
       nextMeasurements.splice(insertIndex, 0, normalizedMeasurement);
