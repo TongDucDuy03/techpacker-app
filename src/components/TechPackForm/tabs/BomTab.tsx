@@ -1515,7 +1515,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               value={formData.supplierCode || ''}
               onChange={handleInputChange('supplierCode')}
               onBlur={() => validation.setFieldTouched('supplierCode')}
-              placeholder="Material code (e.g., MAT-001)"
+              placeholder="Enter supplier code"
               required
               error={validation.getFieldProps('supplierCode').error}
               helperText={validation.getFieldProps('supplierCode').helperText}

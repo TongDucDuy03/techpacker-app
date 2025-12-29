@@ -102,11 +102,12 @@ export const bomItemValidationSchema: FormValidationConfig = {
   },
   supplierCode: {
     required: true,
-    minLength: 2,
-    maxLength: 50,
     custom: (value: string) => {
-      if (!value || value.trim().length < 2) return 'Mã vật liệu phải ít nhất 2 ký tự.';
-      if (!/^[A-Z0-9-]{2,50}$/.test(String(value).toUpperCase())) return "Mã vật liệu chỉ gồm chữ hoa, số và dấu '-'.";
+      // Only validate: not null/undefined and not empty after trim
+      // Accept any characters (no regex validation)
+      if (!value || value.trim().length === 0) {
+        return 'Supplier Code is required.';
+      }
       return null;
     }
   },
