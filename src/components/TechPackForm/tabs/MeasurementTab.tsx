@@ -18,7 +18,7 @@ import { Plus, Upload, Download, Ruler, AlertTriangle, Info, AlertCircle, X, Sav
 import { showSuccess, showWarning, showError } from '../../../lib/toast';
 import SampleMeasurementsTable from './SampleMeasurementsTable';
 import { SampleMeasurementRow } from '../../../types/measurements';
-import { parseTolerance, formatTolerance, parseStepValue, formatStepValue, formatMeasurementValue } from './measurementHelpers';
+import { parseTolerance, formatToleranceNoUnit, parseStepValue, formatStepValue, formatMeasurementValue } from './measurementHelpers';
 import { MEASUREMENT_UNITS, DEFAULT_MEASUREMENT_UNIT, MeasurementUnit, getMeasurementUnitSuffix } from '../../../types/techpack';
 import { SIZE_PRESET_OPTIONS, getPresetById } from '../../../constants/sizePresets';
 import ConfirmationDialog from '../../ConfirmationDialog';
@@ -1885,9 +1885,8 @@ type RoundModalFormState = {
                     ? parseTolerance(plusTolRaw)
                     : (plusTolRaw !== undefined && plusTolRaw !== null ? plusTolRaw : 1.0);
                   
-                  const toleranceDisplay = minusTol === plusTol 
-                    ? formatTolerance(minusTol, tableUnit).replace(/\s*(cm|inch)/gi, '')
-                    : `-${minusTol.toFixed(1)} / +${plusTol.toFixed(1)}`;
+                  // Format tolerance without unit for consistent display
+                  const toleranceDisplay = formatToleranceNoUnit(minusTol, plusTol);
                   const rowBackgroundColor = validationResult.errors.length > 0
                     ? '#fee2e2'
                     : validationResult.warnings.length > 0

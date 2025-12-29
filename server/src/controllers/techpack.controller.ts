@@ -64,13 +64,24 @@ function mergeSubdocumentArray<T extends { _id?: Types.ObjectId; id?: string }>(
     
     if (existingItem) {
       // Update existing item - preserve _id from existing item
-      const updatedItem = {
+      // For measurements: preserve tolerance values if newItem doesn't have them (to prevent reset to default)
+      const updatedItem: any = {
         ...existingItem,
         ...newItem,
         _id: existingItem._id // Preserve original _id from database
       };
+      
+      // Special handling for measurements: preserve toleranceMinus/tolerancePlus if newItem doesn't provide them
+      // This prevents tolerance from being reset to default when updating other fields
+      if ((existingItem as any).toleranceMinus !== undefined && (newItem as any).toleranceMinus === undefined) {
+        updatedItem.toleranceMinus = (existingItem as any).toleranceMinus;
+      }
+      if ((existingItem as any).tolerancePlus !== undefined && (newItem as any).tolerancePlus === undefined) {
+        updatedItem.tolerancePlus = (existingItem as any).tolerancePlus;
+      }
+      
       // Remove temporary id if it exists (keep _id only for Mongoose)
-      delete (updatedItem as any).id;
+      delete updatedItem.id;
       merged.push(updatedItem as T);
     } else {
       // New item - create with new _id

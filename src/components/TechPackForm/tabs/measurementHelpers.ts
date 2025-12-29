@@ -19,6 +19,65 @@ export const formatTolerance = (value: number, unit?: MeasurementUnit): string =
   return `±${normalized.toFixed(1)} ${suffix}`;
 };
 
+/**
+ * Format tolerance without unit suffix
+ * Input can be:
+ * - number: 2.0 -> "±2.0"
+ * - string: "±2.0 mm", "-2.0 / +2.3", "±1.0", "-1.2/+2.5 cm"
+ * - object: {minus: -2, plus: 2.3} -> "-2.0 / +2.3"
+ * Output: string without unit (mm/cm/inch/in)
+ * - "±2.0"
+ * - "-2.0 / +2.3"
+ * - "±1.0"
+ */
+export const formatToleranceNoUnit = (
+  minus: number | string | undefined,
+  plus?: number | string | undefined
+): string => {
+  // If both are provided and different, format as range
+  if (minus !== undefined && plus !== undefined) {
+    const minusNum = typeof minus === 'string' ? parseTolerance(minus) : (typeof minus === 'number' ? minus : 0);
+    const plusNum = typeof plus === 'string' ? parseTolerance(plus) : (typeof plus === 'number' ? plus : 0);
+    
+    if (minusNum === plusNum) {
+      return `±${Math.abs(minusNum).toFixed(1)}`;
+    }
+    return `-${Math.abs(minusNum).toFixed(1)} / +${Math.abs(plusNum).toFixed(1)}`;
+  }
+  
+  // If only one is provided, use it for both (symmetric)
+  const value = minus !== undefined ? minus : plus;
+  if (value === undefined) {
+    return '—';
+  }
+  
+  const numValue = typeof value === 'string' ? parseTolerance(value) : (typeof value === 'number' ? value : 0);
+  return `±${Math.abs(numValue).toFixed(1)}`;
+};
+
+/**
+ * Format tolerance string by removing unit suffixes
+ * Handles strings like "±2.0 mm", "-2.0 / +2.3", "±1.0", "-1.2/+2.5 cm"
+ * Removes: mm, cm, in, inch, inches (case-insensitive)
+ * Normalizes whitespace around "/"
+ */
+export const formatToleranceStringNoUnit = (toleranceStr: string | undefined | null): string => {
+  if (!toleranceStr || typeof toleranceStr !== 'string') {
+    return '—';
+  }
+  
+  // Remove unit suffixes (mm, cm, in, inch, inches) - case insensitive
+  let cleaned = toleranceStr.replace(/\s*(mm|cm|in|inch|inches)\s*/gi, '');
+  
+  // Normalize whitespace around "/"
+  cleaned = cleaned.replace(/\s*\/\s*/g, ' / ');
+  
+  // Trim whitespace
+  cleaned = cleaned.trim();
+  
+  return cleaned || '—';
+};
+
 const FRACTION_DENOMS = [2, 4, 8] as const;
 const FRACTION_EPSILON = 1e-4;
 

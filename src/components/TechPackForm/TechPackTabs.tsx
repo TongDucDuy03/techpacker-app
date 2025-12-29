@@ -28,7 +28,7 @@ import {
   ArrowLeft,
   Archive
 } from 'lucide-react';
-import { showError, showWarning } from '../../lib/toast';
+import { showError, showWarning, showSuccess } from '../../lib/toast';
 import { Modal } from 'antd';
 import { DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR, DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR } from '../../constants/measurementDisplay';
 
@@ -509,17 +509,20 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
           console.log('[TechPackTabs] Calling saveTechPack (confirmed)...');
           await saveTechPack();
           console.log('[TechPackTabs] saveTechPack completed');
-           onBackToList();
+          // ✅ FIXED: Do NOT redirect when updating - stay on current page and tab
+          // Only show success message
+          showSuccess('TechPack đã được cập nhật thành công!');
         }
       });
       return;
     }
 
-    // For create flow: no confirmation
+    // For create flow: no confirmation, redirect to list after create
     console.log('[TechPackTabs] Calling saveTechPack (create)...');
     await saveTechPack();
     console.log('[TechPackTabs] saveTechPack completed');
-     onBackToList();
+    // ✅ CREATE: Redirect to list after creating new techpack
+    onBackToList();
   };
 
   const handleExportPDF = async () => {
