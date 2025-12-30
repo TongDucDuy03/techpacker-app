@@ -810,8 +810,9 @@
                               <div style="margin-bottom: 15px">
                                 <strong>SIZE RANGE:</strong>
                                 <div style="margin-top: 8px">
+                                  <% const baseSize = measurements.baseSize; %>
                                   <% measurements.sizeRange.forEach(size=> { %>
-                                    <span class="size-badge">
+                                    <span class="size-badge" style="<%= size === baseSize ? 'background: #79e5a5; color: #000;' : '' %>">
                                       <%= size %>
                                     </span>
                                     <% }); %>
