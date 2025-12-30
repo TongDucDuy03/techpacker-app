@@ -311,7 +311,7 @@ class PDFService {
         imageUrl,
         placement: this.normalizeText(item.placement),
         sizeWidthUsage: sizeInfo.length > 0 ? sizeInfo.join(' / ') : '—',
-        quantity: item.quantity || 0,
+        quantity: item.quantity !== undefined && item.quantity !== null ? item.quantity : 0, // PDF template expects number, will display '—' if 0
         uom: this.normalizeText(item.uom),
         supplier: this.normalizeText(item.supplier),
         unitPrice: item.unitPrice ? `${item.unitPrice} ${currency}` : '—',
@@ -636,11 +636,7 @@ class PDFService {
     const imageMaxWidth = imageOptions?.maxWidth || 1200;
     const imageMaxHeight = imageOptions?.maxHeight || 800;
     
-    const technicalDesignerName = 
-      (techpack.technicalDesignerId as any)?.firstName && 
-      (techpack.technicalDesignerId as any)?.lastName
-        ? `${(techpack.technicalDesignerId as any).firstName} ${(techpack.technicalDesignerId as any).lastName}`
-        : '—';
+    const technicalDesignerName = techpack.technicalDesignerId || '—';
 
     const articleSummary = {
       generalInfo: {
@@ -657,7 +653,7 @@ class PDFService {
         retailPrice: techpack.retailPrice ? `${techpack.retailPrice} ${currency}` : '—',
       },
       technicalInfo: {
-        fitType: '—',
+        fitType: techpack.fitType || '—',
         productClass: techpack.category || '—',
         supplier: techpack.supplier || '—',
         technicalDesignerId: technicalDesignerName,

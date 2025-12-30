@@ -29,7 +29,6 @@ const safeId = (obj: any): string => {
 const hasViewAccess = (techpack: any, user: any): boolean => {
   const isOwner = safeId(techpack.createdBy) === safeId(user._id);
   const isAdmin = user.role === UserRole.Admin;
-  const isTechnicalDesigner = safeId(techpack.technicalDesignerId) === safeId(user._id);
   
   const sharedAccess = techpack.sharedWith?.find((s: any) => {
     const sharedUserId = safeId(s.userId);
@@ -40,10 +39,10 @@ const hasViewAccess = (techpack: any, user: any): boolean => {
     // Use effective role to check permissions
     const effectiveRole = getEffectiveRole(user.role, sharedAccess.role);
     const hasSharedViewAccess = ['owner', 'admin', 'editor', 'viewer', 'factory'].includes(effectiveRole);
-    return isAdmin || isOwner || isTechnicalDesigner || hasSharedViewAccess;
+    return isAdmin || isOwner || hasSharedViewAccess;
   }
   
-  return isAdmin || isOwner || isTechnicalDesigner;
+  return isAdmin || isOwner;
 };
 
 /**

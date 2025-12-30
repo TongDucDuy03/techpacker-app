@@ -8,7 +8,7 @@ import {
 } from '../../../types/techpack';
 import { getMeasurementUnitSuffix, DEFAULT_MEASUREMENT_UNIT, MeasurementUnit } from '../../../types/techpack';
 import { SampleMeasurementRow } from '../../../types/measurements';
-import { parseTolerance, formatTolerance } from './measurementHelpers';
+import { parseTolerance, formatToleranceNoUnit } from './measurementHelpers';
 
 type EditableSampleField = 'measured' | 'diff' | 'revised' | 'comments';
 
@@ -120,23 +120,33 @@ const getToleranceDisplay = (row: SampleMeasurementRow, tableUnit: MeasurementUn
     return { label: '—' };
   }
 
-  const minus = parseTolerance(row.measurement.minusTolerance);
-  const plus = parseTolerance(row.measurement.plusTolerance);
+  // Priority: UI field names (minusTolerance/plusTolerance) > backend field names (toleranceMinus/tolerancePlus)
+  // Use explicit check for undefined/null to allow 0 as a valid value
+  const minusRaw = row.measurement.minusTolerance ?? (row.measurement as any).toleranceMinus;
+  const plusRaw = row.measurement.plusTolerance ?? (row.measurement as any).tolerancePlus;
+  
+  // Only parse if we have a value, otherwise return undefined to show '—'
+  const minus = (minusRaw !== undefined && minusRaw !== null) ? parseTolerance(minusRaw) : undefined;
+  const plus = (plusRaw !== undefined && plusRaw !== null) ? parseTolerance(plusRaw) : undefined;
+  
+  // If both are undefined, show '—' instead of defaulting to ±1.0
+  if (minus === undefined && plus === undefined) {
+    return { label: '—' };
+  }
+  
+  // If only one is undefined, use the other value for both (symmetric tolerance)
+  const resolvedMinus = minus !== undefined ? minus : (plus !== undefined ? plus : 1.0);
+  const resolvedPlus = plus !== undefined ? plus : (minus !== undefined ? minus : 1.0);
+  
   const unitSuffix = getMeasurementUnitSuffix(tableUnit);
 
-  if (minus === plus) {
-    return {
-      label: formatTolerance(minus, tableUnit),
-      minus,
-      plus,
-      unitSuffix,
-    };
-  }
+  // Format tolerance without unit for consistent display
+  const toleranceLabel = formatToleranceNoUnit(resolvedMinus, resolvedPlus);
 
   return {
-      label: `-${minus.toFixed(1)} / +${plus.toFixed(1)}`,
-    minus,
-    plus,
+    label: toleranceLabel,
+    minus: resolvedMinus,
+    plus: resolvedPlus,
     unitSuffix,
   };
 };
@@ -279,19 +289,14 @@ const getDiffToneClass = (value: string): string => {
                 return FIELD_SEQUENCE.map(fieldKey => {
                   const cellKey = `${round.id}-${row.key}-${size}-${fieldKey}`;
                   
-                  // Always get the correct requested value for this specific row
+                  // ALWAYS use measurement.sizes as source of truth for requested values
+                  // entry.requested is just a snapshot, measurements table is the authoritative source
                   const measurementRequestedValue = row.measurement?.sizes?.[size];
-                  const entryRequestedValue = entry?.requested?.[size];
-                  const requestedValue =
-                    entryRequestedValue !== undefined &&
-                    entryRequestedValue !== null &&
-                    String(entryRequestedValue).trim() !== ''
-                      ? String(entryRequestedValue)
-                      : measurementRequestedValue !== undefined && measurementRequestedValue !== null
-                        ? String(measurementRequestedValue)
-                        : '';
+                  const requestedValue = measurementRequestedValue !== undefined && measurementRequestedValue !== null
+                    ? String(measurementRequestedValue)
+                    : '';
                   
-                  // For requested field: prioritize entry.requested overrides, then fall back to measurement.sizes
+                  // For requested field: always use measurement.sizes (source of truth)
                   if (fieldKey === 'requested') {
                     return (
                       <td
@@ -399,8 +404,7 @@ const getDiffToneClass = (value: string): string => {
                     ? { minus: tolerance.minus, plus: tolerance.plus }
                     : undefined;
 
-                  // Get the correct requested value for this row (same logic as requested field)
-                  // Prioritize measurement.sizes first, then entry.requested as fallback
+                  // ALWAYS use measurement.sizes as source of truth (same as requested field above)
                   const requestedNumber = requestedValue ? parseFloat(requestedValue) : undefined;
                   const measuredNumber = fieldKey === 'measured' && fieldValue ? parseFloat(fieldValue) : undefined;
                   const diffNumber = fieldKey === 'diff' && fieldValue ? parseFloat(fieldValue) : undefined;

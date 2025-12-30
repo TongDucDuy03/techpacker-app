@@ -411,7 +411,8 @@ const normalizeValueMap = (
 const buildRequestedValueMap = (
   measurement?: MeasurementPoint,
   sizeKeys: string[] = [],
-  fallback?: SampleEntryFieldValue
+  fallback?: SampleEntryFieldValue,
+  forceRebuild?: boolean // New parameter: if true, rebuild from measurement.sizes, ignoring fallback
 ): MeasurementSampleValueMap => {
   const measurementValues =
     measurement?.sizes && Object.keys(measurement.sizes).length > 0
@@ -420,6 +421,17 @@ const buildRequestedValueMap = (
           return acc;
         }, {})
       : undefined;
+
+  // If forceRebuild is true, always use measurement values (when measurements are updated, we want to sync requested values)
+  if (forceRebuild && measurementValues) {
+    const combinedKeys = Array.from(
+      new Set([
+        ...sizeKeys,
+        ...Object.keys(measurementValues),
+      ])
+    );
+    return normalizeValueMap(combinedKeys.length ? combinedKeys : Object.keys(measurementValues), undefined, measurementValues);
+  }
 
   const fallbackValues = convertMapToRecord(fallback);
   const combinedKeys = Array.from(
@@ -536,10 +548,12 @@ const generateEntriesForRequestedSource = (
 
 const normalizeSampleEntry = (
   entry: Partial<MeasurementSampleEntry>,
-  measurement?: MeasurementPoint
+  measurement?: MeasurementPoint,
+  forceRebuildRequested?: boolean // New parameter: if true, rebuild requested values from measurement.sizes
 ): MeasurementSampleEntry => {
   const sizeKeys = resolveSizeKeys(measurement, entry);
-  const requested = buildRequestedValueMap(measurement, sizeKeys, entry.requested);
+  // When syncing with updated measurements, rebuild requested values to reflect new measurement.sizes
+  const requested = buildRequestedValueMap(measurement, sizeKeys, entry.requested, forceRebuildRequested);
   const measured = normalizeValueMap(sizeKeys, entry.measured);
   const diff = normalizeValueMap(sizeKeys, entry.diff);
   const revised = normalizeValueMap(sizeKeys, entry.revised);
@@ -596,7 +610,8 @@ const normalizeSampleRound = (round: Partial<MeasurementSampleRound>): Measureme
 
 const syncRoundWithMeasurements = (
   round: MeasurementSampleRound,
-  measurements: MeasurementPoint[]
+  measurements: MeasurementPoint[],
+  forceRebuildRequested: boolean = false // New parameter: if true, rebuild requested values from measurement.sizes
 ): MeasurementSampleRound => {
   if (!measurements || measurements.length === 0) {
     return {
@@ -611,7 +626,8 @@ const syncRoundWithMeasurements = (
     .filter(entry => !entry.measurementId || measurementMap.has(entry.measurementId))
     .map(entry => {
       const measurement = entry.measurementId ? measurementMap.get(entry.measurementId) : undefined;
-      return normalizeSampleEntry(entry, measurement);
+      // When syncing with updated measurements, rebuild requested values to reflect new measurement.sizes
+      return normalizeSampleEntry(entry, measurement, forceRebuildRequested);
     });
 
   measurementMap.forEach(measurement => {
@@ -629,7 +645,8 @@ const syncRoundWithMeasurements = (
 
 const normalizeSampleRounds = (
   rounds: MeasurementSampleRound[] | undefined,
-  measurements: MeasurementPoint[]
+  measurements: MeasurementPoint[],
+  forceRebuildRequested: boolean = false // New parameter: if true, rebuild requested values from measurement.sizes
 ): MeasurementSampleRound[] => {
   const normalizedRounds = Array.isArray(rounds) && rounds.length > 0
     ? rounds.map(round => normalizeSampleRound(round))
@@ -647,7 +664,7 @@ const normalizeSampleRounds = (
           ]
         : [];
 
-  return baseRounds.map(round => syncRoundWithMeasurements(round, measurements));
+  return baseRounds.map(round => syncRoundWithMeasurements(round, measurements, forceRebuildRequested));
 };
 
 const parseNumericValue = (value: string | number | null | undefined): number | undefined => {
@@ -706,22 +723,38 @@ const buildMeasurementPayloads = (techpackData: TechPackFormState['techpack']) =
     // Priority: UI field names (minusTolerance/plusTolerance) > backend field names (toleranceMinus/tolerancePlus) > default 1.0
     // This ensures that when user edits tolerance in UI, the new values are preserved
     // Use explicit check for undefined/null to allow 0 as a valid value
+    // IMPORTANT: Only use default 1.0 if measurement is truly new (no existing tolerance values)
+    // For existing measurements, preserve existing tolerance values to prevent reset
     const resolvedMinus = 
       (minusTolerance !== undefined && minusTolerance !== null) ? minusTolerance :
       (toleranceMinus !== undefined && toleranceMinus !== null) ? toleranceMinus :
-      1.0;
+      // Only default to 1.0 if this is a new measurement (no id/_id), otherwise preserve existing value
+      (measurement?.id || measurement?._id) ? undefined : 1.0;
     const resolvedPlus = 
       (plusTolerance !== undefined && plusTolerance !== null) ? plusTolerance :
       (tolerancePlus !== undefined && tolerancePlus !== null) ? tolerancePlus :
-      1.0;
+      // Only default to 1.0 if this is a new measurement (no id/_id), otherwise preserve existing value
+      (measurement?.id || measurement?._id) ? undefined : 1.0;
+    
     const resolvedUnit = (measurement?.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT;
 
-    return {
+    // Only include tolerance fields if they have valid values
+    // For existing measurements, if tolerance is undefined, don't include it in payload
+    // This allows backend mergeSubdocumentArray to preserve existing tolerance values
+    const payload: any = {
       ...rest,
       unit: resolvedUnit,
-      toleranceMinus: resolvedMinus,
-      tolerancePlus: resolvedPlus,
     };
+    
+    // Only include tolerance if we have valid values (not undefined)
+    if (resolvedMinus !== undefined) {
+      payload.toleranceMinus = resolvedMinus;
+    }
+    if (resolvedPlus !== undefined) {
+      payload.tolerancePlus = resolvedPlus;
+    }
+    
+    return payload;
   });
 
   const measurementNameMap = new Map(
@@ -876,7 +909,7 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
       })(),
       gender: resolvedGender,
       productClass: resolvedProductClass,
-      fitType: 'Regular' as const,
+      fitType: ((apiTechPack as any).fitType || 'Regular') as 'Regular' | 'Slim' | 'Loose' | 'Relaxed' | 'Oversized',
       supplier: (apiTechPack as any).supplier || '',
       technicalDesignerId: typeof (apiTechPack as any).technicalDesignerId === 'object'
         ? (apiTechPack as any).technicalDesignerId?._id || ''
@@ -938,7 +971,7 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
         }))
       : [],
     measurements: Array.isArray((apiTechPack as any).measurements)
-      ? ((apiTechPack as any).measurements || []).map((measurement: any) => {
+      ? ((apiTechPack as any).measurements || []).map((measurement: any, index: number) => {
           // Map toleranceMinus/tolerancePlus to minusTolerance/plusTolerance for UI consistency
           const {
             toleranceMinus,
@@ -954,6 +987,14 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
           const loadedMinus = (toleranceMinus !== undefined && toleranceMinus !== null) ? toleranceMinus : 1.0;
           const loadedPlus = (tolerancePlus !== undefined && tolerancePlus !== null) ? tolerancePlus : 1.0;
           
+          // Ensure clientKey is set for UI selection (normalize here to avoid triggering unsaved changes)
+          const generateClientKey = () => {
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+              return crypto.randomUUID();
+            }
+            return `${Date.now()}_${index}_${Math.random().toString(36).slice(2)}`;
+          };
+          
           return {
             ...rest,
             // Map backend field names to UI field names
@@ -962,6 +1003,8 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
             // Also keep toleranceMinus/tolerancePlus for backward compatibility
             toleranceMinus: loadedMinus,
             tolerancePlus: loadedPlus,
+            // Ensure clientKey exists for UI row keys (frontend-only, not persisted to backend)
+            clientKey: measurement.clientKey || `m_${generateClientKey()}`,
           };
         })
       : [],
@@ -1643,6 +1686,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           status: techpackData.status,
           category: techpackData.articleInfo.productClass,
           gender: techpackData.articleInfo.gender,
+          fitType: techpackData.articleInfo.fitType as any,
           technicalDesignerId: techpackData.articleInfo.technicalDesignerId,
           lifecycleStage: techpackData.articleInfo.lifecycleStage as any,
           collectionName: (techpackData.articleInfo as any).collection,
@@ -1735,6 +1779,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           companyLogoUrl: (techpackData.articleInfo as any).companyLogoUrl || '',
           productClass: techpackData.articleInfo.productClass,
           gender: techpackData.articleInfo.gender,
+          fitType: techpackData.articleInfo.fitType as any,
           technicalDesignerId: techpackData.articleInfo.technicalDesignerId,
           lifecycleStage: techpackData.articleInfo.lifecycleStage as any,
           collection: (techpackData.articleInfo as any).collection,
@@ -1966,7 +2011,9 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         };
       });
 
-      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
+      // Force rebuild requested values when baseSize changes due to size range update
+      const baseSizeChanged = prevBaseSize !== nextBaseSize;
+      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements, baseSizeChanged);
 
       return {
         ...prev,
@@ -1994,11 +2041,15 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         return prev;
       }
 
+      // Update all measurements with new baseSize
       const nextMeasurements = prev.techpack.measurements.map(measurement => ({
         ...measurement,
         baseSize: normalizedBaseSize,
       }));
-      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
+      
+      // Force rebuild requested values in sample rounds to sync with new baseSize
+      // This ensures sample rounds use the new baseSize from updated measurements
+      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements, true);
 
       const updatedTechpack = {
         ...prev.techpack,
@@ -2054,14 +2105,28 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
 
   const addMeasurement = (measurement: MeasurementPoint) => {
     setState(prev => {
-      const baseSize =
-        prev.techpack.measurementBaseSize ||
-        (prev.techpack.measurementSizeRange && prev.techpack.measurementSizeRange[0]) ||
-        '';
-      const normalizedMeasurement =
-        baseSize && measurement.baseSize !== baseSize
-          ? { ...measurement, baseSize }
-          : measurement;
+      // Use the baseSize from the measurement if provided, otherwise fallback to global baseSize
+      // This ensures user-selected baseSize is preserved
+      const sizeRange = prev.techpack.measurementSizeRange || [];
+      const globalBaseSize = prev.techpack.measurementBaseSize;
+      
+      // Determine the baseSize for the new measurement:
+      // 1. Use measurement.baseSize if it exists and is valid
+      // 2. Otherwise use globalBaseSize if it exists and is valid
+      // 3. Otherwise use first size in range
+      let resolvedBaseSize = measurement.baseSize;
+      if (!resolvedBaseSize || !sizeRange.includes(resolvedBaseSize)) {
+        if (globalBaseSize && sizeRange.includes(globalBaseSize)) {
+          resolvedBaseSize = globalBaseSize;
+        } else if (sizeRange.length > 0) {
+          resolvedBaseSize = sizeRange[0];
+        }
+      }
+      
+      const normalizedMeasurement = resolvedBaseSize
+        ? { ...measurement, baseSize: resolvedBaseSize }
+        : measurement;
+      
       const nextMeasurements = [...prev.techpack.measurements, normalizedMeasurement];
       const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
       return {
@@ -2078,14 +2143,28 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
 
   const insertMeasurementAt = (index: number, measurement: MeasurementPoint) => {
     setState(prev => {
-      const baseSize =
-        prev.techpack.measurementBaseSize ||
-        (prev.techpack.measurementSizeRange && prev.techpack.measurementSizeRange[0]) ||
-        '';
-      const normalizedMeasurement =
-        baseSize && measurement.baseSize !== baseSize
-          ? { ...measurement, baseSize }
-          : measurement;
+      // Use the baseSize from the measurement if provided, otherwise fallback to global baseSize
+      // This ensures user-selected baseSize is preserved
+      const sizeRange = prev.techpack.measurementSizeRange || [];
+      const globalBaseSize = prev.techpack.measurementBaseSize;
+      
+      // Determine the baseSize for the new measurement:
+      // 1. Use measurement.baseSize if it exists and is valid
+      // 2. Otherwise use globalBaseSize if it exists and is valid
+      // 3. Otherwise use first size in range
+      let resolvedBaseSize = measurement.baseSize;
+      if (!resolvedBaseSize || !sizeRange.includes(resolvedBaseSize)) {
+        if (globalBaseSize && sizeRange.includes(globalBaseSize)) {
+          resolvedBaseSize = globalBaseSize;
+        } else if (sizeRange.length > 0) {
+          resolvedBaseSize = sizeRange[0];
+        }
+      }
+      
+      const normalizedMeasurement = resolvedBaseSize
+        ? { ...measurement, baseSize: resolvedBaseSize }
+        : measurement;
+      
       const nextMeasurements = [...prev.techpack.measurements];
       const insertIndex = Math.min(Math.max(index + 1, 0), nextMeasurements.length);
       nextMeasurements.splice(insertIndex, 0, normalizedMeasurement);
@@ -2140,7 +2219,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
       };
       
       const nextMeasurements = prev.techpack.measurements.map((m, i) => (i === index ? normalizedMeasurement : m));
-      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
+      // When updating measurement, force rebuild requested values in sample rounds to sync with new measurement.sizes
+      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements, true);
       return {
         ...prev,
         techpack: {

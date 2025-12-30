@@ -14,8 +14,8 @@ export interface IBOMItem {
   materialName: string;
   materialCode?: string;
   placement: string;
-  size: string;
-  quantity: number;
+  size?: string | null;
+  quantity?: number | null;
   uom: string;
   supplier: string;
   supplierCode?: string;
@@ -173,7 +173,7 @@ export interface ITechPack extends Document {
   articleName: string; // Renamed from productName
   articleCode: string;
   sampleType: string; // Renamed from version
-  technicalDesignerId: Types.ObjectId;
+  technicalDesignerId: string;
   customerId?: string;
   supplier: string;
   season: string;
@@ -185,6 +185,7 @@ export interface ITechPack extends Document {
   lifecycleStage?: 'Concept' | 'Design' | 'Development' | 'Pre-production' | 'Production' | 'Shipped';
   category?: string;
   gender?: 'Men' | 'Women' | 'Unisex' | 'Kids';
+  fitType?: 'Regular' | 'Slim' | 'Loose' | 'Relaxed' | 'Oversized';
   brand?: string;
   collectionName?: string;
   targetMarket?: string;
@@ -219,8 +220,8 @@ const BOMItemSchema = new Schema<IBOMItem>({
   materialName: { type: String, required: true },
   materialCode: { type: String },
   placement: { type: String, required: true },
-  size: { type: String, required: true },
-  quantity: { type: Number, required: true, min: 0 },
+  size: { type: String, required: false },
+  quantity: { type: Number, required: false, min: 0 },
   uom: { type: String, required: true },
   supplier: { type: String, required: true },
   supplierCode: { type: String },
@@ -378,9 +379,9 @@ const TechPackSchema = new Schema<ITechPack>(
       maxlength: 120
     },
     technicalDesignerId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
+      type: String,
+      required: [true, 'Technical designer is required'],
+      trim: true
     },
     customerId: { type: String, trim: true },
     sharedWith: [SharedAccessSchema],
@@ -425,6 +426,7 @@ const TechPackSchema = new Schema<ITechPack>(
     lifecycleStage: { type: String, enum: ['Concept', 'Design', 'Development', 'Pre-production', 'Production', 'Shipped'] },
     category: { type: String, trim: true },
     gender: { type: String, enum: ['Men', 'Women', 'Unisex', 'Kids'] },
+    fitType: { type: String, enum: ['Regular', 'Slim', 'Loose', 'Relaxed', 'Oversized'], trim: true },
     brand: { type: String, trim: true },
     collectionName: { type: String, trim: true },
     targetMarket: { type: String, trim: true },

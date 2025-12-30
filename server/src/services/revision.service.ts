@@ -540,17 +540,15 @@ class RevisionService {
         });
       }
 
-      // Special handling for technicalDesignerId to compare by ID and show name
-      const oldDesigner = oldObj.technicalDesignerId;
-      const newDesigner = newObj.technicalDesignerId;
-      const oldDesignerId = oldDesigner?._id?.toString() || oldDesigner;
-      const newDesignerId = newDesigner?._id?.toString() || newDesigner;
+      // technicalDesignerId is now a string (name), not a user reference
+      const oldDesigner = oldObj.technicalDesignerId || 'N/A';
+      const newDesigner = newObj.technicalDesignerId || 'N/A';
 
-      if (!_.isEqual(oldDesignerId, newDesignerId)) {
+      if (oldDesigner !== newDesigner) {
         changes.sectionChanges!.push('technicalDesigner');
         (changes.diffData as any)['technicalDesignerId'] = {
-          old: oldDesigner?.fullName || oldDesignerId || 'N/A',
-          new: newDesigner?.fullName || newDesignerId || 'N/A',
+          old: oldDesigner,
+          new: newDesigner,
         };
         // Add to details for summary generation
         if (!(changes.details as any)['articleInfo']) {
