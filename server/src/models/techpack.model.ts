@@ -14,8 +14,8 @@ export interface IBOMItem {
   materialName: string;
   materialCode?: string;
   placement: string;
-  size: string;
-  quantity: number;
+  size?: string | null;
+  quantity?: number | null;
   uom: string;
   supplier: string;
   supplierCode?: string;
@@ -219,8 +219,8 @@ const BOMItemSchema = new Schema<IBOMItem>({
   materialName: { type: String, required: true },
   materialCode: { type: String },
   placement: { type: String, required: true },
-  size: { type: String, required: true },
-  quantity: { type: Number, required: true, min: 0 },
+  size: { type: String, required: false },
+  quantity: { type: Number, required: false, min: 0 },
   uom: { type: String, required: true },
   supplier: { type: String, required: true },
   supplierCode: { type: String },

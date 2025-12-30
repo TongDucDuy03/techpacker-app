@@ -48,8 +48,8 @@ export interface BomItem {
   part: string;
   materialName: string;
   placement: string;
-  size: string;
-  quantity: number;
+  size?: string | null;
+  quantity?: number | null;
   uom: 'm' | 'cm' | 'mm' | 'pcs' | 'kg' | 'g' | 'yards' | 'inches';
   supplier: string;
   comments?: string;
@@ -94,6 +94,7 @@ export const getMeasurementUnitSuffix = (unit?: MeasurementUnit | null): string 
 
 export interface MeasurementPoint {
   id: string;
+  clientKey?: string; // Stable UI key for checkbox selection and React keys (frontend-only)
   pomCode: string;
   pomName: string;
   minusTolerance: number; // Changed from string to number (in cm)

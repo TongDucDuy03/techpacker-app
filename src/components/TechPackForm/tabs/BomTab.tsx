@@ -11,7 +11,7 @@ import Select from '../shared/Select';
 import Textarea from '../shared/Textarea';
 import Modal from '../shared/Modal';
 import ZoomableImage from '../../common/ZoomableImage';
-import { Plus, Upload, Download, Search, Filter, Package, AlertCircle, X, Copy, RotateCcw, Edit, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Upload, Download, Search, Filter, Package, AlertCircle, X, Copy, RotateCcw, Edit, ChevronLeft, ChevronRight, CheckSquare, Square } from 'lucide-react';
 import { showSuccess, showError, showWarning, showUndoToast } from '../../../lib/toast';
 import { api } from '../../../lib/api';
 
@@ -83,7 +83,7 @@ const exportToCSV = (items: BomItem[], includePrice: boolean = false): string =>
       item.materialName || '',
       item.placement || '',
       item.size || '',
-      item.quantity?.toString() || '0',
+      item.quantity !== undefined && item.quantity !== null ? item.quantity.toString() : '',
       item.uom || '',
       item.supplier || '',
       item.colorCode || '',
@@ -235,6 +235,9 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   } | null>(null);
   const [assignmentMode, setAssignmentMode] = useState<'existing' | 'new'>('existing');
   const [selectedPartId, setSelectedPartId] = useState<string>('');
+  // Multi-select state for bulk actions
+  const [selectedBomIds, setSelectedBomIds] = useState<Set<string>>(new Set());
+  
   const [newAssignmentForm, setNewAssignmentForm] = useState<{
     colorName: string;
     hexCode: string;
@@ -326,7 +329,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     materialName: '',
     placement: '',
     size: '',
-    quantity: 0,
+    quantity: undefined,
     uom: 'm',
     supplier: '',
     comments: '',
@@ -453,9 +456,18 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     
     // Auto-calculate totalPrice when quantity or unitPrice changes
     if (field === 'quantity' || field === 'unitPrice') {
-      const quantity = field === 'quantity' ? Number(value) : Number(updatedFormData.quantity ?? 0);
-      const unitPrice = field === 'unitPrice' ? Number(value) : Number(updatedFormData.unitPrice ?? 0);
-      if (quantity > 0 && unitPrice > 0) {
+      const quantity = field === 'quantity' 
+        ? (value !== undefined && value !== null && value !== '' ? Number(value) : null)
+        : (updatedFormData.quantity !== undefined && updatedFormData.quantity !== null && updatedFormData.quantity !== '' 
+           ? Number(updatedFormData.quantity) 
+           : null);
+      const unitPrice = field === 'unitPrice' 
+        ? (value !== undefined && value !== null && value !== '' ? Number(value) : undefined)
+        : (updatedFormData.unitPrice !== undefined && updatedFormData.unitPrice !== null && updatedFormData.unitPrice !== '' 
+           ? Number(updatedFormData.unitPrice) 
+           : undefined);
+      // Only calculate if both quantity > 0 and unitPrice are provided
+      if (quantity !== null && quantity > 0 && unitPrice !== undefined && unitPrice > 0) {
         updatedFormData.totalPrice = quantity * unitPrice;
       } else {
         updatedFormData.totalPrice = undefined;
@@ -555,9 +567,13 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
         );
         if (duplicateIndex !== -1) {
           const existing = bom[duplicateIndex];
+          const existingQty = existing.quantity !== undefined && existing.quantity !== null ? existing.quantity : 0;
+          const formQty = formData.quantity !== undefined && formData.quantity !== null && formData.quantity !== '' 
+            ? Number(formData.quantity) 
+            : 0;
           const mergedItem: BomItem = {
             ...existing,
-            quantity: existing.quantity + (Number(formData.quantity) || 0),
+            quantity: existingQty + formQty,
           };
           updateBomItem(duplicateIndex, mergedItem);
           showSuccess('Quantities merged successfully');
@@ -568,10 +584,13 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     }
 
     // Calculate totalPrice if quantity and unitPrice are provided
-    const quantity = Number(formData.quantity) || 0;
+    const quantity = formData.quantity !== undefined && formData.quantity !== null && formData.quantity !== '' 
+      ? Number(formData.quantity) 
+      : null;
     const hasUnitPrice = formData.unitPrice !== undefined && formData.unitPrice !== null && formData.unitPrice !== '';
     const unitPrice = hasUnitPrice ? Number(formData.unitPrice) : undefined;
-    const totalPrice = quantity > 0 && unitPrice !== undefined ? quantity * unitPrice : undefined;
+    // Only calculate totalPrice if both quantity > 0 and unitPrice are provided
+    const totalPrice = quantity !== null && quantity > 0 && unitPrice !== undefined ? quantity * unitPrice : undefined;
     
     const normalizedImageUrl = formData.imageUrl?.trim();
     const bomItem: BomItem = {
@@ -614,7 +633,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       materialName: '',
       placement: '',
       size: '',
-      quantity: 0,
+      quantity: undefined,
       uom: 'm',
       unitPrice: undefined,
       totalPrice: undefined,
@@ -642,6 +661,112 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     setEditingIndex(index);
     setEditingId(item.id);
     setShowModal(true);
+  };
+
+  // Multi-select handlers
+  const toggleBomSelection = (itemId: string) => {
+    setSelectedBomIds(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAllBom = () => {
+    if (selectedBomIds.size === filteredBom.length) {
+      setSelectedBomIds(new Set());
+    } else {
+      setSelectedBomIds(new Set(filteredBom.map(item => item.id).filter((id): id is string => Boolean(id))));
+    }
+  };
+
+  const clearBomSelection = () => {
+    setSelectedBomIds(new Set());
+  };
+
+  // Bulk duplicate BOM items
+  const handleBulkDuplicateBom = () => {
+    if (selectedBomIds.size === 0) return;
+    
+    const selectedItems = filteredBom.filter(item => item.id && selectedBomIds.has(item.id));
+    if (selectedItems.length === 0) return;
+
+    const duplicatedItems: BomItem[] = [];
+    selectedItems.forEach((item, idx) => {
+      const originalIndex = bom.findIndex(b => b.id === item.id);
+      const duplicated: BomItem = {
+        ...item,
+        id: generateUUID(),
+        supplierCode: item.supplierCode ? `${item.supplierCode}-COPY${idx > 0 ? `-${idx + 1}` : ''}` : item.supplierCode,
+      };
+      duplicatedItems.push(duplicated);
+      
+      // Insert after original item
+      if (insertBomItemAt && originalIndex >= 0) {
+        insertBomItemAt(originalIndex + 1 + idx, duplicated);
+      } else {
+        addBomItem(duplicated);
+      }
+    });
+
+    showSuccess(`Duplicated ${selectedItems.length} material(s)`);
+    clearBomSelection();
+  };
+
+  // Bulk delete BOM items
+  const handleBulkDeleteBom = () => {
+    if (selectedBomIds.size === 0) return;
+    
+    const selectedItems = filteredBom.filter(item => item.id && selectedBomIds.has(item.id));
+    if (selectedItems.length === 0) return;
+
+    // Count total impacted colorways
+    let totalImpactedColorways = 0;
+    selectedItems.forEach(item => {
+      totalImpactedColorways += countColorwayAssignments(item);
+    });
+
+    const confirmationMessage = totalImpactedColorways > 0
+      ? `${selectedItems.length} material(s) selected. ${totalImpactedColorways} colorway assignment(s) will be removed. Continue?`
+      : `Are you sure you want to delete ${selectedItems.length} selected material(s)?`;
+
+    if (window.confirm(confirmationMessage)) {
+      // Clear previous undo timeout if exists
+      if (deletedItem?.timeoutId) {
+        clearTimeout(deletedItem.timeoutId);
+      }
+
+      // Delete all selected items
+      selectedItems.forEach(item => {
+        const resolvedBomItemId = item.id || (item as any)?._id;
+        if (resolvedBomItemId) {
+          deleteBomItemById(resolvedBomItemId);
+          
+          // Remove colorway assignments
+          if (removeColorwayAssignment && countColorwayAssignments(item) > 0) {
+            colorways.forEach(colorway => {
+              const hasAssignment = colorway.parts?.some(part => part.bomItemId === resolvedBomItemId);
+              if (hasAssignment) {
+                removeColorwayAssignment(colorway.id, resolvedBomItemId);
+              }
+            });
+          }
+        } else {
+          // Fallback to index-based
+          const originalIndex = bom.findIndex(b => b.id === item.id);
+          if (originalIndex >= 0) {
+            deleteBomItem(originalIndex);
+          }
+        }
+      });
+
+      showSuccess(`Deleted ${selectedItems.length} material(s)`);
+      clearBomSelection();
+    }
   };
 
   const handleDuplicateBomItem = (item: BomItem, index: number) => {
@@ -946,10 +1071,12 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     importPreview.forEach((item, idx) => {
       const validation = validateBomItem(item);
       if (validation.isValid) {
-        const quantity = Number(item.quantity) || 0;
+        const quantity = item.quantity !== undefined && item.quantity !== null && item.quantity !== '' 
+          ? Number(item.quantity) 
+          : null;
         const hasUnitPrice = item.unitPrice !== undefined && item.unitPrice !== null && item.unitPrice !== '';
         const unitPrice = hasUnitPrice ? Number(item.unitPrice) : undefined;
-        const totalPrice = item.totalPrice ?? (quantity > 0 && unitPrice !== undefined ? quantity * unitPrice : undefined);
+        const totalPrice = item.totalPrice ?? (quantity !== null && quantity > 0 && unitPrice !== undefined ? quantity * unitPrice : undefined);
         const trimmedImageUrl = typeof item.imageUrl === 'string' ? item.imageUrl.trim() : '';
         
         const bomItem: BomItem = {
@@ -1093,7 +1220,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       key: 'quantity' as keyof BomItem,
       header: 'Qty',
       width: '8%',
-      render: (value: number) => value ? value.toFixed(2) : '-',
+      render: (value: number | null | undefined) => (value !== undefined && value !== null) ? value.toFixed(2) : '-',
     },
     {
       key: 'uom' as keyof BomItem,
@@ -1168,11 +1295,13 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   const tableDataWithErrors = useMemo(() => {
     return paginatedBom.map((item) => {
       const hasErrors = validationErrors[item.id] && Object.keys(validationErrors[item.id]).length > 0;
-      const quantity = Number(item.quantity) || 0;
+      const quantity = item.quantity !== undefined && item.quantity !== null 
+        ? Number(item.quantity) 
+        : null;
       const hasUnitPrice = item.unitPrice !== undefined && item.unitPrice !== null && item.unitPrice !== '';
       const normalizedUnitPrice = hasUnitPrice ? Number(item.unitPrice) : undefined;
       const calculatedTotalPrice = item.totalPrice ??
-        (quantity > 0 && normalizedUnitPrice !== undefined ? quantity * normalizedUnitPrice : undefined);
+        (quantity !== null && quantity > 0 && normalizedUnitPrice !== undefined ? quantity * normalizedUnitPrice : undefined);
       return {
         ...item,
         totalPrice: calculatedTotalPrice,
@@ -1185,7 +1314,9 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   const totalMaterialCost = useMemo(() => {
     if (!canViewPrice) return 0;
     return filteredBom.reduce((sum, item) => {
-      const quantity = Number(item.quantity) || 0;
+      const quantity = item.quantity !== undefined && item.quantity !== null 
+        ? Number(item.quantity) 
+        : null;
       const hasUnitPrice = item.unitPrice !== undefined && item.unitPrice !== null && item.unitPrice !== '';
       const unitPrice = hasUnitPrice ? Number(item.unitPrice) : undefined;
       const explicitTotal =
@@ -1194,7 +1325,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
           : undefined;
       const rowTotal =
         explicitTotal ??
-        (quantity > 0 && unitPrice !== undefined ? quantity * unitPrice : 0);
+        (quantity !== null && quantity > 0 && unitPrice !== undefined ? quantity * unitPrice : 0);
       return sum + (rowTotal || 0);
     }, 0);
   }, [filteredBom, canViewPrice]);
@@ -1448,7 +1579,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
 
             <Input
               label="Quantity"
-              value={formData.quantity || 0}
+              value={formData.quantity !== undefined && formData.quantity !== null ? formData.quantity : ''}
               onChange={handleInputChange('quantity')}
               onBlur={() => validation.setFieldTouched('quantity')}
               type="number"
@@ -1923,10 +2054,56 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
           )}
         </div>
         
+        {/* Bulk Actions Bar */}
+        {selectedBomIds.size > 0 && (
+          <div className="px-4 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-blue-900">
+                Selected: {selectedBomIds.size} item(s)
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleBulkDuplicateBom}
+                className="px-3 py-1.5 text-sm font-medium text-blue-700 bg-white border border-blue-300 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <Copy className="w-4 h-4 inline mr-1.5" />
+                Duplicate
+              </button>
+              <button
+                onClick={handleBulkDeleteBom}
+                className="px-3 py-1.5 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500"
+              >
+                <X className="w-4 h-4 inline mr-1.5" />
+                Delete
+              </button>
+              <button
+                onClick={clearBomSelection}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              >
+                Clear Selection
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th scope="col" className="px-4 py-3 w-12">
+                  <button
+                    onClick={toggleSelectAllBom}
+                    className="flex items-center justify-center w-5 h-5 text-gray-400 hover:text-gray-600 focus:outline-none"
+                    title={selectedBomIds.size === filteredBom.length && filteredBom.length > 0 ? 'Deselect all' : 'Select all'}
+                  >
+                    {selectedBomIds.size === filteredBom.length && filteredBom.length > 0 ? (
+                      <CheckSquare className="w-5 h-5 text-blue-600" />
+                    ) : (
+                      <Square className="w-5 h-5" />
+                    )}
+                  </button>
+                </th>
                 {columns.map((column) => (
                   <th
                     key={column.key as string}
@@ -1945,7 +2122,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredBom.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length + 1} className="px-6 py-12 text-center text-sm text-gray-500">
+                  <td colSpan={columns.length + 2} className="px-6 py-12 text-center text-sm text-gray-500">
                     No materials added yet. Click 'Add Material' to get started or use a template.
                   </td>
                 </tr>
@@ -1958,11 +2135,26 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                   // Đảm bảo key luôn unique: ưu tiên item.id, nếu không có thì dùng mapIndex
                   const uniqueKey = item.id || `bom-item-${mapIndex}`;
                   
+                  const isSelected = item.id ? selectedBomIds.has(item.id) : false;
+                  
                   return (
                     <tr
                       key={uniqueKey}
-                      className={`hover:bg-gray-50 ${hasErrors ? 'bg-red-50 border-l-4 border-red-500' : ''}`}
+                      className={`hover:bg-gray-50 ${hasErrors ? 'bg-red-50 border-l-4 border-red-500' : ''} ${isSelected ? 'bg-blue-50' : ''}`}
                     >
+                      <td className="px-4 py-4">
+                        <button
+                          onClick={() => item.id && toggleBomSelection(item.id)}
+                          className="flex items-center justify-center w-5 h-5 text-gray-400 hover:text-gray-600 focus:outline-none"
+                          title={isSelected ? 'Deselect' : 'Select'}
+                        >
+                          {isSelected ? (
+                            <CheckSquare className="w-5 h-5 text-blue-600" />
+                          ) : (
+                            <Square className="w-5 h-5" />
+                          )}
+                        </button>
+                      </td>
                       {columns.map((column) => {
                         const value = item[column.key];
                         return (

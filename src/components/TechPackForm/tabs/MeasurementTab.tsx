@@ -14,7 +14,7 @@ import { useFormValidation } from '../../../hooks/useFormValidation';
 import { measurementValidationSchema } from '../../../utils/validationSchemas';
 import Input from '../shared/Input';
 import Select from '../shared/Select';
-import { Plus, Upload, Download, Ruler, AlertTriangle, Info, AlertCircle, X, Save, CheckCircle, Copy } from 'lucide-react';
+import { Plus, Upload, Download, Ruler, AlertTriangle, Info, AlertCircle, X, Save, CheckCircle, Copy, CheckSquare, Square } from 'lucide-react';
 import { showSuccess, showWarning, showError } from '../../../lib/toast';
 import SampleMeasurementsTable from './SampleMeasurementsTable';
 import { SampleMeasurementRow } from '../../../types/measurements';
@@ -160,6 +160,9 @@ const MeasurementTab: React.FC = () => {
   const hasUnsavedChanges = state?.hasUnsavedChanges ?? false;
   const tableUnit = (state?.techpack?.measurementUnit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT;
 
+  // Multi-select state for bulk actions
+  const [selectedMeasurementIds, setSelectedMeasurementIds] = useState<Set<string>>(new Set());
+  
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [progressionMode, setProgressionMode] = useState<'strict' | 'warn'>('strict'); // strict = block, warn = allow with warning
@@ -1184,6 +1187,9 @@ type RoundModalFormState = {
 
     const measurement: MeasurementPoint = {
       id: editingIndex !== null ? measurements[editingIndex].id : `measurement_${Date.now()}`,
+      clientKey: editingIndex !== null 
+        ? measurements[editingIndex].clientKey // Keep existing clientKey when editing
+        : `m_${ensureKey()}`, // New clientKey when adding
       pomCode: formData.pomCode!,
       pomName: formData.pomName!,
       minusTolerance: formData.minusTolerance ?? 1.0,
@@ -1282,18 +1288,292 @@ type RoundModalFormState = {
     }
   };
 
+  // Helper to generate unique client key (used when creating new measurements)
+  const ensureKey = useCallback(() => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  }, []);
+
+  // Helper to get unique row key for measurement (ONLY use clientKey - never id or index)
+  // clientKey is stable and unique per row, independent of backend id or array index
+  const getRowKey = useCallback((m: MeasurementPoint): string => {
+    if (m.clientKey) return m.clientKey;
+    // Fallback only if clientKey not set (should not happen after normalization)
+    if (m.id) return `id_${m.id}`;
+    if ((m as any)._id) return `oid_${String((m as any)._id)}`;
+    return `tmp_${ensureKey()}`;
+  }, [ensureKey]);
+
+  // Memoize rowKeys array for select all functionality
+  const rowKeys = useMemo(
+    () => measurements.map(getRowKey),
+    [measurements, getRowKey]
+  );
+
+  // Ensure all measurements have clientKey (normalize only in getRowKey, don't trigger state update)
+  // This prevents triggering unsaved changes when just viewing the tab
+  // clientKey will be properly normalized when data is loaded from server or when user adds/edits
+
+  // Cleanup selection when rowKeys change (remove invalid keys)
+  useEffect(() => {
+    setSelectedMeasurementIds((prev) => {
+      if (prev.size === 0) return prev;
+      const validKeys = new Set(rowKeys);
+      const next = new Set(Array.from(prev).filter(k => validKeys.has(k)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [rowKeys]);
+
+  // Multi-select handlers
+  const toggleMeasurementSelection = (key: string) => {
+    setSelectedMeasurementIds(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAllMeasurements = () => {
+    setSelectedMeasurementIds(prev => {
+      if (prev.size === rowKeys.length && rowKeys.length > 0) {
+        return new Set();
+      }
+      return new Set(rowKeys);
+    });
+  };
+
+  const clearMeasurementSelection = () => {
+    setSelectedMeasurementIds(new Set());
+  };
+
+  // Bulk duplicate Measurements with Sample Rounds mapping
+  const handleBulkDuplicateMeasurements = () => {
+    if (selectedMeasurementIds.size === 0 || !insertMeasurementAt) return;
+    
+    const selectedItems = measurements.filter((m) => {
+      const key = getRowKey(m);
+      return selectedMeasurementIds.has(key);
+    });
+    if (selectedItems.length === 0) return;
+
+    // Create mapping: oldMeasurementKey -> newMeasurementId
+    const measurementKeyMap = new Map<string, string>();
+    const oldIdToNewIdMap = new Map<string, string>(); // For sample rounds lookup
+    const duplicatedMeasurements: MeasurementPoint[] = [];
+    
+      selectedItems.forEach((measurement, idx) => {
+      const originalIndex = measurements.findIndex((m) => {
+        const key = getRowKey(m);
+        const selectedKey = getRowKey(measurement);
+        return key === selectedKey;
+      });
+      if (originalIndex < 0) return;
+      
+      const originalKey = getRowKey(measurement);
+      const oldId = measurement.id || (measurement as any)._id;
+      
+      // Generate unique pomCode with suffix
+      let newPomCode = `${measurement.pomCode}_COPY`;
+      let suffixNum = 1;
+      while (measurements.some(m => m.pomCode === newPomCode)) {
+        newPomCode = `${measurement.pomCode}_COPY-${suffixNum}`;
+        suffixNum++;
+      }
+      
+      // Generate unique ID for duplicate (do not reuse _id)
+      const newId = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `measurement_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 9)}`;
+      const duplicate: MeasurementPoint = {
+        ...measurement,
+        id: newId,
+        clientKey: `m_${ensureKey()}`, // CRITICAL: New clientKey for duplicate
+        pomCode: newPomCode,
+        pomName: `${measurement.pomName} (Copy)`,
+        sizes: measurement.sizes ? { ...measurement.sizes } : {},
+        unit: (measurement.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT,
+      };
+      // Explicitly remove _id from duplicate to avoid conflicts
+      delete (duplicate as any)._id;
+      
+      measurementKeyMap.set(originalKey, newId);
+      if (oldId) {
+        oldIdToNewIdMap.set(oldId, newId);
+      }
+      duplicatedMeasurements.push(duplicate);
+      
+      // Insert after original measurement
+      if (originalIndex >= 0) {
+        insertMeasurementAt(originalIndex + 1 + idx, duplicate);
+      }
+    });
+
+    // Duplicate Sample Rounds entries for duplicated measurements
+    if (measurementKeyMap.size > 0 && sampleMeasurementRounds.length > 0) {
+      // Use context to update sample rounds with duplicated entries
+      sampleMeasurementRounds.forEach(round => {
+        const newEntries: MeasurementSampleEntry[] = [];
+        
+        // Find entries related to duplicated measurements and create copies
+        round.measurements.forEach(entry => {
+          const oldMeasurementId = entry.measurementId;
+          if (oldMeasurementId && oldIdToNewIdMap.has(oldMeasurementId)) {
+            const newMeasurementId = oldIdToNewIdMap.get(oldMeasurementId)!;
+            // Find the new measurement to get its sizes for requested values
+            const newMeasurement = duplicatedMeasurements.find(m => m.id === newMeasurementId);
+            
+            const newEntry: MeasurementSampleEntry = {
+              ...entry,
+              id: `entry_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              measurementId: newMeasurementId,
+              pomCode: newMeasurement?.pomCode || entry.pomCode,
+              pomName: newMeasurement?.pomName || entry.pomName,
+              // Copy user-entered data: measured, revised, comments, diff
+              measured: entry.measured ? { ...entry.measured } : {},
+              revised: entry.revised ? { ...entry.revised } : {},
+              comments: entry.comments ? { ...entry.comments } : {},
+              diff: entry.diff ? { ...entry.diff } : {},
+              // requested will be rebuilt from new measurement.sizes (source-of-truth)
+              requested: newMeasurement?.sizes 
+                ? Object.entries(newMeasurement.sizes).reduce<MeasurementSampleValueMap>((acc, [size, value]) => {
+                    acc[size] = value !== null && value !== undefined ? String(value) : '';
+                    return acc;
+                  }, {})
+                : {},
+            };
+            newEntries.push(newEntry);
+          }
+        });
+        
+        // Add new entries to round
+        if (newEntries.length > 0 && updateSampleMeasurementRound) {
+          const currentEntries = round.measurements || [];
+          updateSampleMeasurementRound(round.id, {
+            measurements: [...currentEntries, ...newEntries],
+          });
+        }
+      });
+    }
+
+    showSuccess(`Duplicated ${selectedItems.length} measurement(s) with sample rounds`);
+    clearMeasurementSelection();
+  };
+
+  // Bulk delete Measurements with Sample Rounds cleanup
+  const handleBulkDeleteMeasurements = () => {
+    if (selectedMeasurementIds.size === 0) return;
+    
+    const selectedItems = measurements.filter((m) => {
+      const key = getRowKey(m);
+      return selectedMeasurementIds.has(key);
+    });
+    if (selectedItems.length === 0) return;
+
+    const confirmationMessage = `Are you sure you want to delete ${selectedItems.length} selected measurement(s)? This will also remove related sample round entries.`;
+    
+    if (window.confirm(confirmationMessage)) {
+      // Build set of deleted measurement ids (_id or id) for sample rounds cleanup
+      const deletedIds = new Set<string>();
+      selectedItems.forEach(m => {
+        const id = m.id || (m as any)._id;
+        if (id) deletedIds.add(id);
+      });
+      
+      // Delete measurements (in reverse order to maintain indices)
+      selectedItems.reverse().forEach(measurement => {
+        const index = measurements.findIndex((m) => {
+          const key = getRowKey(m);
+          const selectedKey = getRowKey(measurement);
+          return key === selectedKey;
+        });
+        if (index >= 0) {
+          deleteMeasurement(index);
+        }
+      });
+
+      // Clean up Sample Rounds: remove entries related to deleted measurements
+      if (deletedIds.size > 0 && sampleMeasurementRounds.length > 0) {
+        sampleMeasurementRounds.forEach(round => {
+          if (updateSampleMeasurementRound) {
+            const remainingEntries = round.measurements.filter(
+              entry => !entry.measurementId || !deletedIds.has(entry.measurementId)
+            );
+            if (remainingEntries.length !== round.measurements.length) {
+              updateSampleMeasurementRound(round.id, {
+                measurements: remainingEntries,
+              });
+            }
+          }
+        });
+      }
+
+      showSuccess(`Deleted ${selectedItems.length} measurement(s)`);
+      clearMeasurementSelection();
+    }
+  };
+
   const handleDuplicateMeasurement = (measurement: MeasurementPoint, index: number) => {
     if (!insertMeasurementAt) return;
+    
+    // Generate unique pomCode
+    let newPomCode = `${measurement.pomCode}_COPY`;
+    let suffixNum = 1;
+    while (measurements.some(m => m.pomCode === newPomCode)) {
+      newPomCode = `${measurement.pomCode}_COPY-${suffixNum}`;
+      suffixNum++;
+    }
+    
+    // Generate unique ID for duplicate (do not reuse _id)
+    const newId = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `measurement_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const duplicate: MeasurementPoint = {
       ...measurement,
-      id: `measurement_${Date.now()}`,
-      pomCode: `${measurement.pomCode}_COPY`,
+      id: newId,
+      clientKey: `m_${ensureKey()}`, // CRITICAL: New clientKey for duplicate
+      pomCode: newPomCode,
       pomName: `${measurement.pomName} (Copy)`,
       sizes: measurement.sizes ? { ...measurement.sizes } : {},
       unit: (measurement.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT,
     };
+    // Explicitly remove _id from duplicate to avoid conflicts
+    delete (duplicate as any)._id;
     insertMeasurementAt(index, duplicate);
-    showSuccess('Measurement duplicated');
+    
+    // Duplicate Sample Rounds entries for this measurement
+    if (measurement.id && sampleMeasurementRounds.length > 0) {
+      sampleMeasurementRounds.forEach(round => {
+        const relatedEntries = round.measurements.filter(
+          entry => entry.measurementId === measurement.id
+        );
+        
+        if (relatedEntries.length > 0 && updateSampleMeasurementRound) {
+          const newEntries: MeasurementSampleEntry[] = relatedEntries.map(entry => ({
+            ...entry,
+            id: `entry_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            measurementId: newId,
+            // Copy user-entered data
+            measured: entry.measured ? { ...entry.measured } : {},
+            revised: entry.revised ? { ...entry.revised } : {},
+            comments: entry.comments ? { ...entry.comments } : {},
+            diff: entry.diff ? { ...entry.diff } : {},
+          }));
+          
+          const currentEntries = round.measurements || [];
+          updateSampleMeasurementRound(round.id, {
+            measurements: [...currentEntries, ...newEntries],
+          });
+        }
+      });
+    }
+    
+    showSuccess('Measurement duplicated with sample rounds');
   };
 
   // Enhanced validation for display in table
@@ -1829,11 +2109,71 @@ type RoundModalFormState = {
 
       {/* Measurements Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        {/* Bulk Actions Bar */}
+        {selectedMeasurementIds.size > 0 && (
+          <div className="px-4 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-blue-900">
+                Selected: {selectedMeasurementIds.size} measurement(s)
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleBulkDuplicateMeasurements}
+                className="px-3 py-1.5 text-sm font-medium text-blue-700 bg-white border border-blue-300 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <Copy className="w-4 h-4 inline mr-1.5" />
+                Duplicate
+              </button>
+              <button
+                onClick={handleBulkDeleteMeasurements}
+                className="px-3 py-1.5 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500"
+              >
+                <X className="w-4 h-4 inline mr-1.5" />
+                Delete
+              </button>
+              <button
+                onClick={clearMeasurementSelection}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              >
+                Clear Selection
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">
+                <th 
+                  scope="col" 
+                  className="px-4 py-3 w-12 sticky left-0 bg-gray-50"
+                  style={{ zIndex: 30, position: 'sticky' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={rowKeys.length > 0 && selectedMeasurementIds.size === rowKeys.length}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      toggleSelectAllMeasurements();
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                    title={selectedMeasurementIds.size === rowKeys.length && rowKeys.length > 0 ? 'Deselect all' : 'Select all'}
+                    ref={(input) => {
+                      if (input) {
+                        input.indeterminate = selectedMeasurementIds.size > 0 && selectedMeasurementIds.size < rowKeys.length;
+                      }
+                    }}
+                  />
+                </th>
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-[48px] bg-gray-50"
+                  style={{ zIndex: 20, position: 'sticky' }}
+                >
                   POM Code
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-48">
@@ -1864,14 +2204,16 @@ type RoundModalFormState = {
             <tbody className="bg-white divide-y divide-gray-200">
               {measurements.length === 0 ? (
                 <tr>
-                  <td colSpan={selectedSizes.length + 4} className="px-6 py-12 text-center text-sm text-gray-500">
+                  <td colSpan={selectedSizes.length + 5} className="px-6 py-12 text-center text-sm text-gray-500">
                     No measurement points defined. Add measurements to get started.
                   </td>
                 </tr>
               ) : (
                 measurements.map((measurement, index) => {
+                  const rowKey = getRowKey(measurement);
                   const validationResult = validateMeasurement(measurement);
                   const hasIssues = validationResult.errors.length > 0 || validationResult.warnings.length > 0;
+                  const isSelected = selectedMeasurementIds.has(rowKey);
                   
                   // Format tolerance for display
                   // Handle both UI field names (minusTolerance/plusTolerance) and backend field names (toleranceMinus/tolerancePlus)
@@ -1891,19 +2233,47 @@ type RoundModalFormState = {
                     ? '#fee2e2'
                     : validationResult.warnings.length > 0
                       ? '#fef3c7'
-                      : index % 2 === 0
-                        ? '#ffffff'
-                        : rowStripeColor;
+                      : isSelected
+                        ? '#dbeafe'
+                        : index % 2 === 0
+                          ? '#ffffff'
+                          : rowStripeColor;
                   
                   return (
                     <tr 
-                      key={measurement.id || `measurement-${index}`} 
+                      key={rowKey}
                       className="transition-colors duration-150 hover:brightness-95"
                       style={{ backgroundColor: rowBackgroundColor }}
                     >
+                      <td 
+                        className="px-4 py-4 sticky left-0"
+                        style={{ 
+                          backgroundColor: rowBackgroundColor,
+                          zIndex: 30,
+                          position: 'sticky'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            toggleMeasurementSelection(rowKey);
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                          title={isSelected ? 'Deselect' : 'Select'}
+                        />
+                      </td>
                       <td
-                        className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0"
-                        style={{ backgroundColor: rowBackgroundColor }}
+                        className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-[48px]"
+                        style={{ 
+                          backgroundColor: rowBackgroundColor,
+                          zIndex: 20,
+                          position: 'sticky'
+                        }}
                       >
                         <div className="flex items-center">
                           {measurement.pomCode}

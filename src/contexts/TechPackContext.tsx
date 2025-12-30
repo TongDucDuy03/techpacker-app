@@ -971,7 +971,7 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
         }))
       : [],
     measurements: Array.isArray((apiTechPack as any).measurements)
-      ? ((apiTechPack as any).measurements || []).map((measurement: any) => {
+      ? ((apiTechPack as any).measurements || []).map((measurement: any, index: number) => {
           // Map toleranceMinus/tolerancePlus to minusTolerance/plusTolerance for UI consistency
           const {
             toleranceMinus,
@@ -987,6 +987,14 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
           const loadedMinus = (toleranceMinus !== undefined && toleranceMinus !== null) ? toleranceMinus : 1.0;
           const loadedPlus = (tolerancePlus !== undefined && tolerancePlus !== null) ? tolerancePlus : 1.0;
           
+          // Ensure clientKey is set for UI selection (normalize here to avoid triggering unsaved changes)
+          const generateClientKey = () => {
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+              return crypto.randomUUID();
+            }
+            return `${Date.now()}_${index}_${Math.random().toString(36).slice(2)}`;
+          };
+          
           return {
             ...rest,
             // Map backend field names to UI field names
@@ -995,6 +1003,8 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
             // Also keep toleranceMinus/tolerancePlus for backward compatibility
             toleranceMinus: loadedMinus,
             tolerancePlus: loadedPlus,
+            // Ensure clientKey exists for UI row keys (frontend-only, not persisted to backend)
+            clientKey: measurement.clientKey || `m_${generateClientKey()}`,
           };
         })
       : [],

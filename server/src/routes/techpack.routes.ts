@@ -253,8 +253,9 @@ const techpackValidation = [
   
   body('bom.*.quantity')
     .if(body('bom').exists())
+    .optional()
     .isFloat({ min: 0 })
-    .withMessage('BOM quantity must be a positive number'),
+    .withMessage('BOM quantity must be a positive number if provided'),
   
   body('measurements')
     .optional()
