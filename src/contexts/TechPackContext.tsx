@@ -909,7 +909,7 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
       })(),
       gender: resolvedGender,
       productClass: resolvedProductClass,
-      fitType: 'Regular' as const,
+      fitType: ((apiTechPack as any).fitType || 'Regular') as 'Regular' | 'Slim' | 'Loose' | 'Relaxed' | 'Oversized',
       supplier: (apiTechPack as any).supplier || '',
       technicalDesignerId: typeof (apiTechPack as any).technicalDesignerId === 'object'
         ? (apiTechPack as any).technicalDesignerId?._id || ''
@@ -1686,6 +1686,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           status: techpackData.status,
           category: techpackData.articleInfo.productClass,
           gender: techpackData.articleInfo.gender,
+          fitType: techpackData.articleInfo.fitType as any,
           technicalDesignerId: techpackData.articleInfo.technicalDesignerId,
           lifecycleStage: techpackData.articleInfo.lifecycleStage as any,
           collectionName: (techpackData.articleInfo as any).collection,
@@ -1778,6 +1779,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           companyLogoUrl: (techpackData.articleInfo as any).companyLogoUrl || '',
           productClass: techpackData.articleInfo.productClass,
           gender: techpackData.articleInfo.gender,
+          fitType: techpackData.articleInfo.fitType as any,
           technicalDesignerId: techpackData.articleInfo.technicalDesignerId,
           lifecycleStage: techpackData.articleInfo.lifecycleStage as any,
           collection: (techpackData.articleInfo as any).collection,

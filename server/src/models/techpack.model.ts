@@ -185,6 +185,7 @@ export interface ITechPack extends Document {
   lifecycleStage?: 'Concept' | 'Design' | 'Development' | 'Pre-production' | 'Production' | 'Shipped';
   category?: string;
   gender?: 'Men' | 'Women' | 'Unisex' | 'Kids';
+  fitType?: 'Regular' | 'Slim' | 'Loose' | 'Relaxed' | 'Oversized';
   brand?: string;
   collectionName?: string;
   targetMarket?: string;
@@ -425,6 +426,7 @@ const TechPackSchema = new Schema<ITechPack>(
     lifecycleStage: { type: String, enum: ['Concept', 'Design', 'Development', 'Pre-production', 'Production', 'Shipped'] },
     category: { type: String, trim: true },
     gender: { type: String, enum: ['Men', 'Women', 'Unisex', 'Kids'] },
+    fitType: { type: String, enum: ['Regular', 'Slim', 'Loose', 'Relaxed', 'Oversized'], trim: true },
     brand: { type: String, trim: true },
     collectionName: { type: String, trim: true },
     targetMarket: { type: String, trim: true },

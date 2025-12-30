@@ -653,7 +653,7 @@ class PDFService {
         retailPrice: techpack.retailPrice ? `${techpack.retailPrice} ${currency}` : '—',
       },
       technicalInfo: {
-        fitType: '—',
+        fitType: techpack.fitType || '—',
         productClass: techpack.category || '—',
         supplier: techpack.supplier || '—',
         technicalDesignerId: technicalDesignerName,

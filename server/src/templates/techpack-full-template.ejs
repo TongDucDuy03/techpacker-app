@@ -91,6 +91,9 @@
       margin-bottom: 5px;
       position: relative;
       z-index: 10;
+      page-break-inside: avoid;
+      page-break-after: avoid;
+      page-break-before: avoid;
     }
 
     .page-header table {
@@ -188,12 +191,25 @@
       display: block;
       margin: 0 auto;
       max-width: 100%;
-      max-height: 500px;
+      max-height: 400px;
       width: auto;
       height: auto;
       object-fit: contain;
       /* Đảm bảo ảnh không tràn ra ngoài container */
       box-sizing: border-box;
+    }
+
+    /* Giới hạn kích thước ảnh Design Sketch để không nhảy xuống trang 2 */
+    .image-box--sketch {
+      max-height: 350px;
+      overflow: hidden;
+      page-break-inside: avoid;
+      page-break-before: avoid;
+      page-break-after: avoid;
+    }
+
+    .image-box--sketch img {
+      max-height: 330px;
     }
 
     .image-box--empty {
@@ -214,6 +230,18 @@
 
     .section:first-child {
       page-break-before: auto;
+    }
+
+    /* Article Information section - keep header and design sketch together on page 1 */
+    .section:first-child {
+      page-break-inside: avoid;
+    }
+
+    .section:first-child .page-header,
+    .section:first-child .image-box--sketch {
+      page-break-inside: avoid;
+      page-break-after: avoid;
+      page-break-before: avoid;
     }
 
     .section-content {
@@ -434,10 +462,10 @@
         <% } %>
 
           <%# 1. ARTICLE INFORMATION %>
-            <div class="section">
+            <div class="section" style="page-break-inside: avoid; page-break-after: avoid;">
               <% renderSectionHeader('Article Information'); %>
-               <!-- Design Sketch Section -->
-                  <div style="margin-top: 0px; page-break-inside: avoid; margin-bottom: 5px; width: 100%; overflow: hidden;">
+               <!-- Design Sketch Section - placed after header table -->
+                  <div style="margin-top: 10px; page-break-inside: avoid; page-break-before: avoid; margin-bottom: 5px; width: 100%; overflow: hidden;">
                     <!-- <div style="font-weight: 700; font-size: 12px; text-transform: uppercase; border-bottom: 2px solid #333; padding-bottom: 5px;">
                       DESIGN SKETCH
                     </div> -->
@@ -481,7 +509,7 @@
                     <div class="info-item">
                       <strong>Fit Type</strong>
                       <span>
-                        <%= meta.fitType || 'Relaxed' %>
+                        <%= (meta.fitType && meta.fitType.trim()) ? meta.fitType : '—' %>
                       </span>
                     </div>
                     <div class="info-item">
@@ -515,16 +543,7 @@
                       </span>
                     </div>
                   </div>
-                  <% if (meta.productDescription || meta.description) { %>
-                    <div style="margin-top: 15px">
-                      <strong>DESCRIPTION:</strong>
-                      <p style="margin-top: 5px; line-height: 1.6">
-                        <%= meta.productDescription || meta.description %>
-                      </p>
-                    </div>
-                    <% } %>
-
-                 
+                  <!-- Description section removed - already shown in header table -->
 
                       <!-- CHÈN NỘI DUNG CARE INSTRUCTIONS Ở ĐÂY -->
 
