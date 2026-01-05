@@ -24,11 +24,13 @@ const safeId = (obj: any): string => {
 
 /**
  * Helper function to check if user has view access to TechPack
- * Now uses getEffectiveRole to respect system role limits
+ * Uses effective role (may be downgraded if TechPack Role exceeds System Role limit)
+ * Factory cannot view revisions (sensitive tab)
  */
 const hasViewAccess = (techpack: any, user: any): boolean => {
   const isOwner = safeId(techpack.createdBy) === safeId(user._id);
   const isAdmin = user.role === UserRole.Admin;
+  if (isAdmin || isOwner) return true;
   
   const sharedAccess = techpack.sharedWith?.find((s: any) => {
     const sharedUserId = safeId(s.userId);
@@ -36,22 +38,24 @@ const hasViewAccess = (techpack: any, user: any): boolean => {
   });
   
   if (sharedAccess) {
-    // Use effective role to check permissions
+    // Get effective role (may be downgraded if it exceeds System Role limit)
     const effectiveRole = getEffectiveRole(user.role, sharedAccess.role);
-    const hasSharedViewAccess = ['owner', 'admin', 'editor', 'viewer', 'factory'].includes(effectiveRole);
-    return isAdmin || isOwner || hasSharedViewAccess;
+    // Factory cannot view revisions (sensitive tab)
+    if (effectiveRole === 'factory') return false;
+    return ['owner', 'admin', 'editor', 'viewer'].includes(effectiveRole);
   }
   
-  return isAdmin || isOwner;
+  return false;
 };
 
 /**
  * Helper function to check if user has edit access to TechPack
- * Now uses getEffectiveRole to respect system role limits
+ * Uses effective role (may be downgraded if TechPack Role exceeds System Role limit)
  */
 const hasEditAccess = (techpack: any, user: any): boolean => {
   const isOwner = safeId(techpack.createdBy) === safeId(user._id);
   const isAdmin = user.role === UserRole.Admin;
+  if (isAdmin || isOwner) return true;
   
   const sharedAccess = techpack.sharedWith?.find((s: any) => {
     const sharedUserId = safeId(s.userId);
@@ -59,14 +63,12 @@ const hasEditAccess = (techpack: any, user: any): boolean => {
   });
   
   if (sharedAccess) {
-    // Use effective role to check permissions
+    // Get effective role (may be downgraded if it exceeds System Role limit)
     const effectiveRole = getEffectiveRole(user.role, sharedAccess.role);
-    const hasSharedEditAccess = ['owner', 'admin', 'editor'].includes(effectiveRole);
-    return isAdmin || isOwner || hasSharedEditAccess;
+    return ['owner', 'admin', 'editor'].includes(effectiveRole);
   }
   
-  // Technical Designer chỉ có quyền xem, không có quyền edit/revert
-  return isAdmin || isOwner;
+  return false;
 };
 
 export class RevisionController {

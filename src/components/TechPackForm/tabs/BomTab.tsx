@@ -1182,8 +1182,8 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     
     if (sharedAccess) {
       const role = sharedAccess.role;
-      // Only Viewer cannot see prices, all other roles can
-      return role !== TechPackRole.Viewer;
+      // Factory and Viewer cannot see prices
+      return role !== TechPackRole.Viewer && role !== TechPackRole.Factory;
     }
     
     return false;

@@ -194,15 +194,15 @@ export const requireTechPackAccess = (requiredActions: string[] = ['view']) => {
         return sendError(res, 'Access denied. You do not have permission to access this TechPack.', 403, 'FORBIDDEN');
       }
 
-      // Apply Global Role Override: get effective role based on user's system role
+      // Get effective TechPack Role (may be downgraded if it exceeds System Role limit)
       const { getEffectiveRole } = await import('../utils/access-control.util');
       const effectiveRole = getEffectiveRole(req.user!.role, sharedAccess.role);
 
-      // Check if user's effective role allows the required actions
+      // Check if user's effective TechPack role allows the required actions
       const hasPermission = requiredActions.every(action => {
         switch (action) {
           case 'view':
-            return true; // All shared users can view (with effective role)
+            return true; // All shared users can view
           case 'edit':
             return ['owner', 'admin', 'editor'].includes(effectiveRole);
           case 'share':
@@ -217,7 +217,7 @@ export const requireTechPackAccess = (requiredActions: string[] = ['view']) => {
       if (!hasPermission) {
         return sendError(
           res,
-          `Access denied. Your effective role (${effectiveRole}) does not allow the required actions: ${requiredActions.join(', ')}.`,
+          `Access denied. Your effective TechPack role (${effectiveRole}) does not allow the required actions: ${requiredActions.join(', ')}.`,
           403,
           'FORBIDDEN'
         );

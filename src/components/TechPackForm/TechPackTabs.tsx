@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTechPack } from '../../contexts/TechPackContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { ApiTechPack, Colorway, SIZE_RANGES, DEFAULT_MEASUREMENT_UNIT } from '../../types/techpack';
+import { ApiTechPack, Colorway, SIZE_RANGES, DEFAULT_MEASUREMENT_UNIT, TechPackRole } from '../../types/techpack';
 import ArticleInfoTab, { ArticleInfoTabRef } from './tabs/ArticleInfoTab';
 import BomTab, { BomTabRef } from './tabs/BomTab';
 import MeasurementTab from './tabs/MeasurementTab';
@@ -49,10 +49,47 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
 
   const [showSaveNotification, setShowSaveNotification] = useState(false);
 
-  // Permission checks based on user role
-  // Allow edit if user is admin/designer, OR if mode is 'create' (new techpack)
-  const canEdit = (user?.role === 'admin' || user?.role === 'designer') || mode === 'create';
-  const isReadOnly = (user?.role === 'merchandiser' || user?.role === 'viewer') && mode !== 'create';
+  // Get current user's TechPack Role (System Role is only a label, permissions based on TechPack Role)
+  const currentUserTechPackRole = useMemo(() => {
+    if (!techpack || !user) return undefined;
+    
+    // System Admin has override
+    if (user.role?.toLowerCase() === 'admin') {
+      return TechPackRole.Admin;
+    }
+    
+    // Check if user is owner
+    const createdByRaw: any = (techpack as any).createdBy;
+    const createdById = createdByRaw && typeof createdByRaw === 'object' ? createdByRaw._id : createdByRaw;
+    const currentUserId = String((user as any)?.id || (user as any)?._id || '');
+    if (createdById && String(createdById) === String(currentUserId)) {
+      return TechPackRole.Owner;
+    }
+    
+    // Check shared access
+    const sharedWith = (techpack as any).sharedWith || [];
+    const sharedAccess = sharedWith.find((share: any) => {
+      const shareUserId = share.userId?._id || share.userId;
+      return String(shareUserId) === String(currentUserId);
+    });
+    
+    return sharedAccess?.role;
+  }, [techpack, user]);
+
+  // Permission checks based on TechPack Role (System Role is only a label)
+  // Allow edit if user is System Admin, Owner, Admin, or Editor
+  const canEdit = useMemo(() => {
+    if (user?.role?.toLowerCase() === 'admin') return true; // System Admin override
+    if (mode === 'create') return true; // Create mode always allows edit
+    if (currentUserTechPackRole === TechPackRole.Owner || 
+        currentUserTechPackRole === TechPackRole.Admin || 
+        currentUserTechPackRole === TechPackRole.Editor) {
+      return true;
+    }
+    return false;
+  }, [user, currentUserTechPackRole, mode]);
+  
+  const isReadOnly = !canEdit && mode !== 'create';
 
   useEffect(() => {
     if ((mode === 'edit' || mode === 'view') && initialTechPack) {
@@ -259,13 +296,14 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
   }, [mode, initialTechPack, updateFormState, resetFormState]);
 
   // Tab configuration
-  const tabs = [
+  const allTabs = [
     {
       id: 0,
       name: 'Article Info',
       icon: FileText,
       component: ArticleInfoTab,
       description: 'Basic product information',
+      sensitive: false, // Not sensitive, Factory can view
     },
     {
       id: 1,
@@ -273,6 +311,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       icon: Package,
       component: () => <BomTab ref={bomTabRef} />,
       description: 'Materials and components',
+      sensitive: false, // Not sensitive, Factory can view (but price hidden)
     },
     {
       id: 2,
@@ -280,6 +319,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       icon: Ruler,
       component: MeasurementTab,
       description: 'Size specifications',
+      sensitive: false, // Not sensitive, Factory can view
     },
     {
       id: 3,
@@ -287,6 +327,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       icon: BookOpen,
       component: () => <ConstructionTab ref={constructionTabRef} />,
       description: 'Construction instructions',
+      sensitive: false, // Not sensitive, Factory can view
     },
     {
       id: 4,
@@ -294,6 +335,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       icon: Palette,
       component: ColorwayTab,
       description: 'Color variations',
+      sensitive: false, // Not sensitive, Factory can view
     },
     {
       id: 5,
@@ -301,6 +343,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       icon: Archive,
       component: PackingTab,
       description: 'Packing & folding instructions',
+      sensitive: false, // Not sensitive, Factory can view
     },
     {
       id: 6,
@@ -308,6 +351,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       icon: Clock,
       component: (props: any) => <RevisionTab onBackToList={onBackToList} {...props} />,
       description: 'Change tracking',
+      sensitive: true, // Sensitive, Factory cannot view
     },
     {
       id: 7,
@@ -315,8 +359,18 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       icon: Share2,
       component: SharingTab,
       description: 'Access control and sharing',
+      sensitive: false, // Not sensitive, but Factory cannot manage (handled in SharingTab)
     },
   ];
+
+  // Filter tabs based on user's TechPack Role
+  // Factory cannot view sensitive tabs (Revision History)
+  const tabs = useMemo(() => {
+    if (currentUserTechPackRole === TechPackRole.Factory) {
+      return allTabs.filter(tab => !tab.sensitive);
+    }
+    return allTabs;
+  }, [currentUserTechPackRole]);
 
   // Calculate tab completion status
   const getTabCompletionStatus = (tabId: number) => {

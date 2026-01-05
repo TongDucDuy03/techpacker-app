@@ -190,12 +190,14 @@ class PDFService {
   /**
    * Optimized BOM data preparation with image compression
    * Maps colorway assignments to BOM items for proper color display
+   * @param hidePrice - If true, hide unitPrice and totalPrice (for Factory role)
    */
   private async prepareBOMDataOptimized(
     bom: IBOMItem[], 
     currency: string,
     colorways?: any[], // Add colorways parameter to map colors
-    imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number }
+    imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number },
+    hidePrice: boolean = false // Hide price for Factory role
   ): Promise<any[]> {
     if (!bom || bom.length === 0) return [];
     
@@ -315,8 +317,8 @@ class PDFService {
         quantity: item.quantity !== undefined && item.quantity !== null ? item.quantity : 0, // PDF template expects number, will display '—' if 0
         uom: this.normalizeText(item.uom),
         supplier: this.normalizeText(item.supplier),
-        unitPrice: item.unitPrice ? `${item.unitPrice} ${currency}` : '—',
-        totalPrice: item.totalPrice ? `${item.totalPrice} ${currency}` : '—',
+        unitPrice: hidePrice ? '—' : (item.unitPrice ? `${item.unitPrice} ${currency}` : '—'),
+        totalPrice: hidePrice ? '—' : (item.totalPrice ? `${item.totalPrice} ${currency}` : '—'),
         comments: this.normalizeText(item.comments),
         colorways,
         // Add color fields for template compatibility - prioritize colorway assignments
@@ -640,10 +642,12 @@ class PDFService {
 
   /**
    * Prepare techpack data with parallel processing and image compression
+   * @param hidePrice - If true, hide unitPrice and totalPrice (for Factory role)
    */
   private async prepareTechPackDataAsync(
     techpack: TechPackForPDF,
-    imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number }
+    imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number },
+    hidePrice: boolean = false // Hide price for Factory role
   ): Promise<any> {
     console.log('📦 Starting ASYNC data preparation with image compression...');
     const startTime = Date.now();
@@ -750,7 +754,7 @@ class PDFService {
         quality: imageQuality,
         maxWidth: 800, // Smaller for BOM thumbnails
         maxHeight: 600,
-      }),
+      }, hidePrice),
       Promise.resolve(this.prepareMeasurementsOptimized(techpack)),
       Promise.resolve(this.prepareSampleRoundsOptimized(techpack)),
       this.prepareHowToMeasureOptimized(techpack, {
@@ -944,8 +948,9 @@ class PDFService {
   /**
    * Generate PDF with full async optimization
    * Each export uses isolated incognito context and page
+   * @param userRole - Optional user role to determine if price should be hidden (for Factory role)
    */
-  async generatePDF(techpack: TechPackForPDF, options: PDFOptions = {}): Promise<PDFGenerationResult> {
+  async generatePDF(techpack: TechPackForPDF, options: PDFOptions = {}, userRole?: string): Promise<PDFGenerationResult> {
     if (this.activeGenerations >= this.maxConcurrent) {
       throw new Error('Maximum concurrent PDF generations reached. Please try again later.');
     }
@@ -1084,10 +1089,14 @@ class PDFService {
         maxHeight: options.imageMaxHeight || 800,
       };
 
+      // Determine if price should be hidden (for Factory role)
+      // userRole can be TechPackRole (from sharedWith) or UserRole (system role)
+      const hidePrice = userRole === 'factory' || userRole === 'Factory';
+      
       // PARALLEL: Prepare data AND fetch revisions at the same time
       console.log('🔄 Running parallel operations...');
       const [templateData, revisionHistory] = await Promise.all([
-        this.prepareTechPackDataAsync(techpack, imageOptions),
+        this.prepareTechPackDataAsync(techpack, imageOptions, hidePrice),
         this.fetchRevisionHistoryAsync(techpack._id)
       ]);
       

@@ -19,10 +19,12 @@ export const useRevisionPermissions = (techPack: TechPack | undefined) => {
     return shareUserId === user._id;
   });
 
-  const hasSharedViewAccess = !!sharedAccess && ['owner', 'admin', 'editor', 'viewer', 'factory'].includes(sharedAccess.role);
+  // Factory cannot view revisions (sensitive tab)
+  const isFactory = !!sharedAccess && sharedAccess.role === 'factory';
+  const hasSharedViewAccess = !!sharedAccess && ['owner', 'admin', 'editor', 'viewer'].includes(sharedAccess.role) && !isFactory;
   const hasSharedEditAccess = !!sharedAccess && ['owner', 'admin', 'editor'].includes(sharedAccess.role);
 
-  // View access: Admin, Owner, or Shared users (all roles)
+  // View access: Admin, Owner, or Shared users (but not Factory)
   const canView = isAdmin || isOwner || hasSharedViewAccess;
 
   // Edit access: Admin, Owner, or Shared Editor

@@ -1192,6 +1192,20 @@ export class TechPackController {
         return sendError(res, 'Cannot share with system admin.', 400, 'BAD_REQUEST');
       }
 
+      // Validate that the requested TechPack Role does not exceed the target user's System Role limit
+      const { isValidRoleForSystemRole } = await import('../utils/access-control.util');
+      if (!isValidRoleForSystemRole(targetUser.role, role)) {
+        const maxRole = targetUser.role === UserRole.Designer ? 'Owner' :
+                        targetUser.role === UserRole.Merchandiser ? 'Editor' :
+                        targetUser.role === UserRole.Viewer ? 'Viewer or Factory' : 'Unknown';
+        return sendError(
+          res,
+          `Cannot assign TechPack Role "${role}" to user with System Role "${targetUser.role}". Maximum allowed role is "${maxRole}".`,
+          400,
+          'VALIDATION_ERROR'
+        );
+      }
+
       const existingShareIndex = techpack.sharedWith?.findIndex(s => s.userId.toString() === userId) || -1;
       let action: 'share_granted' | 'role_changed' = 'share_granted';
 
@@ -1574,10 +1588,21 @@ export class TechPackController {
 
       // Check access
       const isOwner = techpack.createdBy?.toString() === user._id.toString();
-      const isSharedWith = techpack.sharedWith?.some(s => s.userId.toString() === user._id.toString()) || false;
+      const sharedAccess = techpack.sharedWith?.find(s => s.userId.toString() === user._id.toString());
+      const isSharedWith = !!sharedAccess;
 
       if (user.role !== UserRole.Admin && !isOwner && !isSharedWith) {
         return sendError(res, 'Access denied', 403, 'FORBIDDEN');
+      }
+
+      // Determine user's TechPack Role (System Role is only a label, permissions based on TechPack Role)
+      let userTechPackRole: string | undefined;
+      if (user.role === UserRole.Admin) {
+        userTechPackRole = 'admin'; // System Admin override
+      } else if (isOwner) {
+        userTechPackRole = 'owner';
+      } else if (sharedAccess) {
+        userTechPackRole = sharedAccess.role; // Use TechPack Role directly
       }
 
       // Import PDF service
@@ -1603,7 +1628,8 @@ export class TechPackController {
 
       // Generate PDF (techpack is already a lean object from .lean() call)
       // Type assertion needed because .lean() returns FlattenMaps type which doesn't match ITechPack exactly
-      const result = await pdfService.generatePDF(techpack as any, pdfOptions);
+      // Pass userTechPackRole to hide price for Factory role
+      const result = await pdfService.generatePDF(techpack as any, pdfOptions, userTechPackRole);
 
       // Set response headers
       res.setHeader('Content-Type', 'application/pdf');
