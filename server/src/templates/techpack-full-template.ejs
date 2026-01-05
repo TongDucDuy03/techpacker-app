@@ -872,6 +872,9 @@
                             <% if (measurements.sizeRange && measurements.sizeRange.length> 0) { %>
                               <div style="margin-bottom: 15px">
                                 <strong>SIZE RANGE:</strong>
+                                <% if (measurements.unit) { %>
+                                  <span style="margin-left: 10px; color: #666; font-weight: normal;">(Unit: <%= measurements.unit %>)</span>
+                                <% } %>
                                 <div style="margin-top: 8px">
                                   <% const baseSize = measurements.baseSize; %>
                                   <% measurements.sizeRange.forEach(size=> { %>
@@ -914,10 +917,10 @@
                                             <%= row.pomName || '-' %>
                                           </td>
                                           <td>
-                                            <%= row.minusTolerance || '0' %>
+                                            <%= row.minusToleranceFormatted || (row.minusTolerance !== undefined ? row.minusTolerance : '0') %>
                                           </td>
                                           <td>
-                                            <%= row.plusTolerance || '0' %>
+                                            <%= row.plusToleranceFormatted || (row.plusTolerance !== undefined ? row.plusTolerance : '0') %>
                                           </td>
                                           <% if (measurements.sizeRange) { measurements.sizeRange.forEach(size=> { %>
                                             <td style="<%= size === baseSize ? 'background: #79e5a5;' : '' %>">

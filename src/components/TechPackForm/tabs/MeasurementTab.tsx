@@ -1850,7 +1850,12 @@ type RoundModalFormState = {
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h3 className="text-lg font-semibold text-gray-800">Size Range Configuration</h3>
+              <h3 className="text-lg font-semibold text-gray-800">
+                Size Range Configuration
+                {tableUnit && (
+                  <span className="ml-2 text-sm font-normal text-gray-500">(Unit: {getMeasurementUnitSuffix(tableUnit)})</span>
+                )}
+              </h3>
               <p className="text-sm text-gray-500">
                 Manage custom sizes per techpack. Gender default: {articleInfo?.gender || 'Unisex'}
               </p>

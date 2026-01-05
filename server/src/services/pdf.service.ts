@@ -4,6 +4,7 @@ import ejs from 'ejs';
 import { ITechPack, IBOMItem, IMeasurement, ISampleMeasurementRound, IHowToMeasure, IColorway, IColorwayPart } from '../models/techpack.model';
 import fs from 'fs/promises';
 import { compressImagesBatch } from '../utils/image-compression.util';
+import { formatMeasurementValueAsFraction, formatToleranceAsFraction } from '../utils/measurement-format.util';
 
 type TechPackForPDF = ITechPack | any;
 
@@ -344,23 +345,38 @@ class PDFService {
     console.log('📏 Processing measurements...');
     const sizeRange = techpack.measurementSizeRange || ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
     const baseSize = techpack.measurementBaseSize || sizeRange[0] || 'M';
+    const tableUnit = techpack.measurementUnit || 'cm';
     
     const rows = (techpack.measurements || []).map((measurement: IMeasurement) => {
+      const unit = measurement.unit || tableUnit;
+      const minusTol = measurement.toleranceMinus ?? 0;
+      const plusTol = measurement.tolerancePlus ?? 0;
+      
+      const toleranceFormatted = formatToleranceAsFraction(minusTol, plusTol, unit as any);
+      
       const row: any = {
         pomCode: measurement.pomCode || '—',
         pomName: measurement.pomName || '—',
         measurementType: measurement.measurementType || '—',
         category: measurement.category || '—',
-        minusTolerance: measurement.toleranceMinus || 0,
-        plusTolerance: measurement.tolerancePlus || 0,
+        minusTolerance: minusTol,
+        plusTolerance: plusTol,
+        minusToleranceFormatted: toleranceFormatted.minus,
+        plusToleranceFormatted: toleranceFormatted.plus,
         notes: measurement.notes || '—',
         critical: measurement.critical || false,
-        unit: measurement.unit || 'cm',
+        unit: unit,
         sizes: {},
       };
 
       sizeRange.forEach((size: string) => {
-        row.sizes[size] = measurement.sizes?.[size] || '—';
+        const sizeValue = measurement.sizes?.[size];
+        if (sizeValue !== undefined && sizeValue !== null && typeof sizeValue === 'number') {
+          // Format as fraction if unit is inch
+          row.sizes[size] = formatMeasurementValueAsFraction(sizeValue, unit as any);
+        } else {
+          row.sizes[size] = '—';
+        }
       });
 
       return row;
@@ -372,6 +388,7 @@ class PDFService {
       baseSize,
       baseHighlightColor: techpack.measurementBaseHighlightColor || '#dbeafe',
       rowStripeColor: techpack.measurementRowStripeColor || '#f3f4f6',
+      unit: tableUnit,
     };
   }
 
