@@ -1222,75 +1222,19 @@ type RoundModalFormState = {
     updateMeasurementDisplaySettings({ rowStripeColor: color });
   };
 
-  // Enhanced progression validation
+  // Enhanced progression validation - DISABLED: Allow any values
   const validateProgression = useCallback((
     sizes: Record<string, number>,
     sizeOrder: string[],
     unit: MeasurementUnit = DEFAULT_MEASUREMENT_UNIT
   ): ProgressionValidation => {
-    const errors: string[] = [];
-    const warnings: string[] = [];
-    const unitSuffix = getMeasurementUnitSuffix(unit);
-    
-    // Filter sizes that have values
-    const sizeEntries = sizeOrder
-      .map(size => ({ size, value: sizes[size] }))
-      .filter(entry => entry.value !== undefined && entry.value !== null);
-    
-    if (sizeEntries.length < 2) {
-      return { isValid: true, errors: [], warnings: [] }; // Need at least 2 sizes to check progression
-    }
-
-    // Check for zero or negative values
-    const hasInvalidValues = sizeEntries.some(entry => entry.value! <= 0);
-    if (hasInvalidValues) {
-      errors.push('All measurements must be greater than 0');
-    }
-
-    // Check progression: each size should be >= previous size (for most measurements)
-    // Allow some flexibility: if difference is less than 5%, treat as warning
-    const progressionIssues: Array<{ from: string; to: string; diff: number }> = [];
-    
-    for (let i = 1; i < sizeEntries.length; i++) {
-      const prevValue = sizeEntries[i - 1].value!;
-      const currValue = sizeEntries[i].value!;
-      const diff = currValue - prevValue;
-      const percentDiff = (diff / prevValue) * 100;
-      
-      if (diff < 0) {
-        // Decreasing progression - always an issue
-        progressionIssues.push({
-          from: sizeEntries[i - 1].size,
-          to: sizeEntries[i].size,
-          diff: Math.abs(diff)
-        });
-      } else if (diff === 0) {
-        // Same value - warning (might be intentional for some measurements)
-        warnings.push(`${sizeEntries[i - 1].size} and ${sizeEntries[i].size} have the same value`);
-      } else if (percentDiff < 1) {
-        // Very small increase (< 1%) - warning
-        warnings.push(`Very small progression between ${sizeEntries[i - 1].size} and ${sizeEntries[i].size} (${diff.toFixed(2)} ${unitSuffix})`);
-      }
-    }
-
-    if (progressionIssues.length > 0) {
-      const issueDetails = progressionIssues
-        .map(issue => `${issue.from} → ${issue.to}: decreased by ${issue.diff.toFixed(2)} ${unitSuffix}`)
-        .join('; ');
-      
-      if (progressionMode === 'strict') {
-        errors.push(`Size progression error: ${issueDetails}`);
-      } else {
-        warnings.push(`Size progression warning: ${issueDetails}`);
-      }
-    }
-
+    // Always return valid - no validation, no errors, no warnings
     return {
-      isValid: errors.length === 0,
-      errors,
-      warnings
+      isValid: true,
+      errors: [],
+      warnings: []
     };
-  }, [progressionMode]);
+  }, []);
 
   // Helper to format validation alert message
   const formatValidationAlert = (fieldKey: string): string => {
@@ -1359,23 +1303,7 @@ type RoundModalFormState = {
       return;
     }
 
-    // Validate progression
-    const progressionValidation = validateProgression(
-      sizes,
-      selectedSizes,
-      tableUnit
-    );
-    
-    if (!progressionValidation.isValid && progressionMode === 'strict') {
-      // Block submission if strict mode and has errors
-      showError(`Cannot save: ${progressionValidation.errors.join('; ')}`);
-      return;
-    }
-
-    // Show warnings if any
-    if (progressionValidation.warnings.length > 0) {
-      showWarning(`Warning: ${progressionValidation.warnings.join('; ')}`);
-    }
+    // Progression validation disabled - allow any values
 
     const measurement: MeasurementPoint = {
       id: editingIndex !== null ? measurements[editingIndex].id : `measurement_${Date.now()}`,
@@ -2434,8 +2362,6 @@ type RoundModalFormState = {
               ) : (
                 measurements.map((measurement, index) => {
                   const rowKey = getRowKey(measurement);
-                  const validationResult = validateMeasurement(measurement);
-                  const hasIssues = validationResult.errors.length > 0 || validationResult.warnings.length > 0;
                   const isSelected = selectedMeasurementIds.has(rowKey);
                   
                   // Format tolerance for display
@@ -2452,15 +2378,11 @@ type RoundModalFormState = {
                   
                   // Format tolerance without unit for consistent display (keep fraction format for inch units)
                   const toleranceDisplay = formatToleranceNoUnit(minusTol, plusTol, tableUnit);
-                  const rowBackgroundColor = validationResult.errors.length > 0
-                    ? '#fee2e2'
-                    : validationResult.warnings.length > 0
-                      ? '#fef3c7'
-                      : isSelected
-                        ? '#dbeafe'
-                        : index % 2 === 0
-                          ? '#ffffff'
-                          : rowStripeColor;
+                  const rowBackgroundColor = isSelected
+                    ? '#dbeafe'
+                    : index % 2 === 0
+                      ? '#ffffff'
+                      : rowStripeColor;
                   
                   return (
                     <tr 
@@ -2500,14 +2422,6 @@ type RoundModalFormState = {
                       >
                         <div className="flex items-center">
                           {measurement.pomCode}
-                          {hasIssues && (
-                            <AlertTriangle 
-                              className={`w-4 h-4 ml-2 ${
-                                validationResult.errors.length > 0 ? 'text-red-500' : 'text-yellow-500'
-                              }`} 
-                              title={[...validationResult.errors, ...validationResult.warnings].join('; ')} 
-                            />
-                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700">

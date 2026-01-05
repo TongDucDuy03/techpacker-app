@@ -186,11 +186,11 @@ export const bomItemValidationSchema: FormValidationConfig = {
 export const measurementValidationSchema: FormValidationConfig = {
   pomCode: {
     required: true,
-    minLength: 2,
+    minLength: 1,
     maxLength: 20,
     custom: (value: string) => {
-      if (!value || value.trim().length < 2) {
-        return 'POM Code must be at least 2 characters long';
+      if (!value || value.trim().length === 0) {
+        return 'POM Code is required';
       }
       if (!/^[A-Z0-9_-]+$/.test(value.toUpperCase())) {
         return 'POM Code must contain only uppercase letters, numbers, hyphens, and underscores';
@@ -200,11 +200,11 @@ export const measurementValidationSchema: FormValidationConfig = {
   },
   pomName: {
     required: true,
-    minLength: 2,
+    minLength: 1,
     maxLength: 100,
     custom: (value: string) => {
-      if (!value || value.trim().length < 2) {
-        return 'POM Name must be at least 2 characters long';
+      if (!value || value.trim().length === 0) {
+        return 'POM Name is required';
       }
       return null;
     }
