@@ -287,8 +287,9 @@ const MeasurementTab: React.FC = () => {
     ? formData.sizes[formData.baseSize]
     : undefined;
   
-  // Check if unit supports fraction input (inch-10, inch-16, inch-32)
-  const supportsFractionInput = tableUnit === 'inch-10' || tableUnit === 'inch-16' || tableUnit === 'inch-32';
+  // Check if unit supports fraction input (inch-16, inch-32 only)
+  // inch-10 uses decimal input, not fraction
+  const supportsFractionInput = tableUnit === 'inch-16' || tableUnit === 'inch-32';
 
   const deriveAdjustmentsFromSizes = useCallback(
     (sizes: Record<string, number> | undefined, baseSize?: string): Record<string, string> => {
@@ -895,6 +896,9 @@ type RoundModalFormState = {
     if (!isBaseInputFocused && baseValue !== undefined) {
       if (supportsFractionInput) {
         setBaseValueInput(formatMeasurementValueAsFraction(baseValue, tableUnit));
+      } else if (tableUnit === 'inch-10') {
+        // For inch-10, format with 3 decimal places
+        setBaseValueInput(formatMeasurementValueAsFraction(baseValue, tableUnit));
       } else {
         setBaseValueInput(String(baseValue));
       }
@@ -908,6 +912,9 @@ type RoundModalFormState = {
     if (!isMinusToleranceFocused && formData.minusTolerance !== undefined) {
       if (supportsFractionInput) {
         setMinusToleranceInput(formatMeasurementValueAsFraction(formData.minusTolerance, tableUnit));
+      } else if (tableUnit === 'inch-10') {
+        // For inch-10, format with 3 decimal places
+        setMinusToleranceInput(formatMeasurementValueAsFraction(formData.minusTolerance, tableUnit));
       } else {
         setMinusToleranceInput(String(formData.minusTolerance));
       }
@@ -920,6 +927,9 @@ type RoundModalFormState = {
   React.useEffect(() => {
     if (!isPlusToleranceFocused && formData.plusTolerance !== undefined) {
       if (supportsFractionInput) {
+        setPlusToleranceInput(formatMeasurementValueAsFraction(formData.plusTolerance, tableUnit));
+      } else if (tableUnit === 'inch-10') {
+        // For inch-10, format with 3 decimal places
         setPlusToleranceInput(formatMeasurementValueAsFraction(formData.plusTolerance, tableUnit));
       } else {
         setPlusToleranceInput(String(formData.plusTolerance));
@@ -988,10 +998,15 @@ type RoundModalFormState = {
   const handleBaseValueBlur = () => {
     setIsBaseInputFocused(false);
     // When blur, format the value properly if it was successfully parsed
-    if (baseValue !== undefined && supportsFractionInput) {
-      setBaseValueInput(formatMeasurementValueAsFraction(baseValue, tableUnit));
-    } else if (baseValue !== undefined) {
-      setBaseValueInput(String(baseValue));
+    if (baseValue !== undefined) {
+      if (supportsFractionInput) {
+        setBaseValueInput(formatMeasurementValueAsFraction(baseValue, tableUnit));
+      } else if (tableUnit === 'inch-10') {
+        // For inch-10, format with 3 decimal places
+        setBaseValueInput(formatMeasurementValueAsFraction(baseValue, tableUnit));
+      } else {
+        setBaseValueInput(String(baseValue));
+      }
     }
   };
   
@@ -1001,6 +1016,9 @@ type RoundModalFormState = {
     if (baseValue !== undefined) {
       if (supportsFractionInput) {
         // Show formatted fraction when focusing
+        setBaseValueInput(formatMeasurementValueAsFraction(baseValue, tableUnit));
+      } else if (tableUnit === 'inch-10') {
+        // For inch-10, show formatted with 3 decimal places
         setBaseValueInput(formatMeasurementValueAsFraction(baseValue, tableUnit));
       } else {
         setBaseValueInput(String(baseValue));
@@ -1057,10 +1075,15 @@ type RoundModalFormState = {
   const handleMinusToleranceBlur = () => {
     setIsMinusToleranceFocused(false);
     // When blur, format the value properly if it was successfully parsed
-    if (formData.minusTolerance !== undefined && supportsFractionInput) {
-      setMinusToleranceInput(formatMeasurementValueAsFraction(formData.minusTolerance, tableUnit));
-    } else if (formData.minusTolerance !== undefined) {
-      setMinusToleranceInput(String(formData.minusTolerance));
+    if (formData.minusTolerance !== undefined) {
+      if (supportsFractionInput) {
+        setMinusToleranceInput(formatMeasurementValueAsFraction(formData.minusTolerance, tableUnit));
+      } else if (tableUnit === 'inch-10') {
+        // For inch-10, format with 3 decimal places
+        setMinusToleranceInput(formatMeasurementValueAsFraction(formData.minusTolerance, tableUnit));
+      } else {
+        setMinusToleranceInput(String(formData.minusTolerance));
+      }
     }
   };
   
@@ -1070,6 +1093,9 @@ type RoundModalFormState = {
     if (formData.minusTolerance !== undefined) {
       if (supportsFractionInput) {
         // Show formatted fraction when focusing
+        setMinusToleranceInput(formatMeasurementValueAsFraction(formData.minusTolerance, tableUnit));
+      } else if (tableUnit === 'inch-10') {
+        // For inch-10, show formatted with 3 decimal places
         setMinusToleranceInput(formatMeasurementValueAsFraction(formData.minusTolerance, tableUnit));
       } else {
         setMinusToleranceInput(String(formData.minusTolerance));
@@ -1100,10 +1126,15 @@ type RoundModalFormState = {
   const handlePlusToleranceBlur = () => {
     setIsPlusToleranceFocused(false);
     // When blur, format the value properly if it was successfully parsed
-    if (formData.plusTolerance !== undefined && supportsFractionInput) {
-      setPlusToleranceInput(formatMeasurementValueAsFraction(formData.plusTolerance, tableUnit));
-    } else if (formData.plusTolerance !== undefined) {
-      setPlusToleranceInput(String(formData.plusTolerance));
+    if (formData.plusTolerance !== undefined) {
+      if (supportsFractionInput) {
+        setPlusToleranceInput(formatMeasurementValueAsFraction(formData.plusTolerance, tableUnit));
+      } else if (tableUnit === 'inch-10') {
+        // For inch-10, format with 3 decimal places
+        setPlusToleranceInput(formatMeasurementValueAsFraction(formData.plusTolerance, tableUnit));
+      } else {
+        setPlusToleranceInput(String(formData.plusTolerance));
+      }
     }
   };
   
@@ -1113,6 +1144,9 @@ type RoundModalFormState = {
     if (formData.plusTolerance !== undefined) {
       if (supportsFractionInput) {
         // Show formatted fraction when focusing
+        setPlusToleranceInput(formatMeasurementValueAsFraction(formData.plusTolerance, tableUnit));
+      } else if (tableUnit === 'inch-10') {
+        // For inch-10, show formatted with 3 decimal places
         setPlusToleranceInput(formatMeasurementValueAsFraction(formData.plusTolerance, tableUnit));
       } else {
         setPlusToleranceInput(String(formData.plusTolerance));
@@ -2088,7 +2122,9 @@ type RoundModalFormState = {
                   value={isBaseInputFocused 
                     ? baseValueInput 
                     : (baseValue !== undefined 
-                        ? (supportsFractionInput ? formatMeasurementValueAsFraction(baseValue, tableUnit) : String(baseValue))
+                        ? (supportsFractionInput || tableUnit === 'inch-10' 
+                            ? formatMeasurementValueAsFraction(baseValue, tableUnit) 
+                            : String(baseValue))
                         : '')}
                   onChange={(e) => handleBaseValueChange(e.target.value)}
                   onFocus={handleBaseValueFocus}
@@ -2099,11 +2135,13 @@ type RoundModalFormState = {
                   className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     validation.getFieldProps('measurement').error ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder={supportsFractionInput ? "e.g., 15 1/4 or 15.25" : "e.g., 30"}
+                  placeholder={supportsFractionInput ? "e.g., 15 1/4 or 15.25" : (tableUnit === 'inch-10' ? "e.g., 20.500 or 0.250" : "e.g., 30")}
                 />
                 <p className="text-xs text-gray-500 mt-2">
                   {supportsFractionInput 
                     ? 'Enter measurement (e.g., 15 1/4, 15.25, or 1/2). Fractions are supported for inch measurements.'
+                    : tableUnit === 'inch-10'
+                    ? 'Enter measurement as decimal (e.g., 20.500, 0.250, 0.375). Values will be displayed with 3 decimal places.'
                     : 'Enter the actual measurement for the base size; other sizes will follow the jumps.'}
                 </p>
               </div>

@@ -278,7 +278,8 @@ const getDiffToneClass = (value: string): string => {
             const unitSuffix = getMeasurementUnitSuffix(tableUnit);
             const measurementMethod = row.measurement?.measurementMethod;
             const isEvenRow = rowIndex % 2 === 0;
-            const supportsFractionInput = tableUnit === 'inch-10' || tableUnit === 'inch-16' || tableUnit === 'inch-32';
+            // inch-10 uses decimal input, not fraction
+            const supportsFractionInput = tableUnit === 'inch-16' || tableUnit === 'inch-32';
             const rowBgColor = isEvenRow ? '#ffffff' : '#f9fafb';
 
             return sizeKeys.map((size, index) => {

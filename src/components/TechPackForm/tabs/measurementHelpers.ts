@@ -41,18 +41,26 @@ export const formatToleranceNoUnit = (
     const plusNum = typeof plus === 'string' ? parseTolerance(plus) : (typeof plus === 'number' ? plus : 0);
     
     if (minusNum === plusNum) {
-      // Format as fraction if unit is inch
-      if (unit === 'inch-10' || unit === 'inch-16' || unit === 'inch-32') {
+      // Format as fraction if unit is inch-16 or inch-32
+      if (unit === 'inch-16' || unit === 'inch-32') {
         const formatted = formatMeasurementValueAsFraction(Math.abs(minusNum), unit);
         return `±${formatted}`;
       }
+      // inch-10 uses 3 decimal places
+      if (unit === 'inch-10') {
+        return `±${Math.abs(minusNum).toFixed(3)}`;
+      }
       return `±${Math.abs(minusNum).toFixed(1)}`;
     }
-    // Format both as fractions if unit is inch
-    if (unit === 'inch-10' || unit === 'inch-16' || unit === 'inch-32') {
+    // Format both as fractions if unit is inch-16 or inch-32
+    if (unit === 'inch-16' || unit === 'inch-32') {
       const minusFormatted = formatMeasurementValueAsFraction(Math.abs(minusNum), unit);
       const plusFormatted = formatMeasurementValueAsFraction(Math.abs(plusNum), unit);
       return `-${minusFormatted} / +${plusFormatted}`;
+    }
+    // inch-10 uses 3 decimal places
+    if (unit === 'inch-10') {
+      return `-${Math.abs(minusNum).toFixed(3)} / +${Math.abs(plusNum).toFixed(3)}`;
     }
     return `-${Math.abs(minusNum).toFixed(1)} / +${Math.abs(plusNum).toFixed(1)}`;
   }
@@ -64,10 +72,14 @@ export const formatToleranceNoUnit = (
   }
   
   const numValue = typeof value === 'string' ? parseTolerance(value) : (typeof value === 'number' ? value : 0);
-  // Format as fraction if unit is inch
-  if (unit === 'inch-10' || unit === 'inch-16' || unit === 'inch-32') {
+  // Format as fraction if unit is inch-16 or inch-32
+  if (unit === 'inch-16' || unit === 'inch-32') {
     const formatted = formatMeasurementValueAsFraction(Math.abs(numValue), unit);
     return `±${formatted}`;
+  }
+  // inch-10 uses 3 decimal places
+  if (unit === 'inch-10') {
+    return `±${Math.abs(numValue).toFixed(3)}`;
   }
   return `±${Math.abs(numValue).toFixed(1)}`;
 };
@@ -204,22 +216,17 @@ export const formatStepValue = (value: number | undefined): string => {
   return `${sign}${integerPart} ${fractionText}`;
 };
 
-export const formatMeasurementValue = (value?: number): string => {
+export const formatMeasurementValue = (value?: number, unit?: MeasurementUnit): string => {
   if (value === undefined || value === null || Number.isNaN(value)) return '-';
   const sign = value < 0 ? '-' : '';
   const absValue = Math.abs(value);
-  const integerPart = Math.floor(absValue);
-  const decimalPart = absValue - integerPart;
-
-  // const fraction = findNearestFraction(decimalPart);
-  // if (fraction) {
-  //   const fractionText = `${fraction.numerator}/${fraction.denominator}`;
-  //   if (integerPart === 0) {
-  //     return `${sign}${fractionText}`;
-  //   }
-  //   return `${sign}${integerPart} ${fractionText}`;
-  // }
-
+  
+  // For inch-10, always show 3 decimal places to match the standard (0.125, 0.250, 0.375, etc.)
+  if (unit === 'inch-10') {
+    return `${sign}${absValue.toFixed(3)}`;
+  }
+  
+  // For other units, use 2 decimal places
   return `${sign}${absValue % 1 === 0 ? absValue.toFixed(0) : absValue.toFixed(2)}`;
 };
 
@@ -276,16 +283,21 @@ export const parseMeasurementValue = (input: string | number | undefined): numbe
 };
 
 /**
- * Format measurement value as fraction when unit is inch-10, inch-16, or inch-32
- * For inch-10: supports halves (1/2), fifths (1/5, 2/5, etc.), tenths (1/10, 3/10, etc.)
+ * Format measurement value as fraction when unit is inch-16 or inch-32
+ * For inch-10: format as decimal (not fraction)
  * For inch-16: supports sixteenths (1/16, 3/16, 5/16, etc.)
  * For inch-32: supports thirty-seconds (1/32, 3/32, 5/32, etc.)
  */
 export const formatMeasurementValueAsFraction = (value?: number, unit?: MeasurementUnit): string => {
   if (value === undefined || value === null || Number.isNaN(value)) return '-';
   
-  // Only format as fraction for inch units
-  if (unit !== 'inch-10' && unit !== 'inch-16' && unit !== 'inch-32') {
+  // inch-10 uses decimal format with 3 decimal places (not fraction)
+  if (unit === 'inch-10') {
+    return formatMeasurementValue(value, unit);
+  }
+  
+  // Only format as fraction for inch-16 and inch-32
+  if (unit !== 'inch-16' && unit !== 'inch-32') {
     return formatMeasurementValue(value);
   }
 
@@ -333,24 +345,6 @@ export const formatMeasurementValueAsFraction = (value?: number, unit?: Measurem
     const divisor = gcd(sixteenths, 16);
     const num = sixteenths / divisor;
     const den = 16 / divisor;
-    
-    const fractionText = `${num}/${den}`;
-    if (integerPart === 0) {
-      return fractionText;
-    }
-    return `${integerPart} ${fractionText}`;
-  }
-
-  // For inch-10, use tenths (10ths) - could also support halves and fifths
-  if (unit === 'inch-10') {
-    const tenths = Math.round(decimalPart * 10);
-    if (tenths === 0) {
-      return integerPart === 0 ? '0' : `${integerPart}`;
-    }
-    
-    const divisor = gcd(tenths, 10);
-    const num = tenths / divisor;
-    const den = 10 / divisor;
     
     const fractionText = `${num}/${den}`;
     if (integerPart === 0) {

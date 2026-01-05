@@ -9,8 +9,9 @@ function gcd(a: number, b: number): number {
 
 /**
  * Format a number as a fraction string based on the unit
- * For inch units (inch-10, inch-16, inch-32), format as fractions
- * For other units, format as decimal
+ * For inch-16 and inch-32: format as fractions
+ * For inch-10: format as decimal (not fraction)
+ * For other units: format as decimal
  */
 export function formatMeasurementValueAsFraction(
   value: number | undefined | null,
@@ -20,29 +21,30 @@ export function formatMeasurementValueAsFraction(
     return '-';
   }
 
-  // Only format as fraction for inch units
-  if (unit !== 'inch-10' && unit !== 'inch-16' && unit !== 'inch-32') {
-    // Format as decimal for mm, cm
-    const absValue = Math.abs(value);
-    return absValue % 1 === 0 ? absValue.toFixed(0) : absValue.toFixed(2);
-  }
-
   const sign = value < 0 ? '-' : '';
   const absValue = Math.abs(value);
   const integerPart = Math.floor(absValue);
   const decimalPart = absValue - integerPart;
 
-  let denominator: number;
+  // inch-10 uses decimal format with 3 decimal places (not fraction)
   if (unit === 'inch-10') {
-    denominator = 10;
-  } else if (unit === 'inch-16') {
+    return `${sign}${absValue.toFixed(3)}`;
+  }
+
+  // Only format as fraction for inch-16 and inch-32
+  if (unit !== 'inch-16' && unit !== 'inch-32') {
+    // Format as decimal for mm, cm
+    return absValue % 1 === 0 ? `${sign}${absValue.toFixed(0)}` : `${sign}${absValue.toFixed(2)}`;
+  }
+
+  let denominator: number;
+  if (unit === 'inch-16') {
     denominator = 16;
   } else if (unit === 'inch-32') {
     denominator = 32;
   } else {
     // Fallback to decimal
-    const absValue = Math.abs(value);
-    return absValue % 1 === 0 ? absValue.toFixed(0) : absValue.toFixed(2);
+    return absValue % 1 === 0 ? `${sign}${absValue.toFixed(0)}` : `${sign}${absValue.toFixed(2)}`;
   }
 
   const numerator = Math.round(decimalPart * denominator);
