@@ -206,3 +206,130 @@ export const formatMeasurementValue = (value?: number): string => {
   return `${sign}${absValue % 1 === 0 ? absValue.toFixed(0) : absValue.toFixed(2)}`;
 };
 
+/**
+ * Parse measurement value (similar to parseStepValue but without sign handling for absolute values)
+ * Supports: "15.25", "15 1/4", "15 1/2", "1/4", etc.
+ */
+export const parseMeasurementValue = (input: string | number | undefined): number | undefined => {
+  if (typeof input === 'number') {
+    return Number.isFinite(input) ? input : undefined;
+  }
+  if (!input) return undefined;
+
+  let text = String(input).replace(',', '.').trim();
+  if (!text) return undefined;
+
+  let parsed: number | undefined;
+
+  // Handle mixed number: "15 1/4"
+  if (text.includes(' ')) {
+    const [wholePart, fractionPart] = text.split(' ').map(part => part.trim()).filter(Boolean);
+    if (wholePart && fractionPart && fractionPart.includes('/')) {
+      const whole = parseFloat(wholePart);
+      const fraction = parseSimpleFraction(fractionPart);
+      if (Number.isFinite(whole) && fraction !== undefined) {
+        parsed = Math.abs(whole) + fraction;
+      }
+    }
+  }
+
+  // Handle pure fraction: "1/4", "3/8"
+  if (parsed === undefined && text.includes('/')) {
+    parsed = parseSimpleFraction(text);
+  }
+
+  // Handle decimal: "15.25"
+  if (parsed === undefined && !Number.isNaN(parseFloat(text))) {
+    parsed = parseFloat(text);
+  }
+
+  return parsed;
+};
+
+/**
+ * Format measurement value as fraction when unit is inch-10, inch-16, or inch-32
+ * For inch-10: supports halves (1/2), fifths (1/5, 2/5, etc.), tenths (1/10, 3/10, etc.)
+ * For inch-16: supports sixteenths (1/16, 3/16, 5/16, etc.)
+ * For inch-32: supports thirty-seconds (1/32, 3/32, 5/32, etc.)
+ */
+export const formatMeasurementValueAsFraction = (value?: number, unit?: MeasurementUnit): string => {
+  if (value === undefined || value === null || Number.isNaN(value)) return '-';
+  
+  // Only format as fraction for inch units
+  if (unit !== 'inch-10' && unit !== 'inch-16' && unit !== 'inch-32') {
+    return formatMeasurementValue(value);
+  }
+
+  const absValue = Math.abs(value);
+  const integerPart = Math.floor(absValue);
+  const decimalPart = absValue - integerPart;
+
+  // Helper function to simplify fractions
+  const gcd = (a: number, b: number): number => {
+    let x = Math.abs(a);
+    let y = Math.abs(b);
+    while (y) {
+      const temp = y;
+      y = x % y;
+      x = temp;
+    }
+    return x || 1;
+  };
+
+  // For inch-32, use thirty-seconds (32nds)
+  if (unit === 'inch-32') {
+    const thirtySeconds = Math.round(decimalPart * 32);
+    if (thirtySeconds === 0) {
+      return integerPart === 0 ? '0' : `${integerPart}`;
+    }
+    
+    const divisor = gcd(thirtySeconds, 32);
+    const num = thirtySeconds / divisor;
+    const den = 32 / divisor;
+    
+    const fractionText = `${num}/${den}`;
+    if (integerPart === 0) {
+      return fractionText;
+    }
+    return `${integerPart} ${fractionText}`;
+  }
+
+  // For inch-16, use sixteenths (16ths)
+  if (unit === 'inch-16') {
+    const sixteenths = Math.round(decimalPart * 16);
+    if (sixteenths === 0) {
+      return integerPart === 0 ? '0' : `${integerPart}`;
+    }
+    
+    const divisor = gcd(sixteenths, 16);
+    const num = sixteenths / divisor;
+    const den = 16 / divisor;
+    
+    const fractionText = `${num}/${den}`;
+    if (integerPart === 0) {
+      return fractionText;
+    }
+    return `${integerPart} ${fractionText}`;
+  }
+
+  // For inch-10, use tenths (10ths) - could also support halves and fifths
+  if (unit === 'inch-10') {
+    const tenths = Math.round(decimalPart * 10);
+    if (tenths === 0) {
+      return integerPart === 0 ? '0' : `${integerPart}`;
+    }
+    
+    const divisor = gcd(tenths, 10);
+    const num = tenths / divisor;
+    const den = 10 / divisor;
+    
+    const fractionText = `${num}/${den}`;
+    if (integerPart === 0) {
+      return fractionText;
+    }
+    return `${integerPart} ${fractionText}`;
+  }
+
+  return formatMeasurementValue(value);
+};
+

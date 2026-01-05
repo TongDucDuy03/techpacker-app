@@ -456,18 +456,30 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     
     // Auto-calculate totalPrice when quantity or unitPrice changes
     if (field === 'quantity' || field === 'unitPrice') {
+      // Helper to parse value, preserving string if it's a transitional state like "0."
+      const parseNumericValue = (val: string | number | undefined | null): number | null | undefined => {
+        if (val === undefined || val === null || val === '') return null;
+        // If it's already a number, return it
+        if (typeof val === 'number') return val;
+        // If it's a string ending with dot (transitional state), don't parse yet
+        const strVal = String(val);
+        if (strVal.endsWith('.') && !strVal.endsWith('..')) {
+          return undefined; // Return undefined for transitional states, don't calculate yet
+        }
+        const parsed = Number(strVal);
+        return Number.isNaN(parsed) ? null : parsed;
+      };
+      
       const quantity = field === 'quantity' 
-        ? (value !== undefined && value !== null && value !== '' ? Number(value) : null)
-        : (updatedFormData.quantity !== undefined && updatedFormData.quantity !== null && updatedFormData.quantity !== '' 
-           ? Number(updatedFormData.quantity) 
-           : null);
+        ? parseNumericValue(value)
+        : parseNumericValue(updatedFormData.quantity);
       const unitPrice = field === 'unitPrice' 
-        ? (value !== undefined && value !== null && value !== '' ? Number(value) : undefined)
-        : (updatedFormData.unitPrice !== undefined && updatedFormData.unitPrice !== null && updatedFormData.unitPrice !== '' 
-           ? Number(updatedFormData.unitPrice) 
-           : undefined);
-      // Only calculate if both quantity > 0 and unitPrice are provided
-      if (quantity !== null && quantity > 0 && unitPrice !== undefined && unitPrice > 0) {
+        ? parseNumericValue(value)
+        : parseNumericValue(updatedFormData.unitPrice);
+      
+      // Only calculate if both quantity > 0 and unitPrice are provided and not undefined (undefined means transitional state)
+      if (quantity !== null && quantity !== undefined && quantity > 0 && 
+          unitPrice !== undefined && unitPrice !== null && unitPrice > 0) {
         updatedFormData.totalPrice = quantity * unitPrice;
       } else {
         updatedFormData.totalPrice = undefined;
@@ -476,8 +488,12 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     
     setFormData(updatedFormData);
 
-    // Validate the field in real-time
-    validation.validateField(field, value);
+    // Validate the field in real-time (only if value is not a transitional state)
+    if (typeof value === 'string' && value.endsWith('.') && !value.endsWith('..')) {
+      // Skip validation for transitional states to avoid false errors
+    } else {
+      validation.validateField(field, value);
+    }
   }, [formData, validation]);
 
   const handleMaterialImageUpload = useCallback(

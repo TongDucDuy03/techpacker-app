@@ -8,7 +8,7 @@ import {
 } from '../../../types/techpack';
 import { getMeasurementUnitSuffix, DEFAULT_MEASUREMENT_UNIT, MeasurementUnit } from '../../../types/techpack';
 import { SampleMeasurementRow } from '../../../types/measurements';
-import { parseTolerance, formatToleranceNoUnit } from './measurementHelpers';
+import { parseTolerance, formatToleranceNoUnit, parseMeasurementValue, formatMeasurementValueAsFraction } from './measurementHelpers';
 
 type EditableSampleField = 'measured' | 'diff' | 'revised' | 'comments';
 
@@ -278,6 +278,7 @@ const getDiffToneClass = (value: string): string => {
             const unitSuffix = getMeasurementUnitSuffix(tableUnit);
             const measurementMethod = row.measurement?.measurementMethod;
             const isEvenRow = rowIndex % 2 === 0;
+            const supportsFractionInput = tableUnit === 'inch-10' || tableUnit === 'inch-16' || tableUnit === 'inch-32';
             const rowBgColor = isEvenRow ? '#ffffff' : '#f9fafb';
 
             return sizeKeys.map((size, index) => {
@@ -298,13 +299,17 @@ const getDiffToneClass = (value: string): string => {
                   
                   // For requested field: always use measurement.sizes (source of truth)
                   if (fieldKey === 'requested') {
+                    const requestedNumber = requestedValue ? parseFloat(requestedValue) : undefined;
+                    const displayRequested = requestedNumber !== undefined 
+                      ? formatMeasurementValueAsFraction(requestedNumber, tableUnit)
+                      : '—';
                     return (
                       <td
                         key={cellKey}
                         className="border-r border-gray-200 px-2 py-2 align-top text-center text-sm text-gray-900"
                         style={{ backgroundColor: rowBgColor }}
                       >
-                        {requestedValue ? requestedValue : '—'}
+                        {displayRequested}
                       </td>
                     );
                   }
@@ -355,23 +360,28 @@ const getDiffToneClass = (value: string): string => {
                           />
                         ) : (
                           <input
-                            type="number"
-                            inputMode="decimal"
-                            step="0.1"
+                            type={supportsFractionInput ? "text" : "number"}
+                            inputMode={supportsFractionInput ? "text" : "decimal"}
+                            step={supportsFractionInput ? undefined : "0.1"}
                             value=""
-                            onChange={event =>
+                            onChange={event => {
+                              const rawValue = event.target.value;
+                              // Parse fraction to decimal for storage, but keep original string if parse fails (intermediate input)
+                              const parsedValue = supportsFractionInput && rawValue.trim()
+                                ? (parseMeasurementValue(rawValue) ?? rawValue) // Keep original if parse fails (e.g., "15 1/")
+                                : rawValue;
                               onEntrySizeValueChange(
                                 round.id,
                                 '', // entryId rỗng, sẽ tạo entry mới
                                 fieldKey as EditableSampleField,
                                 size,
-                                event.target.value,
+                                String(parsedValue),
                                 row.measurement?.id,
                                 row.pomCode
-                              )
-                            }
+                              );
+                            }}
                             className="w-full min-w-[90px] border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="—"
+                            placeholder={supportsFractionInput ? "15 1/4 or 15.25" : "—"}
                           />
                         )}
                       </td>
@@ -406,8 +416,19 @@ const getDiffToneClass = (value: string): string => {
 
                   // ALWAYS use measurement.sizes as source of truth (same as requested field above)
                   const requestedNumber = requestedValue ? parseFloat(requestedValue) : undefined;
-                  const measuredNumber = fieldKey === 'measured' && fieldValue ? parseFloat(fieldValue) : undefined;
-                  const diffNumber = fieldKey === 'diff' && fieldValue ? parseFloat(fieldValue) : undefined;
+                  // Parse fieldValue - support both decimal string and fraction string
+                  const fieldNumber = fieldValue 
+                    ? (supportsFractionInput ? parseMeasurementValue(fieldValue) : parseFloat(fieldValue))
+                    : undefined;
+                  const measuredNumber = fieldKey === 'measured' && fieldNumber ? fieldNumber : undefined;
+                  const diffNumber = fieldKey === 'diff' && fieldNumber ? fieldNumber : undefined;
+                  
+                  // Format display value (show as fraction if supported)
+                  const displayFieldValue = fieldValue 
+                    ? (supportsFractionInput && fieldNumber !== undefined 
+                        ? formatMeasurementValueAsFraction(fieldNumber, tableUnit)
+                        : fieldValue)
+                    : '';
 
                   let outOfTolerance = false;
                   if (toleranceRange) {
@@ -434,23 +455,28 @@ const getDiffToneClass = (value: string): string => {
                       style={outOfTolerance ? undefined : { backgroundColor: rowBgColor }}
                     >
                       <input
-                        type="number"
-                        inputMode="decimal"
-                        step="0.1"
-                        value={fieldValue}
-                        onChange={event =>
+                        type={supportsFractionInput ? "text" : "number"}
+                        inputMode={supportsFractionInput ? "text" : "decimal"}
+                        step={supportsFractionInput ? undefined : "0.1"}
+                        value={displayFieldValue}
+                        onChange={event => {
+                          const rawValue = event.target.value;
+                          // Parse fraction to decimal for storage, but keep original string if parse fails (intermediate input)
+                          const parsedValue = supportsFractionInput && rawValue.trim()
+                            ? (parseMeasurementValue(rawValue) ?? rawValue) // Keep original if parse fails (e.g., "15 1/")
+                            : rawValue;
                           onEntrySizeValueChange(
                             round.id,
                             entryId,
                             fieldKey as EditableSampleField,
                             size,
-                            event.target.value,
+                            String(parsedValue),
                             row.measurement?.id,
                             row.pomCode
-                          )
-                        }
+                          );
+                        }}
                         className={`w-full min-w-[90px] border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${diffToneClass}`}
-                        placeholder="—"
+                        placeholder={supportsFractionInput ? "15 1/4 or 15.25" : "—"}
                       />
                     </td>
                   );

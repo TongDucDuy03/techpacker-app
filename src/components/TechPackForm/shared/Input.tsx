@@ -29,9 +29,24 @@ const Input: React.FC<InputProps> = ({
     if (isNumeric) {
       const raw = e.target.value;
       const normalized = raw.replace(/,/g, '.');
-      const transitionalStates = ['', '-', '.', '-.', normalized.endsWith('.') ? normalized : null].filter(
+      
+      // Allow transitional states (empty, minus sign, dot, number ending with dot, etc.)
+      // This allows typing "0.", "0.0", "0.05", etc. without losing the decimal point
+      const transitionalStates = [
+        '', 
+        '-', 
+        '.', 
+        '-.',
+        // Allow any number ending with a dot (e.g., "0.", "123.", "0.0")
+        normalized.endsWith('.') ? normalized : null,
+        // Allow "0.0", "0.00", etc. (numbers with leading zeros after decimal)
+        /^0+\.\d*$/.test(normalized) ? normalized : null,
+        // Allow "-0.", "-0.0", etc.
+        /^-0+\.\d*$/.test(normalized) ? normalized : null
+      ].filter(
         (state): state is string => state !== null && state !== undefined
       );
+      
       if (transitionalStates.includes(normalized)) {
         onChange(normalized);
         return;
@@ -39,9 +54,20 @@ const Input: React.FC<InputProps> = ({
 
       const parsed = Number(normalized);
       if (Number.isNaN(parsed)) {
+        // If it's not a valid number but matches a pattern like "0.", keep it as is
+        if (normalized.endsWith('.') || /^0+\.\d*$/.test(normalized) || /^-0+\.\d*$/.test(normalized)) {
+          onChange(normalized);
+          return;
+        }
         onChange('');
       } else {
-        onChange(parsed);
+        // Check if original input ends with dot - if so, keep the string representation
+        // to preserve decimal input (e.g., "0." should stay "0." not become 0)
+        if (normalized.endsWith('.') && !normalized.endsWith('..')) {
+          onChange(normalized);
+        } else {
+          onChange(parsed);
+        }
       }
       return;
     }
@@ -71,7 +97,9 @@ const Input: React.FC<InputProps> = ({
       <input
         id={inputId}
         type={resolvedType}
-        value={value}
+        value={typeof value === 'number' && isNumeric && value.toString().includes('.') && !value.toString().endsWith('.') 
+          ? value.toString() 
+          : value}
         onChange={handleChange}
         onBlur={onBlur}
         placeholder={placeholder}

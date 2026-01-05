@@ -18,7 +18,7 @@ import { Plus, Upload, Download, Ruler, AlertTriangle, Info, AlertCircle, X, Sav
 import { showSuccess, showWarning, showError } from '../../../lib/toast';
 import SampleMeasurementsTable from './SampleMeasurementsTable';
 import { SampleMeasurementRow } from '../../../types/measurements';
-import { parseTolerance, formatToleranceNoUnit, parseStepValue, formatStepValue, formatMeasurementValue } from './measurementHelpers';
+import { parseTolerance, formatToleranceNoUnit, parseStepValue, formatStepValue, formatMeasurementValue, parseMeasurementValue, formatMeasurementValueAsFraction } from './measurementHelpers';
 import { MEASUREMENT_UNITS, DEFAULT_MEASUREMENT_UNIT, MeasurementUnit, getMeasurementUnitSuffix } from '../../../types/techpack';
 import { SIZE_PRESET_OPTIONS, getPresetById } from '../../../constants/sizePresets';
 import ConfirmationDialog from '../../ConfirmationDialog';
@@ -189,6 +189,8 @@ const MeasurementTab: React.FC = () => {
     isActive: true,
   });
   const [sizeAdjustments, setSizeAdjustments] = useState<Record<string, string>>({});
+  const [baseValueInput, setBaseValueInput] = useState<string>(''); // Raw input for base measurement (to allow typing fractions)
+  const [isBaseInputFocused, setIsBaseInputFocused] = useState<boolean>(false);
   const [newSizeLabel, setNewSizeLabel] = useState('');
   const [pendingPresetId, setPendingPresetId] = useState(() => SIZE_PRESET_OPTIONS[0]?.id || 'standard_us_alpha');
   const [baseSizeSelectorValue, setBaseSizeSelectorValue] = useState('');
@@ -278,6 +280,9 @@ const MeasurementTab: React.FC = () => {
   const baseValue = formData.baseSize && formData.sizes
     ? formData.sizes[formData.baseSize]
     : undefined;
+  
+  // Check if unit supports fraction input (inch-10, inch-16, inch-32)
+  const supportsFractionInput = tableUnit === 'inch-10' || tableUnit === 'inch-16' || tableUnit === 'inch-32';
 
   const deriveAdjustmentsFromSizes = useCallback(
     (sizes: Record<string, number> | undefined, baseSize?: string): Record<string, string> => {
@@ -879,6 +884,19 @@ type RoundModalFormState = {
     }
   }, [formData.baseSize, selectedSizes, measurementBaseSize]);
 
+  // Sync baseValueInput with baseValue when not focused (e.g., when baseValue changes from outside)
+  React.useEffect(() => {
+    if (!isBaseInputFocused && baseValue !== undefined) {
+      if (supportsFractionInput) {
+        setBaseValueInput(formatMeasurementValueAsFraction(baseValue, tableUnit));
+      } else {
+        setBaseValueInput(String(baseValue));
+      }
+    } else if (!isBaseInputFocused && baseValue === undefined) {
+      setBaseValueInput('');
+    }
+  }, [baseValue, isBaseInputFocused, supportsFractionInput, tableUnit]);
+
   React.useEffect(() => {
     if (!formData.baseSize) {
       setSizeAdjustments({});
@@ -918,16 +936,46 @@ type RoundModalFormState = {
   };
 
   const handleBaseValueChange = (value: string) => {
-    const normalized = value.replace(',', '.');
-    if (normalized.trim() === '') {
+    // Store raw input while user is typing
+    setBaseValueInput(value);
+    
+    if (value.trim() === '') {
       updateSizesWithBase({ baseValue: undefined });
       return;
     }
-    const parsed = parseFloat(normalized);
-    if (Number.isNaN(parsed)) {
+    // Use parseMeasurementValue to support fractions like "15 1/4", "15.25", "1/2"
+    const parsed = parseMeasurementValue(value);
+    if (parsed === undefined) {
+      // Allow intermediate input states (e.g., "15 ", "15 1/")
+      // Don't update if it's a valid intermediate state - but keep the raw input
       return;
     }
     updateSizesWithBase({ baseValue: parsed });
+  };
+  
+  const handleBaseValueBlur = () => {
+    setIsBaseInputFocused(false);
+    // When blur, format the value properly if it was successfully parsed
+    if (baseValue !== undefined && supportsFractionInput) {
+      setBaseValueInput(formatMeasurementValueAsFraction(baseValue, tableUnit));
+    } else if (baseValue !== undefined) {
+      setBaseValueInput(String(baseValue));
+    }
+  };
+  
+  const handleBaseValueFocus = () => {
+    setIsBaseInputFocused(true);
+    // When focus, show the raw value or formatted value
+    if (baseValue !== undefined) {
+      if (supportsFractionInput) {
+        // Show formatted fraction when focusing
+        setBaseValueInput(formatMeasurementValueAsFraction(baseValue, tableUnit));
+      } else {
+        setBaseValueInput(String(baseValue));
+      }
+    } else {
+      setBaseValueInput('');
+    }
   };
 
   const handleSizeAdjustmentChange = (size: string, value: string) => {
@@ -1871,7 +1919,7 @@ type RoundModalFormState = {
               error={validation.getFieldProps('minusTolerance').error}
               helperText={
                 validation.getFieldProps('minusTolerance').helperText
-                || `Tolerance in ${getMeasurementUnitSuffix(formData.unit as MeasurementUnit)}`
+                || `Tolerance in ${getMeasurementUnitSuffix(tableUnit)}`
               }
             />
 
@@ -1899,7 +1947,7 @@ type RoundModalFormState = {
               error={validation.getFieldProps('plusTolerance').error}
               helperText={
                 validation.getFieldProps('plusTolerance').helperText
-                || `Tolerance in ${getMeasurementUnitSuffix(formData.unit as MeasurementUnit)}`
+                || `Tolerance in ${getMeasurementUnitSuffix(tableUnit)}`
               }
             />
 
@@ -1943,18 +1991,30 @@ type RoundModalFormState = {
                   Base Measurement ({getMeasurementUnitSuffix(tableUnit)})
                 </label>
                 <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={baseValue ?? ''}
+                  type={supportsFractionInput ? "text" : "number"}
+                  step={supportsFractionInput ? undefined : "0.01"}
+                  min={supportsFractionInput ? undefined : "0"}
+                  value={isBaseInputFocused 
+                    ? baseValueInput 
+                    : (baseValue !== undefined 
+                        ? (supportsFractionInput ? formatMeasurementValueAsFraction(baseValue, tableUnit) : String(baseValue))
+                        : '')}
                   onChange={(e) => handleBaseValueChange(e.target.value)}
-                  onBlur={() => validation.setFieldTouched('measurement')}
+                  onFocus={handleBaseValueFocus}
+                  onBlur={() => {
+                    handleBaseValueBlur();
+                    validation.setFieldTouched('measurement');
+                  }}
                   className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     validation.getFieldProps('measurement').error ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder="e.g., 30"
+                  placeholder={supportsFractionInput ? "e.g., 15 1/4 or 15.25" : "e.g., 30"}
                 />
-                <p className="text-xs text-gray-500 mt-2">Enter the actual measurement for the base size; other sizes will follow the jumps.</p>
+                <p className="text-xs text-gray-500 mt-2">
+                  {supportsFractionInput 
+                    ? 'Enter measurement (e.g., 15 1/4, 15.25, or 1/2). Fractions are supported for inch measurements.'
+                    : 'Enter the actual measurement for the base size; other sizes will follow the jumps.'}
+                </p>
               </div>
             </div>
 
@@ -1969,7 +2029,7 @@ type RoundModalFormState = {
                       <div className="text-lg font-semibold text-blue-900">{size}</div>
                       <div className="text-sm text-blue-800 mt-1">
                         {baseValue !== undefined && !Number.isNaN(baseValue)
-                          ? `${formatMeasurementValue(baseValue)} ${getMeasurementUnitSuffix(tableUnit)}`
+                          ? `${formatMeasurementValueAsFraction(baseValue, tableUnit)} ${getMeasurementUnitSuffix(tableUnit)}`
                           : 'Enter a base value'}
                       </div>
                     </div>
@@ -1977,7 +2037,7 @@ type RoundModalFormState = {
                 }
 
                 const adjustmentValue = sizeAdjustments[size] || '';
-                const displayActual = formatMeasurementValue(actualValue);
+                const displayActual = formatMeasurementValueAsFraction(actualValue, tableUnit);
 
                 return (
                   <div key={size} className="flex flex-col border rounded-md p-3">
@@ -2300,7 +2360,7 @@ type RoundModalFormState = {
                       </td>
                       {selectedSizes.map(size => {
                         const value = measurement.sizes ? measurement.sizes[size] : undefined;
-                        const displayValue = formatMeasurementValue(value);
+                        const displayValue = formatMeasurementValueAsFraction(value, tableUnit);
                         const isBaseCell = highlightedColumn ? size === highlightedColumn : measurement.baseSize === size;
                         return (
                           <td 
