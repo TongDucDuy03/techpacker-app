@@ -97,9 +97,11 @@ const Input: React.FC<InputProps> = ({
       <input
         id={inputId}
         type={resolvedType}
-        value={typeof value === 'number' && isNumeric && value.toString().includes('.') && !value.toString().endsWith('.') 
-          ? value.toString() 
-          : value}
+        value={typeof value === 'number' 
+          ? (isNumeric && value.toString().includes('.') && !value.toString().endsWith('.') 
+              ? value.toString() 
+              : String(value))
+          : (value ?? '')}
         onChange={handleChange}
         onBlur={onBlur}
         placeholder={placeholder}

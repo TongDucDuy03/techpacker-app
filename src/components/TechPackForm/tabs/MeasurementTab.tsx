@@ -19,7 +19,7 @@ import { showSuccess, showWarning, showError } from '../../../lib/toast';
 import SampleMeasurementsTable from './SampleMeasurementsTable';
 import { SampleMeasurementRow } from '../../../types/measurements';
 import { parseTolerance, formatToleranceNoUnit, parseStepValue, formatStepValue, formatMeasurementValue, parseMeasurementValue, formatMeasurementValueAsFraction } from './measurementHelpers';
-import { MEASUREMENT_UNITS, DEFAULT_MEASUREMENT_UNIT, MeasurementUnit, getMeasurementUnitSuffix } from '../../../types/techpack';
+import { MEASUREMENT_UNITS, DEFAULT_MEASUREMENT_UNIT, MeasurementUnit, getMeasurementUnitSuffix, getMeasurementUnitMeta } from '../../../types/techpack';
 import { SIZE_PRESET_OPTIONS, getPresetById } from '../../../constants/sizePresets';
 import ConfirmationDialog from '../../ConfirmationDialog';
 import { DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR, DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR } from '../../../constants/measurementDisplay';
@@ -191,11 +191,17 @@ const MeasurementTab: React.FC = () => {
   const [sizeAdjustments, setSizeAdjustments] = useState<Record<string, string>>({});
   const [baseValueInput, setBaseValueInput] = useState<string>(''); // Raw input for base measurement (to allow typing fractions)
   const [isBaseInputFocused, setIsBaseInputFocused] = useState<boolean>(false);
+  const [minusToleranceInput, setMinusToleranceInput] = useState<string>(''); // Raw input for minus tolerance
+  const [isMinusToleranceFocused, setIsMinusToleranceFocused] = useState<boolean>(false);
+  const [plusToleranceInput, setPlusToleranceInput] = useState<string>(''); // Raw input for plus tolerance
+  const [isPlusToleranceFocused, setIsPlusToleranceFocused] = useState<boolean>(false);
   const [newSizeLabel, setNewSizeLabel] = useState('');
   const [pendingPresetId, setPendingPresetId] = useState(() => SIZE_PRESET_OPTIONS[0]?.id || 'standard_us_alpha');
   const [baseSizeSelectorValue, setBaseSizeSelectorValue] = useState('');
   const [pendingBaseSize, setPendingBaseSize] = useState<string | null>(null);
   const [showBaseSizeConfirm, setShowBaseSizeConfirm] = useState(false);
+  const [showUnitChangeConfirm, setShowUnitChangeConfirm] = useState(false);
+  const [pendingNewUnit, setPendingNewUnit] = useState<MeasurementUnit | null>(null);
   const measurementUnitOptions = useMemo(
     () => MEASUREMENT_UNITS.map(unit => ({ value: unit.value, label: unit.label })),
     []
@@ -897,6 +903,32 @@ type RoundModalFormState = {
     }
   }, [baseValue, isBaseInputFocused, supportsFractionInput, tableUnit]);
 
+  // Sync minusToleranceInput with formData.minusTolerance when not focused
+  React.useEffect(() => {
+    if (!isMinusToleranceFocused && formData.minusTolerance !== undefined) {
+      if (supportsFractionInput) {
+        setMinusToleranceInput(formatMeasurementValueAsFraction(formData.minusTolerance, tableUnit));
+      } else {
+        setMinusToleranceInput(String(formData.minusTolerance));
+      }
+    } else if (!isMinusToleranceFocused && formData.minusTolerance === undefined) {
+      setMinusToleranceInput('');
+    }
+  }, [formData.minusTolerance, isMinusToleranceFocused, supportsFractionInput, tableUnit]);
+
+  // Sync plusToleranceInput with formData.plusTolerance when not focused
+  React.useEffect(() => {
+    if (!isPlusToleranceFocused && formData.plusTolerance !== undefined) {
+      if (supportsFractionInput) {
+        setPlusToleranceInput(formatMeasurementValueAsFraction(formData.plusTolerance, tableUnit));
+      } else {
+        setPlusToleranceInput(String(formData.plusTolerance));
+      }
+    } else if (!isPlusToleranceFocused && formData.plusTolerance === undefined) {
+      setPlusToleranceInput('');
+    }
+  }, [formData.plusTolerance, isPlusToleranceFocused, supportsFractionInput, tableUnit]);
+
   React.useEffect(() => {
     if (!formData.baseSize) {
       setSizeAdjustments({});
@@ -975,6 +1007,118 @@ type RoundModalFormState = {
       }
     } else {
       setBaseValueInput('');
+    }
+  };
+
+  const handleUnitChange = async (newUnit: MeasurementUnit) => {
+    // Update local state first
+    updateMeasurementDisplaySettings({ unit: newUnit });
+    // Update all existing measurements to use the new unit
+    measurements.forEach((measurement, index) => {
+      updateMeasurement(index, { ...measurement, unit: newUnit });
+    });
+    // Wait a bit for state to update, then auto-save to backend
+    if (saveTechPack && state?.techpack?.id) {
+      try {
+        // Use setTimeout to ensure state is updated before save
+        await new Promise(resolve => setTimeout(resolve, 100));
+        // Get updated techpack with new unit
+        const updatedTechpack = {
+          ...state.techpack,
+          measurementUnit: newUnit,
+        };
+        await saveTechPack(updatedTechpack);
+        showSuccess('Measurement unit updated and saved');
+      } catch (error: any) {
+        console.error('Failed to save measurement unit:', error);
+        showError(error?.message || 'Failed to save measurement unit');
+      }
+    }
+  };
+
+  const handleMinusToleranceChange = (value: string) => {
+    // Store raw input while user is typing
+    setMinusToleranceInput(value);
+    
+    if (value.trim() === '') {
+      setFormData(prev => ({ ...prev, minusTolerance: undefined }));
+      return;
+    }
+    // Use parseMeasurementValue to support fractions like "1/2", "1 1/4", "1.5", "0.5"
+    const parsed = parseMeasurementValue(value);
+    if (parsed === undefined) {
+      // Allow intermediate input states (e.g., "1/", "1 1/", "0.")
+      // Don't update if it's a valid intermediate state - but keep the raw input
+      return;
+    }
+    handleInputChange('minusTolerance')(parsed);
+  };
+  
+  const handleMinusToleranceBlur = () => {
+    setIsMinusToleranceFocused(false);
+    // When blur, format the value properly if it was successfully parsed
+    if (formData.minusTolerance !== undefined && supportsFractionInput) {
+      setMinusToleranceInput(formatMeasurementValueAsFraction(formData.minusTolerance, tableUnit));
+    } else if (formData.minusTolerance !== undefined) {
+      setMinusToleranceInput(String(formData.minusTolerance));
+    }
+  };
+  
+  const handleMinusToleranceFocus = () => {
+    setIsMinusToleranceFocused(true);
+    // When focus, show the raw value or formatted value
+    if (formData.minusTolerance !== undefined) {
+      if (supportsFractionInput) {
+        // Show formatted fraction when focusing
+        setMinusToleranceInput(formatMeasurementValueAsFraction(formData.minusTolerance, tableUnit));
+      } else {
+        setMinusToleranceInput(String(formData.minusTolerance));
+      }
+    } else {
+      setMinusToleranceInput('');
+    }
+  };
+
+  const handlePlusToleranceChange = (value: string) => {
+    // Store raw input while user is typing
+    setPlusToleranceInput(value);
+    
+    if (value.trim() === '') {
+      setFormData(prev => ({ ...prev, plusTolerance: undefined }));
+      return;
+    }
+    // Use parseMeasurementValue to support fractions like "1/2", "1 1/4", "1.5", "0.5"
+    const parsed = parseMeasurementValue(value);
+    if (parsed === undefined) {
+      // Allow intermediate input states (e.g., "1/", "1 1/", "0.")
+      // Don't update if it's a valid intermediate state - but keep the raw input
+      return;
+    }
+    handleInputChange('plusTolerance')(parsed);
+  };
+  
+  const handlePlusToleranceBlur = () => {
+    setIsPlusToleranceFocused(false);
+    // When blur, format the value properly if it was successfully parsed
+    if (formData.plusTolerance !== undefined && supportsFractionInput) {
+      setPlusToleranceInput(formatMeasurementValueAsFraction(formData.plusTolerance, tableUnit));
+    } else if (formData.plusTolerance !== undefined) {
+      setPlusToleranceInput(String(formData.plusTolerance));
+    }
+  };
+  
+  const handlePlusToleranceFocus = () => {
+    setIsPlusToleranceFocused(true);
+    // When focus, show the raw value or formatted value
+    if (formData.plusTolerance !== undefined) {
+      if (supportsFractionInput) {
+        // Show formatted fraction when focusing
+        setPlusToleranceInput(formatMeasurementValueAsFraction(formData.plusTolerance, tableUnit));
+      } else {
+        setPlusToleranceInput(String(formData.plusTolerance));
+      }
+    } else {
+      setPlusToleranceInput('');
     }
   };
 
@@ -1279,6 +1423,12 @@ type RoundModalFormState = {
       isActive: true,
     });
     setSizeAdjustments({});
+    setBaseValueInput('');
+    setIsBaseInputFocused(false);
+    setMinusToleranceInput('');
+    setIsMinusToleranceFocused(false);
+    setPlusToleranceInput('');
+    setIsPlusToleranceFocused(false);
     setShowAddForm(false);
     setEditingIndex(null);
     validation.reset();
@@ -1779,31 +1929,17 @@ type RoundModalFormState = {
             <label className="block text-sm font-medium text-gray-700 mb-1">Measurement Unit</label>
             <Select
               value={tableUnit}
-              onChange={async (value) => {
+              onChange={(value) => {
                 const newUnit = value as MeasurementUnit;
-                // Update local state first
-                updateMeasurementDisplaySettings({ unit: newUnit });
-                // Update all existing measurements to use the new unit
-                measurements.forEach((measurement, index) => {
-                  updateMeasurement(index, { ...measurement, unit: newUnit });
-                });
-                // Wait a bit for state to update, then auto-save to backend
-                if (saveTechPack && state?.techpack?.id) {
-                  try {
-                    // Use setTimeout to ensure state is updated before save
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    // Get updated techpack with new unit
-                    const updatedTechpack = {
-                      ...state.techpack,
-                      measurementUnit: newUnit,
-                    };
-                    await saveTechPack(updatedTechpack);
-                    showSuccess('Measurement unit updated and saved');
-                  } catch (error: any) {
-                    console.error('Failed to save measurement unit:', error);
-                    showError(error?.message || 'Failed to save measurement unit');
-                  }
+                // Always show confirmation dialog if there are existing measurements and unit is actually changing
+                if (measurements.length > 0 && newUnit !== tableUnit) {
+                  setPendingNewUnit(newUnit);
+                  setShowUnitChangeConfirm(true);
+                } else if (measurements.length === 0) {
+                  // No measurements yet, change unit directly
+                  handleUnitChange(newUnit);
                 }
+                // If newUnit === tableUnit, do nothing (no change)
               }}
               options={measurementUnitOptions}
               className="w-full"
@@ -1895,61 +2031,83 @@ type RoundModalFormState = {
               helperText={validation.getFieldProps('pomName').helperText}
             />
 
-            <Input
-              label={`Minus Tolerance (${getMeasurementUnitSuffix(tableUnit)}) *`}
-              value={formData.minusTolerance ?? ''}
-              onChange={(value) => {
-                // value là string, giữ nguyên nếu là chuỗi rỗng hoặc số hợp lệ
-                if (typeof value === 'string') {
-                  // Cho phép nhập số thập phân, số âm, chuỗi rỗng
-                  if (/^-?\d*\.?\d*$/.test(value) || value === '') {
-                    handleInputChange('minusTolerance')(value);
-                  }
-                } else {
-                  handleInputChange('minusTolerance')(value);
-                }
-              }}
-              onBlur={() => validation.setFieldTouched('minusTolerance')}
-              type="number"
-              step="0.01"
-              min="0"
-              max="50"
-              placeholder="e.g., 1.0"
-              required
-              error={validation.getFieldProps('minusTolerance').error}
-              helperText={
-                validation.getFieldProps('minusTolerance').helperText
-                || `Tolerance in ${getMeasurementUnitSuffix(tableUnit)}`
-              }
-            />
+            <div className="flex flex-col space-y-1">
+              <label className="text-sm font-medium text-gray-700 flex items-center">
+                Minus Tolerance ({getMeasurementUnitSuffix(tableUnit)}) *
+                <span className="text-red-500 ml-1">*</span>
+              </label>
+              <input
+                type="text"
+                inputMode={supportsFractionInput ? "text" : "decimal"}
+                value={isMinusToleranceFocused 
+                  ? minusToleranceInput 
+                  : (formData.minusTolerance !== undefined 
+                      ? (supportsFractionInput ? formatMeasurementValueAsFraction(formData.minusTolerance, tableUnit) : String(formData.minusTolerance))
+                      : '')}
+                onChange={(e) => handleMinusToleranceChange(e.target.value)}
+                onFocus={handleMinusToleranceFocus}
+                onBlur={() => {
+                  handleMinusToleranceBlur();
+                  validation.setFieldTouched('minusTolerance');
+                }}
+                placeholder={supportsFractionInput ? "e.g., 1/2 or 0.5" : "e.g., 1.0"}
+                className={`px-3 py-2 border rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                  validation.getFieldProps('minusTolerance').error 
+                    ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
+                    : 'border-gray-300'
+                }`}
+              />
+              {validation.getFieldProps('minusTolerance').error && (
+                <span className="text-xs text-red-600 mt-1">{validation.getFieldProps('minusTolerance').error}</span>
+              )}
+              {!validation.getFieldProps('minusTolerance').error && (
+                <span className="text-xs text-gray-500 mt-1">
+                  {validation.getFieldProps('minusTolerance').helperText
+                    || (supportsFractionInput 
+                      ? `Tolerance in ${getMeasurementUnitSuffix(tableUnit)} (e.g., 1/2, 0.5, or 1 1/4)`
+                      : `Tolerance in ${getMeasurementUnitSuffix(tableUnit)}`)}
+                </span>
+              )}
+            </div>
 
-            <Input
-              label={`Plus Tolerance (${getMeasurementUnitSuffix(tableUnit)}) *`}
-              value={formData.plusTolerance ?? ''}
-              onChange={(value) => {
-                // value là string, giữ nguyên nếu là chuỗi rỗng hoặc số hợp lệ
-                if (typeof value === 'string') {
-                  // Cho phép nhập số thập phân, số âm, chuỗi rỗng
-                  if (/^-?\d*\.?\d*$/.test(value) || value === '') {
-                    handleInputChange('plusTolerance')(value);
-                  }
-                } else {
-                  handleInputChange('plusTolerance')(value);
-                }
-              }}
-              onBlur={() => validation.setFieldTouched('plusTolerance')}
-              type="number"
-              step="0.01"
-              min="0"
-              max="50"
-              placeholder="e.g., 1.0"
-              required
-              error={validation.getFieldProps('plusTolerance').error}
-              helperText={
-                validation.getFieldProps('plusTolerance').helperText
-                || `Tolerance in ${getMeasurementUnitSuffix(tableUnit)}`
-              }
-            />
+            <div className="flex flex-col space-y-1">
+              <label className="text-sm font-medium text-gray-700 flex items-center">
+                Plus Tolerance ({getMeasurementUnitSuffix(tableUnit)}) *
+                <span className="text-red-500 ml-1">*</span>
+              </label>
+              <input
+                type="text"
+                inputMode={supportsFractionInput ? "text" : "decimal"}
+                value={isPlusToleranceFocused 
+                  ? plusToleranceInput 
+                  : (formData.plusTolerance !== undefined 
+                      ? (supportsFractionInput ? formatMeasurementValueAsFraction(formData.plusTolerance, tableUnit) : String(formData.plusTolerance))
+                      : '')}
+                onChange={(e) => handlePlusToleranceChange(e.target.value)}
+                onFocus={handlePlusToleranceFocus}
+                onBlur={() => {
+                  handlePlusToleranceBlur();
+                  validation.setFieldTouched('plusTolerance');
+                }}
+                placeholder={supportsFractionInput ? "e.g., 1/2 or 0.5" : "e.g., 1.0"}
+                className={`px-3 py-2 border rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                  validation.getFieldProps('plusTolerance').error 
+                    ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
+                    : 'border-gray-300'
+                }`}
+              />
+              {validation.getFieldProps('plusTolerance').error && (
+                <span className="text-xs text-red-600 mt-1">{validation.getFieldProps('plusTolerance').error}</span>
+              )}
+              {!validation.getFieldProps('plusTolerance').error && (
+                <span className="text-xs text-gray-500 mt-1">
+                  {validation.getFieldProps('plusTolerance').helperText
+                    || (supportsFractionInput 
+                      ? `Tolerance in ${getMeasurementUnitSuffix(tableUnit)} (e.g., 1/2, 0.5, or 1 1/4)`
+                      : `Tolerance in ${getMeasurementUnitSuffix(tableUnit)}`)}
+                </span>
+              )}
+            </div>
 
             <div className="md:col-span-2">
               <Input
@@ -2287,8 +2445,8 @@ type RoundModalFormState = {
                     ? parseTolerance(plusTolRaw)
                     : (plusTolRaw !== undefined && plusTolRaw !== null ? plusTolRaw : 1.0);
                   
-                  // Format tolerance without unit for consistent display
-                  const toleranceDisplay = formatToleranceNoUnit(minusTol, plusTol);
+                  // Format tolerance without unit for consistent display (keep fraction format for inch units)
+                  const toleranceDisplay = formatToleranceNoUnit(minusTol, plusTol, tableUnit);
                   const rowBackgroundColor = validationResult.errors.length > 0
                     ? '#fee2e2'
                     : validationResult.warnings.length > 0
@@ -2651,6 +2809,28 @@ type RoundModalFormState = {
           </div>
         </div>
       </div>
+
+      <ConfirmationDialog
+        isOpen={showUnitChangeConfirm}
+        title="Đổi đơn vị đo"
+        message={pendingNewUnit 
+          ? `Đơn vị hiện tại là "${getMeasurementUnitMeta(tableUnit).label}". Bạn muốn đổi sang "${getMeasurementUnitMeta(pendingNewUnit).label}".\n\n⚠️ Cảnh báo: Việc đổi đơn vị có thể gây xê dịch số liệu do làm tròn giữa các đơn vị đo. Vui lòng kiểm tra kỹ các giá trị sau khi đổi và xác nhận quyết định của bạn.`
+          : ''}
+        confirmText="Đổi đơn vị"
+        cancelText="Hủy"
+        type="warning"
+        onConfirm={async () => {
+          if (pendingNewUnit) {
+            await handleUnitChange(pendingNewUnit);
+          }
+          setShowUnitChangeConfirm(false);
+          setPendingNewUnit(null);
+        }}
+        onCancel={() => {
+          setShowUnitChangeConfirm(false);
+          setPendingNewUnit(null);
+        }}
+      />
 
       <ConfirmationDialog
         isOpen={showBaseSizeConfirm}

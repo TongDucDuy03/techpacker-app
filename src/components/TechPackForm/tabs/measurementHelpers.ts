@@ -32,7 +32,8 @@ export const formatTolerance = (value: number, unit?: MeasurementUnit): string =
  */
 export const formatToleranceNoUnit = (
   minus: number | string | undefined,
-  plus?: number | string | undefined
+  plus?: number | string | undefined,
+  unit?: MeasurementUnit
 ): string => {
   // If both are provided and different, format as range
   if (minus !== undefined && plus !== undefined) {
@@ -40,7 +41,18 @@ export const formatToleranceNoUnit = (
     const plusNum = typeof plus === 'string' ? parseTolerance(plus) : (typeof plus === 'number' ? plus : 0);
     
     if (minusNum === plusNum) {
+      // Format as fraction if unit is inch
+      if (unit === 'inch-10' || unit === 'inch-16' || unit === 'inch-32') {
+        const formatted = formatMeasurementValueAsFraction(Math.abs(minusNum), unit);
+        return `±${formatted}`;
+      }
       return `±${Math.abs(minusNum).toFixed(1)}`;
+    }
+    // Format both as fractions if unit is inch
+    if (unit === 'inch-10' || unit === 'inch-16' || unit === 'inch-32') {
+      const minusFormatted = formatMeasurementValueAsFraction(Math.abs(minusNum), unit);
+      const plusFormatted = formatMeasurementValueAsFraction(Math.abs(plusNum), unit);
+      return `-${minusFormatted} / +${plusFormatted}`;
     }
     return `-${Math.abs(minusNum).toFixed(1)} / +${Math.abs(plusNum).toFixed(1)}`;
   }
@@ -52,6 +64,11 @@ export const formatToleranceNoUnit = (
   }
   
   const numValue = typeof value === 'string' ? parseTolerance(value) : (typeof value === 'number' ? value : 0);
+  // Format as fraction if unit is inch
+  if (unit === 'inch-10' || unit === 'inch-16' || unit === 'inch-32') {
+    const formatted = formatMeasurementValueAsFraction(Math.abs(numValue), unit);
+    return `±${formatted}`;
+  }
   return `±${Math.abs(numValue).toFixed(1)}`;
 };
 
@@ -208,7 +225,7 @@ export const formatMeasurementValue = (value?: number): string => {
 
 /**
  * Parse measurement value (similar to parseStepValue but without sign handling for absolute values)
- * Supports: "15.25", "15 1/4", "15 1/2", "1/4", etc.
+ * Supports: "15.25", "15 1/4", "15 1/2", "1/4", "1/2", etc.
  */
 export const parseMeasurementValue = (input: string | number | undefined): number | undefined => {
   if (typeof input === 'number') {
@@ -216,31 +233,43 @@ export const parseMeasurementValue = (input: string | number | undefined): numbe
   }
   if (!input) return undefined;
 
-  let text = String(input).replace(',', '.').trim();
-  if (!text) return undefined;
+  const s = String(input).trim().replace(',', '.');
+  if (!s) return undefined;
+
+  // Allow intermediate states while typing (e.g., "1/", "1 1/", "1 1/2 ")
+  // Return undefined to keep raw input in these cases
+  if (/^\d+\s+\d+\/?$/.test(s) || /^\d+\/$/.test(s)) {
+    return undefined;
+  }
 
   let parsed: number | undefined;
 
-  // Handle mixed number: "15 1/4"
-  if (text.includes(' ')) {
-    const [wholePart, fractionPart] = text.split(' ').map(part => part.trim()).filter(Boolean);
-    if (wholePart && fractionPart && fractionPart.includes('/')) {
-      const whole = parseFloat(wholePart);
-      const fraction = parseSimpleFraction(fractionPart);
-      if (Number.isFinite(whole) && fraction !== undefined) {
-        parsed = Math.abs(whole) + fraction;
+  // Handle mixed number: "A B/C" (e.g., "1 1/2", "15 1/4")
+  const mixedNumberMatch = s.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if (mixedNumberMatch) {
+    const whole = Number(mixedNumberMatch[1]);
+    const num = Number(mixedNumberMatch[2]);
+    const den = Number(mixedNumberMatch[3]);
+    if (den && Number.isFinite(whole) && Number.isFinite(num) && Number.isFinite(den)) {
+      parsed = whole + num / den;
+    }
+  }
+
+  // Handle fraction only: "B/C" (e.g., "1/2", "1/4", "3/8")
+  if (parsed === undefined) {
+    const fractionMatch = s.match(/^(\d+)\/(\d+)$/);
+    if (fractionMatch) {
+      const num = Number(fractionMatch[1]);
+      const den = Number(fractionMatch[2]);
+      if (den && Number.isFinite(num) && Number.isFinite(den)) {
+        parsed = num / den;
       }
     }
   }
 
-  // Handle pure fraction: "1/4", "3/8"
-  if (parsed === undefined && text.includes('/')) {
-    parsed = parseSimpleFraction(text);
-  }
-
-  // Handle decimal: "15.25"
-  if (parsed === undefined && !Number.isNaN(parseFloat(text))) {
-    parsed = parseFloat(text);
+  // Handle decimal: "15.25", "1.5"
+  if (parsed === undefined && !Number.isNaN(parseFloat(s))) {
+    parsed = parseFloat(s);
   }
 
   return parsed;

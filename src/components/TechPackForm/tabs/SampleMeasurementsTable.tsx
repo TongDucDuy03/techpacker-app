@@ -140,8 +140,8 @@ const getToleranceDisplay = (row: SampleMeasurementRow, tableUnit: MeasurementUn
   
   const unitSuffix = getMeasurementUnitSuffix(tableUnit);
 
-  // Format tolerance without unit for consistent display
-  const toleranceLabel = formatToleranceNoUnit(resolvedMinus, resolvedPlus);
+  // Format tolerance without unit for consistent display (keep fraction format for inch units)
+  const toleranceLabel = formatToleranceNoUnit(resolvedMinus, resolvedPlus, tableUnit);
 
   return {
     label: toleranceLabel,
