@@ -586,9 +586,15 @@ const normalizeSampleRound = (round: Partial<MeasurementSampleRound>): Measureme
         ? String((round as any).reviewerName) 
         : '');
   
+  // Cho phép tên rỗng hoặc không có tên - không force tên mặc định
+  // Chỉ dùng tên mặc định khi round hoàn toàn mới và không có tên nào được cung cấp
+  const roundName = round.name !== undefined && round.name !== null 
+    ? String(round.name).trim() 
+    : '';
+  
   return {
     id: roundId,
-    name: round.name || DEFAULT_SAMPLE_ROUND_NAME,
+    name: roundName, // Cho phép tên rỗng, không force DEFAULT_SAMPLE_ROUND_NAME
     date: typeof roundDate === 'string' ? roundDate : new Date(roundDate).toISOString(),
     reviewer: reviewer, // ✅ FIXED: Always preserve reviewer value
     requestedSource: round.requestedSource || 'original',
@@ -634,16 +640,19 @@ const syncRoundWithMeasurements = (
 
 const normalizeSampleRounds = (
   rounds: MeasurementSampleRound[] | undefined,
-  measurements: MeasurementPoint[]
+  measurements: MeasurementPoint[],
+  autoCreateFirstRound: boolean = false // Thêm flag để kiểm soát việc tự động tạo round đầu tiên
 ): MeasurementSampleRound[] => {
   const normalizedRounds = Array.isArray(rounds) && rounds.length > 0
     ? rounds.map(round => normalizeSampleRound(round))
     : [];
 
+  // Chỉ tự động tạo round đầu tiên khi autoCreateFirstRound = true (ví dụ khi load từ server lần đầu)
+  // Không tự động tạo khi user xóa tất cả rounds
   const baseRounds =
     normalizedRounds.length > 0
       ? normalizedRounds
-      : measurements.length > 0
+      : (autoCreateFirstRound && measurements.length > 0)
         ? [
             normalizeSampleRound({
               name: DEFAULT_SAMPLE_ROUND_NAME,
@@ -1406,7 +1415,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         ? (Array.isArray(incomingSampleRounds) ? incomingSampleRounds : [])
         : prev.techpack.sampleMeasurementRounds;
 
-      const normalizedSampleRounds = normalizeSampleRounds(nextSampleRoundsRaw, nextMeasurements);
+      // Khi load từ server hoặc update từ API, tự động tạo round đầu tiên nếu chưa có
+      const normalizedSampleRounds = normalizeSampleRounds(nextSampleRoundsRaw, nextMeasurements, true);
 
       const incomingHowToMeasures = (updates as any).howToMeasures;
       const nextHowToMeasures = incomingHowToMeasures !== undefined 
@@ -1954,7 +1964,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         };
       });
 
-      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
+      // Không tự động tạo round khi user đang làm việc với rounds
+      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements, false);
 
       return {
         ...prev,
@@ -1986,7 +1997,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         ...measurement,
         baseSize: normalizedBaseSize,
       }));
-      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
+      // Không tự động tạo round khi user đang làm việc với rounds
+      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements, false);
 
       const updatedTechpack = {
         ...prev.techpack,
@@ -2051,7 +2063,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           ? { ...measurement, baseSize }
           : measurement;
       const nextMeasurements = [...prev.techpack.measurements, normalizedMeasurement];
-      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
+      // Không tự động tạo round khi user đang làm việc với rounds
+      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements, false);
       return {
         ...prev,
         techpack: {
@@ -2077,7 +2090,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
       const nextMeasurements = [...prev.techpack.measurements];
       const insertIndex = Math.min(Math.max(index + 1, 0), nextMeasurements.length);
       nextMeasurements.splice(insertIndex, 0, normalizedMeasurement);
-      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
+      // Không tự động tạo round khi user đang làm việc với rounds
+      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements, false);
       return {
         ...prev,
         techpack: {
@@ -2101,7 +2115,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           ? { ...measurement, baseSize }
           : measurement;
       const nextMeasurements = prev.techpack.measurements.map((m, i) => (i === index ? normalizedMeasurement : m));
-      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
+      // Không tự động tạo round khi user đang làm việc với rounds
+      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements, false);
       return {
         ...prev,
         techpack: {
@@ -2117,7 +2132,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
   const deleteMeasurement = (index: number) => {
     setState(prev => {
       const nextMeasurements = prev.techpack.measurements.filter((_, i) => i !== index);
-      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
+      // Không tự động tạo round khi user đang làm việc với rounds
+      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements, false);
       return {
         ...prev,
         techpack: {
@@ -2169,9 +2185,12 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     setState(prev => {
       const nextRounds = (prev.techpack.sampleMeasurementRounds || []).map(round => {
         if (round.id !== roundId) return round;
+        // Preserve name explicitly - nếu updates có name (kể cả empty string), dùng nó; nếu không, giữ nguyên round.name
+        const roundName = updates.name !== undefined ? String(updates.name) : round.name;
         const mergedRound = normalizeSampleRound({
           ...round,
           ...updates,
+          name: roundName, // Đảm bảo name được preserve đúng cách
           measurements: (updates as any)?.measurements ?? round.measurements,
         });
         return syncRoundWithMeasurements(mergedRound, prev.techpack.measurements);
@@ -2190,10 +2209,11 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
   const deleteSampleMeasurementRound = (roundId: string) => {
     setState(prev => {
       const filtered = (prev.techpack.sampleMeasurementRounds || []).filter(round => round.id !== roundId);
+      // Không tự động tạo lại round khi user xóa - chỉ sync các rounds còn lại
       const normalized =
         filtered.length > 0
           ? filtered.map(round => syncRoundWithMeasurements(round, prev.techpack.measurements))
-          : normalizeSampleRounds(undefined, prev.techpack.measurements);
+          : []; // Trả về mảng rỗng thay vì tự động tạo round mới
       return {
         ...prev,
         techpack: {

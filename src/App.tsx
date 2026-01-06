@@ -76,8 +76,9 @@ function AppContent() {
   const [currentTab, setCurrentTab] = useState('list');
   const [selectedTechPack, setSelectedTechPack] = useState<ApiTechPack | null>(null);
   const [loadingTechPack, setLoadingTechPack] = useState(false);
+  const [savedPage, setSavedPage] = useState<number | null>(null); // Lưu trang hiện tại khi vào edit/view
   const context = useTechPack();
-  const { techPacks = [], updateTechPack, deleteTechPack, getTechPack } = context ?? {};
+  const { techPacks = [], updateTechPack, deleteTechPack, getTechPack, pagination } = context ?? {};
   const { user } = useAuth();
 
   // Permission checks based on user role
@@ -85,6 +86,11 @@ function AppContent() {
   const canEdit = user?.role === 'admin' || user?.role === 'designer';
 
   const handleViewTechPack = async (techPack: ApiTechPack) => {
+    // Lưu trang hiện tại trước khi vào view
+    if (pagination?.page) {
+      setSavedPage(pagination.page);
+    }
+    
     const techPackId = techPack._id || techPack.id;
     if (!techPackId || !getTechPack) {
       // Fallback: dùng data từ list nếu không có getTechPack hoặc ID
@@ -116,6 +122,11 @@ function AppContent() {
   };
 
   const handleEditTechPack = async (techPack: ApiTechPack) => {
+    // Lưu trang hiện tại trước khi vào edit
+    if (pagination?.page) {
+      setSavedPage(pagination.page);
+    }
+    
     const techPackId = techPack._id || techPack.id;
     if (!techPackId || !getTechPack) {
       // Fallback: dùng data từ list nếu không có getTechPack hoặc ID
@@ -149,10 +160,13 @@ function AppContent() {
   const handleBackToList = async () => {
     setSelectedTechPack(null);
     setCurrentTab('list');
-    // Refresh the list when returning to it
+    // Refresh the list when returning to it, khôi phục trang đã lưu hoặc dùng trang hiện tại từ pagination
     if (context?.loadTechPacks) {
       try {
-        await context.loadTechPacks({ page: 1 });
+        const pageToLoad = savedPage ?? pagination?.page ?? 1;
+        await context.loadTechPacks({ page: pageToLoad });
+        // Reset savedPage sau khi đã load
+        setSavedPage(null);
       } catch (error) {
         console.error('Failed to refresh techpack list when returning:', error);
       }
@@ -188,6 +202,12 @@ function AppContent() {
             onCreateTechPack={() => setCurrentTab('create')}
             onUpdateTechPack={handleUpdate}
             onDeleteTechPack={handleDelete}
+            pagination={pagination}
+            onPageChange={(page) => {
+              if (context?.loadTechPacks) {
+                context.loadTechPacks({ page });
+              }
+            }}
           />
         );
       case 'create':
@@ -246,6 +266,12 @@ function AppContent() {
             onCreateTechPack={() => setCurrentTab('create')}
             onUpdateTechPack={handleUpdate}
             onDeleteTechPack={handleDelete}
+            pagination={pagination}
+            onPageChange={(page) => {
+              if (context?.loadTechPacks) {
+                context.loadTechPacks({ page });
+              }
+            }}
           />
         );
     }

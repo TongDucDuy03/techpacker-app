@@ -42,6 +42,8 @@ interface TechPackListProps {
   onEditTechPack?: (techPack: ApiTechPack) => void;
   onCreateTechPack?: () => void;
   onDeleteTechPack?: (id: string) => void;
+  pagination?: { page: number; total: number; totalPages: number };
+  onPageChange?: (page: number) => void;
 }
 
 const TechPackListComponent: React.FC<TechPackListProps> = ({
@@ -50,6 +52,8 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
   onEditTechPack,
   onCreateTechPack,
   onDeleteTechPack,
+  pagination: externalPagination,
+  onPageChange,
 }) => {
   const { loadTechPacks, addTechPackToList } = useTechPack();
   const { user } = useAuth();
@@ -237,7 +241,17 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
           columns={columns}
           dataSource={filteredTechPacks}
           rowKey="_id"
-          pagination={{ pageSize: 10, total: filteredTechPacks.length, showSizeChanger: true }}
+          pagination={{
+            pageSize: 10,
+            total: externalPagination?.total ?? filteredTechPacks.length,
+            current: externalPagination?.page ?? 1,
+            showSizeChanger: true,
+            onChange: (page) => {
+              if (onPageChange) {
+                onPageChange(page);
+              }
+            },
+          }}
           onRow={(record) => ({
             onDoubleClick: () => onEditTechPack?.(record),
           })}
