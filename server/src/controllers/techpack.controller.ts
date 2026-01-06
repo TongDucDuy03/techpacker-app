@@ -111,6 +111,12 @@ export class TechPackController {
     try {
       const { page = 1, limit = config.defaultPageSize, q = '', status, season, brand, sortBy = 'updatedAt', sortOrder = 'desc' } = req.query;
       const user = req.user!;
+      
+      // Validate user._id is a valid ObjectId
+      if (!user._id || !Types.ObjectId.isValid(user._id)) {
+        return sendError(res, 'Invalid user ID', 400, 'VALIDATION_ERROR');
+      }
+      
       const pageNum = Math.max(1, parseInt(page as string));
       const limitNum = Math.min(config.maxPageSize, Math.max(1, parseInt(limit as string)));
       const skip = (pageNum - 1) * limitNum;
@@ -138,28 +144,31 @@ export class TechPackController {
       let query: any = {};
 
       // Base query for access control - Updated logic per requirements
+      // Ensure user._id is converted to ObjectId for proper querying
+      const userId = new Types.ObjectId(user._id);
+      
       if (user.role === UserRole.Admin) {
         // Admins can view all TechPacks without restriction
         query = {};
       } else if (user.role === UserRole.Designer) {
         // Designers can see TechPacks they created, are technical designer for, or are shared with
         query.$or = [
-          { createdBy: user._id },
-          { technicalDesignerId: user._id },
-          { 'sharedWith.userId': user._id }
+          { createdBy: userId },
+          { technicalDesignerId: userId },
+          { 'sharedWith.userId': userId }
         ];
       } else if (user.role === UserRole.Viewer) {
         // Viewers can ONLY see TechPacks that are explicitly shared with them
-        query = { 'sharedWith.userId': user._id };
+        query = { 'sharedWith.userId': userId };
       } else if (user.role === UserRole.Merchandiser) {
         // Merchandisers can see TechPacks they created or are shared with
         query.$or = [
-          { createdBy: user._id },
-          { 'sharedWith.userId': user._id }
+          { createdBy: userId },
+          { 'sharedWith.userId': userId }
         ];
       } else {
         // For any other roles, restrict to only shared TechPacks
-        query = { 'sharedWith.userId': user._id };
+        query = { 'sharedWith.userId': userId };
       }
 
       // Additional search and filter criteria
@@ -205,6 +214,19 @@ export class TechPackController {
       sendSuccess(res, techpacks, 'Tech packs retrieved successfully', 200, pagination);
     } catch (error: any) {
       console.error('Get TechPacks error:', error);
+      
+      // Check for BSON ObjectId validation errors
+      if (error.name === 'BSONError' || error.message?.includes('24 character hex string') || error.message?.includes('ObjectId')) {
+        console.error('BSON ObjectId validation error detected. This may indicate invalid ObjectId values in the database.');
+        console.error('Error details:', {
+          message: error.message,
+          path: error.path,
+          valueType: error.valueType,
+          value: error.value
+        });
+        return sendError(res, 'Database contains invalid data. Please contact administrator.', 500, 'DATABASE_ERROR');
+      }
+      
       sendError(res, 'Failed to retrieve tech packs');
     }
   }
@@ -1420,7 +1442,28 @@ export class TechPackController {
       const sharedByUserIds = (techpack.sharedWith || [])
         .map(s => s.sharedBy)
         .filter((id): id is Types.ObjectId => !!id);
-      const allUserIds = [...new Set([...sharedUserIds, ...sharedByUserIds])];
+      
+      // Filter out invalid ObjectIds to prevent BSON errors
+      const allUserIds = [...new Set([...sharedUserIds, ...sharedByUserIds])]
+        .filter(id => {
+          if (!id) return false;
+          // Check if it's a valid ObjectId
+          if (id instanceof Types.ObjectId) {
+            return Types.ObjectId.isValid(id);
+          }
+          // If it's a string, validate it
+          if (typeof id === 'string') {
+            return Types.ObjectId.isValid(id);
+          }
+          return false;
+        })
+        .map(id => {
+          // Ensure all IDs are ObjectId instances
+          if (id instanceof Types.ObjectId) {
+            return id;
+          }
+          return new Types.ObjectId(id);
+        });
       
       const usersMap = new Map();
       if (allUserIds.length > 0) {
