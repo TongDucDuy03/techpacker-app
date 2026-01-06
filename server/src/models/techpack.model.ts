@@ -174,7 +174,7 @@ export interface ITechPack extends Document {
   articleName: string; // Renamed from productName
   articleCode: string;
   sampleType: string; // Renamed from version
-  technicalDesignerId: Types.ObjectId;
+  technicalDesignerId: string; // Free text field, not a User reference
   customerId?: string;
   supplier: string;
   season: string;
@@ -378,9 +378,9 @@ const TechPackSchema = new Schema<ITechPack>(
       maxlength: 120
     },
     technicalDesignerId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
+      type: String,
+      required: true,
+      trim: true
     },
     customerId: { type: String, trim: true },
     sharedWith: [SharedAccessSchema],
@@ -490,7 +490,7 @@ const TechPackSchema = new Schema<ITechPack>(
 // Indexes for performance - optimized for common query patterns
  // `articleCode` schema path is declared with `unique: true`, which creates an index.
  // Avoid declaring a duplicate index here to prevent Mongoose warnings.
-TechPackSchema.index({ technicalDesignerId: 1, createdAt: -1 }); // Designer's techpacks
+TechPackSchema.index({ technicalDesignerId: 1, createdAt: -1 }); // Index for filtering/searching by technicalDesignerId (now a string field)
 TechPackSchema.index({ createdBy: 1, createdAt: -1 }); // Owner's techpacks
 TechPackSchema.index({ customerId: 1, createdAt: -1 }); // Customer filter
 TechPackSchema.index({ 'sharedWith.userId': 1 }); // Shared access lookup
@@ -505,7 +505,7 @@ TechPackSchema.index({ articleName: 'text', articleCode: 'text' });
 // Performance optimization: Compound indexes for complex queries in getTechPacks
 // These indexes optimize the $or queries with status filtering
 TechPackSchema.index({ createdBy: 1, status: 1, updatedAt: -1 }); // For Admin/Designer queries
-TechPackSchema.index({ technicalDesignerId: 1, status: 1, updatedAt: -1 }); // For Designer queries
+TechPackSchema.index({ technicalDesignerId: 1, status: 1, updatedAt: -1 }); // Index for filtering by technicalDesignerId (now a string field)
 TechPackSchema.index({ 'sharedWith.userId': 1, status: 1, updatedAt: -1 }); // For shared access queries
 // Compound index for the most complex query pattern (createdBy OR sharedWith)
 TechPackSchema.index({ 

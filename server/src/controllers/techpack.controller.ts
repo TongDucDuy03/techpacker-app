@@ -151,10 +151,9 @@ export class TechPackController {
         // Admins can view all TechPacks without restriction
         query = {};
       } else if (user.role === UserRole.Designer) {
-        // Designers can see TechPacks they created, are technical designer for, or are shared with
+        // Designers can see TechPacks they created or are shared with
         query.$or = [
           { createdBy: userId },
-          { technicalDesignerId: userId },
           { 'sharedWith.userId': userId }
         ];
       } else if (user.role === UserRole.Viewer) {
@@ -193,17 +192,23 @@ export class TechPackController {
       const sortOptions: any = { [sortBy as string]: sortOrder === 'asc' ? 1 : -1 };
 
       // Optimize: Only select fields needed for list view, exclude heavy nested arrays
-      const [techpacks, total] = await Promise.all([
-        TechPack.find(query)
-          .populate('technicalDesignerId', 'firstName lastName')
-          .populate('createdBy', 'firstName lastName')
-          .sort(sortOptions)
-          .skip(skip)
-          .limit(limitNum)
-          .select('articleCode articleName brand season status category createdAt updatedAt technicalDesignerId createdBy sharedWith supplier lifecycleStage gender currency sampleType fabricDescription productDescription designSketchUrl companyLogoUrl')
-          .lean(),
-        TechPack.countDocuments(query)
-      ]);
+      // Query without populate first to avoid BSON errors from invalid ObjectIds, then manually populate valid ones
+      let techpacks: any[];
+      let total: number;
+      
+      try {
+        // technicalDesignerId is now a string field, no need to populate
+        // Only populate createdBy
+        [techpacks, total] = await Promise.all([
+          TechPack.find(query)
+            .populate('createdBy', 'firstName lastName')
+            .sort(sortOptions)
+            .skip(skip)
+            .limit(limitNum)
+            .select('articleCode articleName brand season status category createdAt updatedAt technicalDesignerId createdBy sharedWith supplier lifecycleStage gender currency sampleType fabricDescription productDescription designSketchUrl companyLogoUrl')
+            .lean(),
+          TechPack.countDocuments(query)
+        ]);
 
       const pagination = { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) };
       const result = { data: techpacks, pagination };
@@ -274,11 +279,10 @@ export class TechPackController {
       const cachedTechpack = await cacheService.get<any>(cacheKey);
 
       if (cachedTechpack) {
-        // Kiểm tra quyền truy cập từ cached data
+        // Kiểm tra quyền truy cập từ cached data (technicalDesignerId is no longer used for access control)
         const isOwner = cachedTechpack.createdBy?._id?.toString() === requestUser._id.toString();
-        const isTechnicalDesigner = cachedTechpack.technicalDesignerId?._id?.toString() === requestUser._id.toString();
         const sharedAccess = cachedTechpack.sharedWith?.find((s: any) => s.userId._id?.toString() === requestUser._id.toString());
-        const hasAccess = requestUser.role === UserRole.Admin || isOwner || isTechnicalDesigner || sharedAccess;
+        const hasAccess = requestUser.role === UserRole.Admin || isOwner || sharedAccess;
 
         if (hasAccess) {
           return sendSuccess(res, cachedTechpack, 'TechPack retrieved from cache');
@@ -286,15 +290,75 @@ export class TechPackController {
       }
 
       // Handle both ObjectId and string ID formats
-      let techpack;
+      // Query without populate first to avoid BSON errors from invalid ObjectIds
+      let techpack: any;
       try {
         techpack = await TechPack.findById(id)
-          .populate('technicalDesignerId createdBy updatedBy sharedWith.userId', 'firstName lastName email')
-          // Note: nested arrays (bom, measurements, colorways, howToMeasure) are embedded, not references
-          // They are already included in the document, no need for additional populate
+          .populate('createdBy updatedBy sharedWith.userId', 'firstName lastName email')
           .lean();
-      } catch (error) {
-        techpack = null;
+      } catch (populateError: any) {
+        // If populate fails due to invalid ObjectIds, query without populate and manually populate valid ones
+        console.warn('Populate error in getTechPack, using manual populate:', populateError.message);
+        try {
+          techpack = await TechPack.findById(id).lean();
+          
+          if (techpack) {
+            // Collect and validate ObjectIds (technicalDesignerId is now a string, skip it)
+            const userIds: Types.ObjectId[] = [];
+            
+            if (techpack.createdBy && Types.ObjectId.isValid(techpack.createdBy.toString())) {
+              userIds.push(new Types.ObjectId(techpack.createdBy));
+            }
+            if (techpack.updatedBy && Types.ObjectId.isValid(techpack.updatedBy.toString())) {
+              userIds.push(new Types.ObjectId(techpack.updatedBy));
+            }
+            
+            // Collect valid userIds from sharedWith
+            if (techpack.sharedWith && Array.isArray(techpack.sharedWith)) {
+              techpack.sharedWith.forEach((share: any) => {
+                if (share.userId && Types.ObjectId.isValid(share.userId.toString())) {
+                  userIds.push(new Types.ObjectId(share.userId));
+                }
+              });
+            }
+            
+            // Query users with valid ObjectIds only
+            const uniqueUserIds = [...new Set(userIds.map(id => id.toString()))].map(id => new Types.ObjectId(id));
+            const usersMap = new Map();
+            
+            if (uniqueUserIds.length > 0) {
+              try {
+                const users = await User.find({ _id: { $in: uniqueUserIds } })
+                  .select('firstName lastName email')
+                  .lean();
+                users.forEach(u => usersMap.set(u._id.toString(), u));
+              } catch (userQueryError) {
+                console.error('Error querying users:', userQueryError);
+              }
+            }
+            
+            // Manually attach user data (technicalDesignerId is now a string, keep as is)
+            techpack.createdBy = techpack.createdBy && Types.ObjectId.isValid(techpack.createdBy.toString())
+              ? usersMap.get(techpack.createdBy.toString()) || null
+              : null;
+            techpack.updatedBy = techpack.updatedBy && Types.ObjectId.isValid(techpack.updatedBy.toString())
+              ? usersMap.get(techpack.updatedBy.toString()) || null
+              : null;
+            
+            // Handle sharedWith
+            if (techpack.sharedWith && Array.isArray(techpack.sharedWith)) {
+              techpack.sharedWith = techpack.sharedWith.map((share: any) => ({
+                ...share,
+                userId: share.userId && Types.ObjectId.isValid(share.userId.toString())
+                  ? usersMap.get(share.userId.toString()) || null
+                  : null
+              }));
+            }
+          }
+        } catch (secondError) {
+          console.error('Error in manual populate fallback:', secondError);
+          techpack = null;
+        }
       }
 
       if (!techpack) {
@@ -549,7 +613,8 @@ export class TechPackController {
           productDescription: articleInfo?.productDescription || req.body.productDescription,
           designSketchUrl: articleInfo?.designSketchUrl || req.body.designSketchUrl,
           companyLogoUrl: articleInfo?.companyLogoUrl || req.body.companyLogoUrl,
-          technicalDesignerId: articleInfo?.technicalDesignerId || req.body.technicalDesignerId || user._id,
+          // technicalDesignerId is now a free text field, accept any string value
+          technicalDesignerId: articleInfo?.technicalDesignerId || req.body.technicalDesignerId || '',
           status: TechPackStatus.Draft,
           // Additional fields from articleInfo
           category: articleInfo?.productClass || req.body.category || req.body.productClass,
@@ -636,34 +701,21 @@ export class TechPackController {
       }
 
       // Handle both ObjectId and string ID formats
-      let techpack;
+      // Query without populate first to avoid BSON errors from invalid ObjectIds
+      let techpack: any;
 
-      try {
-        // First try as ObjectId
-        techpack = await TechPack.findById(id)
-          .populate('technicalDesignerId', 'firstName lastName email')
-          .populate('createdBy', 'firstName lastName email')
-          .populate('sharedWith.userId', 'firstName lastName email');
-      } catch (error) {
-        // If that fails, try with relaxed validation
-        try {
-          // Use findOne with mixed type to handle string IDs
-          techpack = await TechPack.findOne({ _id: id } as any)
-            .populate('technicalDesignerId', 'firstName lastName email')
-            .populate('createdBy', 'firstName lastName email')
-            .populate('sharedWith.userId', 'firstName lastName email');
-        } catch (secondError) {
-          // Both attempts failed
-          techpack = null;
-        }
-      }
+      // technicalDesignerId is now a string field, no need to populate
+      // Only populate createdBy and sharedWith
+      techpack = await TechPack.findById(id)
+        .populate('createdBy', 'firstName lastName email')
+        .populate('sharedWith.userId', 'firstName lastName email');
       if (!techpack) {
         return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
       }
 
-      // Data integrity patch: If createdBy is missing, assign it from technical designer or current user
+      // Data integrity patch: If createdBy is missing, assign it from current user
       if (!techpack.createdBy) {
-        techpack.createdBy = techpack.technicalDesignerId || user._id;
+        techpack.createdBy = user._id;
       }
 
       // Check access permissions using centralized helper
@@ -730,7 +782,8 @@ export class TechPackController {
           updateData.fitType = articleInfo.fitType;
         }
         if (articleInfo.technicalDesignerId !== undefined) {
-          updateData.technicalDesignerId = articleInfo.technicalDesignerId;
+          // technicalDesignerId is now a free text field, accept any string value
+          updateData.technicalDesignerId = String(articleInfo.technicalDesignerId || '');
         }
         if (articleInfo.lifecycleStage !== undefined) {
           updateData.lifecycleStage = articleInfo.lifecycleStage;
@@ -1117,8 +1170,13 @@ export class TechPackController {
       }
 
       const query: any = { _id: { $in: ids } };
+      // technicalDesignerId is no longer used for access control
+      // Designers can only bulk operate on techpacks they created or are shared with
       if (user.role === UserRole.Designer) {
-        query.technicalDesignerId = user._id;
+        query.$or = [
+          { createdBy: user._id },
+          { 'sharedWith.userId': user._id }
+        ];
       }
 
       let modifiedCount = 0;
@@ -1597,9 +1655,8 @@ export class TechPackController {
       const { orientation, format } = req.query;
       const user = req.user!;
 
-      // Get techpack
+      // Get techpack (technicalDesignerId is now a string field, no need to populate)
       const techpack = await TechPack.findById(id)
-        .populate('technicalDesignerId', 'firstName lastName')
         .populate('createdBy', 'firstName lastName')
         .populate('updatedBy', 'firstName lastName')
         .lean();
