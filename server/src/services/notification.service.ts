@@ -63,10 +63,7 @@ export class NotificationService {
         userIds.push(String(techpack.createdBy._id || techpack.createdBy));
       }
 
-      // Add technical designer
-      if (techpack?.technicalDesignerId) {
-        userIds.push(String(techpack.technicalDesignerId._id || techpack.technicalDesignerId));
-      }
+      // technicalDesignerId is now a string field, not a User reference, so skip it
 
       // Add shared users (editors and viewers)
       if (techpack?.sharedWith) {
