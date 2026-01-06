@@ -64,24 +64,13 @@ function mergeSubdocumentArray<T extends { _id?: Types.ObjectId; id?: string }>(
     
     if (existingItem) {
       // Update existing item - preserve _id from existing item
-      // For measurements: preserve tolerance values if newItem doesn't have them (to prevent reset to default)
-      const updatedItem: any = {
+      const updatedItem = {
         ...existingItem,
         ...newItem,
         _id: existingItem._id // Preserve original _id from database
       };
-      
-      // Special handling for measurements: preserve toleranceMinus/tolerancePlus if newItem doesn't provide them
-      // This prevents tolerance from being reset to default when updating other fields
-      if ((existingItem as any).toleranceMinus !== undefined && (newItem as any).toleranceMinus === undefined) {
-        updatedItem.toleranceMinus = (existingItem as any).toleranceMinus;
-      }
-      if ((existingItem as any).tolerancePlus !== undefined && (newItem as any).tolerancePlus === undefined) {
-        updatedItem.tolerancePlus = (existingItem as any).tolerancePlus;
-      }
-      
       // Remove temporary id if it exists (keep _id only for Mongoose)
-      delete updatedItem.id;
+      delete (updatedItem as any).id;
       merged.push(updatedItem as T);
     } else {
       // New item - create with new _id
@@ -153,10 +142,10 @@ export class TechPackController {
         // Admins can view all TechPacks without restriction
         query = {};
       } else if (user.role === UserRole.Designer) {
-        // Designers can see TechPacks they created or are shared with
-        // Note: technicalDesignerId is now a string (name), not a user reference, so we can't filter by it
+        // Designers can see TechPacks they created, are technical designer for, or are shared with
         query.$or = [
           { createdBy: user._id },
+          { technicalDesignerId: user._id },
           { 'sharedWith.userId': user._id }
         ];
       } else if (user.role === UserRole.Viewer) {
@@ -197,6 +186,7 @@ export class TechPackController {
       // Optimize: Only select fields needed for list view, exclude heavy nested arrays
       const [techpacks, total] = await Promise.all([
         TechPack.find(query)
+          .populate('technicalDesignerId', 'firstName lastName')
           .populate('createdBy', 'firstName lastName')
           .sort(sortOptions)
           .skip(skip)
@@ -264,8 +254,9 @@ export class TechPackController {
       if (cachedTechpack) {
         // Kiểm tra quyền truy cập từ cached data
         const isOwner = cachedTechpack.createdBy?._id?.toString() === requestUser._id.toString();
+        const isTechnicalDesigner = cachedTechpack.technicalDesignerId?._id?.toString() === requestUser._id.toString();
         const sharedAccess = cachedTechpack.sharedWith?.find((s: any) => s.userId._id?.toString() === requestUser._id.toString());
-        const hasAccess = requestUser.role === UserRole.Admin || isOwner || sharedAccess;
+        const hasAccess = requestUser.role === UserRole.Admin || isOwner || isTechnicalDesigner || sharedAccess;
 
         if (hasAccess) {
           return sendSuccess(res, cachedTechpack, 'TechPack retrieved from cache');
@@ -276,7 +267,7 @@ export class TechPackController {
       let techpack;
       try {
         techpack = await TechPack.findById(id)
-          .populate('createdBy updatedBy sharedWith.userId', 'firstName lastName email')
+          .populate('technicalDesignerId createdBy updatedBy sharedWith.userId', 'firstName lastName email')
           // Note: nested arrays (bom, measurements, colorways, howToMeasure) are embedded, not references
           // They are already included in the document, no need for additional populate
           .lean();
@@ -359,8 +350,12 @@ export class TechPackController {
           } else if (req.body[field] !== undefined && req.body[field] !== null && req.body[field] !== '') {
             (newTechPackData as any)[field] = req.body[field];
           } else {
-            // technicalDesignerId is now a required string field, must be provided by frontend
-            missingFields.push(field);
+            // If field is technicalDesignerId and missing, use current user
+            if (field === 'technicalDesignerId') {
+              (newTechPackData as any)[field] = user._id;
+            } else {
+              missingFields.push(field);
+            }
           }
         }
 
@@ -381,7 +376,6 @@ export class TechPackController {
             companyLogoUrl: sourceTechPack.companyLogoUrl || req.body.companyLogoUrl,
             category: sourceTechPack.category || req.body.category,
             gender: sourceTechPack.gender || req.body.gender,
-            fitType: (sourceTechPack as any).fitType || req.body.fitType || (req.body.articleInfo?.fitType),
             brand: sourceTechPack.brand || req.body.brand,
             collectionName: sourceTechPack.collectionName || req.body.collectionName,
             targetMarket: sourceTechPack.targetMarket || req.body.targetMarket,
@@ -533,12 +527,11 @@ export class TechPackController {
           productDescription: articleInfo?.productDescription || req.body.productDescription,
           designSketchUrl: articleInfo?.designSketchUrl || req.body.designSketchUrl,
           companyLogoUrl: articleInfo?.companyLogoUrl || req.body.companyLogoUrl,
-          technicalDesignerId: articleInfo?.technicalDesignerId || req.body.technicalDesignerId,
+          technicalDesignerId: articleInfo?.technicalDesignerId || req.body.technicalDesignerId || user._id,
           status: TechPackStatus.Draft,
           // Additional fields from articleInfo
           category: articleInfo?.productClass || req.body.category || req.body.productClass,
           gender: articleInfo?.gender || req.body.gender,
-          fitType: articleInfo?.fitType || req.body.fitType,
           brand: articleInfo?.brand || req.body.brand,
           collectionName: articleInfo?.collection || articleInfo?.collectionName || req.body.collectionName,
           targetMarket: articleInfo?.targetMarket || req.body.targetMarket,
@@ -626,6 +619,7 @@ export class TechPackController {
       try {
         // First try as ObjectId
         techpack = await TechPack.findById(id)
+          .populate('technicalDesignerId', 'firstName lastName email')
           .populate('createdBy', 'firstName lastName email')
           .populate('sharedWith.userId', 'firstName lastName email');
       } catch (error) {
@@ -633,6 +627,7 @@ export class TechPackController {
         try {
           // Use findOne with mixed type to handle string IDs
           techpack = await TechPack.findOne({ _id: id } as any)
+            .populate('technicalDesignerId', 'firstName lastName email')
             .populate('createdBy', 'firstName lastName email')
             .populate('sharedWith.userId', 'firstName lastName email');
         } catch (secondError) {
@@ -644,10 +639,9 @@ export class TechPackController {
         return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
       }
 
-      // Data integrity patch: If createdBy is missing, assign it from current user
-      // Note: technicalDesignerId is now a string (name), not a user reference
+      // Data integrity patch: If createdBy is missing, assign it from technical designer or current user
       if (!techpack.createdBy) {
-        techpack.createdBy = user._id;
+        techpack.createdBy = techpack.technicalDesignerId || user._id;
       }
 
       // Check access permissions using centralized helper
@@ -659,7 +653,7 @@ export class TechPackController {
       // Support both old field names (productName, version) and new field names (articleName, sampleType) for backward compatibility
       const allowedFields = [
         'articleName', 'productName', 'articleCode', 'sampleType', 'version', 'supplier', 'season',
-        'fabricDescription', 'productDescription', 'designSketchUrl', 'companyLogoUrl', 'status', 'category', 'gender', 'fitType', 'brand',
+        'fabricDescription', 'productDescription', 'designSketchUrl', 'companyLogoUrl', 'status', 'category', 'gender', 'brand',
         'technicalDesignerId', 'lifecycleStage', 'collectionName', 'targetMarket', 'pricePoint',
         'retailPrice', 'currency', 'description', 'notes', 'bom',
         'measurements', 'colorways', 'howToMeasure', 'sampleMeasurementRounds',
@@ -1101,10 +1095,8 @@ export class TechPackController {
       }
 
       const query: any = { _id: { $in: ids } };
-      // Note: technicalDesignerId is now a string (name), not a user reference, so we can't filter by it
-      // Designers can only operate on techpacks they created
       if (user.role === UserRole.Designer) {
-        query.createdBy = user._id;
+        query.technicalDesignerId = user._id;
       }
 
       let modifiedCount = 0;
@@ -1186,24 +1178,9 @@ export class TechPackController {
         return sendError(res, 'Cannot share with yourself.', 400, 'BAD_REQUEST');
       }
 
-      // Prevent sharing with system admin
-      // Note: technicalDesignerId is now a string (name), not a user reference, so we don't check it
-      if (targetUser.role === UserRole.Admin) {
-        return sendError(res, 'Cannot share with system admin.', 400, 'BAD_REQUEST');
-      }
-
-      // Validate that the requested TechPack Role does not exceed the target user's System Role limit
-      const { isValidRoleForSystemRole } = await import('../utils/access-control.util');
-      if (!isValidRoleForSystemRole(targetUser.role, role)) {
-        const maxRole = targetUser.role === UserRole.Designer ? 'Owner' :
-                        targetUser.role === UserRole.Merchandiser ? 'Editor' :
-                        targetUser.role === UserRole.Viewer ? 'Viewer or Factory' : 'Unknown';
-        return sendError(
-          res,
-          `Cannot assign TechPack Role "${role}" to user with System Role "${targetUser.role}". Maximum allowed role is "${maxRole}".`,
-          400,
-          'VALIDATION_ERROR'
-        );
+      // Prevent sharing with system admin or technical designer
+      if (targetUser.role === UserRole.Admin || techpack.technicalDesignerId?.toString() === userId) {
+        return sendError(res, 'Cannot share with system admin or the assigned technical designer.', 400, 'BAD_REQUEST');
       }
 
       const existingShareIndex = techpack.sharedWith?.findIndex(s => s.userId.toString() === userId) || -1;
@@ -1377,11 +1354,12 @@ export class TechPackController {
 
       // Get all users except:
       // - System admins
+      // - The technical designer
       // - Users already shared with
       // - The current user
-      // Note: technicalDesignerId is now a string (name), not a user reference, so we don't exclude it
       const excludedUserIds = [
         user._id.toString(),
+        techpack.technicalDesignerId?.toString(),
         ...(techpack.sharedWith?.map(s => s.userId.toString()) || [])
       ].filter(Boolean);
 
@@ -1578,6 +1556,7 @@ export class TechPackController {
 
       // Get techpack
       const techpack = await TechPack.findById(id)
+        .populate('technicalDesignerId', 'firstName lastName')
         .populate('createdBy', 'firstName lastName')
         .populate('updatedBy', 'firstName lastName')
         .lean();
@@ -1588,21 +1567,10 @@ export class TechPackController {
 
       // Check access
       const isOwner = techpack.createdBy?.toString() === user._id.toString();
-      const sharedAccess = techpack.sharedWith?.find(s => s.userId.toString() === user._id.toString());
-      const isSharedWith = !!sharedAccess;
+      const isSharedWith = techpack.sharedWith?.some(s => s.userId.toString() === user._id.toString()) || false;
 
       if (user.role !== UserRole.Admin && !isOwner && !isSharedWith) {
         return sendError(res, 'Access denied', 403, 'FORBIDDEN');
-      }
-
-      // Determine user's TechPack Role (System Role is only a label, permissions based on TechPack Role)
-      let userTechPackRole: string | undefined;
-      if (user.role === UserRole.Admin) {
-        userTechPackRole = 'admin'; // System Admin override
-      } else if (isOwner) {
-        userTechPackRole = 'owner';
-      } else if (sharedAccess) {
-        userTechPackRole = sharedAccess.role; // Use TechPack Role directly
       }
 
       // Import PDF service
@@ -1628,8 +1596,7 @@ export class TechPackController {
 
       // Generate PDF (techpack is already a lean object from .lean() call)
       // Type assertion needed because .lean() returns FlattenMaps type which doesn't match ITechPack exactly
-      // Pass userTechPackRole to hide price for Factory role
-      const result = await pdfService.generatePDF(techpack as any, pdfOptions, userTechPackRole);
+      const result = await pdfService.generatePDF(techpack as any, pdfOptions);
 
       // Set response headers
       res.setHeader('Content-Type', 'application/pdf');

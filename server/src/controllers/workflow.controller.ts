@@ -59,10 +59,10 @@ export class WorkflowController {
         return;
       }
 
-      // Check ownership for submit action - based on createdBy since technicalDesignerId is now just a text field
+      // Check ownership for submit action
       if (action === 'submit_for_review' && 
           user.role === UserRole.Designer && 
-          techpack.createdBy?.toString() !== user._id.toString()) {
+          techpack.technicalDesignerId.toString() !== user._id.toString()) {
         res.status(403).json({
           success: false,
           message: 'You can only submit your own TechPacks for review'
@@ -188,10 +188,10 @@ export class WorkflowController {
         return;
       }
 
-      // Check access permissions - based on createdBy since technicalDesignerId is now just a text field
+      // Check access permissions
       const user = req.user!;
       if (user.role === UserRole.Designer && 
-          techpack.createdBy?.toString() !== user._id.toString()) {
+          techpack.technicalDesignerId.toString() !== user._id.toString()) {
         res.status(403).json({
           success: false,
           message: 'Access denied. You can only view revisions of your own TechPacks.'

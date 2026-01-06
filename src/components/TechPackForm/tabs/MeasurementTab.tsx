@@ -14,19 +14,18 @@ import { useFormValidation } from '../../../hooks/useFormValidation';
 import { measurementValidationSchema } from '../../../utils/validationSchemas';
 import Input from '../shared/Input';
 import Select from '../shared/Select';
-import { Plus, Upload, Download, Ruler, AlertTriangle, Info, AlertCircle, X, Save, CheckCircle, Copy, CheckSquare, Square } from 'lucide-react';
+import { Plus, Upload, Download, Ruler, AlertTriangle, Info, AlertCircle, X, Save, CheckCircle, Copy } from 'lucide-react';
 import { showSuccess, showWarning, showError } from '../../../lib/toast';
 import SampleMeasurementsTable from './SampleMeasurementsTable';
 import { SampleMeasurementRow } from '../../../types/measurements';
-import { parseTolerance, formatToleranceNoUnit, parseStepValue, formatStepValue, formatMeasurementValue, parseMeasurementValue, formatMeasurementValueAsFraction } from './measurementHelpers';
-import { MEASUREMENT_UNITS, DEFAULT_MEASUREMENT_UNIT, MeasurementUnit, getMeasurementUnitSuffix, getMeasurementUnitMeta } from '../../../types/techpack';
+import { parseTolerance, formatTolerance, parseStepValue, formatStepValue, formatMeasurementValue } from './measurementHelpers';
+import { MEASUREMENT_UNITS, DEFAULT_MEASUREMENT_UNIT, MeasurementUnit, getMeasurementUnitSuffix } from '../../../types/techpack';
 import { SIZE_PRESET_OPTIONS, getPresetById } from '../../../constants/sizePresets';
 import ConfirmationDialog from '../../ConfirmationDialog';
 import { DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR, DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR } from '../../../constants/measurementDisplay';
 import { normalizeMeasurementBaseSizes } from '../../../utils/measurements';
 import Quill from 'quill';
 import ImageUploader from 'quill-image-uploader';
-import { api } from '../../../lib/api';
 
 // Progression validation result
 interface ProgressionValidation {
@@ -35,30 +34,8 @@ interface ProgressionValidation {
   warnings: string[];
 }
 Quill.register('modules/imageUploader', ImageUploader);
-
-// Helper to resolve image URL for Quill editor (needs full URL)
-// Use same pattern as other tabs (ConstructionTab, ColorwayTab, etc.)
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001/api/v1';
-const FILE_BASE_URL = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
-
-const resolveImageUrlForQuill = (url: string): string => {
-  if (!url) return '';
-  const trimmed = url.trim();
-  
-  // Already absolute URL
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) {
-    return trimmed;
-  }
-  
-  // Relative path: /uploads/image.jpg
-  if (trimmed.startsWith('/')) {
-    return `${FILE_BASE_URL}${trimmed}`;
-  }
-  
-  // Fallback: prepend FILE_BASE_URL
-  return `${FILE_BASE_URL}/${trimmed}`;
-};
-
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
+const API_UPLOAD_BASE = API_BASE_URL.replace(/\/api\/v1$/, '');
 const sampleRoundQuillModules = {
   toolbar: [
     [{ header: [1, 2, 3, 4, 5, false] }],
@@ -76,37 +53,26 @@ const sampleRoundQuillModules = {
   imageUploader: {
     upload: async (file: File) => {
       const formData = new FormData();
-      // Backend expects 'constructionImage' field name for /techpacks/upload-construction-image
-      formData.append('constructionImage', file);
+      formData.append('file', file);
       
       try {
-        // Use api client (axios) with proper baseURL configured in src/lib/api.ts
-        // This ensures correct URL resolution: /techpacks/upload-construction-image
-        // Will resolve to: http://host:4001/api/v1/techpacks/upload-construction-image
-        const response = await api.post('/techpacks/upload-construction-image', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
+        const response = await fetch(`${API_BASE_URL}/api/upload-image`, {
+          method: 'POST',
+          body: formData,
         });
         
-        if (response.data.success) {
-          // Backend returns { success: true, data: { url: '/uploads/...' } }
-          const imageUrl = response.data.data.url;
-          
-          if (!imageUrl) {
-            throw new Error('No image URL returned from server');
-          }
-          
-          // Convert relative URL to full URL for Quill imageUploader
-          // Quill needs absolute URL to display images in the editor
-          return resolveImageUrlForQuill(imageUrl);
-        } else {
-          throw new Error(response.data.message || 'Upload failed');
+        if (!response.ok) {
+          throw new Error('Upload failed');
         }
-      } catch (error: any) {
+        
+        const data = await response.json();
+        const imageUrl = data.url.startsWith('/') 
+          ? `${window.location.origin}${data.url}`
+          : data.url;
+        return imageUrl;
+      } catch (error) {
         console.error('Image upload error:', error);
-        const errorMessage = error.response?.data?.message || error.message || 'Upload failed';
-        throw new Error(errorMessage);
+        throw error;
       }
     }
   },
@@ -160,12 +126,8 @@ const MeasurementTab: React.FC = () => {
   const hasUnsavedChanges = state?.hasUnsavedChanges ?? false;
   const tableUnit = (state?.techpack?.measurementUnit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT;
 
-  // Multi-select state for bulk actions
-  const [selectedMeasurementIds, setSelectedMeasurementIds] = useState<Set<string>>(new Set());
-  
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [progressionMode, setProgressionMode] = useState<'strict' | 'warn'>('strict'); // strict = block, warn = allow with warning
   const [showRoundModal, setShowRoundModal] = useState(false);
   const [roundForm, setRoundForm] = useState<RoundModalFormState>(() => ({
     name: '',
@@ -189,19 +151,11 @@ const MeasurementTab: React.FC = () => {
     isActive: true,
   });
   const [sizeAdjustments, setSizeAdjustments] = useState<Record<string, string>>({});
-  const [baseValueInput, setBaseValueInput] = useState<string>(''); // Raw input for base measurement (to allow typing fractions)
-  const [isBaseInputFocused, setIsBaseInputFocused] = useState<boolean>(false);
-  const [minusToleranceInput, setMinusToleranceInput] = useState<string>(''); // Raw input for minus tolerance
-  const [isMinusToleranceFocused, setIsMinusToleranceFocused] = useState<boolean>(false);
-  const [plusToleranceInput, setPlusToleranceInput] = useState<string>(''); // Raw input for plus tolerance
-  const [isPlusToleranceFocused, setIsPlusToleranceFocused] = useState<boolean>(false);
   const [newSizeLabel, setNewSizeLabel] = useState('');
   const [pendingPresetId, setPendingPresetId] = useState(() => SIZE_PRESET_OPTIONS[0]?.id || 'standard_us_alpha');
   const [baseSizeSelectorValue, setBaseSizeSelectorValue] = useState('');
   const [pendingBaseSize, setPendingBaseSize] = useState<string | null>(null);
   const [showBaseSizeConfirm, setShowBaseSizeConfirm] = useState(false);
-  const [showUnitChangeConfirm, setShowUnitChangeConfirm] = useState(false);
-  const [pendingNewUnit, setPendingNewUnit] = useState<MeasurementUnit | null>(null);
   const measurementUnitOptions = useMemo(
     () => MEASUREMENT_UNITS.map(unit => ({ value: unit.value, label: unit.label })),
     []
@@ -286,10 +240,6 @@ const MeasurementTab: React.FC = () => {
   const baseValue = formData.baseSize && formData.sizes
     ? formData.sizes[formData.baseSize]
     : undefined;
-  
-  // Check if unit supports fraction input (inch-16, inch-32 only)
-  // inch-10 uses decimal input, not fraction
-  const supportsFractionInput = tableUnit === 'inch-16' || tableUnit === 'inch-32';
 
   const deriveAdjustmentsFromSizes = useCallback(
     (sizes: Record<string, number> | undefined, baseSize?: string): Record<string, string> => {
@@ -354,18 +304,21 @@ const MeasurementTab: React.FC = () => {
       sizeList: string[]
     ): Record<string, number> => {
       if (!baseSize) {
+        // ✅ FIXED: Preserve all existing sizes, only update sizes in sizeList
         const sanitized = { ...(prevSizes || {}) };
-        sizeList.forEach(size => delete sanitized[size]);
+        // Don't delete sizes outside sizeList - preserve them
         return sanitized;
       }
       const recalculated = recalcSizesFromBase(baseSize, nextBaseValue, adjustments, sizeList);
+      // ✅ FIXED: Preserve all existing sizes first, then update only sizes in sizeList
       const merged = { ...(prevSizes || {}) };
+      // Only update sizes that are in sizeList and have been recalculated
       sizeList.forEach(size => {
-        if (recalculated[size] === undefined) {
-          delete merged[size];
-        } else {
+        if (recalculated[size] !== undefined) {
           merged[size] = recalculated[size];
         }
+        // ✅ FIXED: Don't delete sizes that are not in sizeList - preserve them
+        // This ensures non-standard sizes (like EU numeric sizes) are not lost
       });
       return merged;
     },
@@ -825,24 +778,38 @@ type RoundModalFormState = {
               const adjustments = deriveAdjustmentsFromSizes(oldSizes, baseSize);
               console.log(`  📐 Base size: ${baseSize}, Adjustments:`, adjustments);
               
-              // Tính lại TẤT CẢ sizes dựa trên base value MỚI và adjustments cũ
-              const recalculatedSizes = recalcSizesFromBase(
+              // ✅ FIXED: Merge recalculated sizes with existing sizes to preserve non-standard sizes
+              // This ensures sizes like EU numeric (36, 38, 40, etc.) are not lost during updates
+              const mergedSizes = mergeRecalculatedSizes(
+                oldSizes, // Preserve all existing sizes
                 baseSize,
                 newSizes[baseSize],
                 adjustments,
                 selectedSizes
               );
               
-              console.log(`  ✨ Recalculated sizes:`, recalculatedSizes);
+              // ✅ FIXED: Also preserve any sizes from newSizes that are not in selectedSizes
+              // This ensures newly added sizes with data are preserved
+              Object.keys(newSizes).forEach(size => {
+                if (!selectedSizes.includes(size) && newSizes[size] !== undefined) {
+                  mergedSizes[size] = newSizes[size];
+                }
+              });
               
-              // Cập nhật measurement với sizes đã được tính lại
+              console.log(`  ✨ Merged sizes (preserving all):`, mergedSizes);
+              
+              // Cập nhật measurement với sizes đã được merge (giữ lại tất cả sizes)
               updateMeasurement(i, {
                 ...updatedMeasurement,
-                sizes: recalculatedSizes
+                sizes: mergedSizes
               });
             } else {
-              // Nếu không có baseSize, chỉ cập nhật sizes mới
-              updateMeasurement(i, updatedMeasurement);
+              // ✅ FIXED: When no baseSize, merge newSizes with oldSizes to preserve all data
+              const mergedSizes = { ...oldSizes, ...newSizes };
+              updateMeasurement(i, {
+                ...updatedMeasurement,
+                sizes: mergedSizes
+              });
             }
           }
         }
@@ -863,7 +830,7 @@ type RoundModalFormState = {
       console.error('❌ Error saving sample round:', error);
       showError(error.message || 'Failed to save sample measurement round');
     }
-  }, [saveTechPack, sampleMeasurementRounds, measurements, state?.techpack, updateMeasurement, measurementBaseSize, deriveAdjustmentsFromSizes, recalcSizesFromBase, selectedSizes]);
+  }, [saveTechPack, sampleMeasurementRounds, measurements, state?.techpack, updateMeasurement, measurementBaseSize, deriveAdjustmentsFromSizes, recalcSizesFromBase, mergeRecalculatedSizes, selectedSizes]);
 
   const getDateInputValue = useCallback((value?: string) => {
     if (!value) return '';
@@ -880,64 +847,12 @@ type RoundModalFormState = {
   React.useEffect(() => {
     if (selectedSizes.length === 0) return;
     if (!formData.baseSize || !selectedSizes.includes(formData.baseSize)) {
-      // Use measurementBaseSize (global base size) if available, otherwise use first size in range
-      const defaultBaseSize = measurementBaseSize && selectedSizes.includes(measurementBaseSize)
-        ? measurementBaseSize
-        : selectedSizes[0];
       setFormData(prev => ({
         ...prev,
-        baseSize: defaultBaseSize,
+        baseSize: selectedSizes[0],
       }));
     }
-  }, [formData.baseSize, selectedSizes, measurementBaseSize]);
-
-  // Sync baseValueInput with baseValue when not focused (e.g., when baseValue changes from outside)
-  React.useEffect(() => {
-    if (!isBaseInputFocused && baseValue !== undefined) {
-      if (supportsFractionInput) {
-        setBaseValueInput(formatMeasurementValueAsFraction(baseValue, tableUnit));
-      } else if (tableUnit === 'inch-10') {
-        // For inch-10, format with 3 decimal places
-        setBaseValueInput(formatMeasurementValueAsFraction(baseValue, tableUnit));
-      } else {
-        setBaseValueInput(String(baseValue));
-      }
-    } else if (!isBaseInputFocused && baseValue === undefined) {
-      setBaseValueInput('');
-    }
-  }, [baseValue, isBaseInputFocused, supportsFractionInput, tableUnit]);
-
-  // Sync minusToleranceInput with formData.minusTolerance when not focused
-  React.useEffect(() => {
-    if (!isMinusToleranceFocused && formData.minusTolerance !== undefined) {
-      if (supportsFractionInput) {
-        setMinusToleranceInput(formatMeasurementValueAsFraction(formData.minusTolerance, tableUnit));
-      } else if (tableUnit === 'inch-10') {
-        // For inch-10, format with 3 decimal places
-        setMinusToleranceInput(formatMeasurementValueAsFraction(formData.minusTolerance, tableUnit));
-      } else {
-        setMinusToleranceInput(String(formData.minusTolerance));
-      }
-    } else if (!isMinusToleranceFocused && formData.minusTolerance === undefined) {
-      setMinusToleranceInput('');
-    }
-  }, [formData.minusTolerance, isMinusToleranceFocused, supportsFractionInput, tableUnit]);
-
-  // Sync plusToleranceInput with formData.plusTolerance when not focused
-  React.useEffect(() => {
-    if (!isPlusToleranceFocused && formData.plusTolerance !== undefined) {
-      if (supportsFractionInput) {
-        setPlusToleranceInput(formatMeasurementValueAsFraction(formData.plusTolerance, tableUnit));
-      } else if (tableUnit === 'inch-10') {
-        // For inch-10, format with 3 decimal places
-        setPlusToleranceInput(formatMeasurementValueAsFraction(formData.plusTolerance, tableUnit));
-      } else {
-        setPlusToleranceInput(String(formData.plusTolerance));
-      }
-    } else if (!isPlusToleranceFocused && formData.plusTolerance === undefined) {
-      setPlusToleranceInput('');
-    }
-  }, [formData.plusTolerance, isPlusToleranceFocused, supportsFractionInput, tableUnit]);
+  }, [formData.baseSize, selectedSizes]);
 
   React.useEffect(() => {
     if (!formData.baseSize) {
@@ -978,182 +893,16 @@ type RoundModalFormState = {
   };
 
   const handleBaseValueChange = (value: string) => {
-    // Store raw input while user is typing
-    setBaseValueInput(value);
-    
-    if (value.trim() === '') {
+    const normalized = value.replace(',', '.');
+    if (normalized.trim() === '') {
       updateSizesWithBase({ baseValue: undefined });
       return;
     }
-    // Use parseMeasurementValue to support fractions like "15 1/4", "15.25", "1/2"
-    const parsed = parseMeasurementValue(value);
-    if (parsed === undefined) {
-      // Allow intermediate input states (e.g., "15 ", "15 1/")
-      // Don't update if it's a valid intermediate state - but keep the raw input
+    const parsed = parseFloat(normalized);
+    if (Number.isNaN(parsed)) {
       return;
     }
     updateSizesWithBase({ baseValue: parsed });
-  };
-  
-  const handleBaseValueBlur = () => {
-    setIsBaseInputFocused(false);
-    // When blur, format the value properly if it was successfully parsed
-    if (baseValue !== undefined) {
-      if (supportsFractionInput) {
-        setBaseValueInput(formatMeasurementValueAsFraction(baseValue, tableUnit));
-      } else if (tableUnit === 'inch-10') {
-        // For inch-10, format with 3 decimal places
-        setBaseValueInput(formatMeasurementValueAsFraction(baseValue, tableUnit));
-      } else {
-        setBaseValueInput(String(baseValue));
-      }
-    }
-  };
-  
-  const handleBaseValueFocus = () => {
-    setIsBaseInputFocused(true);
-    // When focus, show the raw value or formatted value
-    if (baseValue !== undefined) {
-      if (supportsFractionInput) {
-        // Show formatted fraction when focusing
-        setBaseValueInput(formatMeasurementValueAsFraction(baseValue, tableUnit));
-      } else if (tableUnit === 'inch-10') {
-        // For inch-10, show formatted with 3 decimal places
-        setBaseValueInput(formatMeasurementValueAsFraction(baseValue, tableUnit));
-      } else {
-        setBaseValueInput(String(baseValue));
-      }
-    } else {
-      setBaseValueInput('');
-    }
-  };
-
-  const handleUnitChange = async (newUnit: MeasurementUnit) => {
-    // Update local state first
-    updateMeasurementDisplaySettings({ unit: newUnit });
-    // Update all existing measurements to use the new unit
-    measurements.forEach((measurement, index) => {
-      updateMeasurement(index, { ...measurement, unit: newUnit });
-    });
-    // Wait a bit for state to update, then auto-save to backend
-    if (saveTechPack && state?.techpack?.id) {
-      try {
-        // Use setTimeout to ensure state is updated before save
-        await new Promise(resolve => setTimeout(resolve, 100));
-        // Get updated techpack with new unit
-        const updatedTechpack = {
-          ...state.techpack,
-          measurementUnit: newUnit,
-        };
-        await saveTechPack(updatedTechpack);
-        showSuccess('Measurement unit updated and saved');
-      } catch (error: any) {
-        console.error('Failed to save measurement unit:', error);
-        showError(error?.message || 'Failed to save measurement unit');
-      }
-    }
-  };
-
-  const handleMinusToleranceChange = (value: string) => {
-    // Store raw input while user is typing
-    setMinusToleranceInput(value);
-    
-    if (value.trim() === '') {
-      setFormData(prev => ({ ...prev, minusTolerance: undefined }));
-      return;
-    }
-    // Use parseMeasurementValue to support fractions like "1/2", "1 1/4", "1.5", "0.5"
-    const parsed = parseMeasurementValue(value);
-    if (parsed === undefined) {
-      // Allow intermediate input states (e.g., "1/", "1 1/", "0.")
-      // Don't update if it's a valid intermediate state - but keep the raw input
-      return;
-    }
-    handleInputChange('minusTolerance')(parsed);
-  };
-  
-  const handleMinusToleranceBlur = () => {
-    setIsMinusToleranceFocused(false);
-    // When blur, format the value properly if it was successfully parsed
-    if (formData.minusTolerance !== undefined) {
-      if (supportsFractionInput) {
-        setMinusToleranceInput(formatMeasurementValueAsFraction(formData.minusTolerance, tableUnit));
-      } else if (tableUnit === 'inch-10') {
-        // For inch-10, format with 3 decimal places
-        setMinusToleranceInput(formatMeasurementValueAsFraction(formData.minusTolerance, tableUnit));
-      } else {
-        setMinusToleranceInput(String(formData.minusTolerance));
-      }
-    }
-  };
-  
-  const handleMinusToleranceFocus = () => {
-    setIsMinusToleranceFocused(true);
-    // When focus, show the raw value or formatted value
-    if (formData.minusTolerance !== undefined) {
-      if (supportsFractionInput) {
-        // Show formatted fraction when focusing
-        setMinusToleranceInput(formatMeasurementValueAsFraction(formData.minusTolerance, tableUnit));
-      } else if (tableUnit === 'inch-10') {
-        // For inch-10, show formatted with 3 decimal places
-        setMinusToleranceInput(formatMeasurementValueAsFraction(formData.minusTolerance, tableUnit));
-      } else {
-        setMinusToleranceInput(String(formData.minusTolerance));
-      }
-    } else {
-      setMinusToleranceInput('');
-    }
-  };
-
-  const handlePlusToleranceChange = (value: string) => {
-    // Store raw input while user is typing
-    setPlusToleranceInput(value);
-    
-    if (value.trim() === '') {
-      setFormData(prev => ({ ...prev, plusTolerance: undefined }));
-      return;
-    }
-    // Use parseMeasurementValue to support fractions like "1/2", "1 1/4", "1.5", "0.5"
-    const parsed = parseMeasurementValue(value);
-    if (parsed === undefined) {
-      // Allow intermediate input states (e.g., "1/", "1 1/", "0.")
-      // Don't update if it's a valid intermediate state - but keep the raw input
-      return;
-    }
-    handleInputChange('plusTolerance')(parsed);
-  };
-  
-  const handlePlusToleranceBlur = () => {
-    setIsPlusToleranceFocused(false);
-    // When blur, format the value properly if it was successfully parsed
-    if (formData.plusTolerance !== undefined) {
-      if (supportsFractionInput) {
-        setPlusToleranceInput(formatMeasurementValueAsFraction(formData.plusTolerance, tableUnit));
-      } else if (tableUnit === 'inch-10') {
-        // For inch-10, format with 3 decimal places
-        setPlusToleranceInput(formatMeasurementValueAsFraction(formData.plusTolerance, tableUnit));
-      } else {
-        setPlusToleranceInput(String(formData.plusTolerance));
-      }
-    }
-  };
-  
-  const handlePlusToleranceFocus = () => {
-    setIsPlusToleranceFocused(true);
-    // When focus, show the raw value or formatted value
-    if (formData.plusTolerance !== undefined) {
-      if (supportsFractionInput) {
-        // Show formatted fraction when focusing
-        setPlusToleranceInput(formatMeasurementValueAsFraction(formData.plusTolerance, tableUnit));
-      } else if (tableUnit === 'inch-10') {
-        // For inch-10, show formatted with 3 decimal places
-        setPlusToleranceInput(formatMeasurementValueAsFraction(formData.plusTolerance, tableUnit));
-      } else {
-        setPlusToleranceInput(String(formData.plusTolerance));
-      }
-    } else {
-      setPlusToleranceInput('');
-    }
   };
 
   const handleSizeAdjustmentChange = (size: string, value: string) => {
@@ -1256,13 +1005,13 @@ type RoundModalFormState = {
     updateMeasurementDisplaySettings({ rowStripeColor: color });
   };
 
-  // Enhanced progression validation - DISABLED: Allow any values
+  // Progression validation disabled - allow any values
   const validateProgression = useCallback((
     sizes: Record<string, number>,
     sizeOrder: string[],
     unit: MeasurementUnit = DEFAULT_MEASUREMENT_UNIT
   ): ProgressionValidation => {
-    // Always return valid - no validation, no errors, no warnings
+    // Always return valid - no validation, allow any values
     return {
       isValid: true,
       errors: [],
@@ -1341,9 +1090,6 @@ type RoundModalFormState = {
 
     const measurement: MeasurementPoint = {
       id: editingIndex !== null ? measurements[editingIndex].id : `measurement_${Date.now()}`,
-      clientKey: editingIndex !== null 
-        ? measurements[editingIndex].clientKey // Keep existing clientKey when editing
-        : `m_${ensureKey()}`, // New clientKey when adding
       pomCode: formData.pomCode!,
       pomName: formData.pomName!,
       minusTolerance: formData.minusTolerance ?? 1.0,
@@ -1368,46 +1114,31 @@ type RoundModalFormState = {
   };
 
   const resetForm = () => {
-    // Use measurementBaseSize (global base size) if available, otherwise use first size in range
-    const defaultBaseSize = measurementBaseSize && selectedSizes.includes(measurementBaseSize)
-      ? measurementBaseSize
-      : selectedSizes[0];
-    
     setFormData({
       pomCode: '',
       pomName: '',
       minusTolerance: 1.0,
       plusTolerance: 1.0,
       sizes: {},
-      baseSize: defaultBaseSize,
+      baseSize: selectedSizes[0],
       notes: '',
       measurementMethod: '',
       isActive: true,
     });
     setSizeAdjustments({});
-    setBaseValueInput('');
-    setIsBaseInputFocused(false);
-    setMinusToleranceInput('');
-    setIsMinusToleranceFocused(false);
-    setPlusToleranceInput('');
-    setIsPlusToleranceFocused(false);
     setShowAddForm(false);
     setEditingIndex(null);
     validation.reset();
   };
 
   const handleEdit = (measurement: MeasurementPoint, index: number) => {
-    // Handle both UI field names (minusTolerance/plusTolerance) and backend field names (toleranceMinus/tolerancePlus)
-    const minusTolRaw = measurement.minusTolerance ?? (measurement as any).toleranceMinus;
-    const plusTolRaw = measurement.plusTolerance ?? (measurement as any).tolerancePlus;
-    
     // Convert tolerance from string to number if needed (backward compatibility)
-    const minusTol = typeof minusTolRaw === 'string' 
-      ? parseTolerance(minusTolRaw) 
-      : (minusTolRaw !== undefined && minusTolRaw !== null ? minusTolRaw : 1.0);
-    const plusTol = typeof plusTolRaw === 'string'
-      ? parseTolerance(plusTolRaw)
-      : (plusTolRaw !== undefined && plusTolRaw !== null ? plusTolRaw : 1.0);
+    const minusTol = typeof measurement.minusTolerance === 'string' 
+      ? parseTolerance(measurement.minusTolerance) 
+      : (measurement.minusTolerance ?? 1.0);
+    const plusTol = typeof measurement.plusTolerance === 'string'
+      ? parseTolerance(measurement.plusTolerance)
+      : (measurement.plusTolerance ?? 1.0);
 
     const measurementSizes = measurement.sizes ? Object.keys(measurement.sizes) : [];
     // Priority: measurementBaseSize (global) > measurement.baseSize > measurementSizes[0] > selectedSizes[0]
@@ -1448,292 +1179,18 @@ type RoundModalFormState = {
     }
   };
 
-  // Helper to generate unique client key (used when creating new measurements)
-  const ensureKey = useCallback(() => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-      return crypto.randomUUID();
-    }
-    return `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  }, []);
-
-  // Helper to get unique row key for measurement (ONLY use clientKey - never id or index)
-  // clientKey is stable and unique per row, independent of backend id or array index
-  const getRowKey = useCallback((m: MeasurementPoint): string => {
-    if (m.clientKey) return m.clientKey;
-    // Fallback only if clientKey not set (should not happen after normalization)
-    if (m.id) return `id_${m.id}`;
-    if ((m as any)._id) return `oid_${String((m as any)._id)}`;
-    return `tmp_${ensureKey()}`;
-  }, [ensureKey]);
-
-  // Memoize rowKeys array for select all functionality
-  const rowKeys = useMemo(
-    () => measurements.map(getRowKey),
-    [measurements, getRowKey]
-  );
-
-  // Ensure all measurements have clientKey (normalize only in getRowKey, don't trigger state update)
-  // This prevents triggering unsaved changes when just viewing the tab
-  // clientKey will be properly normalized when data is loaded from server or when user adds/edits
-
-  // Cleanup selection when rowKeys change (remove invalid keys)
-  useEffect(() => {
-    setSelectedMeasurementIds((prev) => {
-      if (prev.size === 0) return prev;
-      const validKeys = new Set(rowKeys);
-      const next = new Set(Array.from(prev).filter(k => validKeys.has(k)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [rowKeys]);
-
-  // Multi-select handlers
-  const toggleMeasurementSelection = (key: string) => {
-    setSelectedMeasurementIds(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  };
-
-  const toggleSelectAllMeasurements = () => {
-    setSelectedMeasurementIds(prev => {
-      if (prev.size === rowKeys.length && rowKeys.length > 0) {
-        return new Set();
-      }
-      return new Set(rowKeys);
-    });
-  };
-
-  const clearMeasurementSelection = () => {
-    setSelectedMeasurementIds(new Set());
-  };
-
-  // Bulk duplicate Measurements with Sample Rounds mapping
-  const handleBulkDuplicateMeasurements = () => {
-    if (selectedMeasurementIds.size === 0 || !insertMeasurementAt) return;
-    
-    const selectedItems = measurements.filter((m) => {
-      const key = getRowKey(m);
-      return selectedMeasurementIds.has(key);
-    });
-    if (selectedItems.length === 0) return;
-
-    // Create mapping: oldMeasurementKey -> newMeasurementId
-    const measurementKeyMap = new Map<string, string>();
-    const oldIdToNewIdMap = new Map<string, string>(); // For sample rounds lookup
-    const duplicatedMeasurements: MeasurementPoint[] = [];
-    
-      selectedItems.forEach((measurement, idx) => {
-      const originalIndex = measurements.findIndex((m) => {
-        const key = getRowKey(m);
-        const selectedKey = getRowKey(measurement);
-        return key === selectedKey;
-      });
-      if (originalIndex < 0) return;
-      
-      const originalKey = getRowKey(measurement);
-      const oldId = measurement.id || (measurement as any)._id;
-      
-      // Generate unique pomCode with suffix
-      let newPomCode = `${measurement.pomCode}_COPY`;
-      let suffixNum = 1;
-      while (measurements.some(m => m.pomCode === newPomCode)) {
-        newPomCode = `${measurement.pomCode}_COPY-${suffixNum}`;
-        suffixNum++;
-      }
-      
-      // Generate unique ID for duplicate (do not reuse _id)
-      const newId = typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `measurement_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 9)}`;
-      const duplicate: MeasurementPoint = {
-        ...measurement,
-        id: newId,
-        clientKey: `m_${ensureKey()}`, // CRITICAL: New clientKey for duplicate
-        pomCode: newPomCode,
-        pomName: `${measurement.pomName} (Copy)`,
-        sizes: measurement.sizes ? { ...measurement.sizes } : {},
-        unit: (measurement.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT,
-      };
-      // Explicitly remove _id from duplicate to avoid conflicts
-      delete (duplicate as any)._id;
-      
-      measurementKeyMap.set(originalKey, newId);
-      if (oldId) {
-        oldIdToNewIdMap.set(oldId, newId);
-      }
-      duplicatedMeasurements.push(duplicate);
-      
-      // Insert after original measurement
-      if (originalIndex >= 0) {
-        insertMeasurementAt(originalIndex + 1 + idx, duplicate);
-      }
-    });
-
-    // Duplicate Sample Rounds entries for duplicated measurements
-    if (measurementKeyMap.size > 0 && sampleMeasurementRounds.length > 0) {
-      // Use context to update sample rounds with duplicated entries
-      sampleMeasurementRounds.forEach(round => {
-        const newEntries: MeasurementSampleEntry[] = [];
-        
-        // Find entries related to duplicated measurements and create copies
-        round.measurements.forEach(entry => {
-          const oldMeasurementId = entry.measurementId;
-          if (oldMeasurementId && oldIdToNewIdMap.has(oldMeasurementId)) {
-            const newMeasurementId = oldIdToNewIdMap.get(oldMeasurementId)!;
-            // Find the new measurement to get its sizes for requested values
-            const newMeasurement = duplicatedMeasurements.find(m => m.id === newMeasurementId);
-            
-            const newEntry: MeasurementSampleEntry = {
-              ...entry,
-              id: `entry_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-              measurementId: newMeasurementId,
-              pomCode: newMeasurement?.pomCode || entry.pomCode,
-              pomName: newMeasurement?.pomName || entry.pomName,
-              // Copy user-entered data: measured, revised, comments, diff
-              measured: entry.measured ? { ...entry.measured } : {},
-              revised: entry.revised ? { ...entry.revised } : {},
-              comments: entry.comments ? { ...entry.comments } : {},
-              diff: entry.diff ? { ...entry.diff } : {},
-              // requested will be rebuilt from new measurement.sizes (source-of-truth)
-              requested: newMeasurement?.sizes 
-                ? Object.entries(newMeasurement.sizes).reduce<MeasurementSampleValueMap>((acc, [size, value]) => {
-                    acc[size] = value !== null && value !== undefined ? String(value) : '';
-                    return acc;
-                  }, {})
-                : {},
-            };
-            newEntries.push(newEntry);
-          }
-        });
-        
-        // Add new entries to round
-        if (newEntries.length > 0 && updateSampleMeasurementRound) {
-          const currentEntries = round.measurements || [];
-          updateSampleMeasurementRound(round.id, {
-            measurements: [...currentEntries, ...newEntries],
-          });
-        }
-      });
-    }
-
-    showSuccess(`Duplicated ${selectedItems.length} measurement(s) with sample rounds`);
-    clearMeasurementSelection();
-  };
-
-  // Bulk delete Measurements with Sample Rounds cleanup
-  const handleBulkDeleteMeasurements = () => {
-    if (selectedMeasurementIds.size === 0) return;
-    
-    const selectedItems = measurements.filter((m) => {
-      const key = getRowKey(m);
-      return selectedMeasurementIds.has(key);
-    });
-    if (selectedItems.length === 0) return;
-
-    const confirmationMessage = `Are you sure you want to delete ${selectedItems.length} selected measurement(s)? This will also remove related sample round entries.`;
-    
-    if (window.confirm(confirmationMessage)) {
-      // Build set of deleted measurement ids (_id or id) for sample rounds cleanup
-      const deletedIds = new Set<string>();
-      selectedItems.forEach(m => {
-        const id = m.id || (m as any)._id;
-        if (id) deletedIds.add(id);
-      });
-      
-      // Delete measurements (in reverse order to maintain indices)
-      selectedItems.reverse().forEach(measurement => {
-        const index = measurements.findIndex((m) => {
-          const key = getRowKey(m);
-          const selectedKey = getRowKey(measurement);
-          return key === selectedKey;
-        });
-        if (index >= 0) {
-          deleteMeasurement(index);
-        }
-      });
-
-      // Clean up Sample Rounds: remove entries related to deleted measurements
-      if (deletedIds.size > 0 && sampleMeasurementRounds.length > 0) {
-        sampleMeasurementRounds.forEach(round => {
-          if (updateSampleMeasurementRound) {
-            const remainingEntries = round.measurements.filter(
-              entry => !entry.measurementId || !deletedIds.has(entry.measurementId)
-            );
-            if (remainingEntries.length !== round.measurements.length) {
-              updateSampleMeasurementRound(round.id, {
-                measurements: remainingEntries,
-              });
-            }
-          }
-        });
-      }
-
-      showSuccess(`Deleted ${selectedItems.length} measurement(s)`);
-      clearMeasurementSelection();
-    }
-  };
-
   const handleDuplicateMeasurement = (measurement: MeasurementPoint, index: number) => {
     if (!insertMeasurementAt) return;
-    
-    // Generate unique pomCode
-    let newPomCode = `${measurement.pomCode}_COPY`;
-    let suffixNum = 1;
-    while (measurements.some(m => m.pomCode === newPomCode)) {
-      newPomCode = `${measurement.pomCode}_COPY-${suffixNum}`;
-      suffixNum++;
-    }
-    
-    // Generate unique ID for duplicate (do not reuse _id)
-    const newId = typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `measurement_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const duplicate: MeasurementPoint = {
       ...measurement,
-      id: newId,
-      clientKey: `m_${ensureKey()}`, // CRITICAL: New clientKey for duplicate
-      pomCode: newPomCode,
+      id: `measurement_${Date.now()}`,
+      pomCode: `${measurement.pomCode}_COPY`,
       pomName: `${measurement.pomName} (Copy)`,
       sizes: measurement.sizes ? { ...measurement.sizes } : {},
       unit: (measurement.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT,
     };
-    // Explicitly remove _id from duplicate to avoid conflicts
-    delete (duplicate as any)._id;
     insertMeasurementAt(index, duplicate);
-    
-    // Duplicate Sample Rounds entries for this measurement
-    if (measurement.id && sampleMeasurementRounds.length > 0) {
-      sampleMeasurementRounds.forEach(round => {
-        const relatedEntries = round.measurements.filter(
-          entry => entry.measurementId === measurement.id
-        );
-        
-        if (relatedEntries.length > 0 && updateSampleMeasurementRound) {
-          const newEntries: MeasurementSampleEntry[] = relatedEntries.map(entry => ({
-            ...entry,
-            id: `entry_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            measurementId: newId,
-            // Copy user-entered data
-            measured: entry.measured ? { ...entry.measured } : {},
-            revised: entry.revised ? { ...entry.revised } : {},
-            comments: entry.comments ? { ...entry.comments } : {},
-            diff: entry.diff ? { ...entry.diff } : {},
-          }));
-          
-          const currentEntries = round.measurements || [];
-          updateSampleMeasurementRound(round.id, {
-            measurements: [...currentEntries, ...newEntries],
-          });
-        }
-      });
-    }
-    
-    showSuccess('Measurement duplicated with sample rounds');
+    showSuccess('Measurement duplicated');
   };
 
   // Enhanced validation for display in table
@@ -1812,12 +1269,7 @@ type RoundModalFormState = {
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h3 className="text-lg font-semibold text-gray-800">
-                Size Range Configuration
-                {tableUnit && (
-                  <span className="ml-2 text-sm font-normal text-gray-500">(Unit: {getMeasurementUnitSuffix(tableUnit)})</span>
-                )}
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-800">Size Range Configuration</h3>
               <p className="text-sm text-gray-500">
                 Manage custom sizes per techpack. Gender default: {articleInfo?.gender || 'Unisex'}
               </p>
@@ -1896,17 +1348,31 @@ type RoundModalFormState = {
             <label className="block text-sm font-medium text-gray-700 mb-1">Measurement Unit</label>
             <Select
               value={tableUnit}
-              onChange={(value) => {
+              onChange={async (value) => {
                 const newUnit = value as MeasurementUnit;
-                // Always show confirmation dialog if there are existing measurements and unit is actually changing
-                if (measurements.length > 0 && newUnit !== tableUnit) {
-                  setPendingNewUnit(newUnit);
-                  setShowUnitChangeConfirm(true);
-                } else if (measurements.length === 0) {
-                  // No measurements yet, change unit directly
-                  handleUnitChange(newUnit);
+                // Update local state first
+                updateMeasurementDisplaySettings({ unit: newUnit });
+                // Update all existing measurements to use the new unit
+                measurements.forEach((measurement, index) => {
+                  updateMeasurement(index, { ...measurement, unit: newUnit });
+                });
+                // Wait a bit for state to update, then auto-save to backend
+                if (saveTechPack && state?.techpack?.id) {
+                  try {
+                    // Use setTimeout to ensure state is updated before save
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    // Get updated techpack with new unit
+                    const updatedTechpack = {
+                      ...state.techpack,
+                      measurementUnit: newUnit,
+                    };
+                    await saveTechPack(updatedTechpack);
+                    showSuccess('Measurement unit updated and saved');
+                  } catch (error: any) {
+                    console.error('Failed to save measurement unit:', error);
+                    showError(error?.message || 'Failed to save measurement unit');
+                  }
                 }
-                // If newUnit === tableUnit, do nothing (no change)
               }}
               options={measurementUnitOptions}
               className="w-full"
@@ -1998,83 +1464,61 @@ type RoundModalFormState = {
               helperText={validation.getFieldProps('pomName').helperText}
             />
 
-            <div className="flex flex-col space-y-1">
-              <label className="text-sm font-medium text-gray-700 flex items-center">
-                Minus Tolerance ({getMeasurementUnitSuffix(tableUnit)}) *
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              <input
-                type="text"
-                inputMode={supportsFractionInput ? "text" : "decimal"}
-                value={isMinusToleranceFocused 
-                  ? minusToleranceInput 
-                  : (formData.minusTolerance !== undefined 
-                      ? (supportsFractionInput ? formatMeasurementValueAsFraction(formData.minusTolerance, tableUnit) : String(formData.minusTolerance))
-                      : '')}
-                onChange={(e) => handleMinusToleranceChange(e.target.value)}
-                onFocus={handleMinusToleranceFocus}
-                onBlur={() => {
-                  handleMinusToleranceBlur();
-                  validation.setFieldTouched('minusTolerance');
-                }}
-                placeholder={supportsFractionInput ? "e.g., 1/2 or 0.5" : "e.g., 1.0"}
-                className={`px-3 py-2 border rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  validation.getFieldProps('minusTolerance').error 
-                    ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
-                    : 'border-gray-300'
-                }`}
-              />
-              {validation.getFieldProps('minusTolerance').error && (
-                <span className="text-xs text-red-600 mt-1">{validation.getFieldProps('minusTolerance').error}</span>
-              )}
-              {!validation.getFieldProps('minusTolerance').error && (
-                <span className="text-xs text-gray-500 mt-1">
-                  {validation.getFieldProps('minusTolerance').helperText
-                    || (supportsFractionInput 
-                      ? `Tolerance in ${getMeasurementUnitSuffix(tableUnit)} (e.g., 1/2, 0.5, or 1 1/4)`
-                      : `Tolerance in ${getMeasurementUnitSuffix(tableUnit)}`)}
-                </span>
-              )}
-            </div>
+            <Input
+              label={`Minus Tolerance (${getMeasurementUnitSuffix(tableUnit)}) *`}
+              value={formData.minusTolerance ?? ''}
+              onChange={(value) => {
+                // value là string, giữ nguyên nếu là chuỗi rỗng hoặc số hợp lệ
+                if (typeof value === 'string') {
+                  // Cho phép nhập số thập phân, số âm, chuỗi rỗng
+                  if (/^-?\d*\.?\d*$/.test(value) || value === '') {
+                    handleInputChange('minusTolerance')(value);
+                  }
+                } else {
+                  handleInputChange('minusTolerance')(value);
+                }
+              }}
+              onBlur={() => validation.setFieldTouched('minusTolerance')}
+              type="number"
+              step="0.01"
+              min="0"
+              max="50"
+              placeholder="e.g., 1.0"
+              required
+              error={validation.getFieldProps('minusTolerance').error}
+              helperText={
+                validation.getFieldProps('minusTolerance').helperText
+                || `Tolerance in ${getMeasurementUnitSuffix(formData.unit as MeasurementUnit)}`
+              }
+            />
 
-            <div className="flex flex-col space-y-1">
-              <label className="text-sm font-medium text-gray-700 flex items-center">
-                Plus Tolerance ({getMeasurementUnitSuffix(tableUnit)}) *
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              <input
-                type="text"
-                inputMode={supportsFractionInput ? "text" : "decimal"}
-                value={isPlusToleranceFocused 
-                  ? plusToleranceInput 
-                  : (formData.plusTolerance !== undefined 
-                      ? (supportsFractionInput ? formatMeasurementValueAsFraction(formData.plusTolerance, tableUnit) : String(formData.plusTolerance))
-                      : '')}
-                onChange={(e) => handlePlusToleranceChange(e.target.value)}
-                onFocus={handlePlusToleranceFocus}
-                onBlur={() => {
-                  handlePlusToleranceBlur();
-                  validation.setFieldTouched('plusTolerance');
-                }}
-                placeholder={supportsFractionInput ? "e.g., 1/2 or 0.5" : "e.g., 1.0"}
-                className={`px-3 py-2 border rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  validation.getFieldProps('plusTolerance').error 
-                    ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
-                    : 'border-gray-300'
-                }`}
-              />
-              {validation.getFieldProps('plusTolerance').error && (
-                <span className="text-xs text-red-600 mt-1">{validation.getFieldProps('plusTolerance').error}</span>
-              )}
-              {!validation.getFieldProps('plusTolerance').error && (
-                <span className="text-xs text-gray-500 mt-1">
-                  {validation.getFieldProps('plusTolerance').helperText
-                    || (supportsFractionInput 
-                      ? `Tolerance in ${getMeasurementUnitSuffix(tableUnit)} (e.g., 1/2, 0.5, or 1 1/4)`
-                      : `Tolerance in ${getMeasurementUnitSuffix(tableUnit)}`)}
-                </span>
-              )}
-            </div>
+            <Input
+              label={`Plus Tolerance (${getMeasurementUnitSuffix(tableUnit)}) *`}
+              value={formData.plusTolerance ?? ''}
+              onChange={(value) => {
+                // value là string, giữ nguyên nếu là chuỗi rỗng hoặc số hợp lệ
+                if (typeof value === 'string') {
+                  // Cho phép nhập số thập phân, số âm, chuỗi rỗng
+                  if (/^-?\d*\.?\d*$/.test(value) || value === '') {
+                    handleInputChange('plusTolerance')(value);
+                  }
+                } else {
+                  handleInputChange('plusTolerance')(value);
+                }
+              }}
+              onBlur={() => validation.setFieldTouched('plusTolerance')}
+              type="number"
+              step="0.01"
+              min="0"
+              max="50"
+              placeholder="e.g., 1.0"
+              required
+              error={validation.getFieldProps('plusTolerance').error}
+              helperText={
+                validation.getFieldProps('plusTolerance').helperText
+                || `Tolerance in ${getMeasurementUnitSuffix(formData.unit as MeasurementUnit)}`
+              }
+            />
 
             <div className="md:col-span-2">
               <Input
@@ -2116,34 +1560,18 @@ type RoundModalFormState = {
                   Base Measurement ({getMeasurementUnitSuffix(tableUnit)})
                 </label>
                 <input
-                  type={supportsFractionInput ? "text" : "number"}
-                  step={supportsFractionInput ? undefined : "0.01"}
-                  min={supportsFractionInput ? undefined : "0"}
-                  value={isBaseInputFocused 
-                    ? baseValueInput 
-                    : (baseValue !== undefined 
-                        ? (supportsFractionInput || tableUnit === 'inch-10' 
-                            ? formatMeasurementValueAsFraction(baseValue, tableUnit) 
-                            : String(baseValue))
-                        : '')}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={baseValue ?? ''}
                   onChange={(e) => handleBaseValueChange(e.target.value)}
-                  onFocus={handleBaseValueFocus}
-                  onBlur={() => {
-                    handleBaseValueBlur();
-                    validation.setFieldTouched('measurement');
-                  }}
+                  onBlur={() => validation.setFieldTouched('measurement')}
                   className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     validation.getFieldProps('measurement').error ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder={supportsFractionInput ? "e.g., 15 1/4 or 15.25" : (tableUnit === 'inch-10' ? "e.g., 20.500 or 0.250" : "e.g., 30")}
+                  placeholder="e.g., 30"
                 />
-                <p className="text-xs text-gray-500 mt-2">
-                  {supportsFractionInput 
-                    ? 'Enter measurement (e.g., 15 1/4, 15.25, or 1/2). Fractions are supported for inch measurements.'
-                    : tableUnit === 'inch-10'
-                    ? 'Enter measurement as decimal (e.g., 20.500, 0.250, 0.375). Values will be displayed with 3 decimal places.'
-                    : 'Enter the actual measurement for the base size; other sizes will follow the jumps.'}
-                </p>
+                <p className="text-xs text-gray-500 mt-2">Enter the actual measurement for the base size; other sizes will follow the jumps.</p>
               </div>
             </div>
 
@@ -2158,7 +1586,7 @@ type RoundModalFormState = {
                       <div className="text-lg font-semibold text-blue-900">{size}</div>
                       <div className="text-sm text-blue-800 mt-1">
                         {baseValue !== undefined && !Number.isNaN(baseValue)
-                          ? `${formatMeasurementValueAsFraction(baseValue, tableUnit)} ${getMeasurementUnitSuffix(tableUnit)}`
+                          ? `${formatMeasurementValue(baseValue)} ${getMeasurementUnitSuffix(tableUnit)}`
                           : 'Enter a base value'}
                       </div>
                     </div>
@@ -2166,7 +1594,7 @@ type RoundModalFormState = {
                 }
 
                 const adjustmentValue = sizeAdjustments[size] || '';
-                const displayActual = formatMeasurementValueAsFraction(actualValue, tableUnit);
+                const displayActual = formatMeasurementValue(actualValue);
 
                 return (
                   <div key={size} className="flex flex-col border rounded-md p-3">
@@ -2196,40 +1624,6 @@ type RoundModalFormState = {
               <p className="mt-2 text-sm text-red-600">{validation.getFieldProps('measurement').error}</p>
             )}
             
-            {/* Progression validation preview */}
-            {Object.keys(formData.sizes || {}).length >= 2 && (
-              (() => {
-                const progValidation = validateProgression(formData.sizes || {}, selectedSizes);
-                if (progValidation.errors.length > 0 || progValidation.warnings.length > 0) {
-                  return (
-                    <div className={`mt-3 p-3 rounded-md ${
-                      progValidation.errors.length > 0 ? 'bg-red-50 border border-red-200' : 'bg-yellow-50 border border-yellow-200'
-                    }`}>
-                      <div className="flex items-start">
-                        <AlertTriangle className={`w-5 h-5 mt-0.5 mr-2 ${
-                          progValidation.errors.length > 0 ? 'text-red-400' : 'text-yellow-400'
-                        }`} />
-                        <div className="text-sm">
-                          {progValidation.errors.length > 0 && (
-                            <div className="text-red-800 font-medium mb-1">Errors:</div>
-                          )}
-                          {progValidation.errors.map((err, idx) => (
-                            <div key={`${err}-${idx}`} className="text-red-700">{err}</div>
-                          ))}
-                          {progValidation.warnings.length > 0 && (
-                            <div className="text-yellow-800 font-medium mt-2 mb-1">Warnings:</div>
-                          )}
-                          {progValidation.warnings.map((warn, idx) => (
-                            <div key={`${warn}-${idx}`} className="text-yellow-700">{warn}</div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-                return null;
-              })()
-            )}
           </div>
 
           <div className="mb-4">
@@ -2298,71 +1692,11 @@ type RoundModalFormState = {
 
       {/* Measurements Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        {/* Bulk Actions Bar */}
-        {selectedMeasurementIds.size > 0 && (
-          <div className="px-4 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-blue-900">
-                Selected: {selectedMeasurementIds.size} measurement(s)
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleBulkDuplicateMeasurements}
-                className="px-3 py-1.5 text-sm font-medium text-blue-700 bg-white border border-blue-300 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <Copy className="w-4 h-4 inline mr-1.5" />
-                Duplicate
-              </button>
-              <button
-                onClick={handleBulkDeleteMeasurements}
-                className="px-3 py-1.5 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500"
-              >
-                <X className="w-4 h-4 inline mr-1.5" />
-                Delete
-              </button>
-              <button
-                onClick={clearMeasurementSelection}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
-              >
-                Clear Selection
-              </button>
-            </div>
-          </div>
-        )}
-
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th 
-                  scope="col" 
-                  className="px-4 py-3 w-12 sticky left-0 bg-gray-50"
-                  style={{ zIndex: 30, position: 'sticky' }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={rowKeys.length > 0 && selectedMeasurementIds.size === rowKeys.length}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      toggleSelectAllMeasurements();
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                    }}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                    title={selectedMeasurementIds.size === rowKeys.length && rowKeys.length > 0 ? 'Deselect all' : 'Select all'}
-                    ref={(input) => {
-                      if (input) {
-                        input.indeterminate = selectedMeasurementIds.size > 0 && selectedMeasurementIds.size < rowKeys.length;
-                      }
-                    }}
-                  />
-                </th>
-                <th 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-[48px] bg-gray-50"
-                  style={{ zIndex: 20, position: 'sticky' }}
-                >
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">
                   POM Code
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-48">
@@ -2393,73 +1727,53 @@ type RoundModalFormState = {
             <tbody className="bg-white divide-y divide-gray-200">
               {measurements.length === 0 ? (
                 <tr>
-                  <td colSpan={selectedSizes.length + 5} className="px-6 py-12 text-center text-sm text-gray-500">
+                  <td colSpan={selectedSizes.length + 4} className="px-6 py-12 text-center text-sm text-gray-500">
                     No measurement points defined. Add measurements to get started.
                   </td>
                 </tr>
               ) : (
                 measurements.map((measurement, index) => {
-                  const rowKey = getRowKey(measurement);
-                  const isSelected = selectedMeasurementIds.has(rowKey);
+                  const validationResult = validateMeasurement(measurement);
+                  const hasIssues = validationResult.errors.length > 0 || validationResult.warnings.length > 0;
                   
                   // Format tolerance for display
-                  // Handle both UI field names (minusTolerance/plusTolerance) and backend field names (toleranceMinus/tolerancePlus)
-                  const minusTolRaw = measurement.minusTolerance ?? (measurement as any).toleranceMinus;
-                  const plusTolRaw = measurement.plusTolerance ?? (measurement as any).tolerancePlus;
-                  
-                  const minusTol = typeof minusTolRaw === 'string' 
-                    ? parseTolerance(minusTolRaw) 
-                    : (minusTolRaw !== undefined && minusTolRaw !== null ? minusTolRaw : 1.0);
-                  const plusTol = typeof plusTolRaw === 'string'
-                    ? parseTolerance(plusTolRaw)
-                    : (plusTolRaw !== undefined && plusTolRaw !== null ? plusTolRaw : 1.0);
-                  
-                  // Format tolerance without unit for consistent display (keep fraction format for inch units)
-                  const toleranceDisplay = formatToleranceNoUnit(minusTol, plusTol, tableUnit);
-                  const rowBackgroundColor = isSelected
-                    ? '#dbeafe'
-                    : index % 2 === 0
-                      ? '#ffffff'
-                      : rowStripeColor;
+                  const minusTol = typeof measurement.minusTolerance === 'string' 
+                    ? parseTolerance(measurement.minusTolerance) 
+                    : (measurement.minusTolerance ?? 1.0);
+                  const plusTol = typeof measurement.plusTolerance === 'string'
+                    ? parseTolerance(measurement.plusTolerance)
+                    : (measurement.plusTolerance ?? 1.0);
+                  const toleranceDisplay = minusTol === plusTol 
+                    ? formatTolerance(minusTol, tableUnit).replace(/\s*(cm|inch)/gi, '')
+                    : `-${minusTol.toFixed(1)} / +${plusTol.toFixed(1)}`;
+                  const rowBackgroundColor = validationResult.errors.length > 0
+                    ? '#fee2e2'
+                    : validationResult.warnings.length > 0
+                      ? '#fef3c7'
+                      : index % 2 === 0
+                        ? '#ffffff'
+                        : rowStripeColor;
                   
                   return (
                     <tr 
-                      key={rowKey}
+                      key={measurement.id || `measurement-${index}`} 
                       className="transition-colors duration-150 hover:brightness-95"
                       style={{ backgroundColor: rowBackgroundColor }}
                     >
-                      <td 
-                        className="px-4 py-4 sticky left-0"
-                        style={{ 
-                          backgroundColor: rowBackgroundColor,
-                          zIndex: 30,
-                          position: 'sticky'
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            toggleMeasurementSelection(rowKey);
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                          }}
-                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                          title={isSelected ? 'Deselect' : 'Select'}
-                        />
-                      </td>
                       <td
-                        className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-[48px]"
-                        style={{ 
-                          backgroundColor: rowBackgroundColor,
-                          zIndex: 20,
-                          position: 'sticky'
-                        }}
+                        className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0"
+                        style={{ backgroundColor: rowBackgroundColor }}
                       >
                         <div className="flex items-center">
                           {measurement.pomCode}
+                          {hasIssues && (
+                            <AlertTriangle 
+                              className={`w-4 h-4 ml-2 ${
+                                validationResult.errors.length > 0 ? 'text-red-500' : 'text-yellow-500'
+                              }`} 
+                              title={[...validationResult.errors, ...validationResult.warnings].join('; ')} 
+                            />
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700">
@@ -2475,7 +1789,7 @@ type RoundModalFormState = {
                       </td>
                       {selectedSizes.map(size => {
                         const value = measurement.sizes ? measurement.sizes[size] : undefined;
-                        const displayValue = formatMeasurementValueAsFraction(value, tableUnit);
+                        const displayValue = formatMeasurementValue(value);
                         const isBaseCell = highlightedColumn ? size === highlightedColumn : measurement.baseSize === size;
                         return (
                           <td 
@@ -2757,7 +2071,6 @@ type RoundModalFormState = {
             <p className="font-medium mb-1">Measurement Guidelines:</p>
             <ul className="list-disc list-inside space-y-1 text-blue-700">
               <li>All measurements use the same unit selected at the table level</li>
-              <li>Ensure size progression is logical (each size should be larger than or equal to the previous)</li>
               <li>Tolerance values follow the selected unit (e.g., 1.0 means ±1.0 {getMeasurementUnitSuffix(tableUnit)})</li>
               <li>Use consistent tolerance values across similar measurement points</li>
               <li>Zero values are preserved - use empty field to indicate "not measured"</li>
@@ -2766,28 +2079,6 @@ type RoundModalFormState = {
           </div>
         </div>
       </div>
-
-      <ConfirmationDialog
-        isOpen={showUnitChangeConfirm}
-        title="Đổi đơn vị đo"
-        message={pendingNewUnit 
-          ? `Đơn vị hiện tại là "${getMeasurementUnitMeta(tableUnit).label}". Bạn muốn đổi sang "${getMeasurementUnitMeta(pendingNewUnit).label}".\n\n⚠️ Cảnh báo: Việc đổi đơn vị có thể gây xê dịch số liệu do làm tròn giữa các đơn vị đo. Vui lòng kiểm tra kỹ các giá trị sau khi đổi và xác nhận quyết định của bạn.`
-          : ''}
-        confirmText="Đổi đơn vị"
-        cancelText="Hủy"
-        type="warning"
-        onConfirm={async () => {
-          if (pendingNewUnit) {
-            await handleUnitChange(pendingNewUnit);
-          }
-          setShowUnitChangeConfirm(false);
-          setPendingNewUnit(null);
-        }}
-        onCancel={() => {
-          setShowUnitChangeConfirm(false);
-          setPendingNewUnit(null);
-        }}
-      />
 
       <ConfirmationDialog
         isOpen={showBaseSizeConfirm}

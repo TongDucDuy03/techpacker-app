@@ -100,7 +100,7 @@ const options = {
         },
         BOMItem: {
           type: 'object',
-          required: ['part', 'materialName', 'placement', 'size', 'quantity', 'uom', 'supplier'],
+          required: ['part', 'materialName', 'uom', 'supplier'], // ✅ FIXED: Placement, size, and quantity are now optional
           properties: {
             id: { type: 'string', format: 'uuid' },
             part: { type: 'string' },

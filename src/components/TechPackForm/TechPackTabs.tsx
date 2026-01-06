@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTechPack } from '../../contexts/TechPackContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { ApiTechPack, Colorway, SIZE_RANGES, DEFAULT_MEASUREMENT_UNIT, TechPackRole } from '../../types/techpack';
+import { ApiTechPack, Colorway, SIZE_RANGES, DEFAULT_MEASUREMENT_UNIT } from '../../types/techpack';
 import ArticleInfoTab, { ArticleInfoTabRef } from './tabs/ArticleInfoTab';
 import BomTab, { BomTabRef } from './tabs/BomTab';
 import MeasurementTab from './tabs/MeasurementTab';
@@ -28,7 +28,7 @@ import {
   ArrowLeft,
   Archive
 } from 'lucide-react';
-import { showError, showWarning, showSuccess } from '../../lib/toast';
+import { showError, showWarning } from '../../lib/toast';
 import { Modal } from 'antd';
 import { DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR, DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR } from '../../constants/measurementDisplay';
 
@@ -49,47 +49,10 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
 
   const [showSaveNotification, setShowSaveNotification] = useState(false);
 
-  // Get current user's TechPack Role (System Role is only a label, permissions based on TechPack Role)
-  const currentUserTechPackRole = useMemo(() => {
-    if (!techpack || !user) return undefined;
-    
-    // System Admin has override
-    if (user.role?.toLowerCase() === 'admin') {
-      return TechPackRole.Admin;
-    }
-    
-    // Check if user is owner
-    const createdByRaw: any = (techpack as any).createdBy;
-    const createdById = createdByRaw && typeof createdByRaw === 'object' ? createdByRaw._id : createdByRaw;
-    const currentUserId = String((user as any)?.id || (user as any)?._id || '');
-    if (createdById && String(createdById) === String(currentUserId)) {
-      return TechPackRole.Owner;
-    }
-    
-    // Check shared access
-    const sharedWith = (techpack as any).sharedWith || [];
-    const sharedAccess = sharedWith.find((share: any) => {
-      const shareUserId = share.userId?._id || share.userId;
-      return String(shareUserId) === String(currentUserId);
-    });
-    
-    return sharedAccess?.role;
-  }, [techpack, user]);
-
-  // Permission checks based on TechPack Role (System Role is only a label)
-  // Allow edit if user is System Admin, Owner, Admin, or Editor
-  const canEdit = useMemo(() => {
-    if (user?.role?.toLowerCase() === 'admin') return true; // System Admin override
-    if (mode === 'create') return true; // Create mode always allows edit
-    if (currentUserTechPackRole === TechPackRole.Owner || 
-        currentUserTechPackRole === TechPackRole.Admin || 
-        currentUserTechPackRole === TechPackRole.Editor) {
-      return true;
-    }
-    return false;
-  }, [user, currentUserTechPackRole, mode]);
-  
-  const isReadOnly = !canEdit && mode !== 'create';
+  // Permission checks based on user role
+  // Allow edit if user is admin/designer, OR if mode is 'create' (new techpack)
+  const canEdit = (user?.role === 'admin' || user?.role === 'designer') || mode === 'create';
+  const isReadOnly = (user?.role === 'merchandiser' || user?.role === 'viewer') && mode !== 'create';
 
   useEffect(() => {
     if ((mode === 'edit' || mode === 'view') && initialTechPack) {
@@ -245,9 +208,9 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
               id: item._id ? String(item._id) : (item.id || `bom_${index}`),
               part: item.part || '',
               materialName: item.materialName || '',
-              placement: item.placement || '',
+              placement: item.placement || '', // ✅ FIXED: Preserve placement (can be empty)
               size: item.size || '',
-              quantity: item.quantity || 0,
+              quantity: item.quantity !== undefined && item.quantity !== null ? item.quantity : undefined, // ✅ FIXED: Preserve undefined if not set (don't default to 0)
               uom: item.uom || 'm',
               supplier: item.supplier || '',
               comments: item.comments || '',
@@ -265,7 +228,19 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
             }))
           : [],
         measurements: (initialTechPack as any).measurements || [],
-        sampleMeasurementRounds: (initialTechPack as any).sampleMeasurementRounds || [],
+        // ✅ FIXED: Sample rounds will be normalized by updateFormState -> normalizeSampleRounds
+        // But we need to ensure date and reviewer are mapped correctly from API
+        sampleMeasurementRounds: Array.isArray((initialTechPack as any).sampleMeasurementRounds)
+          ? ((initialTechPack as any).sampleMeasurementRounds || []).map((round: any) => ({
+              id: round._id ? String(round._id) : (round.id || ''),
+              name: round.name || '',
+              date: round.date || round.measurementDate || new Date().toISOString(), // ✅ FIXED: Map measurementDate to date
+              reviewer: round.reviewer || round.reviewerName || '', // ✅ FIXED: Map reviewerName to reviewer
+              requestedSource: round.requestedSource || 'original',
+              overallComments: round.overallComments || '',
+              measurements: round.measurements || [],
+            }))
+          : [],
         measurementSizeRange: normalizedSizeRange,
         measurementBaseSize: resolvedBaseSize,
         measurementUnit: (initialTechPack as any).measurementUnit || DEFAULT_MEASUREMENT_UNIT,
@@ -296,14 +271,13 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
   }, [mode, initialTechPack, updateFormState, resetFormState]);
 
   // Tab configuration
-  const allTabs = [
+  const tabs = [
     {
       id: 0,
       name: 'Article Info',
       icon: FileText,
       component: ArticleInfoTab,
       description: 'Basic product information',
-      sensitive: false, // Not sensitive, Factory can view
     },
     {
       id: 1,
@@ -311,7 +285,6 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       icon: Package,
       component: () => <BomTab ref={bomTabRef} />,
       description: 'Materials and components',
-      sensitive: false, // Not sensitive, Factory can view (but price hidden)
     },
     {
       id: 2,
@@ -319,7 +292,6 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       icon: Ruler,
       component: MeasurementTab,
       description: 'Size specifications',
-      sensitive: false, // Not sensitive, Factory can view
     },
     {
       id: 3,
@@ -327,7 +299,6 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       icon: BookOpen,
       component: () => <ConstructionTab ref={constructionTabRef} />,
       description: 'Construction instructions',
-      sensitive: false, // Not sensitive, Factory can view
     },
     {
       id: 4,
@@ -335,7 +306,6 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       icon: Palette,
       component: ColorwayTab,
       description: 'Color variations',
-      sensitive: false, // Not sensitive, Factory can view
     },
     {
       id: 5,
@@ -343,7 +313,6 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       icon: Archive,
       component: PackingTab,
       description: 'Packing & folding instructions',
-      sensitive: false, // Not sensitive, Factory can view
     },
     {
       id: 6,
@@ -351,7 +320,6 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       icon: Clock,
       component: (props: any) => <RevisionTab onBackToList={onBackToList} {...props} />,
       description: 'Change tracking',
-      sensitive: true, // Sensitive, Factory cannot view
     },
     {
       id: 7,
@@ -359,18 +327,8 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       icon: Share2,
       component: SharingTab,
       description: 'Access control and sharing',
-      sensitive: false, // Not sensitive, but Factory cannot manage (handled in SharingTab)
     },
   ];
-
-  // Filter tabs based on user's TechPack Role
-  // Factory cannot view sensitive tabs (Revision History)
-  const tabs = useMemo(() => {
-    if (currentUserTechPackRole === TechPackRole.Factory) {
-      return allTabs.filter(tab => !tab.sensitive);
-    }
-    return allTabs;
-  }, [currentUserTechPackRole]);
 
   // Calculate tab completion status
   const getTabCompletionStatus = (tabId: number) => {
@@ -548,8 +506,9 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       }
     }
 
-    // For update flow, require confirmation and skip when no changes
+    // ✅ FIXED: Both create and update flows now have the same confirmation behavior
     if (mode === 'edit') {
+      // For update flow, require confirmation and skip when no changes
       if (!hasUnsavedChanges) {
         showWarning('Chưa có gì thay đổi.');
         return;
@@ -560,23 +519,26 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
         okText: 'Cập nhật',
         cancelText: 'Hủy',
         onOk: async () => {
-          console.log('[TechPackTabs] Calling saveTechPack (confirmed)...');
+          console.log('[TechPackTabs] Calling saveTechPack (update confirmed)...');
           await saveTechPack();
           console.log('[TechPackTabs] saveTechPack completed');
-          // ✅ FIXED: Do NOT redirect when updating - stay on current page and tab
-          // Only show success message
-          showSuccess('TechPack đã được cập nhật thành công!');
         }
       });
       return;
     }
 
-    // For create flow: no confirmation, redirect to list after create
-    console.log('[TechPackTabs] Calling saveTechPack (create)...');
+    // ✅ FIXED: Create flow now also has confirmation (same as update)
+    Modal.confirm({
+      title: 'Xác nhận lưu',
+      content: 'Bạn có muốn lưu TechPack này?',
+      okText: 'Lưu',
+      cancelText: 'Hủy',
+      onOk: async () => {
+        console.log('[TechPackTabs] Calling saveTechPack (create confirmed)...');
     await saveTechPack();
     console.log('[TechPackTabs] saveTechPack completed');
-    // ✅ CREATE: Redirect to list after creating new techpack
-    onBackToList();
+      }
+    });
   };
 
   const handleExportPDF = async () => {
@@ -718,8 +680,8 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
                   </>
                 ) : (
                   <>
-                    <Download className="w-4 h-4 mr-2" />
-                    Export PDF
+                <Download className="w-4 h-4 mr-2" />
+                Export PDF
                   </>
                 )}
               </button>

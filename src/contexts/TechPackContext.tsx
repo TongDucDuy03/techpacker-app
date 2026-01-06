@@ -411,8 +411,7 @@ const normalizeValueMap = (
 const buildRequestedValueMap = (
   measurement?: MeasurementPoint,
   sizeKeys: string[] = [],
-  fallback?: SampleEntryFieldValue,
-  forceRebuild?: boolean // New parameter: if true, rebuild from measurement.sizes, ignoring fallback
+  fallback?: SampleEntryFieldValue
 ): MeasurementSampleValueMap => {
   const measurementValues =
     measurement?.sizes && Object.keys(measurement.sizes).length > 0
@@ -421,17 +420,6 @@ const buildRequestedValueMap = (
           return acc;
         }, {})
       : undefined;
-
-  // If forceRebuild is true, always use measurement values (when measurements are updated, we want to sync requested values)
-  if (forceRebuild && measurementValues) {
-    const combinedKeys = Array.from(
-      new Set([
-        ...sizeKeys,
-        ...Object.keys(measurementValues),
-      ])
-    );
-    return normalizeValueMap(combinedKeys.length ? combinedKeys : Object.keys(measurementValues), undefined, measurementValues);
-  }
 
   const fallbackValues = convertMapToRecord(fallback);
   const combinedKeys = Array.from(
@@ -548,12 +536,10 @@ const generateEntriesForRequestedSource = (
 
 const normalizeSampleEntry = (
   entry: Partial<MeasurementSampleEntry>,
-  measurement?: MeasurementPoint,
-  forceRebuildRequested?: boolean // New parameter: if true, rebuild requested values from measurement.sizes
+  measurement?: MeasurementPoint
 ): MeasurementSampleEntry => {
   const sizeKeys = resolveSizeKeys(measurement, entry);
-  // When syncing with updated measurements, rebuild requested values to reflect new measurement.sizes
-  const requested = buildRequestedValueMap(measurement, sizeKeys, entry.requested, forceRebuildRequested);
+  const requested = buildRequestedValueMap(measurement, sizeKeys, entry.requested);
   const measured = normalizeValueMap(sizeKeys, entry.measured);
   const diff = normalizeValueMap(sizeKeys, entry.diff);
   const revised = normalizeValueMap(sizeKeys, entry.revised);
@@ -592,14 +578,19 @@ const normalizeSampleRound = (round: Partial<MeasurementSampleRound>): Measureme
   const roundId = round.id || (round as any)._id?.toString() || generateClientId('sample-round');
   // Khi load từ server, date có thể là measurementDate
   const roundDate = round.date || (round as any).measurementDate || new Date().toISOString();
-  // Đảm bảo reviewer được map đúng từ API response
-  const reviewer = round.reviewer || (round as any).reviewerName || '';
+  // ✅ FIXED: Preserve reviewer from updates, fallback to reviewerName from API, then empty string
+  // This ensures reviewer is not lost when updating
+  const reviewer = round.reviewer !== undefined && round.reviewer !== null 
+    ? String(round.reviewer) 
+    : ((round as any).reviewerName !== undefined && (round as any).reviewerName !== null 
+        ? String((round as any).reviewerName) 
+        : '');
   
   return {
     id: roundId,
     name: round.name || DEFAULT_SAMPLE_ROUND_NAME,
     date: typeof roundDate === 'string' ? roundDate : new Date(roundDate).toISOString(),
-    reviewer: reviewer,
+    reviewer: reviewer, // ✅ FIXED: Always preserve reviewer value
     requestedSource: round.requestedSource || 'original',
     overallComments: round.overallComments ?? '',
     measurements: Array.isArray(round.measurements)
@@ -610,8 +601,7 @@ const normalizeSampleRound = (round: Partial<MeasurementSampleRound>): Measureme
 
 const syncRoundWithMeasurements = (
   round: MeasurementSampleRound,
-  measurements: MeasurementPoint[],
-  forceRebuildRequested: boolean = false // New parameter: if true, rebuild requested values from measurement.sizes
+  measurements: MeasurementPoint[]
 ): MeasurementSampleRound => {
   if (!measurements || measurements.length === 0) {
     return {
@@ -626,8 +616,7 @@ const syncRoundWithMeasurements = (
     .filter(entry => !entry.measurementId || measurementMap.has(entry.measurementId))
     .map(entry => {
       const measurement = entry.measurementId ? measurementMap.get(entry.measurementId) : undefined;
-      // When syncing with updated measurements, rebuild requested values to reflect new measurement.sizes
-      return normalizeSampleEntry(entry, measurement, forceRebuildRequested);
+      return normalizeSampleEntry(entry, measurement);
     });
 
   measurementMap.forEach(measurement => {
@@ -645,8 +634,7 @@ const syncRoundWithMeasurements = (
 
 const normalizeSampleRounds = (
   rounds: MeasurementSampleRound[] | undefined,
-  measurements: MeasurementPoint[],
-  forceRebuildRequested: boolean = false // New parameter: if true, rebuild requested values from measurement.sizes
+  measurements: MeasurementPoint[]
 ): MeasurementSampleRound[] => {
   const normalizedRounds = Array.isArray(rounds) && rounds.length > 0
     ? rounds.map(round => normalizeSampleRound(round))
@@ -664,7 +652,7 @@ const normalizeSampleRounds = (
           ]
         : [];
 
-  return baseRounds.map(round => syncRoundWithMeasurements(round, measurements, forceRebuildRequested));
+  return baseRounds.map(round => syncRoundWithMeasurements(round, measurements));
 };
 
 const parseNumericValue = (value: string | number | null | undefined): number | undefined => {
@@ -720,41 +708,16 @@ const buildMeasurementPayloads = (techpackData: TechPackFormState['techpack']) =
       ...rest
     } = measurement || {};
 
-    // Priority: UI field names (minusTolerance/plusTolerance) > backend field names (toleranceMinus/tolerancePlus) > default 1.0
-    // This ensures that when user edits tolerance in UI, the new values are preserved
-    // Use explicit check for undefined/null to allow 0 as a valid value
-    // IMPORTANT: Only use default 1.0 if measurement is truly new (no existing tolerance values)
-    // For existing measurements, preserve existing tolerance values to prevent reset
-    const resolvedMinus = 
-      (minusTolerance !== undefined && minusTolerance !== null) ? minusTolerance :
-      (toleranceMinus !== undefined && toleranceMinus !== null) ? toleranceMinus :
-      // Only default to 1.0 if this is a new measurement (no id/_id), otherwise preserve existing value
-      (measurement?.id || measurement?._id) ? undefined : 1.0;
-    const resolvedPlus = 
-      (plusTolerance !== undefined && plusTolerance !== null) ? plusTolerance :
-      (tolerancePlus !== undefined && tolerancePlus !== null) ? tolerancePlus :
-      // Only default to 1.0 if this is a new measurement (no id/_id), otherwise preserve existing value
-      (measurement?.id || measurement?._id) ? undefined : 1.0;
-    
+    const resolvedMinus = toleranceMinus ?? minusTolerance ?? 0;
+    const resolvedPlus = tolerancePlus ?? plusTolerance ?? 0;
     const resolvedUnit = (measurement?.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT;
 
-    // Only include tolerance fields if they have valid values
-    // For existing measurements, if tolerance is undefined, don't include it in payload
-    // This allows backend mergeSubdocumentArray to preserve existing tolerance values
-    const payload: any = {
+    return {
       ...rest,
       unit: resolvedUnit,
+      toleranceMinus: resolvedMinus,
+      tolerancePlus: resolvedPlus,
     };
-    
-    // Only include tolerance if we have valid values (not undefined)
-    if (resolvedMinus !== undefined) {
-      payload.toleranceMinus = resolvedMinus;
-    }
-    if (resolvedPlus !== undefined) {
-      payload.tolerancePlus = resolvedPlus;
-    }
-    
-    return payload;
   });
 
   const measurementNameMap = new Map(
@@ -797,7 +760,7 @@ const buildMeasurementPayloads = (techpackData: TechPackFormState['techpack']) =
       name: round.name?.trim() || `Sample Round ${index + 1}`,
       order: index + 1,
       measurementDate: normalizedDate,
-      reviewer: round.reviewer || '',
+      reviewer: round.reviewer !== undefined && round.reviewer !== null ? String(round.reviewer) : '', // ✅ FIXED: Always send reviewer (even if empty string) to preserve it
       overallComments: round.overallComments || '',
       requestedSource: round.requestedSource || 'original',
       measurements: mappedEntries,
@@ -909,7 +872,7 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
       })(),
       gender: resolvedGender,
       productClass: resolvedProductClass,
-      fitType: ((apiTechPack as any).fitType || 'Regular') as 'Regular' | 'Slim' | 'Loose' | 'Relaxed' | 'Oversized',
+      fitType: 'Regular' as const,
       supplier: (apiTechPack as any).supplier || '',
       technicalDesignerId: typeof (apiTechPack as any).technicalDesignerId === 'object'
         ? (apiTechPack as any).technicalDesignerId?._id || ''
@@ -951,9 +914,9 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
           id: item._id ? String(item._id) : (item.id || `bom_${index}`),
           part: item.part || '',
           materialName: item.materialName || '',
-          placement: item.placement || '',
+          placement: item.placement || '', // ✅ FIXED: Preserve placement (can be empty)
           size: item.size || '',
-          quantity: item.quantity || 0,
+          quantity: item.quantity !== undefined && item.quantity !== null ? item.quantity : undefined, // ✅ FIXED: Preserve undefined if not set (don't default to 0)
           uom: item.uom || 'm',
           supplier: item.supplier || '',
           comments: item.comments || '',
@@ -970,45 +933,10 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
           totalPrice: item.totalPrice,
         }))
       : [],
-    measurements: Array.isArray((apiTechPack as any).measurements)
-      ? ((apiTechPack as any).measurements || []).map((measurement: any, index: number) => {
-          // Map toleranceMinus/tolerancePlus to minusTolerance/plusTolerance for UI consistency
-          const {
-            toleranceMinus,
-            tolerancePlus,
-            minusTolerance,
-            plusTolerance,
-            ...rest
-          } = measurement || {};
-          
-          // When loading from API, backend returns toleranceMinus/tolerancePlus
-          // Map to both field names for consistency
-          // Use explicit check for undefined/null to allow 0 as a valid value
-          const loadedMinus = (toleranceMinus !== undefined && toleranceMinus !== null) ? toleranceMinus : 1.0;
-          const loadedPlus = (tolerancePlus !== undefined && tolerancePlus !== null) ? tolerancePlus : 1.0;
-          
-          // Ensure clientKey is set for UI selection (normalize here to avoid triggering unsaved changes)
-          const generateClientKey = () => {
-            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-              return crypto.randomUUID();
-            }
-            return `${Date.now()}_${index}_${Math.random().toString(36).slice(2)}`;
-          };
-          
-          return {
-            ...rest,
-            // Map backend field names to UI field names
-            minusTolerance: loadedMinus,
-            plusTolerance: loadedPlus,
-            // Also keep toleranceMinus/tolerancePlus for backward compatibility
-            toleranceMinus: loadedMinus,
-            tolerancePlus: loadedPlus,
-            // Ensure clientKey exists for UI row keys (frontend-only, not persisted to backend)
-            clientKey: measurement.clientKey || `m_${generateClientKey()}`,
-          };
-        })
+    measurements: (apiTechPack as any).measurements || [],
+    sampleMeasurementRounds: Array.isArray((apiTechPack as any).sampleMeasurementRounds)
+      ? ((apiTechPack as any).sampleMeasurementRounds || []).map((round: any) => normalizeSampleRound(round)) // ✅ FIXED: Normalize sample rounds to ensure date and reviewer are mapped correctly
       : [],
-    sampleMeasurementRounds: (apiTechPack as any).sampleMeasurementRounds || [],
     measurementSizeRange: normalizedSizeRange,
     measurementBaseSize: resolvedBaseSize,
     measurementUnit: (apiTechPack as any).measurementUnit || DEFAULT_MEASUREMENT_UNIT,
@@ -1429,7 +1357,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
 
   const getTechPack = async (id: string, skipLoading = false) => {
     if (!skipLoading) {
-      setLoading(true);
+    setLoading(true);
     }
     try {
       const result = await api.getTechPack(id);
@@ -1444,12 +1372,12 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
       console.error('❌ getTechPack error:', error);
       if (!skipLoading) {
-        showError(error.message || 'Failed to fetch tech pack');
+      showError(error.message || 'Failed to fetch tech pack');
       }
       return undefined;
     } finally {
       if (!skipLoading) {
-        setLoading(false);
+      setLoading(false);
       }
     }
   };
@@ -1573,19 +1501,19 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     try {
       const latestState = state;
       const techpackData = techpackOverride ?? latestState.techpack;
-  
+
       const {
         measurementsWithBase,
         measurementsPayload,
         sampleMeasurementRoundsPayload,
         measurementNameMap,
       } = buildMeasurementPayloads(techpackData);
-  
+
       const howToMeasuresPayload = (techpackData.howToMeasures || []).map((howToMeasure: any, index: number) => {
         const steps = Array.isArray(howToMeasure?.steps) && howToMeasure.steps.length > 0
           ? howToMeasure.steps
           : (howToMeasure?.instructions || []);
-  
+
         const mapped: any = {
           pomCode: howToMeasure?.pomCode || '',
           pomName: howToMeasure?.pomName || measurementNameMap.get(howToMeasure?.pomCode) || '',
@@ -1600,15 +1528,15 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           videoUrl: howToMeasure?.videoUrl || '',
           note: howToMeasure?.note || '',
         };
-  
+
         const existingId = (howToMeasure as any)._id || howToMeasure?.id;
         if (existingId && typeof existingId === 'string' && objectIdPattern.test(existingId)) {
           mapped._id = existingId;
         }
-  
+
         return mapped;
       });
-  
+
       const colorwaysForSave = sanitizeColorwayList(techpackData.colorways as Array<PartialColorway>, techpackData.bom);
       const colorwaysPayload = colorwaysForSave.map(colorway => {
         const partsPayload = (colorway.parts || []).map(part => {
@@ -1618,29 +1546,29 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
             colorName: part.colorName.trim(),
             colorType: part.colorType,
           };
-  
+
           const partObjectId =
             (part as any)?._id && typeof (part as any)._id === 'string' && objectIdPattern.test((part as any)._id)
               ? (part as any)._id
               : undefined;
           const partIdIsObjectId = typeof part.id === 'string' && objectIdPattern.test(part.id);
-  
+
           if (partIdIsObjectId) {
             payload._id = part.id;
           } else if (partObjectId) {
             payload._id = partObjectId;
           }
-  
+
           if (part.bomItemId) payload.bomItemId = part.bomItemId;
           if (part.pantoneCode) payload.pantoneCode = part.pantoneCode.trim();
           if (normalizedHex) payload.hexCode = normalizedHex;
           if (part.rgbCode) payload.rgbCode = part.rgbCode.trim();
           if (part.supplier) payload.supplier = part.supplier.trim();
           if (part.imageUrl) payload.imageUrl = part.imageUrl.trim();
-  
+
           return payload;
         });
-  
+
         const normalizedPlacement = colorway.placement?.trim();
         const normalizedMaterialType = colorway.materialType?.trim();
         return {
@@ -1662,14 +1590,14 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           parts: partsPayload,
         };
       });
-  
+
       const incompleteColorway = colorwaysPayload.find(cw => !cw.name || !cw.code);
       if (incompleteColorway) {
         setState(prev => ({ ...prev, isSaving: false }));
         showError('Please complete all required colorway fields (name, code).');
         return;
       }
-  
+
       // ===== UPDATE EXISTING TECHPACK =====
       if (techpackData.id && techpackData.id !== '') {
         const currentMeasurementUnit = techpackData.measurementUnit || latestState.techpack.measurementUnit || DEFAULT_MEASUREMENT_UNIT;
@@ -1686,7 +1614,6 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           status: techpackData.status,
           category: techpackData.articleInfo.productClass,
           gender: techpackData.articleInfo.gender,
-          fitType: techpackData.articleInfo.fitType as any,
           technicalDesignerId: techpackData.articleInfo.technicalDesignerId,
           lifecycleStage: techpackData.articleInfo.lifecycleStage as any,
           collectionName: (techpackData.articleInfo as any).collection,
@@ -1695,9 +1622,13 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           description: techpackData.articleInfo.notes,
           notes: techpackData.articleInfo.notes,
           brand: techpackData.articleInfo.brand,
-          retailPrice: (techpackData as any).retailPrice,
-          currency: (techpackData as any).currency,
-          bom: techpackData.bom,
+          retailPrice: techpackData.articleInfo.retailPrice || undefined, // ✅ FIXED: Get from articleInfo, not root level
+          currency: techpackData.articleInfo.currency || 'USD', // ✅ FIXED: Get from articleInfo, not root level
+          bom: (techpackData.bom || []).map((item: any) => ({
+            ...item,
+            size: item.size || '', // ✅ FIXED: Ensure size is always present (can be empty string)
+            placement: item.placement || '', // ✅ FIXED: Ensure placement is always present (can be empty string)
+          })),
           measurements: measurementsPayload,
           colorways: colorwaysPayload,
           howToMeasure: howToMeasuresPayload,
@@ -1711,17 +1642,17 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         };
         
         const updatedTP = await updateTechPack(techpackData.id, updatePayload);
-  
+
         if (updatedTP) {
           await loadRevisions(techpackData.id);
           // ✅ FIXED: Skip loading state to avoid UI flicker/reset
           const refreshedTechPack = await getTechPack(techpackData.id, true);
           
           if (refreshedTechPack) {
+            // ✅ FIXED: Use the same mapping logic as Edit mode (TechPackTabs.tsx)
+            // This ensures form shows data exactly like when entering Edit mode
             const mappedTechPack = mapApiTechPackToFormState(refreshedTechPack) as any;
             
-            // ✅ FIXED: Use mappedTechPack as source of truth (from server)
-            // This ensures form shows complete data from backend
             console.log('🔄 Reloading TechPack after update:', {
               id: techpackData.id,
               articleName: mappedTechPack.articleInfo?.articleName,
@@ -1729,12 +1660,13 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
               hasMeasurements: Array.isArray(mappedTechPack.measurements) && mappedTechPack.measurements.length > 0,
             });
             
+            // ✅ FIXED: Use updateFormState with skipUnsavedFlag=true (same as Edit mode)
+            // This ensures the form state is updated exactly like when entering Edit mode
+            updateFormState(mappedTechPack, true); // skipUnsavedFlag = true
+            
+            // Update flags separately
             setState(prev => ({
               ...prev,
-              techpack: {
-                ...mappedTechPack,
-                id: techpackData.id, // Ensure ID is set
-              },
               isSaving: false,
               hasUnsavedChanges: false,
               lastSaved: new Date().toISOString(),
@@ -1745,14 +1677,14 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           } else {
             // ✅ FIXED: If reload fails, keep current data and just update flags
             console.warn('⚠️ Failed to reload TechPack after update, keeping current state');
-            setState(prev => ({
-              ...prev,
-              isSaving: false,
-              hasUnsavedChanges: false,
-              lastSaved: new Date().toISOString(),
-            }));
-          }
-        } else {
+          setState(prev => ({
+            ...prev,
+            isSaving: false,
+            hasUnsavedChanges: false,
+            lastSaved: new Date().toISOString(),
+          }));
+        }
+      } else {
           setState(prev => ({
             ...prev,
             isSaving: false,
@@ -1766,43 +1698,48 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
   
       // ===== CREATE NEW TECHPACK =====
       const currentMeasurementUnitForCreate = techpackData.measurementUnit || latestState.techpack.measurementUnit || DEFAULT_MEASUREMENT_UNIT;
-      const createPayload: CreateTechPackInput = {
-        articleInfo: {
+        const createPayload: CreateTechPackInput = {
+          articleInfo: {
           articleName: techpackData.articleInfo.articleName || '',
-          articleCode: techpackData.articleInfo.articleCode,
-          version: techpackData.articleInfo.version,
-          supplier: techpackData.articleInfo.supplier || '',
-          season: techpackData.articleInfo.season,
-          fabricDescription: techpackData.articleInfo.fabricDescription || '',
-          productDescription: (techpackData.articleInfo as any).productDescription || '',
-          designSketchUrl: (techpackData.articleInfo as any).designSketchUrl || '',
+            articleCode: techpackData.articleInfo.articleCode,
+            version: techpackData.articleInfo.version,
+            supplier: techpackData.articleInfo.supplier || '',
+            season: techpackData.articleInfo.season,
+            fabricDescription: techpackData.articleInfo.fabricDescription || '',
+            productDescription: (techpackData.articleInfo as any).productDescription || '',
+            designSketchUrl: (techpackData.articleInfo as any).designSketchUrl || '',
           companyLogoUrl: (techpackData.articleInfo as any).companyLogoUrl || '',
-          productClass: techpackData.articleInfo.productClass,
-          gender: techpackData.articleInfo.gender,
-          fitType: techpackData.articleInfo.fitType as any,
-          technicalDesignerId: techpackData.articleInfo.technicalDesignerId,
-          lifecycleStage: techpackData.articleInfo.lifecycleStage as any,
-          collection: (techpackData.articleInfo as any).collection,
-          targetMarket: (techpackData.articleInfo as any).targetMarket,
-          pricePoint: (techpackData.articleInfo as any).pricePoint,
-          notes: techpackData.articleInfo.notes,
-        },
-        bom: techpackData.bom,
-        measurements: measurementsPayload,
-        colorways: colorwaysPayload,
-        howToMeasures: howToMeasuresPayload,
-        sampleMeasurementRounds: sampleMeasurementRoundsPayload,
-        status: techpackData.status as any,
-        measurementSizeRange: techpackData.measurementSizeRange || [],
-        measurementBaseSize: techpackData.measurementBaseSize || techpackData.measurementSizeRange?.[0],
+            productClass: techpackData.articleInfo.productClass,
+            gender: techpackData.articleInfo.gender,
+            technicalDesignerId: techpackData.articleInfo.technicalDesignerId,
+            lifecycleStage: techpackData.articleInfo.lifecycleStage as any,
+            collection: (techpackData.articleInfo as any).collection,
+            targetMarket: (techpackData.articleInfo as any).targetMarket,
+            pricePoint: (techpackData.articleInfo as any).pricePoint,
+            currency: techpackData.articleInfo.currency || 'USD', // ✅ FIXED: Add currency to create payload
+            retailPrice: techpackData.articleInfo.retailPrice || undefined, // ✅ FIXED: Add retailPrice to create payload
+            notes: techpackData.articleInfo.notes,
+          },
+          bom: (techpackData.bom || []).map((item: any) => ({
+            ...item,
+            size: item.size || '', // ✅ FIXED: Ensure size is always present (can be empty string)
+            placement: item.placement || '', // ✅ FIXED: Ensure placement is always present (can be empty string)
+          })),
+          measurements: measurementsPayload,
+          colorways: colorwaysPayload,
+          howToMeasures: howToMeasuresPayload,
+          sampleMeasurementRounds: sampleMeasurementRoundsPayload,
+          status: techpackData.status as any,
+          measurementSizeRange: techpackData.measurementSizeRange || [],
+          measurementBaseSize: techpackData.measurementBaseSize || techpackData.measurementSizeRange?.[0],
         measurementUnit: currentMeasurementUnitForCreate,
-        measurementBaseHighlightColor: techpackData.measurementBaseHighlightColor || DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR,
-        measurementRowStripeColor: techpackData.measurementRowStripeColor || DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR,
-        packingNotes: techpackData.packingNotes || '',
-      } as unknown as CreateTechPackInput;
-  
-      const newTechPack = await createTechPack(createPayload);
-  
+          measurementBaseHighlightColor: techpackData.measurementBaseHighlightColor || DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR,
+          measurementRowStripeColor: techpackData.measurementRowStripeColor || DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR,
+          packingNotes: techpackData.packingNotes || '',
+        } as unknown as CreateTechPackInput;
+
+        const newTechPack = await createTechPack(createPayload);
+
       if (!newTechPack) {
         // Create failed, keep current state
         setState(prev => ({
@@ -1811,9 +1748,9 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         }));
         return;
       }
-  
+
       // Get the new TechPack ID
-      const techPackId = newTechPack._id || newTechPack.id;
+          const techPackId = newTechPack._id || newTechPack.id;
       
       if (!techPackId) {
         // No ID returned, something went wrong
@@ -1827,7 +1764,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
       // === FIX: Load complete data from server BEFORE updating state ===
       try {
         // 1. Load revisions
-        await loadRevisions(techPackId);
+            await loadRevisions(techPackId);
         
         // 2. Fetch complete TechPack data from server (skip loading to avoid UI flicker)
         const refreshedTechPack = await getTechPack(techPackId, true);
@@ -1836,12 +1773,13 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           // Fallback: use newTechPack data if fetch fails
           console.warn('⚠️ Failed to reload TechPack after create, using newTechPack data');
           const mappedTechPack = mapApiTechPackToFormState(newTechPack) as any;
+          
+          // ✅ FIXED: Use updateFormState (same as Edit mode)
+          updateFormState(mappedTechPack, true); // skipUnsavedFlag = true
+          
+          // Update flags separately
           setState(prev => ({
             ...prev,
-            techpack: {
-              ...mappedTechPack,
-              id: techPackId, // Ensure ID is set
-            },
             isSaving: false,
             hasUnsavedChanges: false,
             lastSaved: new Date().toISOString(),
@@ -1851,7 +1789,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           const mappedTechPack = mapApiTechPackToFormState(refreshedTechPack) as any;
           
           // 4. Update form state with complete server data
-          // ✅ FIXED: Use mappedTechPack as source of truth (from server)
+          // ✅ FIXED: Use updateFormState (same as Edit mode) to ensure exact same behavior
           console.log('🔄 Reloading TechPack after create:', {
             id: techPackId,
             articleName: mappedTechPack.articleInfo?.articleName,
@@ -1859,12 +1797,13 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
             hasMeasurements: Array.isArray(mappedTechPack.measurements) && mappedTechPack.measurements.length > 0,
           });
           
+          // ✅ FIXED: Use updateFormState with skipUnsavedFlag=true (same as Edit mode)
+          // This ensures the form state is updated exactly like when entering Edit mode
+          updateFormState(mappedTechPack, true); // skipUnsavedFlag = true
+          
+          // Update flags separately
           setState(prev => ({
             ...prev,
-            techpack: {
-              ...mappedTechPack,
-              id: techPackId, // Ensure ID is set
-            },
             isSaving: false,
             hasUnsavedChanges: false,
             lastSaved: new Date().toISOString(),
@@ -1880,18 +1819,16 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         
         // Fallback: use newTechPack data
         const mappedTechPack = mapApiTechPackToFormState(newTechPack) as any;
-        setState(prev => ({
-          ...prev,
-          techpack: {
-            ...mappedTechPack,
-            id: techPackId, // Ensure ID is set
-            // Preserve UI-related state that shouldn't be overwritten
-            currentTab: prev.currentTab,
-          },
-          isSaving: false,
-          hasUnsavedChanges: false,
+        
+        // ✅ FIXED: Use updateFormState (same as Edit mode)
+        updateFormState(mappedTechPack, true); // skipUnsavedFlag = true
+
+      setState(prev => ({
+        ...prev,
+        isSaving: false,
+        hasUnsavedChanges: false,
           lastSaved: new Date().toISOString(),
-        }));
+      }));
         
         // Still clear draft even on error
         clearDraftFromStorage(techPackId);
@@ -1997,9 +1934,15 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         : fallbackSizes[0];
 
       const nextMeasurements = prev.techpack.measurements.map(measurement => {
+        // ✅ FIXED: Ensure sizes object exists and is not undefined to prevent "Cannot read properties of undefined" error
+        const currentSizes = measurement.sizes || {};
+        
+        // ✅ FIXED: Preserve all existing size data for sizes in the new range
+        // This ensures that when adding new sizes and entering data, the data is preserved
         const nextSizes = fallbackSizes.reduce<Record<string, number>>((acc, size) => {
-          if (measurement.sizes[size] !== undefined) {
-            acc[size] = measurement.sizes[size];
+          // Preserve existing value if it exists (including newly added sizes with data)
+          if (currentSizes[size] !== undefined && currentSizes[size] !== null) {
+            acc[size] = currentSizes[size];
           }
           return acc;
         }, {});
@@ -2011,9 +1954,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         };
       });
 
-      // Force rebuild requested values when baseSize changes due to size range update
-      const baseSizeChanged = prevBaseSize !== nextBaseSize;
-      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements, baseSizeChanged);
+      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
 
       return {
         ...prev,
@@ -2041,15 +1982,11 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         return prev;
       }
 
-      // Update all measurements with new baseSize
       const nextMeasurements = prev.techpack.measurements.map(measurement => ({
         ...measurement,
         baseSize: normalizedBaseSize,
       }));
-      
-      // Force rebuild requested values in sample rounds to sync with new baseSize
-      // This ensures sample rounds use the new baseSize from updated measurements
-      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements, true);
+      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
 
       const updatedTechpack = {
         ...prev.techpack,
@@ -2105,28 +2042,14 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
 
   const addMeasurement = (measurement: MeasurementPoint) => {
     setState(prev => {
-      // Use the baseSize from the measurement if provided, otherwise fallback to global baseSize
-      // This ensures user-selected baseSize is preserved
-      const sizeRange = prev.techpack.measurementSizeRange || [];
-      const globalBaseSize = prev.techpack.measurementBaseSize;
-      
-      // Determine the baseSize for the new measurement:
-      // 1. Use measurement.baseSize if it exists and is valid
-      // 2. Otherwise use globalBaseSize if it exists and is valid
-      // 3. Otherwise use first size in range
-      let resolvedBaseSize = measurement.baseSize;
-      if (!resolvedBaseSize || !sizeRange.includes(resolvedBaseSize)) {
-        if (globalBaseSize && sizeRange.includes(globalBaseSize)) {
-          resolvedBaseSize = globalBaseSize;
-        } else if (sizeRange.length > 0) {
-          resolvedBaseSize = sizeRange[0];
-        }
-      }
-      
-      const normalizedMeasurement = resolvedBaseSize
-        ? { ...measurement, baseSize: resolvedBaseSize }
-        : measurement;
-      
+      const baseSize =
+        prev.techpack.measurementBaseSize ||
+        (prev.techpack.measurementSizeRange && prev.techpack.measurementSizeRange[0]) ||
+        '';
+      const normalizedMeasurement =
+        baseSize && measurement.baseSize !== baseSize
+          ? { ...measurement, baseSize }
+          : measurement;
       const nextMeasurements = [...prev.techpack.measurements, normalizedMeasurement];
       const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
       return {
@@ -2143,28 +2066,14 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
 
   const insertMeasurementAt = (index: number, measurement: MeasurementPoint) => {
     setState(prev => {
-      // Use the baseSize from the measurement if provided, otherwise fallback to global baseSize
-      // This ensures user-selected baseSize is preserved
-      const sizeRange = prev.techpack.measurementSizeRange || [];
-      const globalBaseSize = prev.techpack.measurementBaseSize;
-      
-      // Determine the baseSize for the new measurement:
-      // 1. Use measurement.baseSize if it exists and is valid
-      // 2. Otherwise use globalBaseSize if it exists and is valid
-      // 3. Otherwise use first size in range
-      let resolvedBaseSize = measurement.baseSize;
-      if (!resolvedBaseSize || !sizeRange.includes(resolvedBaseSize)) {
-        if (globalBaseSize && sizeRange.includes(globalBaseSize)) {
-          resolvedBaseSize = globalBaseSize;
-        } else if (sizeRange.length > 0) {
-          resolvedBaseSize = sizeRange[0];
-        }
-      }
-      
-      const normalizedMeasurement = resolvedBaseSize
-        ? { ...measurement, baseSize: resolvedBaseSize }
-        : measurement;
-      
+      const baseSize =
+        prev.techpack.measurementBaseSize ||
+        (prev.techpack.measurementSizeRange && prev.techpack.measurementSizeRange[0]) ||
+        '';
+      const normalizedMeasurement =
+        baseSize && measurement.baseSize !== baseSize
+          ? { ...measurement, baseSize }
+          : measurement;
       const nextMeasurements = [...prev.techpack.measurements];
       const insertIndex = Math.min(Math.max(index + 1, 0), nextMeasurements.length);
       nextMeasurements.splice(insertIndex, 0, normalizedMeasurement);
@@ -2187,40 +2096,12 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         prev.techpack.measurementBaseSize ||
         (prev.techpack.measurementSizeRange && prev.techpack.measurementSizeRange[0]) ||
         '';
-      
-      // Ensure both tolerance field names are synchronized
-      // UI uses minusTolerance/plusTolerance, backend expects toleranceMinus/tolerancePlus
-      const {
-        minusTolerance,
-        plusTolerance,
-        toleranceMinus,
-        tolerancePlus,
-        ...rest
-      } = measurement;
-      
-      // Prioritize values from UI fields (minusTolerance/plusTolerance), but sync to both
-      // Use explicit check for undefined/null to allow 0 as a valid value
-      const resolvedMinus = 
-        (minusTolerance !== undefined && minusTolerance !== null) ? minusTolerance :
-        (toleranceMinus !== undefined && toleranceMinus !== null) ? toleranceMinus :
-        1.0;
-      const resolvedPlus = 
-        (plusTolerance !== undefined && plusTolerance !== null) ? plusTolerance :
-        (tolerancePlus !== undefined && tolerancePlus !== null) ? tolerancePlus :
-        1.0;
-      
-      const normalizedMeasurement = {
-        ...rest,
-        minusTolerance: resolvedMinus,
-        plusTolerance: resolvedPlus,
-        toleranceMinus: resolvedMinus, // Sync to backend field name
-        tolerancePlus: resolvedPlus,   // Sync to backend field name
-        baseSize: baseSize && measurement.baseSize !== baseSize ? baseSize : measurement.baseSize,
-      };
-      
+      const normalizedMeasurement =
+        baseSize && measurement.baseSize !== baseSize
+          ? { ...measurement, baseSize }
+          : measurement;
       const nextMeasurements = prev.techpack.measurements.map((m, i) => (i === index ? normalizedMeasurement : m));
-      // When updating measurement, force rebuild requested values in sample rounds to sync with new measurement.sizes
-      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements, true);
+      const nextSampleRounds = normalizeSampleRounds(prev.techpack.sampleMeasurementRounds, nextMeasurements);
       return {
         ...prev,
         techpack: {

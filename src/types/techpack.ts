@@ -48,8 +48,8 @@ export interface BomItem {
   part: string;
   materialName: string;
   placement: string;
-  size?: string | null;
-  quantity?: number | null;
+  size: string;
+  quantity?: number; // ✅ FIXED: Quantity is now optional
   uom: 'm' | 'cm' | 'mm' | 'pcs' | 'kg' | 'g' | 'yards' | 'inches';
   supplier: string;
   comments?: string;
@@ -94,7 +94,6 @@ export const getMeasurementUnitSuffix = (unit?: MeasurementUnit | null): string 
 
 export interface MeasurementPoint {
   id: string;
-  clientKey?: string; // Stable UI key for checkbox selection and React keys (frontend-only)
   pomCode: string;
   pomName: string;
   minusTolerance: number; // Changed from string to number (in cm)
@@ -298,7 +297,6 @@ export interface ApiTechPack {
   auditLogs: AuditLogEntry[];
   isDeleted: boolean;
   productClass?: string; // Alias được backend trả về cho category
-  fitType?: 'Regular' | 'Slim' | 'Loose' | 'Relaxed' | 'Oversized';
   metadata?: {
     description?: string;
     category?: string;

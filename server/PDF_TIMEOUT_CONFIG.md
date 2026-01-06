@@ -149,3 +149,7 @@ curl -X GET "http://localhost:4001/api/v1/techpacks/{id}/pdf" \
 
 Nếu thành công, file `test.pdf` sẽ được download.
 
+
+
+
+

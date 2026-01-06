@@ -18,7 +18,7 @@ const idValidation = [
 const bomValidation = [
   body('part').notEmpty().withMessage('Part is required'),
   body('materialName').notEmpty().withMessage('Material name is required'),
-  body('placement').notEmpty().withMessage('Placement is required'),
+  body('placement').optional().isString().withMessage('Placement must be a string'), // ✅ FIXED: Placement is now optional
   body('size').optional().isString().withMessage('Size must be a string'),
   body('quantity').optional().isFloat({ min: 0 }).withMessage('Quantity must be a positive number if provided'),
   body('uom').notEmpty().withMessage('Unit of measure is required'),
@@ -40,6 +40,19 @@ const measurementValidation = [
     .isIn(['mm', 'cm', 'inch-10', 'inch-16', 'inch-32'])
     .withMessage('Unit must be one of mm, cm, inch-10, inch-16, inch-32'),
   body('sizes').isObject().withMessage('Sizes must be an object'),
+  // Validate that all size values are positive numbers (supports any string keys including numeric sizes)
+  body('sizes').custom((sizes) => {
+    if (!sizes || typeof sizes !== 'object') {
+      return false;
+    }
+    for (const [key, value] of Object.entries(sizes)) {
+      if (typeof value !== 'number' || value < 0) {
+        throw new Error(`Size "${key}" must be a positive number`);
+      }
+    }
+    return true;
+  }),
+  // Keep backward compatibility: validate standard sizes if present
   body('sizes.XS').optional().isFloat({ min: 0 }).withMessage('XS size must be positive'),
   body('sizes.S').optional().isFloat({ min: 0 }).withMessage('S size must be positive'),
   body('sizes.M').optional().isFloat({ min: 0 }).withMessage('M size must be positive'),

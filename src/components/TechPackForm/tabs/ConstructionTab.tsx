@@ -130,23 +130,36 @@ const validateConstructionItem = (item: Partial<Construction>, measurements: Mea
   
   // POM Code validation removed - field not visible to user
   
-  // Validate description (instructions)
-  if (schema.description?.required) {
-    const description = item.description || '';
-    const steps = item.steps || [];
-    if (description.trim().length < 10 && steps.length === 0) {
-      errors.description = 'Thêm mô tả chi tiết (ít nhất 1 bước hoặc mô tả 10 ký tự).';
+  // Check if we have image, note, description, or steps - if so, allow saving
+  const hasImage = item.imageUrl && item.imageUrl.trim().length > 0;
+  const hasNote = (item as any).note && (item as any).note.trim().length > 0;
+  const hasDescription = item.description && item.description.trim().length >= 10;
+  const hasSteps = item.steps && item.steps.length > 0;
+  
+  // If we have image, note, description, or steps, skip description/steps validation
+  if (!hasImage && !hasNote && !hasDescription && !hasSteps) {
+    // Validate description (instructions) - only if no image, note, description, or steps
+    if (schema.description?.required) {
+      const description = item.description || '';
+      const steps = item.steps || [];
+      if (description.trim().length < 10 && steps.length === 0) {
+        errors.description = 'Thêm mô tả chi tiết (ít nhất 1 bước hoặc mô tả 10 ký tự).';
+      }
+    }
+    
+    // Validate steps - only if no image, note, description, or steps
+    if (schema.steps?.custom) {
+      const steps = item.steps || [];
+      const description = item.description || '';
+      if (steps.length === 0 && description.trim().length < 10) {
+        errors.steps = 'Thêm ít nhất 1 bước hoặc mô tả chi tiết.';
+      }
     }
   }
   
-  // Validate steps
-  if (schema.steps?.custom) {
-    const steps = item.steps || [];
-    const description = item.description || '';
-    if (steps.length === 0 && description.trim().length < 10) {
-      errors.steps = 'Thêm ít nhất 1 bước hoặc mô tả chi tiết.';
-    }
-    steps.forEach((step, idx) => {
+  // Always validate step content if steps exist
+  if (schema.steps?.custom && item.steps && item.steps.length > 0) {
+    item.steps.forEach((step, idx) => {
       if (!step || step.trim().length === 0) {
         errors[`steps.${idx}`] = `Bước ${idx + 1} không được để trống.`;
       }
@@ -347,10 +360,15 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
       nextValue = value.toString();
     }
 
-    const updatedFormData = { ...formData, [field]: nextValue };
-    setFormData(updatedFormData);
-    validation.validateField(field, value);
-  }, [formData, validation]);
+    setFormData(prevFormData => {
+      const updatedFormData = { ...prevFormData, [field]: nextValue };
+      // Only validate if field exists in validation schema
+      if (howToMeasureValidationSchema[field as string]) {
+        validation.validateField(field, value);
+      }
+      return updatedFormData;
+    });
+  }, [validation]);
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -455,13 +473,16 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
     try {
       // Validate the entire form before submission
       
-      // Skip validation if we have an image - allow saving construction with just an image
+      // Allow saving if we have image, note, description, or steps
       const hasImage = formData.imageUrl && formData.imageUrl.trim().length > 0;
-      const hasContent = (formData.description && formData.description.trim().length >= 10) ||
-                         (formData.steps && formData.steps.length > 0);
+      const hasNote = (formData as any).note && (formData as any).note.trim().length > 0;
+      const hasDescription = formData.description && formData.description.trim().length >= 10;
+      const hasSteps = formData.steps && formData.steps.length > 0;
+      const hasContent = hasDescription || hasSteps;
       
-      if (hasImage && !hasContent) {
-        // Skip validation - has image only
+      // Skip validation if we have image, note, or content - allow saving with any of these
+      if (hasImage || hasNote || hasContent) {
+        // Skip validation - has image, note, or content
       } else {
         const validationResult = validation.validateForm(formData);
         const itemValidation = validateConstructionItem(formData, measurements);
@@ -515,7 +536,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
         tips: formData.tips || [],
         commonMistakes: formData.commonMistakes || [],
         relatedMeasurements: formData.relatedMeasurements || [],
-        note: formData.note || '',
+        note: (formData as any).note || '',
       };
 
       if (editingId) {

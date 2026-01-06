@@ -132,19 +132,19 @@ curl http://localhost:4001/api/v1/techpacks/{techpackId}/pdf
 ### Lỗi: "Failed to launch browser"
 
 1. **Kiểm tra permissions**: Đảm bảo user chạy Node.js có quyền execute Chromium
-   ```bash
+```bash
    ls -la /usr/bin/chromium-browser
-   ```
+```
 
 2. **Kiểm tra CHROME_PATH**: Nếu set `CHROME_PATH`, đảm bảo đường dẫn đúng
-   ```bash
+```bash
    which chromium-browser
    # hoặc
    which chromium
    ```
 
 3. **Test Chromium manually**:
-   ```bash
+```bash
    chromium-browser --version
    # hoặc
    chromium --version

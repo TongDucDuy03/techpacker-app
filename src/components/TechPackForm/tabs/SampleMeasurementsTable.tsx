@@ -8,7 +8,7 @@ import {
 } from '../../../types/techpack';
 import { getMeasurementUnitSuffix, DEFAULT_MEASUREMENT_UNIT, MeasurementUnit } from '../../../types/techpack';
 import { SampleMeasurementRow } from '../../../types/measurements';
-import { parseTolerance, formatToleranceNoUnit, parseMeasurementValue, formatMeasurementValueAsFraction } from './measurementHelpers';
+import { parseTolerance, formatTolerance } from './measurementHelpers';
 
 type EditableSampleField = 'measured' | 'diff' | 'revised' | 'comments';
 
@@ -120,33 +120,23 @@ const getToleranceDisplay = (row: SampleMeasurementRow, tableUnit: MeasurementUn
     return { label: '—' };
   }
 
-  // Priority: UI field names (minusTolerance/plusTolerance) > backend field names (toleranceMinus/tolerancePlus)
-  // Use explicit check for undefined/null to allow 0 as a valid value
-  const minusRaw = row.measurement.minusTolerance ?? (row.measurement as any).toleranceMinus;
-  const plusRaw = row.measurement.plusTolerance ?? (row.measurement as any).tolerancePlus;
-  
-  // Only parse if we have a value, otherwise return undefined to show '—'
-  const minus = (minusRaw !== undefined && minusRaw !== null) ? parseTolerance(minusRaw) : undefined;
-  const plus = (plusRaw !== undefined && plusRaw !== null) ? parseTolerance(plusRaw) : undefined;
-  
-  // If both are undefined, show '—' instead of defaulting to ±1.0
-  if (minus === undefined && plus === undefined) {
-    return { label: '—' };
-  }
-  
-  // If only one is undefined, use the other value for both (symmetric tolerance)
-  const resolvedMinus = minus !== undefined ? minus : (plus !== undefined ? plus : 1.0);
-  const resolvedPlus = plus !== undefined ? plus : (minus !== undefined ? minus : 1.0);
-  
+  const minus = parseTolerance(row.measurement.minusTolerance);
+  const plus = parseTolerance(row.measurement.plusTolerance);
   const unitSuffix = getMeasurementUnitSuffix(tableUnit);
 
-  // Format tolerance without unit for consistent display (keep fraction format for inch units)
-  const toleranceLabel = formatToleranceNoUnit(resolvedMinus, resolvedPlus, tableUnit);
+  if (minus === plus) {
+    return {
+      label: formatTolerance(minus, tableUnit),
+      minus,
+      plus,
+      unitSuffix,
+    };
+  }
 
   return {
-    label: toleranceLabel,
-    minus: resolvedMinus,
-    plus: resolvedPlus,
+      label: `-${minus.toFixed(1)} / +${plus.toFixed(1)}`,
+    minus,
+    plus,
     unitSuffix,
   };
 };
@@ -255,9 +245,9 @@ const getDiffToneClass = (value: string): string => {
             ))}
           </tr>
           <tr>
-            <th key="empty-1" className="sticky left-0 z-30 bg-gray-50 border-t border-r border-gray-200 px-4 py-2" />
-            <th key="empty-2" className="sticky left-[220px] z-30 bg-gray-50 border-t border-r border-gray-200 px-3 py-2" />
-            <th key="empty-3" className="sticky left-[290px] z-30 bg-gray-50 border-t border-r border-gray-200 px-3 py-2" />
+            <th className="sticky left-0 z-30 bg-gray-50 border-t border-r border-gray-200 px-4 py-2" />
+            <th className="sticky left-[220px] z-30 bg-gray-50 border-t border-r border-gray-200 px-3 py-2" />
+            <th className="sticky left-[290px] z-30 bg-gray-50 border-t border-r border-gray-200 px-3 py-2" />
             {sampleRounds.flatMap(round =>
               FIELD_SEQUENCE.map(fieldKey => (
                 <th
@@ -271,19 +261,16 @@ const getDiffToneClass = (value: string): string => {
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-100">
-          {measurementRows.flatMap((row, rowIndex) => {
+          {measurementRows.map((row, rowIndex) => {
             const rawSizeKeys = getSizeKeysForRow(row, sampleRounds, availableSizes, getEntryForRound);
             const sizeKeys = getVisibleSampleSizes(rawSizeKeys, baseSize);
             const tolerance = getToleranceDisplay(row, tableUnit);
             const unitSuffix = getMeasurementUnitSuffix(tableUnit);
             const measurementMethod = row.measurement?.measurementMethod;
             const isEvenRow = rowIndex % 2 === 0;
-            // inch-10 uses decimal input, not fraction
-            const supportsFractionInput = tableUnit === 'inch-16' || tableUnit === 'inch-32';
             const rowBgColor = isEvenRow ? '#ffffff' : '#f9fafb';
 
             return sizeKeys.map((size, index) => {
-              const rowSizeKey = `${row.key}-${size}-${rowIndex}`;
               const entryCells = sampleRounds.flatMap(round => {
                 const entry = getEntryForRound(round, row);
                 const entryId = entry?.id || '';
@@ -291,26 +278,27 @@ const getDiffToneClass = (value: string): string => {
                 return FIELD_SEQUENCE.map(fieldKey => {
                   const cellKey = `${round.id}-${row.key}-${size}-${fieldKey}`;
                   
-                  // ALWAYS use measurement.sizes as source of truth for requested values
-                  // entry.requested is just a snapshot, measurements table is the authoritative source
+                  // Always get the correct requested value for this specific row
                   const measurementRequestedValue = row.measurement?.sizes?.[size];
-                  const requestedValue = measurementRequestedValue !== undefined && measurementRequestedValue !== null
-                    ? String(measurementRequestedValue)
-                    : '';
+                  const entryRequestedValue = entry?.requested?.[size];
+                  const requestedValue =
+                    entryRequestedValue !== undefined &&
+                    entryRequestedValue !== null &&
+                    String(entryRequestedValue).trim() !== ''
+                      ? String(entryRequestedValue)
+                      : measurementRequestedValue !== undefined && measurementRequestedValue !== null
+                        ? String(measurementRequestedValue)
+                        : '';
                   
-                  // For requested field: always use measurement.sizes (source of truth)
+                  // For requested field: prioritize entry.requested overrides, then fall back to measurement.sizes
                   if (fieldKey === 'requested') {
-                    const requestedNumber = requestedValue ? parseFloat(requestedValue) : undefined;
-                    const displayRequested = requestedNumber !== undefined 
-                      ? formatMeasurementValueAsFraction(requestedNumber, tableUnit)
-                      : '—';
                     return (
                       <td
                         key={cellKey}
                         className="border-r border-gray-200 px-2 py-2 align-top text-center text-sm text-gray-900"
                         style={{ backgroundColor: rowBgColor }}
                       >
-                        {displayRequested}
+                        {requestedValue ? requestedValue : '—'}
                       </td>
                     );
                   }
@@ -361,28 +349,23 @@ const getDiffToneClass = (value: string): string => {
                           />
                         ) : (
                           <input
-                            type={supportsFractionInput ? "text" : "number"}
-                            inputMode={supportsFractionInput ? "text" : "decimal"}
-                            step={supportsFractionInput ? undefined : "0.1"}
+                            type="number"
+                            inputMode="decimal"
+                            step="0.1"
                             value=""
-                            onChange={event => {
-                              const rawValue = event.target.value;
-                              // Parse fraction to decimal for storage, but keep original string if parse fails (intermediate input)
-                              const parsedValue = supportsFractionInput && rawValue.trim()
-                                ? (parseMeasurementValue(rawValue) ?? rawValue) // Keep original if parse fails (e.g., "15 1/")
-                                : rawValue;
+                            onChange={event =>
                               onEntrySizeValueChange(
                                 round.id,
                                 '', // entryId rỗng, sẽ tạo entry mới
                                 fieldKey as EditableSampleField,
                                 size,
-                                String(parsedValue),
+                                event.target.value,
                                 row.measurement?.id,
                                 row.pomCode
-                              );
-                            }}
+                              )
+                            }
                             className="w-full min-w-[90px] border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder={supportsFractionInput ? "15 1/4 or 15.25" : "—"}
+                            placeholder="—"
                           />
                         )}
                       </td>
@@ -415,21 +398,11 @@ const getDiffToneClass = (value: string): string => {
                     ? { minus: tolerance.minus, plus: tolerance.plus }
                     : undefined;
 
-                  // ALWAYS use measurement.sizes as source of truth (same as requested field above)
+                  // Get the correct requested value for this row (same logic as requested field)
+                  // Prioritize measurement.sizes first, then entry.requested as fallback
                   const requestedNumber = requestedValue ? parseFloat(requestedValue) : undefined;
-                  // Parse fieldValue - support both decimal string and fraction string
-                  const fieldNumber = fieldValue 
-                    ? (supportsFractionInput ? parseMeasurementValue(fieldValue) : parseFloat(fieldValue))
-                    : undefined;
-                  const measuredNumber = fieldKey === 'measured' && fieldNumber ? fieldNumber : undefined;
-                  const diffNumber = fieldKey === 'diff' && fieldNumber ? fieldNumber : undefined;
-                  
-                  // Format display value (show as fraction if supported)
-                  const displayFieldValue = fieldValue 
-                    ? (supportsFractionInput && fieldNumber !== undefined 
-                        ? formatMeasurementValueAsFraction(fieldNumber, tableUnit)
-                        : fieldValue)
-                    : '';
+                  const measuredNumber = fieldKey === 'measured' && fieldValue ? parseFloat(fieldValue) : undefined;
+                  const diffNumber = fieldKey === 'diff' && fieldValue ? parseFloat(fieldValue) : undefined;
 
                   let outOfTolerance = false;
                   if (toleranceRange) {
@@ -456,28 +429,23 @@ const getDiffToneClass = (value: string): string => {
                       style={outOfTolerance ? undefined : { backgroundColor: rowBgColor }}
                     >
                       <input
-                        type={supportsFractionInput ? "text" : "number"}
-                        inputMode={supportsFractionInput ? "text" : "decimal"}
-                        step={supportsFractionInput ? undefined : "0.1"}
-                        value={displayFieldValue}
-                        onChange={event => {
-                          const rawValue = event.target.value;
-                          // Parse fraction to decimal for storage, but keep original string if parse fails (intermediate input)
-                          const parsedValue = supportsFractionInput && rawValue.trim()
-                            ? (parseMeasurementValue(rawValue) ?? rawValue) // Keep original if parse fails (e.g., "15 1/")
-                            : rawValue;
+                        type="number"
+                        inputMode="decimal"
+                        step="0.1"
+                        value={fieldValue}
+                        onChange={event =>
                           onEntrySizeValueChange(
                             round.id,
                             entryId,
                             fieldKey as EditableSampleField,
                             size,
-                            String(parsedValue),
+                            event.target.value,
                             row.measurement?.id,
                             row.pomCode
-                          );
-                        }}
+                          )
+                        }
                         className={`w-full min-w-[90px] border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${diffToneClass}`}
-                        placeholder={supportsFractionInput ? "15 1/4 or 15.25" : "—"}
+                        placeholder="—"
                       />
                     </td>
                   );
@@ -486,12 +454,11 @@ const getDiffToneClass = (value: string): string => {
 
               return (
                 <tr 
-                  key={`${row.key}-${size}-${rowIndex}-${index}`}
+                  key={`${row.key}-${size}`}
                   style={{ backgroundColor: rowBgColor }}
                 >
                   {index === 0 && (
                     <td
-                      key={`${rowSizeKey}-pom`}
                       rowSpan={sizeKeys.length}
                       className="sticky left-0 border-r border-gray-200 px-4 py-3 align-top z-20 shadow-[4px_0_6px_-4px_rgba(0,0,0,0.1)] min-w-[220px]"
                       style={{ backgroundColor: rowBgColor }}
@@ -507,14 +474,12 @@ const getDiffToneClass = (value: string): string => {
                     </td>
                   )}
                   <td 
-                    key={`${rowSizeKey}-size`}
                     className="sticky left-[220px] border-r border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 z-10 min-w-[70px]"
                     style={{ backgroundColor: rowBgColor }}
                   >
                     {size}
                   </td>
                   <td 
-                    key={`${rowSizeKey}-tolerance`}
                     className="sticky left-[290px] border-r border-gray-200 px-3 py-2 text-xs text-gray-600 z-10 min-w-[100px]"
                     style={{ backgroundColor: rowBgColor }}
                   >

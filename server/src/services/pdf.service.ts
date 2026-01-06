@@ -3,8 +3,7 @@ import path from 'path';
 import ejs from 'ejs';
 import { ITechPack, IBOMItem, IMeasurement, ISampleMeasurementRound, IHowToMeasure, IColorway, IColorwayPart } from '../models/techpack.model';
 import fs from 'fs/promises';
-import { compressImagesBatch } from '../utils/image-compression.util';
-import { formatMeasurementValueAsFraction, formatToleranceAsFraction } from '../utils/measurement-format.util';
+import { compressImageToDataURI, compressImagesBatch } from '../utils/image-compression.util';
 
 type TechPackForPDF = ITechPack | any;
 
@@ -151,6 +150,80 @@ class PDFService {
   }
 
   /**
+   * Optimized image URL preparation with caching
+   * Now returns compressed data URIs for better PDF size
+   * With timeout protection
+   */
+  private async prepareImageUrlCompressed(
+    url?: string, 
+    placeholder?: string,
+    options?: { quality?: number; maxWidth?: number; maxHeight?: number }
+  ): Promise<string> {
+    if (!url || url.trim() === '') {
+      return placeholder || this.getPlaceholderSVG();
+    }
+
+    // Check cache first
+    const cacheKey = `${url}_${options?.quality || 65}_${options?.maxWidth || 1200}`;
+    if (this.imageCache.has(cacheKey)) {
+      return this.imageCache.get(cacheKey)!;
+    }
+
+    const trimmedUrl = url.trim();
+    
+    // If already a data URI, try to compress it
+    if (trimmedUrl.startsWith('data:image/')) {
+      try {
+        const compressed = await compressImageToDataURI(trimmedUrl, {
+          quality: options?.quality || 65,
+          maxWidth: options?.maxWidth || 1200,
+          maxHeight: options?.maxHeight || 800,
+        }, this.IMAGE_COMPRESSION_TIMEOUT);
+        this.imageCache.set(cacheKey, compressed);
+        return compressed;
+      } catch {
+        // If compression fails, return original
+        this.imageCache.set(cacheKey, trimmedUrl);
+        return trimmedUrl;
+      }
+    }
+
+    // For URLs, resolve and compress
+    let resolvedUrl: string;
+    if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
+      resolvedUrl = trimmedUrl;
+    } else {
+      const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const serverUrl = process.env.SERVER_URL || `http://localhost:${process.env.PORT || 4001}`;
+      
+      if (trimmedUrl.startsWith('/uploads/') || trimmedUrl.startsWith('/api/uploads/')) {
+        resolvedUrl = `${serverUrl}${trimmedUrl}`;
+      } else if (trimmedUrl.startsWith('/static/')) {
+        resolvedUrl = `${baseUrl}${trimmedUrl}`;
+      } else if (trimmedUrl.startsWith('/')) {
+        resolvedUrl = `${baseUrl}${trimmedUrl}`;
+      } else {
+        resolvedUrl = `${baseUrl}/${trimmedUrl}`;
+      }
+    }
+
+    // Compress the image with timeout
+    try {
+      const compressed = await compressImageToDataURI(resolvedUrl, {
+        quality: options?.quality || 65,
+        maxWidth: options?.maxWidth || 1200,
+        maxHeight: options?.maxHeight || 800,
+      }, this.IMAGE_COMPRESSION_TIMEOUT);
+      this.imageCache.set(cacheKey, compressed);
+      return compressed;
+    } catch (error) {
+      console.warn(`Image compression failed for ${resolvedUrl?.substring(0, 50)}..., using original URL`);
+      this.imageCache.set(cacheKey, resolvedUrl);
+      return resolvedUrl;
+    }
+  }
+
+  /**
    * Generate placeholder SVG (cached)
    */
   private getPlaceholderSVG(width: number = 260, height: number = 200): string {
@@ -189,51 +262,16 @@ class PDFService {
 
   /**
    * Optimized BOM data preparation with image compression
-   * Maps colorway assignments to BOM items for proper color display
-   * @param hidePrice - If true, hide unitPrice and totalPrice (for Factory role)
    */
   private async prepareBOMDataOptimized(
     bom: IBOMItem[], 
     currency: string,
-    colorways?: any[], // Add colorways parameter to map colors
-    imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number },
-    hidePrice: boolean = false // Hide price for Factory role
+    imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number }
   ): Promise<any[]> {
     if (!bom || bom.length === 0) return [];
     
     console.log(`📋 Processing ${bom.length} BOM items...`);
     const bomByPart: { [key: string]: any[] } = {};
-    
-    // Build a map of bomItemId -> colorway parts for fast lookup
-    // This maps colors assigned via colorways to BOM items
-    const bomItemColorMap = new Map<string, {
-      colorName?: string;
-      hexCode?: string;
-      pantoneCode?: string;
-      colorCode?: string;
-      rgbCode?: string;
-    }>();
-    
-    if (colorways && colorways.length > 0) {
-      colorways.forEach((colorway: any) => {
-        if (colorway.parts && Array.isArray(colorway.parts)) {
-          colorway.parts.forEach((part: any) => {
-            if (part.bomItemId) {
-              // Use the first matching part (or could aggregate if multiple colorways assign to same item)
-              if (!bomItemColorMap.has(part.bomItemId)) {
-                bomItemColorMap.set(part.bomItemId, {
-                  colorName: part.colorName,
-                  hexCode: part.hexCode,
-                  pantoneCode: part.pantoneCode,
-                  colorCode: part.hexCode || part.pantoneCode, // Use hexCode or pantoneCode as colorCode
-                  rgbCode: part.rgbCode,
-                });
-              }
-            }
-          });
-        }
-      });
-    }
     
     // Collect all image URLs for batch compression
     const imageUrls: string[] = [];
@@ -268,24 +306,13 @@ class PDFService {
         bomByPart[partName] = [];
       }
       
-      // Try to get color from colorway assignment first, then fallback to item fields
-      // IBOMItem has _id (MongoDB ObjectId), but may also have id when populated
-      const itemId = (item._id || (item as any).id)?.toString();
-      const colorwayColor = itemId ? bomItemColorMap.get(itemId) : null;
-      
-      // Priority: colorway assignment > item.color/colorCode/pantoneCode
-      const resolvedColorName = colorwayColor?.colorName || item.color;
-      const resolvedHexCode = colorwayColor?.hexCode;
-      const resolvedPantoneCode = colorwayColor?.pantoneCode || item.pantoneCode;
-      const resolvedColorCode = colorwayColor?.colorCode || item.colorCode;
-      
       const colorways: string[] = [];
-      if (resolvedColorName) {
-        const colorText = this.normalizeText(resolvedColorName);
-        if (resolvedColorCode) {
-          colorways.push(`${colorText} (${this.normalizeText(resolvedColorCode)})`);
-        } else if (resolvedPantoneCode) {
-          colorways.push(`${colorText} (Pantone: ${this.normalizeText(resolvedPantoneCode)})`);
+      if (item.color) {
+        const colorText = this.normalizeText(item.color);
+        if (item.colorCode) {
+          colorways.push(`${colorText} (${this.normalizeText(item.colorCode)})`);
+        } else if (item.pantoneCode) {
+          colorways.push(`${colorText} (Pantone: ${this.normalizeText(item.pantoneCode)})`);
         } else {
           colorways.push(colorText);
         }
@@ -295,15 +322,33 @@ class PDFService {
       if (item.size) sizeInfo.push(`Size: ${this.normalizeText(item.size)}`);
       if (item.width) sizeInfo.push(`Width: ${this.normalizeText(item.width)}`);
 
-      // Use compressed image from batch (same approach as Construction)
-      const imageUrl = item.imageUrl
-        ? (imageMap.get(item.imageUrl) || this.getPlaceholderSVG(64, 64))
-        : this.getPlaceholderSVG(64, 64);
+      // Use compressed image if available (with fallback)
+      let imageUrl: string;
+      if (item.imageUrl) {
+        const cached = imageMap.get(item.imageUrl);
+        if (cached) {
+          imageUrl = cached;
+        } else {
+          // Fallback with timeout protection
+          try {
+            imageUrl = await Promise.race([
+              this.prepareImageUrlCompressed(item.imageUrl, this.getPlaceholderSVG(64, 64), imageOptions),
+              new Promise<string>((resolve) => 
+                setTimeout(() => resolve(this.getPlaceholderSVG(64, 64)), this.IMAGE_COMPRESSION_TIMEOUT)
+              ),
+            ]);
+          } catch {
+            imageUrl = this.getPlaceholderSVG(64, 64);
+          }
+        }
+      } else {
+        imageUrl = this.getPlaceholderSVG(64, 64);
+      }
 
-      // Extract hexCode: prioritize colorway assignment, then try to parse from colorCode
-      let hexCode: string | undefined = resolvedHexCode;
-      if (!hexCode && resolvedColorCode) {
-        const colorCodeStr = String(resolvedColorCode).trim();
+      // Extract hexCode from colorCode if it's a hex color (starts with #)
+      let hexCode: string | undefined;
+      if (item.colorCode) {
+        const colorCodeStr = String(item.colorCode).trim();
         if (colorCodeStr.startsWith('#') && (colorCodeStr.length === 4 || colorCodeStr.length === 7)) {
           hexCode = colorCodeStr;
         }
@@ -314,19 +359,18 @@ class PDFService {
         imageUrl,
         placement: this.normalizeText(item.placement),
         sizeWidthUsage: sizeInfo.length > 0 ? sizeInfo.join(' / ') : '—',
-        quantity: item.quantity !== undefined && item.quantity !== null ? item.quantity : 0, // PDF template expects number, will display '—' if 0
+        quantity: item.quantity || 0,
         uom: this.normalizeText(item.uom),
         supplier: this.normalizeText(item.supplier),
-        unitPrice: hidePrice ? '—' : (item.unitPrice ? `${item.unitPrice} ${currency}` : '—'),
-        totalPrice: hidePrice ? '—' : (item.totalPrice ? `${item.totalPrice} ${currency}` : '—'),
+        unitPrice: item.unitPrice ? `${item.unitPrice} ${currency}` : '—',
+        totalPrice: item.totalPrice ? `${item.totalPrice} ${currency}` : '—',
         comments: this.normalizeText(item.comments),
         colorways,
-        // Add color fields for template compatibility - prioritize colorway assignments
-        color: resolvedColorName ? this.normalizeText(resolvedColorName) : undefined,
+        // Add color fields for template compatibility
+        color: item.color ? this.normalizeText(item.color) : undefined,
         hexCode: hexCode,
-        colorCode: resolvedColorCode ? this.normalizeText(resolvedColorCode) : (hexCode || (resolvedPantoneCode ? this.normalizeText(resolvedPantoneCode) : undefined)),
-        pantone: resolvedPantoneCode ? this.normalizeText(resolvedPantoneCode) : undefined,
-        pantoneCode: resolvedPantoneCode ? this.normalizeText(resolvedPantoneCode) : undefined,
+        pantone: item.pantoneCode ? this.normalizeText(item.pantoneCode) : undefined,
+        pantoneCode: item.pantoneCode ? this.normalizeText(item.pantoneCode) : undefined,
         materialCode: item.materialCode ? this.normalizeText(item.materialCode) : undefined,
         size: item.size ? this.normalizeText(item.size) : undefined,
         part: item.part ? this.normalizeText(item.part) : undefined,
@@ -347,38 +391,23 @@ class PDFService {
     console.log('📏 Processing measurements...');
     const sizeRange = techpack.measurementSizeRange || ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
     const baseSize = techpack.measurementBaseSize || sizeRange[0] || 'M';
-    const tableUnit = techpack.measurementUnit || 'cm';
     
     const rows = (techpack.measurements || []).map((measurement: IMeasurement) => {
-      const unit = measurement.unit || tableUnit;
-      const minusTol = measurement.toleranceMinus ?? 0;
-      const plusTol = measurement.tolerancePlus ?? 0;
-      
-      const toleranceFormatted = formatToleranceAsFraction(minusTol, plusTol, unit as any);
-      
       const row: any = {
         pomCode: measurement.pomCode || '—',
         pomName: measurement.pomName || '—',
         measurementType: measurement.measurementType || '—',
         category: measurement.category || '—',
-        minusTolerance: minusTol,
-        plusTolerance: plusTol,
-        minusToleranceFormatted: toleranceFormatted.minus,
-        plusToleranceFormatted: toleranceFormatted.plus,
+        minusTolerance: measurement.toleranceMinus || 0,
+        plusTolerance: measurement.tolerancePlus || 0,
         notes: measurement.notes || '—',
         critical: measurement.critical || false,
-        unit: unit,
+        unit: measurement.unit || 'cm',
         sizes: {},
       };
 
       sizeRange.forEach((size: string) => {
-        const sizeValue = measurement.sizes?.[size];
-        if (sizeValue !== undefined && sizeValue !== null && typeof sizeValue === 'number') {
-          // Format as fraction if unit is inch
-          row.sizes[size] = formatMeasurementValueAsFraction(sizeValue, unit as any);
-        } else {
-          row.sizes[size] = '—';
-        }
+        row.sizes[size] = measurement.sizes?.[size] || '—';
       });
 
       return row;
@@ -390,7 +419,6 @@ class PDFService {
       baseSize,
       baseHighlightColor: techpack.measurementBaseHighlightColor || '#dbeafe',
       rowStripeColor: techpack.measurementRowStripeColor || '#f3f4f6',
-      unit: tableUnit,
     };
   }
 
@@ -642,12 +670,10 @@ class PDFService {
 
   /**
    * Prepare techpack data with parallel processing and image compression
-   * @param hidePrice - If true, hide unitPrice and totalPrice (for Factory role)
    */
   private async prepareTechPackDataAsync(
     techpack: TechPackForPDF,
-    imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number },
-    hidePrice: boolean = false // Hide price for Factory role
+    imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number }
   ): Promise<any> {
     console.log('📦 Starting ASYNC data preparation with image compression...');
     const startTime = Date.now();
@@ -657,7 +683,11 @@ class PDFService {
     const imageMaxWidth = imageOptions?.maxWidth || 1200;
     const imageMaxHeight = imageOptions?.maxHeight || 800;
     
-    const technicalDesignerName = techpack.technicalDesignerId || '—';
+    const technicalDesignerName = 
+      (techpack.technicalDesignerId as any)?.firstName && 
+      (techpack.technicalDesignerId as any)?.lastName
+        ? `${(techpack.technicalDesignerId as any).firstName} ${(techpack.technicalDesignerId as any).lastName}`
+        : '—';
 
     const articleSummary = {
       generalInfo: {
@@ -674,7 +704,7 @@ class PDFService {
         retailPrice: techpack.retailPrice ? `${techpack.retailPrice} ${currency}` : '—',
       },
       technicalInfo: {
-        fitType: techpack.fitType || '—',
+        fitType: '—',
         productClass: techpack.category || '—',
         supplier: techpack.supplier || '—',
         technicalDesignerId: technicalDesignerName,
@@ -697,64 +727,38 @@ class PDFService {
       },
     };
 
-    // Compress main images (logo, cover, design sketch) using batch compression
-    // ✅ UNIFIED: Same approach as Construction - collect URLs and use compressImagesBatch()
+    // Compress main images (logo and cover) first with timeout protection
     console.log('🖼️  Compressing main images (logo, cover, design sketch)...');
+    // ✅ FIX: compressedCover và compressedDesignSketch đều dùng designSketchUrl (cover = design sketch trong model này)
+    // Nếu có coverImageUrl riêng thì dùng, không thì dùng designSketchUrl cho cả 2
     const coverImageUrl = (techpack as any).coverImageUrl || techpack.designSketchUrl;
-    
-    // Collect all Article image URLs
-    const articleImageUrls: Array<{ url: string; type: 'logo' | 'cover' | 'designSketch'; width?: number; height?: number }> = [];
-    if (techpack.companyLogoUrl) {
-      articleImageUrls.push({ url: techpack.companyLogoUrl, type: 'logo', width: 400, height: 200 });
-    }
-    if (coverImageUrl) {
-      articleImageUrls.push({ url: coverImageUrl, type: 'cover', width: imageMaxWidth, height: imageMaxHeight });
-    }
-    if (techpack.designSketchUrl) {
-      articleImageUrls.push({ url: techpack.designSketchUrl, type: 'designSketch', width: imageMaxWidth, height: imageMaxHeight });
-    }
-    
-    // Compress all images in batch (same as Construction)
-    const articleImageUrlStrings = articleImageUrls.map(item => item.url);
-    let articleImageMap = new Map<string, string>();
-    
-    if (articleImageUrlStrings.length > 0) {
-      // Use default options for batch (logo will be resized by sharp based on actual dimensions)
-      const compressedArticleImages = await compressImagesBatch(articleImageUrlStrings, {
+    const [compressedLogo, compressedCover, compressedDesignSketch] = await Promise.allSettled([
+      this.prepareImageUrlCompressed(techpack.companyLogoUrl, undefined, {
         quality: imageQuality,
-        maxWidth: imageMaxWidth, // Will be applied, sharp will resize logo appropriately
+        maxWidth: 400, // Logo is smaller
+        maxHeight: 200,
+      }).catch(() => this.getPlaceholderSVG(400, 200)),
+      this.prepareImageUrlCompressed(coverImageUrl, undefined, {
+        quality: imageQuality,
+        maxWidth: imageMaxWidth,
         maxHeight: imageMaxHeight,
-      }, this.MAX_IMAGES_PARALLEL, this.IMAGE_COMPRESSION_TIMEOUT);
-      
-      articleImageUrlStrings.forEach((url, i) => {
-        articleImageMap.set(url, compressedArticleImages[i]);
-      });
-    }
-    
-    // Extract compressed images by type
-    const compressedLogo = techpack.companyLogoUrl 
-      ? (articleImageMap.get(techpack.companyLogoUrl) || this.getPlaceholderSVG(400, 200))
-      : this.getPlaceholderSVG(400, 200);
-    const compressedCover = coverImageUrl
-      ? (articleImageMap.get(coverImageUrl) || this.getPlaceholderSVG())
-      : this.getPlaceholderSVG();
-    const compressedDesignSketch = techpack.designSketchUrl
-      ? (articleImageMap.get(techpack.designSketchUrl) || this.getPlaceholderSVG())
-      : this.getPlaceholderSVG();
+      }).catch(() => this.getPlaceholderSVG()),
+      this.prepareImageUrlCompressed(techpack.designSketchUrl, undefined, {
+        quality: imageQuality,
+        maxWidth: imageMaxWidth,
+        maxHeight: imageMaxHeight,
+      }).catch(() => this.getPlaceholderSVG()),
+    ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : this.getPlaceholderSVG()));
 
     console.log('🚀 Processing data in parallel with image compression...');
     const parallelStart = Date.now();
     
-    // Prepare BOM with raw colorways data for mapping colors
-    // We pass raw colorways (not prepared) to access bomItemId mapping
-    const rawColorways = techpack.colorways || [];
-    
-    const [bomParts, measurementData, sampleRounds, howToMeasures, preparedColorways] = await Promise.all([
-      this.prepareBOMDataOptimized(techpack.bom || [], currency, rawColorways, {
+    const [bomParts, measurementData, sampleRounds, howToMeasures, colorways] = await Promise.all([
+      this.prepareBOMDataOptimized(techpack.bom || [], currency, {
         quality: imageQuality,
         maxWidth: 800, // Smaller for BOM thumbnails
         maxHeight: 600,
-      }, hidePrice),
+      }),
       Promise.resolve(this.prepareMeasurementsOptimized(techpack)),
       Promise.resolve(this.prepareSampleRoundsOptimized(techpack)),
       this.prepareHowToMeasureOptimized(techpack, {
@@ -813,7 +817,7 @@ class PDFService {
         category: techpack.category || '—',
         productClass: techpack.category || '—',
         gender: techpack.gender || '—',
-        fitType: techpack.fitType || '—',
+        fitType: '—',
         collectionName: techpack.collectionName || '—',
         supplier: techpack.supplier || '—',
         updatedAt: this.formatDate(techpack.updatedAt),
@@ -835,7 +839,6 @@ class PDFService {
       images: {
         companyLogo: compressedLogo,
         coverImage: compressedCover,
-        designSketch: compressedDesignSketch, // Add design sketch for Article Information section
       },
       articleSummary,
       bom: {
@@ -849,7 +852,7 @@ class PDFService {
       measurements: measurementData,
       sampleMeasurementRounds: sampleRounds,
       howToMeasures,
-      colorways: preparedColorways,
+      colorways,
       packingNotes: techpack.packingNotes || '—',
       revisionHistory: [],
       summary,
@@ -948,9 +951,8 @@ class PDFService {
   /**
    * Generate PDF with full async optimization
    * Each export uses isolated incognito context and page
-   * @param userRole - Optional user role to determine if price should be hidden (for Factory role)
    */
-  async generatePDF(techpack: TechPackForPDF, options: PDFOptions = {}, userRole?: string): Promise<PDFGenerationResult> {
+  async generatePDF(techpack: TechPackForPDF, options: PDFOptions = {}): Promise<PDFGenerationResult> {
     if (this.activeGenerations >= this.maxConcurrent) {
       throw new Error('Maximum concurrent PDF generations reached. Please try again later.');
     }
@@ -1089,14 +1091,10 @@ class PDFService {
         maxHeight: options.imageMaxHeight || 800,
       };
 
-      // Determine if price should be hidden (for Factory role)
-      // userRole can be TechPackRole (from sharedWith) or UserRole (system role)
-      const hidePrice = userRole === 'factory' || userRole === 'Factory';
-      
       // PARALLEL: Prepare data AND fetch revisions at the same time
       console.log('🔄 Running parallel operations...');
       const [templateData, revisionHistory] = await Promise.all([
-        this.prepareTechPackDataAsync(techpack, imageOptions, hidePrice),
+        this.prepareTechPackDataAsync(techpack, imageOptions),
         this.fetchRevisionHistoryAsync(techpack._id)
       ]);
       

@@ -1405,8 +1405,8 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
           </div>
 
           <div className="flex items-center space-x-3">
-            {/* Template Buttons */}
-            <div className="flex items-center space-x-2">
+            {/* Template Buttons - HIDDEN */}
+            {/* <div className="flex items-center space-x-2">
               <button
                 onClick={() => handleAddTemplate('shirt')}
                 className="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -1421,10 +1421,10 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                 <Package className="w-3 h-3 mr-1 inline" />
                 Pants Template
               </button>
-            </div>
+            </div> */}
 
-            {/* Import/Export */}
-            <div className="relative">
+            {/* Import/Export - HIDDEN */}
+            {/* <div className="relative">
               <input
                 type="file"
                 accept=".csv"
@@ -1458,7 +1458,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             >
               <Download className="w-3 h-3 mr-1" />
               Sample
-            </button>
+            </button> */}
 
             {/* Add Button */}
             <button

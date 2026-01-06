@@ -14,8 +14,8 @@ export interface IBOMItem {
   materialName: string;
   materialCode?: string;
   placement: string;
-  size?: string | null;
-  quantity?: number | null;
+  size: string;
+  quantity: number;
   uom: string;
   supplier: string;
   supplierCode?: string;
@@ -83,6 +83,7 @@ export interface ISampleMeasurementRound {
   name: string;
   order?: number;
   measurementDate?: Date;
+  reviewer?: string;
   createdBy?: Types.ObjectId;
   createdAt?: Date;
   updatedAt?: Date;
@@ -173,7 +174,7 @@ export interface ITechPack extends Document {
   articleName: string; // Renamed from productName
   articleCode: string;
   sampleType: string; // Renamed from version
-  technicalDesignerId: string;
+  technicalDesignerId: Types.ObjectId;
   customerId?: string;
   supplier: string;
   season: string;
@@ -185,7 +186,6 @@ export interface ITechPack extends Document {
   lifecycleStage?: 'Concept' | 'Design' | 'Development' | 'Pre-production' | 'Production' | 'Shipped';
   category?: string;
   gender?: 'Men' | 'Women' | 'Unisex' | 'Kids';
-  fitType?: 'Regular' | 'Slim' | 'Loose' | 'Relaxed' | 'Oversized';
   brand?: string;
   collectionName?: string;
   targetMarket?: string;
@@ -219,9 +219,9 @@ const BOMItemSchema = new Schema<IBOMItem>({
   part: { type: String, required: true },
   materialName: { type: String, required: true },
   materialCode: { type: String },
-  placement: { type: String, required: true },
-  size: { type: String, required: false },
-  quantity: { type: Number, required: false, min: 0 },
+  placement: { type: String, required: false }, // ✅ FIXED: Placement is now optional
+  size: { type: String, required: false }, // ✅ FIXED: Size is now optional
+  quantity: { type: Number, required: false, min: 0 }, // ✅ FIXED: Quantity is now optional
   uom: { type: String, required: true },
   supplier: { type: String, required: true },
   supplierCode: { type: String },
@@ -252,13 +252,10 @@ const MeasurementSchema = new Schema<IMeasurement>({
   tolerancePlus: { type: Number, required: true },
   unit: { type: String, enum: ['mm', 'cm', 'inch-10', 'inch-16', 'inch-32'], default: 'cm' },
   sizes: {
-    XS: { type: Number },
-    S: { type: Number },
-    M: { type: Number },
-    L: { type: Number },
-    XL: { type: Number },
-    XXL: { type: Number },
-    XXXL: { type: Number }
+    type: Schema.Types.Mixed,
+    default: {},
+    // Support both standard sizes (XS, S, M, L, XL, XXL, XXXL) and custom/numeric sizes
+    // This allows any string key with number values
   },
   notes: { type: String },
   critical: { type: Boolean, default: false },
@@ -272,17 +269,19 @@ const SampleMeasurementEntrySchema = new Schema<ISampleMeasurementEntry>({
   pomName: { type: String, required: true },
   toleranceMinus: { type: Number },
   tolerancePlus: { type: Number },
-  requested: { type: Map, of: String, default: {} },
-  measured: { type: Map, of: String, default: {} },
-  diff: { type: Map, of: String, default: {} },
-  revised: { type: Map, of: String, default: {} },
-  comments: { type: Map, of: String, default: {} }
+  // Use Mixed type instead of Map to support any string keys (including numeric sizes)
+  requested: { type: Schema.Types.Mixed, default: {} },
+  measured: { type: Schema.Types.Mixed, default: {} },
+  diff: { type: Schema.Types.Mixed, default: {} },
+  revised: { type: Schema.Types.Mixed, default: {} },
+  comments: { type: Schema.Types.Mixed, default: {} }
 });
 
 const SampleMeasurementRoundSchema = new Schema<ISampleMeasurementRound>({
   name: { type: String, required: true },
   order: { type: Number, default: 1 },
   measurementDate: { type: Date },
+  reviewer: { type: String, default: '' },
   createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
   requestedSource: { type: String, enum: ['original', 'previous'], default: 'original' },
   overallComments: { type: String },
@@ -379,9 +378,9 @@ const TechPackSchema = new Schema<ITechPack>(
       maxlength: 120
     },
     technicalDesignerId: {
-      type: String,
-      required: [true, 'Technical designer is required'],
-      trim: true
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
     },
     customerId: { type: String, trim: true },
     sharedWith: [SharedAccessSchema],
@@ -426,7 +425,6 @@ const TechPackSchema = new Schema<ITechPack>(
     lifecycleStage: { type: String, enum: ['Concept', 'Design', 'Development', 'Pre-production', 'Production', 'Shipped'] },
     category: { type: String, trim: true },
     gender: { type: String, enum: ['Men', 'Women', 'Unisex', 'Kids'] },
-    fitType: { type: String, enum: ['Regular', 'Slim', 'Loose', 'Relaxed', 'Oversized'], trim: true },
     brand: { type: String, trim: true },
     collectionName: { type: String, trim: true },
     targetMarket: { type: String, trim: true },
