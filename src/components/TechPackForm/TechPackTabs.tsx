@@ -229,7 +229,37 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
               totalPrice: item.totalPrice,
             }))
           : [],
-        measurements: (initialTechPack as any).measurements || [],
+        measurements: Array.isArray((initialTechPack as any).measurements)
+          ? ((initialTechPack as any).measurements || []).map((measurement: any) => {
+              // Map toleranceMinus/tolerancePlus back to minusTolerance/plusTolerance
+              const {
+                toleranceMinus,
+                tolerancePlus,
+                minusTolerance,
+                plusTolerance,
+                ...rest
+              } = measurement || {};
+              
+              // Resolve tolerance: prefer toleranceMinus/tolerancePlus (from API) over minusTolerance/plusTolerance
+              // Default to 1.0 if not provided (not 0, as 0 would be falsy and cause issues)
+              const resolvedMinus = toleranceMinus !== undefined && toleranceMinus !== null 
+                ? (typeof toleranceMinus === 'string' ? parseFloat(toleranceMinus) : toleranceMinus)
+                : (minusTolerance !== undefined && minusTolerance !== null
+                  ? (typeof minusTolerance === 'string' ? parseFloat(minusTolerance) : minusTolerance)
+                  : 1.0);
+              const resolvedPlus = tolerancePlus !== undefined && tolerancePlus !== null
+                ? (typeof tolerancePlus === 'string' ? parseFloat(tolerancePlus) : tolerancePlus)
+                : (plusTolerance !== undefined && plusTolerance !== null
+                  ? (typeof plusTolerance === 'string' ? parseFloat(plusTolerance) : plusTolerance)
+                  : 1.0);
+              
+              return {
+                ...rest,
+                minusTolerance: resolvedMinus,
+                plusTolerance: resolvedPlus,
+              };
+            })
+          : [],
         // ✅ FIXED: Sample rounds will be normalized by updateFormState -> normalizeSampleRounds
         // But we need to ensure date and reviewer are mapped correctly from API
         sampleMeasurementRounds: Array.isArray((initialTechPack as any).sampleMeasurementRounds)
@@ -454,6 +484,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       const { validateMeasurementsForSave } = await import('./tabs/MeasurementTab');
       const measurementsValidation = validateMeasurementsForSave(techpack.measurements, {
         defaultBaseSize: techpack.measurementBaseSize,
+        t,
       });
       
       if (!measurementsValidation.isValid) {

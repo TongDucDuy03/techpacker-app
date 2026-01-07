@@ -717,8 +717,17 @@ const buildMeasurementPayloads = (techpackData: TechPackFormState['techpack']) =
       ...rest
     } = measurement || {};
 
-    const resolvedMinus = toleranceMinus ?? minusTolerance ?? 0;
-    const resolvedPlus = tolerancePlus ?? plusTolerance ?? 0;
+    // Preserve tolerance values, default to 1.0 if not provided (not 0, as 0 would cause issues)
+    const resolvedMinus = toleranceMinus !== undefined && toleranceMinus !== null
+      ? toleranceMinus
+      : (minusTolerance !== undefined && minusTolerance !== null
+        ? minusTolerance
+        : 1.0);
+    const resolvedPlus = tolerancePlus !== undefined && tolerancePlus !== null
+      ? tolerancePlus
+      : (plusTolerance !== undefined && plusTolerance !== null
+        ? plusTolerance
+        : 1.0);
     const resolvedUnit = (measurement?.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT;
 
     return {
@@ -942,7 +951,37 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
           totalPrice: item.totalPrice,
         }))
       : [],
-    measurements: (apiTechPack as any).measurements || [],
+    measurements: Array.isArray((apiTechPack as any).measurements)
+      ? ((apiTechPack as any).measurements || []).map((measurement: any) => {
+          // Map toleranceMinus/tolerancePlus back to minusTolerance/plusTolerance
+          const {
+            toleranceMinus,
+            tolerancePlus,
+            minusTolerance,
+            plusTolerance,
+            ...rest
+          } = measurement || {};
+          
+          // Resolve tolerance: prefer toleranceMinus/tolerancePlus (from API) over minusTolerance/plusTolerance
+          // Default to 1.0 if not provided (not 0, as 0 would be falsy and cause issues)
+          const resolvedMinus = toleranceMinus !== undefined && toleranceMinus !== null 
+            ? (typeof toleranceMinus === 'string' ? parseFloat(toleranceMinus) : toleranceMinus)
+            : (minusTolerance !== undefined && minusTolerance !== null
+              ? (typeof minusTolerance === 'string' ? parseFloat(minusTolerance) : minusTolerance)
+              : 1.0);
+          const resolvedPlus = tolerancePlus !== undefined && tolerancePlus !== null
+            ? (typeof tolerancePlus === 'string' ? parseFloat(tolerancePlus) : tolerancePlus)
+            : (plusTolerance !== undefined && plusTolerance !== null
+              ? (typeof plusTolerance === 'string' ? parseFloat(plusTolerance) : plusTolerance)
+              : 1.0);
+          
+          return {
+            ...rest,
+            minusTolerance: resolvedMinus,
+            plusTolerance: resolvedPlus,
+          };
+        })
+      : [],
     sampleMeasurementRounds: Array.isArray((apiTechPack as any).sampleMeasurementRounds)
       ? ((apiTechPack as any).sampleMeasurementRounds || []).map((round: any) => normalizeSampleRound(round)) // ✅ FIXED: Normalize sample rounds to ensure date and reviewer are mapped correctly
       : [],

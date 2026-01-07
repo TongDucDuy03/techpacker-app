@@ -14,11 +14,11 @@ import { useFormValidation } from '../../../hooks/useFormValidation';
 import { measurementValidationSchema } from '../../../utils/validationSchemas';
 import Input from '../shared/Input';
 import Select from '../shared/Select';
-import { Plus, Upload, Download, Ruler, AlertTriangle, Info, AlertCircle, X, Save, CheckCircle, Copy } from 'lucide-react';
+import { Plus, AlertTriangle, AlertCircle, X, Save } from 'lucide-react';
 import { showSuccess, showWarning, showError } from '../../../lib/toast';
 import SampleMeasurementsTable from './SampleMeasurementsTable';
 import { SampleMeasurementRow } from '../../../types/measurements';
-import { parseTolerance, formatTolerance, parseStepValue, formatStepValue, formatMeasurementValue } from './measurementHelpers';
+import { parseTolerance, formatTolerance, parseStepValue, formatStepValue, formatMeasurementValue, parseMeasurementValue, formatMeasurementValueAsFraction, formatMeasurementValueNoRound, formatStepValueNoRound } from './measurementHelpers';
 import { MEASUREMENT_UNITS, DEFAULT_MEASUREMENT_UNIT, MeasurementUnit, getMeasurementUnitSuffix } from '../../../types/techpack';
 import { SIZE_PRESET_OPTIONS, getPresetById } from '../../../constants/sizePresets';
 import ConfirmationDialog from '../../ConfirmationDialog';
@@ -153,6 +153,11 @@ const MeasurementTab: React.FC = () => {
     isActive: true,
   });
   const [sizeAdjustments, setSizeAdjustments] = useState<Record<string, string>>({});
+  // Store raw input strings to preserve original format (fractions, mixed numbers, decimals)
+  const [baseValueRaw, setBaseValueRaw] = useState<string>('');
+  const [sizeValuesRaw, setSizeValuesRaw] = useState<Record<string, string>>({});
+  const [minusToleranceRaw, setMinusToleranceRaw] = useState<string>('');
+  const [plusToleranceRaw, setPlusToleranceRaw] = useState<string>('');
   const [newSizeLabel, setNewSizeLabel] = useState('');
   const [pendingPresetId, setPendingPresetId] = useState(() => SIZE_PRESET_OPTIONS[0]?.id || 'standard_us_alpha');
   const [baseSizeSelectorValue, setBaseSizeSelectorValue] = useState('');
@@ -249,12 +254,13 @@ const MeasurementTab: React.FC = () => {
       const base = sizes[baseSize];
       const entries = Object.entries(sizes).reduce<Record<string, string>>((acc, [size, value]) => {
         if (size === baseSize || value === undefined || value === null) return acc;
-        acc[size] = formatStepValue(value - base);
+        // Use formatStepValue with unit to format correctly (fraction for inch-16/32, decimal for others)
+        acc[size] = formatStepValue(value - base, tableUnit);
         return acc;
       }, {});
       return entries;
     },
-    []
+    [tableUnit]
   );
 
   const recalcSizesFromBase = useCallback(
@@ -276,7 +282,8 @@ const MeasurementTab: React.FC = () => {
         if (size === activeBaseSize) return;
         const delta = parseStepValue(adjustments[size]);
         if (delta === undefined) return;
-        nextSizes[size] = parseFloat((nextBaseValue + delta).toFixed(4));
+        // Don't round - preserve precision
+        nextSizes[size] = nextBaseValue + delta;
       });
 
       return nextSizes;
@@ -627,13 +634,35 @@ type RoundModalFormState = {
       const nextMap: MeasurementSampleValueMap = { ...existingMap };
       const normalizedValue =
         field === 'comments' ? rawValue : rawValue.replace(',', '.');
-      const shouldDelete = normalizedValue.trim().length === 0;
-      const storedValue = field === 'comments' ? normalizedValue : normalizedValue.trim();
+      
+      // For measured/revised, DO NOT trim to preserve intermediate typing states (e.g., "1.", "-", ".")
+      // This allows users to type decimals naturally without being blocked
+      const trimmedForDeleteCheck = normalizedValue.trim();
+      const shouldDelete = trimmedForDeleteCheck.length === 0;
+      
+      // Store value: preserve all input for measured/revised (including intermediate states like "1.", "-", ".")
+      // Only trim when it's comments or diff field
+      const storedValue = field === 'comments' 
+        ? normalizedValue 
+        : (field === 'measured' || field === 'revised'
+          ? normalizedValue // DO NOT trim - preserve all input including intermediate states
+          : normalizedValue.trim()); // Trim only for diff field
 
       if (shouldDelete) {
         delete nextMap[sizeKey];
       } else {
-        nextMap[sizeKey] = storedValue;
+        // For diff field, parse fraction to decimal for storage to ensure consistency
+        // For measured/revised, preserve original format (fraction or decimal)
+        if (field === 'diff') {
+          const parsedValue = parseMeasurementValue(storedValue);
+          if (parsedValue !== undefined && !Number.isNaN(parsedValue)) {
+            nextMap[sizeKey] = String(parsedValue);
+          } else {
+            nextMap[sizeKey] = storedValue;
+          }
+        } else {
+          nextMap[sizeKey] = storedValue;
+        }
       }
 
       const payload: Partial<MeasurementSampleEntry> = {
@@ -641,15 +670,19 @@ type RoundModalFormState = {
       } as Partial<MeasurementSampleEntry>;
 
       if (field === 'measured') {
-        const measuredNumber = parseFloat(storedValue);
+        // Parse values for calculation, but preserve original format when storing
+        const measuredNumber = parseMeasurementValue(storedValue);
         const requestedNumber =
           requestedValue !== undefined && requestedValue !== ''
-            ? parseFloat(String(requestedValue).replace(',', '.'))
+            ? parseMeasurementValue(String(requestedValue).replace(',', '.'))
             : undefined;
 
-        if (!Number.isNaN(measuredNumber) && requestedNumber !== undefined && !Number.isNaN(requestedNumber)) {
+        if (measuredNumber !== undefined && requestedNumber !== undefined) {
           const nextDiff = { ...(entry.diff || {}) };
-          nextDiff[sizeKey] = (measuredNumber - requestedNumber).toFixed(1);
+          // Calculate difference but preserve precision - don't round
+          const diffValue = measuredNumber - requestedNumber;
+          // Store as string without rounding to preserve precision
+          nextDiff[sizeKey] = String(diffValue);
           payload.diff = nextDiff;
         } else if (entry.diff?.[sizeKey]) {
           const nextDiff = { ...(entry.diff || {}) };
@@ -728,8 +761,9 @@ type RoundModalFormState = {
               
               // Chỉ cập nhật nếu revised có giá trị (không null, undefined, hoặc chuỗi rỗng)
               if (revisedValue !== null && revisedValue !== undefined && String(revisedValue).trim() !== '') {
-                const numValue = parseFloat(String(revisedValue));
-                if (!isNaN(numValue)) {
+                // Parse but preserve precision - don't round
+                const numValue = parseMeasurementValue(String(revisedValue));
+                if (numValue !== undefined) {
                   console.log(`    ✅ Updating size ${sizeKey}: ${measurement.sizes?.[sizeKey]} → ${numValue}`);
                   updatedSizes[sizeKey] = numValue;
                   hasRevised = true;
@@ -753,20 +787,21 @@ type RoundModalFormState = {
       console.log('📊 Has updates:', hasUpdates);
       console.log('📊 Updated measurements:', updatedMeasurements);
       
-      // Nếu có cập nhật measurements, cập nhật từng measurement VÀ tính lại sizes khác
+      // ✅ FIXED: Nếu có cập nhật measurements, merge và tính lại sizes trước khi lưu
       if (hasUpdates && updateMeasurement) {
-        // Cập nhật đồng bộ từng measurement
-        for (let i = 0; i < updatedMeasurements.length; i++) {
+        // Tạo final measurements với merged sizes để đảm bảo được lưu đúng
+        const finalUpdatedMeasurements = updatedMeasurements.map((updatedMeasurement, i) => {
           const oldMeasurement = measurements[i];
-          const updatedMeasurement = updatedMeasurements[i];
-          const oldSizes = oldMeasurement?.sizes || {};
-          const newSizes = updatedMeasurement?.sizes || {};
+          if (!oldMeasurement) return updatedMeasurement;
+          
+          const oldSizes = oldMeasurement.sizes || {};
+          const newSizes = updatedMeasurement.sizes || {};
           
           // Kiểm tra xem sizes có thay đổi không
           const sizesChanged = JSON.stringify(oldSizes) !== JSON.stringify(newSizes);
           
           if (sizesChanged) {
-            console.log(`🔄 Updating measurement ${i}:`, {
+            console.log(`🔄 Processing measurement ${i} for save:`, {
               pomCode: updatedMeasurement.pomCode,
               old: oldSizes,
               new: newSizes
@@ -781,7 +816,6 @@ type RoundModalFormState = {
               console.log(`  📐 Base size: ${baseSize}, Adjustments:`, adjustments);
               
               // ✅ FIXED: Merge recalculated sizes with existing sizes to preserve non-standard sizes
-              // This ensures sizes like EU numeric (36, 38, 40, etc.) are not lost during updates
               const mergedSizes = mergeRecalculatedSizes(
                 oldSizes, // Preserve all existing sizes
                 baseSize,
@@ -791,7 +825,6 @@ type RoundModalFormState = {
               );
               
               // ✅ FIXED: Also preserve any sizes from newSizes that are not in selectedSizes
-              // This ensures newly added sizes with data are preserved
               Object.keys(newSizes).forEach(size => {
                 if (!selectedSizes.includes(size) && newSizes[size] !== undefined) {
                   mergedSizes[size] = newSizes[size];
@@ -800,28 +833,87 @@ type RoundModalFormState = {
               
               console.log(`  ✨ Merged sizes (preserving all):`, mergedSizes);
               
-              // Cập nhật measurement với sizes đã được merge (giữ lại tất cả sizes)
-              updateMeasurement(i, {
+              // Cập nhật measurement trong array với sizes đã được merge
+              return {
                 ...updatedMeasurement,
                 sizes: mergedSizes
-              });
+              };
             } else {
               // ✅ FIXED: When no baseSize, merge newSizes with oldSizes to preserve all data
               const mergedSizes = { ...oldSizes, ...newSizes };
-              updateMeasurement(i, {
+              return {
                 ...updatedMeasurement,
                 sizes: mergedSizes
-              });
+              };
             }
+          }
+          
+          return updatedMeasurement;
+        });
+        
+        // Cập nhật state với final measurements
+        for (let i = 0; i < finalUpdatedMeasurements.length; i++) {
+          const oldMeasurement = measurements[i];
+          const finalMeasurement = finalUpdatedMeasurements[i];
+          const oldSizes = oldMeasurement?.sizes || {};
+          const finalSizes = finalMeasurement.sizes || {};
+          
+          if (JSON.stringify(oldSizes) !== JSON.stringify(finalSizes)) {
+            updateMeasurement(i, finalMeasurement);
           }
         }
         
-        // Đợi một chút để state cập nhật
+        // ✅ FIXED: Đợi để đảm bảo state được cập nhật
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // ✅ FIXED: Cập nhật REQUESTED values trong sample round từ measurements mới đã được cập nhật
+        if (round && updateSampleMeasurementRound) {
+          const updatedRound = { ...round };
+          if (updatedRound.measurements) {
+            updatedRound.measurements = updatedRound.measurements.map(entry => {
+              // Tìm measurement tương ứng trong finalUpdatedMeasurements
+              const measurement = finalUpdatedMeasurements.find(
+                m => m.pomCode === entry.pomCode || m.id === entry.measurementId
+              );
+              
+              if (measurement && measurement.sizes) {
+                // Cập nhật requested từ measurements mới
+                const newRequested: MeasurementSampleValueMap = {};
+                Object.entries(measurement.sizes).forEach(([size, value]) => {
+                  if (value !== null && value !== undefined) {
+                    newRequested[size] = String(value);
+                  }
+                });
+                
+                return {
+                  ...entry,
+                  requested: newRequested
+                };
+              }
+              
+              return entry;
+            });
+            
+            // Cập nhật round với requested values mới
+            updateSampleMeasurementRound(roundId, {
+              measurements: updatedRound.measurements
+            });
+          }
+        }
+        
+        // ✅ FIXED: Đợi thêm một chút để đảm bảo round được cập nhật
         await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // ✅ FIXED: Lưu với final measurements đã được merge
+        const techpackWithUpdatedMeasurements = {
+          ...state?.techpack,
+          measurements: finalUpdatedMeasurements
+        };
+        
+        await saveTechPack(techpackWithUpdatedMeasurements);
+      } else {
+        await saveTechPack();
       }
-      
-      // Lưu toàn bộ TechPack
-      await saveTechPack();
       
       if (hasUpdates) {
         showSuccess('Sample round saved and measurements updated from revised values');
@@ -832,7 +924,7 @@ type RoundModalFormState = {
       console.error('❌ Error saving sample round:', error);
       showError(error.message || 'Failed to save sample measurement round');
     }
-  }, [saveTechPack, sampleMeasurementRounds, measurements, state?.techpack, updateMeasurement, measurementBaseSize, deriveAdjustmentsFromSizes, recalcSizesFromBase, mergeRecalculatedSizes, selectedSizes]);
+  }, [saveTechPack, sampleMeasurementRounds, measurements, state?.techpack, updateMeasurement, measurementBaseSize, deriveAdjustmentsFromSizes, recalcSizesFromBase, mergeRecalculatedSizes, selectedSizes, updateSampleMeasurementRound]);
 
   const getDateInputValue = useCallback((value?: string) => {
     if (!value) return '';
@@ -895,19 +987,43 @@ type RoundModalFormState = {
   };
 
   const handleBaseValueChange = (value: string) => {
+    // Store raw input to preserve original format
+    setBaseValueRaw(value);
     const normalized = value.replace(',', '.');
     if (normalized.trim() === '') {
       updateSizesWithBase({ baseValue: undefined });
       return;
     }
-    const parsed = parseFloat(normalized);
-    if (Number.isNaN(parsed)) {
-      return;
+    
+    // For inch-16 and inch-32, allow mixed numbers and fractions
+    if (tableUnit === 'inch-16' || tableUnit === 'inch-32') {
+      // Allow intermediate states while typing (e.g., "1/", "1 1/", "1 1/2 ")
+      // Only parse if it's a complete value
+      const parsed = parseMeasurementValue(normalized);
+      if (parsed !== undefined && !Number.isNaN(parsed)) {
+        updateSizesWithBase({ baseValue: parsed });
+      }
+      // If parsing fails (intermediate state), don't update sizes but keep raw value
+    } else {
+      // For other units, parse as decimal
+      const parsed = parseFloat(normalized);
+      if (!Number.isNaN(parsed)) {
+        updateSizesWithBase({ baseValue: parsed });
+      }
     }
-    updateSizesWithBase({ baseValue: parsed });
   };
 
   const handleSizeAdjustmentChange = (size: string, value: string) => {
+    // Store raw input to preserve original format
+    setSizeValuesRaw(prev => {
+      const next = { ...prev };
+      if (!value.trim()) {
+        delete next[size];
+      } else {
+        next[size] = value; // Store raw value, not normalized
+      }
+      return next;
+    });
     const normalized = value.replace(',', '.');
     const nextAdjustments = { ...sizeAdjustments };
     if (!normalized.trim()) {
@@ -1131,6 +1247,10 @@ type RoundModalFormState = {
       isActive: true,
     });
     setSizeAdjustments({});
+    setBaseValueRaw('');
+    setSizeValuesRaw({});
+    setMinusToleranceRaw('');
+    setPlusToleranceRaw('');
     setShowAddForm(false);
     setEditingIndex(null);
     validation.reset();
@@ -1166,7 +1286,39 @@ type RoundModalFormState = {
     setEditingIndex(index);
     setShowAddForm(true);
 
-    setSizeAdjustments(buildAdjustmentMap(measurement.sizes || {}, resolvedBaseSize, measurementSizes.length > 0 ? measurementSizes : selectedSizes));
+    const adjustments = buildAdjustmentMap(measurement.sizes || {}, resolvedBaseSize, measurementSizes.length > 0 ? measurementSizes : selectedSizes);
+    setSizeAdjustments(adjustments);
+    
+    // Initialize raw values from existing values
+    // For base value, format as fraction if unit is inch-16/32, no rounding for others
+    const baseVal = measurement.sizes?.[resolvedBaseSize];
+    if (baseVal !== undefined) {
+      const baseRaw = (tableUnit === 'inch-16' || tableUnit === 'inch-32')
+        ? formatMeasurementValueAsFraction(baseVal, tableUnit)
+        : formatMeasurementValueNoRound(baseVal, tableUnit);
+      setBaseValueRaw(baseRaw);
+    } else {
+      setBaseValueRaw('');
+    }
+    
+    // Initialize raw values for tolerance - format as fraction if unit is inch-16/32, no rounding for others
+    const minusTolRaw = (tableUnit === 'inch-16' || tableUnit === 'inch-32')
+      ? formatMeasurementValueAsFraction(minusTol, tableUnit)
+      : formatMeasurementValueNoRound(minusTol, tableUnit);
+    setMinusToleranceRaw(minusTolRaw);
+    
+    const plusTolRaw = (tableUnit === 'inch-16' || tableUnit === 'inch-32')
+      ? formatMeasurementValueAsFraction(plusTol, tableUnit)
+      : formatMeasurementValueNoRound(plusTol, tableUnit);
+    setPlusToleranceRaw(plusTolRaw);
+    
+    // Initialize raw values for adjustments
+    const rawAdjustments: Record<string, string> = {};
+    Object.entries(adjustments).forEach(([size, adjValue]) => {
+      // Keep the adjustment value as is (it's already a string)
+      rawAdjustments[size] = adjValue;
+    });
+    setSizeValuesRaw(rawAdjustments);
 
     // Set selected sizes based on measurement data
     if (measurementSizes.length > 0 && updateMeasurementSizeRange) {
@@ -1408,7 +1560,8 @@ type RoundModalFormState = {
       {/* Controls */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+          {/* Hidden: Add Common Points button */}
+          {/* <div className="flex items-center space-x-3">
             <button
               onClick={addCommonMeasurements}
               className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -1417,17 +1570,19 @@ type RoundModalFormState = {
               {t('form.measurement.addCommonPoints')}
             </button>
             
-          </div>
+          </div> */}
 
           <div className="flex items-center space-x-3">
-            <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+            {/* Hidden: Import Excel button */}
+            {/* <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
               <Upload className="w-4 h-4 mr-2" />
               {t('form.measurement.importExcel')}
-            </button>
-            <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+            </button> */}
+            {/* Hidden: Export Excel button */}
+            {/* <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
               <Download className="w-4 h-4 mr-2" />
               {t('form.measurement.exportExcel')}
-            </button>
+            </button> */}
             <button
               onClick={() => setShowAddForm(true)}
               className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
@@ -1471,23 +1626,61 @@ type RoundModalFormState = {
 
             <Input
               label={`${t('form.measurement.minusToleranceLabel')} (${getMeasurementUnitSuffix(tableUnit)}) *`}
-              value={formData.minusTolerance ?? ''}
+              value={
+                minusToleranceRaw || (formData.minusTolerance !== undefined && formData.minusTolerance !== null
+                  ? String(formData.minusTolerance)
+                  : '')
+              }
               onChange={(value) => {
-                // value là string, giữ nguyên nếu là chuỗi rỗng hoặc số hợp lệ
+                // Store raw input to preserve original format for all units
                 if (typeof value === 'string') {
-                  // Cho phép nhập số thập phân, số âm, chuỗi rỗng
-                  if (/^-?\d*\.?\d*$/.test(value) || value === '') {
-                    handleInputChange('minusTolerance')(value);
+                  setMinusToleranceRaw(value);
+                  if (tableUnit === 'inch-16' || tableUnit === 'inch-32') {
+                    // Allow fractions, mixed numbers, decimals, and empty string
+                    // Pattern: optional sign, optional whole number, optional space, optional fraction
+                    if (/^-?(\d+(\s+\d+\/\d+)?|\d*\/\d+|\d*\.?\d*)$/.test(value) || value === '' || value.trim() === '') {
+                      // Parse to number for storage, but keep raw string for display
+                      const normalized = value.replace(',', '.');
+                      const parsed = parseMeasurementValue(normalized);
+                      if (parsed !== undefined && !Number.isNaN(parsed)) {
+                        handleInputChange('minusTolerance')(parsed);
+                      } else if (value === '' || value.trim() === '') {
+                        handleInputChange('minusTolerance')(1.0);
+                      }
+                    }
+                  } else {
+                    // For other units (inch-10, cm, mm), allow decimals with multiple decimal places
+                    // Allow intermediate states while typing (e.g., "1.", "1.1", "1.12")
+                    if (/^-?\d*\.?\d*$/.test(value) || value === '' || value.trim() === '') {
+                      if (value === '' || value.trim() === '') {
+                        handleInputChange('minusTolerance')(1.0);
+                        setMinusToleranceRaw('');
+                      } else {
+                        // Parse but allow intermediate states
+                        const normalized = value.replace(',', '.');
+                        const numValue = parseFloat(normalized);
+                        if (!Number.isNaN(numValue)) {
+                          handleInputChange('minusTolerance')(numValue);
+                        }
+                        // Keep raw value even if parsing fails (intermediate state like "1.")
+                      }
+                    }
                   }
                 } else {
                   handleInputChange('minusTolerance')(value);
                 }
               }}
-              onBlur={() => validation.setFieldTouched('minusTolerance')}
-              type="number"
-              step="0.01"
-              min="0"
-              max="50"
+              onBlur={() => {
+                validation.setFieldTouched('minusTolerance');
+                // On blur, if raw value is empty but we have a number, format it
+                if (!minusToleranceRaw && formData.minusTolerance !== undefined && formData.minusTolerance !== null) {
+                  setMinusToleranceRaw(String(formData.minusTolerance));
+                }
+              }}
+              type={tableUnit === 'inch-16' || tableUnit === 'inch-32' ? 'text' : 'text'}
+              step={tableUnit === 'inch-16' || tableUnit === 'inch-32' ? undefined : undefined}
+              min={tableUnit === 'inch-16' || tableUnit === 'inch-32' ? undefined : undefined}
+              max={tableUnit === 'inch-16' || tableUnit === 'inch-32' ? undefined : undefined}
               placeholder={t('form.measurement.tolerancePlaceholder')}
               required
               error={validation.getFieldProps('minusTolerance').error}
@@ -1499,23 +1692,61 @@ type RoundModalFormState = {
 
             <Input
               label={`${t('form.measurement.plusToleranceLabel')} (${getMeasurementUnitSuffix(tableUnit)}) *`}
-              value={formData.plusTolerance ?? ''}
+              value={
+                plusToleranceRaw || (formData.plusTolerance !== undefined && formData.plusTolerance !== null
+                  ? String(formData.plusTolerance)
+                  : '')
+              }
               onChange={(value) => {
-                // value là string, giữ nguyên nếu là chuỗi rỗng hoặc số hợp lệ
+                // Store raw input to preserve original format for all units
                 if (typeof value === 'string') {
-                  // Cho phép nhập số thập phân, số âm, chuỗi rỗng
-                  if (/^-?\d*\.?\d*$/.test(value) || value === '') {
-                    handleInputChange('plusTolerance')(value);
+                  setPlusToleranceRaw(value);
+                  if (tableUnit === 'inch-16' || tableUnit === 'inch-32') {
+                    // Allow fractions, mixed numbers, decimals, and empty string
+                    // Pattern: optional sign, optional whole number, optional space, optional fraction
+                    if (/^-?(\d+(\s+\d+\/\d+)?|\d*\/\d+|\d*\.?\d*)$/.test(value) || value === '' || value.trim() === '') {
+                      // Parse to number for storage, but keep raw string for display
+                      const normalized = value.replace(',', '.');
+                      const parsed = parseMeasurementValue(normalized);
+                      if (parsed !== undefined && !Number.isNaN(parsed)) {
+                        handleInputChange('plusTolerance')(parsed);
+                      } else if (value === '' || value.trim() === '') {
+                        handleInputChange('plusTolerance')(1.0);
+                      }
+                    }
+                  } else {
+                    // For other units (inch-10, cm, mm), allow decimals with multiple decimal places
+                    // Allow intermediate states while typing (e.g., "1.", "1.1", "1.12")
+                    if (/^-?\d*\.?\d*$/.test(value) || value === '' || value.trim() === '') {
+                      if (value === '' || value.trim() === '') {
+                        handleInputChange('plusTolerance')(1.0);
+                        setPlusToleranceRaw('');
+                      } else {
+                        // Parse but allow intermediate states
+                        const normalized = value.replace(',', '.');
+                        const numValue = parseFloat(normalized);
+                        if (!Number.isNaN(numValue)) {
+                          handleInputChange('plusTolerance')(numValue);
+                        }
+                        // Keep raw value even if parsing fails (intermediate state like "1.")
+                      }
+                    }
                   }
                 } else {
                   handleInputChange('plusTolerance')(value);
                 }
               }}
-              onBlur={() => validation.setFieldTouched('plusTolerance')}
-              type="number"
-              step="0.01"
-              min="0"
-              max="50"
+              onBlur={() => {
+                validation.setFieldTouched('plusTolerance');
+                // On blur, if raw value is empty but we have a number, format it
+                if (!plusToleranceRaw && formData.plusTolerance !== undefined && formData.plusTolerance !== null) {
+                  setPlusToleranceRaw(String(formData.plusTolerance));
+                }
+              }}
+              type={tableUnit === 'inch-16' || tableUnit === 'inch-32' ? 'text' : 'text'}
+              step={tableUnit === 'inch-16' || tableUnit === 'inch-32' ? undefined : undefined}
+              min={tableUnit === 'inch-16' || tableUnit === 'inch-32' ? undefined : undefined}
+              max={tableUnit === 'inch-16' || tableUnit === 'inch-32' ? undefined : undefined}
               placeholder={t('form.measurement.tolerancePlaceholder')}
               required
               error={validation.getFieldProps('plusTolerance').error}
@@ -1565,10 +1796,16 @@ type RoundModalFormState = {
                   {t('form.measurement.baseMeasurementLabel', { unit: getMeasurementUnitSuffix(tableUnit) })}
                 </label>
                 <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={baseValue ?? ''}
+                  type={tableUnit === 'inch-16' || tableUnit === 'inch-32' ? 'text' : 'number'}
+                  step={tableUnit === 'inch-16' || tableUnit === 'inch-32' ? undefined : '0.01'}
+                  min={tableUnit === 'inch-16' || tableUnit === 'inch-32' ? undefined : '0'}
+                  value={
+                    baseValueRaw && (tableUnit === 'inch-16' || tableUnit === 'inch-32')
+                      ? baseValueRaw
+                      : baseValue !== undefined && baseValue !== null
+                        ? String(baseValue)
+                        : ''
+                  }
                   onChange={(e) => handleBaseValueChange(e.target.value)}
                   onBlur={() => validation.setFieldTouched('measurement')}
                   className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -1591,15 +1828,22 @@ type RoundModalFormState = {
                       <div className="text-lg font-semibold text-blue-900">{size}</div>
                       <div className="text-sm text-blue-800 mt-1">
                         {baseValue !== undefined && !Number.isNaN(baseValue)
-                          ? `${formatMeasurementValue(baseValue)} ${getMeasurementUnitSuffix(tableUnit)}`
+                          ? (baseValueRaw && (tableUnit === 'inch-16' || tableUnit === 'inch-32')
+                              ? `${baseValueRaw} ${getMeasurementUnitSuffix(tableUnit)}`
+                              : `${formatMeasurementValueNoRound(baseValue, tableUnit)} ${getMeasurementUnitSuffix(tableUnit)}`)
                           : t('form.measurement.enterBaseValue')}
                       </div>
                     </div>
                   );
                 }
 
-                const adjustmentValue = sizeAdjustments[size] || '';
-                const displayActual = formatMeasurementValue(actualValue);
+                // Use raw value if available, otherwise use formatted adjustment value
+                const adjustmentValue = sizeValuesRaw[size] || sizeAdjustments[size] || '';
+                // For inch-16/32, format as fraction to preserve original format
+                // For other units, use decimal format without rounding
+                const displayActual = (tableUnit === 'inch-16' || tableUnit === 'inch-32')
+                  ? formatMeasurementValueAsFraction(actualValue, tableUnit)
+                  : formatMeasurementValueNoRound(actualValue, tableUnit);
 
                 return (
                   <div key={size} className="flex flex-col border rounded-md p-3">
@@ -1750,9 +1994,14 @@ type RoundModalFormState = {
                   const plusTol = typeof measurement.plusTolerance === 'string'
                     ? parseTolerance(measurement.plusTolerance)
                     : (measurement.plusTolerance ?? 1.0);
+                  // Format tolerance for display - use fraction format for inch-16/32, no rounding for others
                   const toleranceDisplay = minusTol === plusTol 
-                    ? formatTolerance(minusTol, tableUnit).replace(/\s*(cm|inch)/gi, '')
-                    : `-${minusTol.toFixed(1)} / +${plusTol.toFixed(1)}`;
+                    ? (tableUnit === 'inch-16' || tableUnit === 'inch-32')
+                        ? `±${formatMeasurementValueAsFraction(minusTol, tableUnit)}`
+                        : `±${formatMeasurementValueNoRound(minusTol, tableUnit)}`
+                    : (tableUnit === 'inch-16' || tableUnit === 'inch-32')
+                        ? `-${formatMeasurementValueAsFraction(minusTol, tableUnit)} / +${formatMeasurementValueAsFraction(plusTol, tableUnit)}`
+                        : `-${formatMeasurementValueNoRound(minusTol, tableUnit)} / +${formatMeasurementValueNoRound(plusTol, tableUnit)}`;
                   const rowBackgroundColor = validationResult.errors.length > 0
                     ? '#fee2e2'
                     : validationResult.warnings.length > 0
@@ -1796,7 +2045,11 @@ type RoundModalFormState = {
                       </td>
                       {selectedSizes.map(size => {
                         const value = measurement.sizes ? measurement.sizes[size] : undefined;
-                        const displayValue = formatMeasurementValue(value);
+                        // For inch-16/32, format as fraction to preserve original format
+                        // For other units, use decimal format without rounding
+                        const displayValue = (tableUnit === 'inch-16' || tableUnit === 'inch-32')
+                          ? formatMeasurementValueAsFraction(value, tableUnit)
+                          : formatMeasurementValueNoRound(value, tableUnit);
                         const isBaseCell = highlightedColumn ? size === highlightedColumn : measurement.baseSize === size;
                         return (
                           <td 
@@ -2070,8 +2323,8 @@ type RoundModalFormState = {
         </div>
       )}
 
-      {/* Info Panel */}
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+      {/* Hidden: Info Panel - Measurement Guidelines */}
+      {/* <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-start">
           <Info className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
           <div className="text-sm text-blue-800">
@@ -2085,7 +2338,7 @@ type RoundModalFormState = {
             </ul>
           </div>
         </div>
-      </div>
+      </div> */}
 
       <ConfirmationDialog
         isOpen={showBaseSizeConfirm}
@@ -2105,10 +2358,13 @@ type RoundModalFormState = {
 // Only validate fields that are actually displayed on the UI form
 export const validateMeasurementsForSave = (
   measurements: MeasurementPoint[],
-  options?: { defaultBaseSize?: string }
+  options?: { defaultBaseSize?: string; t?: (key: string, params?: Record<string, string | number>) => string }
 ): { isValid: boolean; errors: Array<{ id: string; item: MeasurementPoint; errors: Record<string, string> }> } => {
   const errors: Array<{ id: string; item: MeasurementPoint; errors: Record<string, string> }> = [];
   const { normalized } = normalizeMeasurementBaseSizes(measurements, options?.defaultBaseSize);
+  
+  // Use provided t function or fallback to key
+  const t = options?.t || ((key: string) => key);
   
   // Only validate fields that exist on the UI form
   const visibleFields = ['pomCode', 'pomName', 'minusTolerance', 'plusTolerance'];

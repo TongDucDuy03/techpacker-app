@@ -3,7 +3,7 @@ import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { ApiTechPack, TechPack } from '../../../types/techpack';
 import { useAuth } from '../../../contexts/AuthContext';
-import { Info, RefreshCcw } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { useI18n } from '../../../lib/i18n';
 
 interface PackingTabProps {
@@ -102,7 +102,8 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate }) => 
             <span>{t('form.packing.wordCount', { count: wordCount })}</span>
             <span>•</span>
             <span>{t('form.packing.charCount', { count: Math.max(value?.length ?? 0, 0) })}</span>
-            <span>•</span>
+            {/* Hidden: Clear button */}
+            {/* <span>•</span>
             <button
               type="button"
               onClick={handleClear}
@@ -111,7 +112,7 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate }) => 
             >
               <RefreshCcw className="w-4 h-4 mr-2" />
               {t('form.packing.clear')}
-            </button>
+            </button> */}
           </div>
         </div>
 

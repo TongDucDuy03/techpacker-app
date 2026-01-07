@@ -11,8 +11,8 @@ const LanguageSwitcher = () => {
       value={lang}
       onChange={value => setLang(value as LanguageCode)}
       options={[
-        // { label: t('common.language.english'), value: 'en' },
-        // { label: t('common.language.vietnamese'), value: 'vi' },
+        { label: t('common.language.english'), value: 'en' },
+        { label: t('common.language.vietnamese'), value: 'vi' },
       ]}
     />
   );

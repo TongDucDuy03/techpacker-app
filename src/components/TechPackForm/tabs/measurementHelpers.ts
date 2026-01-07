@@ -195,25 +195,78 @@ const findNearestFraction = (decimal: number) => {
   return null;
 };
 
-export const formatStepValue = (value: number | undefined): string => {
+/**
+ * Format step value (adjustment/jump) without rounding and without converting to fraction
+ * Preserves original precision for inch-10/cm/mm
+ */
+export const formatStepValueNoRound = (value: number | undefined): string => {
   if (value === undefined || value === null || Number.isNaN(value)) return '';
   if (value === 0) return '0';
   const sign = value > 0 ? '+' : '-';
   const absValue = Math.abs(value);
-  const integerPart = Math.floor(absValue);
-  const decimalPart = absValue - integerPart;
+  
+  // Use toFixed with high precision then remove trailing zeros to preserve original precision
+  const str = absValue.toFixed(10);
+  // Remove trailing zeros after decimal point
+  const cleaned = str.replace(/\.?0+$/, '');
+  return `${sign}${cleaned}`;
+};
 
-  const fraction = findNearestFraction(decimalPart);
+export const formatStepValue = (value: number | undefined, unit?: MeasurementUnit): string => {
+  if (value === undefined || value === null || Number.isNaN(value)) return '';
+  if (value === 0) return '0';
+  
+  // For inch-16/32, allow fraction format
+  // For other units (inch-10/cm/mm), use decimal format without rounding
+  if (unit === 'inch-16' || unit === 'inch-32') {
+    const sign = value > 0 ? '+' : '-';
+    const absValue = Math.abs(value);
+    const integerPart = Math.floor(absValue);
+    const decimalPart = absValue - integerPart;
 
-  if (!fraction) {
-    return `${sign}${absValue.toFixed(2).replace(/\.00$/, '')}`;
+    const fraction = findNearestFraction(decimalPart);
+
+    if (!fraction) {
+      return `${sign}${absValue.toFixed(2).replace(/\.00$/, '')}`;
+    }
+
+    const fractionText = `${fraction.numerator}/${fraction.denominator}`;
+    if (integerPart === 0) {
+      return `${sign}${fractionText}`;
+    }
+    return `${sign}${integerPart} ${fractionText}`;
   }
+  
+  // For other units, use decimal format without rounding
+  return formatStepValueNoRound(value);
+};
 
-  const fractionText = `${fraction.numerator}/${fraction.denominator}`;
-  if (integerPart === 0) {
-    return `${sign}${fractionText}`;
+/**
+ * Format measurement value without rounding - preserves original precision
+ * For inch-10: shows up to 3 decimal places if needed
+ * For other units: shows as many decimal places as needed (preserves precision)
+ */
+export const formatMeasurementValueNoRound = (value?: number, unit?: MeasurementUnit): string => {
+  if (value === undefined || value === null || Number.isNaN(value)) return '-';
+  const sign = value < 0 ? '-' : '';
+  const absValue = Math.abs(value);
+  
+  // Use toFixed with high precision then remove trailing zeros to preserve original precision
+  // This handles floating point precision issues
+  let str: string;
+  if (unit === 'inch-10') {
+    // For inch-10, use up to 3 decimal places
+    str = absValue.toFixed(3);
+  } else {
+    // For other units, use up to 10 decimal places to capture full precision
+    // then remove trailing zeros
+    str = absValue.toFixed(10);
   }
-  return `${sign}${integerPart} ${fractionText}`;
+  
+  // Remove trailing zeros after decimal point, but keep at least one digit if it's a decimal
+  str = str.replace(/\.?0+$/, '');
+  
+  return `${sign}${str}`;
 };
 
 export const formatMeasurementValue = (value?: number, unit?: MeasurementUnit): string => {

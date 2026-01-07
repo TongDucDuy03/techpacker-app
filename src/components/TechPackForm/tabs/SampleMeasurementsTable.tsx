@@ -8,7 +8,7 @@ import {
 } from '../../../types/techpack';
 import { getMeasurementUnitSuffix, DEFAULT_MEASUREMENT_UNIT, MeasurementUnit } from '../../../types/techpack';
 import { SampleMeasurementRow } from '../../../types/measurements';
-import { parseTolerance, formatTolerance } from './measurementHelpers';
+import { parseTolerance, formatTolerance, formatMeasurementValueAsFraction, formatMeasurementValueNoRound, parseMeasurementValue } from './measurementHelpers';
 import { useI18n } from '../../../lib/i18n';
 
 type EditableSampleField = 'measured' | 'diff' | 'revised' | 'comments';
@@ -126,16 +126,44 @@ const getToleranceDisplay = (row: SampleMeasurementRow, tableUnit: MeasurementUn
   const unitSuffix = getMeasurementUnitSuffix(tableUnit);
 
   if (minus === plus) {
+    // Format as fraction if unit is inch-16 or inch-32
+    if (tableUnit === 'inch-16' || tableUnit === 'inch-32') {
+      const formatted = formatMeasurementValueAsFraction(minus, tableUnit);
+      const unitSuffix = getMeasurementUnitSuffix(tableUnit);
+      return {
+        label: `±${formatted} ${unitSuffix}`,
+        minus,
+        plus,
+        unitSuffix,
+      };
+    }
+    // For other units, use no-round format to preserve precision
+    const formatted = formatMeasurementValueNoRound(minus, tableUnit);
     return {
-      label: formatTolerance(minus, tableUnit),
+      label: `±${formatted}`,
       minus,
       plus,
       unitSuffix,
     };
   }
 
+  // Format as fraction if unit is inch-16 or inch-32
+  if (tableUnit === 'inch-16' || tableUnit === 'inch-32') {
+    const minusFormatted = formatMeasurementValueAsFraction(minus, tableUnit);
+    const plusFormatted = formatMeasurementValueAsFraction(plus, tableUnit);
+    return {
+      label: `-${minusFormatted} / +${plusFormatted}`,
+      minus,
+      plus,
+      unitSuffix,
+    };
+  }
+  
+  // For other units, use no-round format to preserve precision
+  const minusFormatted = formatMeasurementValueNoRound(minus, tableUnit);
+  const plusFormatted = formatMeasurementValueNoRound(plus, tableUnit);
   return {
-      label: `-${minus.toFixed(1)} / +${plus.toFixed(1)}`,
+      label: `-${minusFormatted} / +${plusFormatted}`,
     minus,
     plus,
     unitSuffix,
@@ -162,6 +190,7 @@ const getVisibleSampleSizes = (sizeKeys: string[], baseSize?: string): string[] 
   }
   return sizeKeys.length > 0 ? [sizeKeys[0]] : ['M'];
 };
+
 
 const SampleMeasurementsTable: React.FC<SampleMeasurementsTableProps> = ({
   measurementRows,
@@ -298,13 +327,21 @@ const getDiffToneClass = (value: string): string => {
                   
                   // For requested field: prioritize entry.requested overrides, then fall back to measurement.sizes
                   if (fieldKey === 'requested') {
+                    // Format requested value as fraction if unit is inch-16/32 and value is a number
+                    let displayRequested = requestedValue;
+                    if (requestedValue && (tableUnit === 'inch-16' || tableUnit === 'inch-32')) {
+                      const numValue = parseFloat(requestedValue);
+                      if (!Number.isNaN(numValue)) {
+                        displayRequested = formatMeasurementValueAsFraction(numValue, tableUnit);
+                      }
+                    }
                     return (
                       <td
                         key={cellKey}
                         className="border-r border-gray-200 px-2 py-2 align-top text-center text-sm text-gray-900"
                         style={{ backgroundColor: rowBgColor }}
                       >
-                        {requestedValue ? requestedValue : '—'}
+                        {displayRequested ? displayRequested : '—'}
                       </td>
                     );
                   }
@@ -330,9 +367,7 @@ const getDiffToneClass = (value: string): string => {
                     return (
                       <td
                         key={cellKey}
-                        className={`border-r border-gray-200 px-2 py-1 align-top ${
-                          fieldKey === 'measured' || fieldKey === 'revised' ? '' : ''
-                        }`}
+                        className={`border-r border-gray-200 px-2 py-1 align-top`}
                         style={{ backgroundColor: rowBgColor }}
                       >
                         {fieldKey === 'comments' ? (
@@ -354,25 +389,35 @@ const getDiffToneClass = (value: string): string => {
                             placeholder={t('sample.comments')}
                           />
                         ) : (
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="0.1"
-                            value=""
-                            onChange={event =>
+                          (() => {
+                            // ✅ Use text input for all units to allow full precision
+                            // Handle onChange - NO regex validation, allow any input
+                            // User can type anything: integers, decimals, fractions, mixed numbers
+                            // Validation will happen when parsing for calculations (parseMeasurementValue)
+                            const handleEmptyInputChange = (value: string) => {
+                              // Allow any input - no regex blocking
+                              // Store raw input as-is, preserve all spaces and format
                               onEntrySizeValueChange(
                                 round.id,
                                 '', // entryId rỗng, sẽ tạo entry mới
                                 fieldKey as EditableSampleField,
                                 size,
-                                event.target.value,
+                                value, // Store raw input as-is, preserve all spaces and format
                                 row.measurement?.id,
                                 row.pomCode
-                              )
-                            }
-                            className="w-full min-w-[90px] border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="—"
-                          />
+                              );
+                            };
+                            
+                            return (
+                              <input
+                                type="text"
+                                value=""
+                                onChange={event => handleEmptyInputChange(event.target.value)}
+                                className="w-full min-w-[90px] border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="—"
+                              />
+                            );
+                          })()
                         )}
                       </td>
                     );
@@ -406,9 +451,9 @@ const getDiffToneClass = (value: string): string => {
 
                   // Get the correct requested value for this row (same logic as requested field)
                   // Prioritize measurement.sizes first, then entry.requested as fallback
-                  const requestedNumber = requestedValue ? parseFloat(requestedValue) : undefined;
-                  const measuredNumber = fieldKey === 'measured' && fieldValue ? parseFloat(fieldValue) : undefined;
-                  const diffNumber = fieldKey === 'diff' && fieldValue ? parseFloat(fieldValue) : undefined;
+                  const requestedNumber = requestedValue ? parseMeasurementValue(requestedValue) : undefined;
+                  const measuredNumber = fieldKey === 'measured' && fieldValue ? parseMeasurementValue(fieldValue) : undefined;
+                  const diffNumber = fieldKey === 'diff' && fieldValue ? parseMeasurementValue(fieldValue) : undefined;
 
                   let outOfTolerance = false;
                   if (toleranceRange) {
@@ -426,6 +471,50 @@ const getDiffToneClass = (value: string): string => {
 
                   const diffToneClass = fieldKey === 'diff' ? getDiffToneClass(fieldValue) : '';
 
+                  // Format display value based on unit and field type
+                  const isFractionUnit = tableUnit === 'inch-16' || tableUnit === 'inch-32';
+                  let displayValue = fieldValue;
+                  
+                  if (fieldValue && isFractionUnit) {
+                    if (fieldKey === 'diff') {
+                      // Format diff as fraction with sign
+                      const numValue = parseMeasurementValue(fieldValue);
+                      if (numValue !== undefined && !Number.isNaN(numValue)) {
+                        displayValue = formatMeasurementValueAsFraction(Math.abs(numValue), tableUnit);
+                        if (numValue < 0) {
+                          displayValue = `-${displayValue}`;
+                        } else if (numValue > 0) {
+                          displayValue = `+${displayValue}`;
+                        }
+                      }
+                    }
+                    // For measured/revised, keep raw value as-is to preserve user input format
+                  } else if (fieldValue && !isFractionUnit && fieldKey === 'diff') {
+                    // Only format diff field for inch-10/cm/mm, keep measured/revised as raw input
+                    const numValue = parseMeasurementValue(fieldValue);
+                    if (numValue !== undefined && !Number.isNaN(numValue)) {
+                      displayValue = formatMeasurementValueNoRound(numValue, tableUnit);
+                    }
+                  }
+                  // For measured/revised with inch-10/cm/mm, keep raw value as-is to allow typing decimals
+
+                  // ✅ Handle onChange - NO regex validation, allow any input
+                  // User can type anything: integers, decimals, fractions, mixed numbers
+                  // Validation will happen when parsing for calculations (parseMeasurementValue)
+                  const handleInputChange = (value: string) => {
+                    // Allow any input - no regex blocking
+                    // Store raw input as-is, preserve all spaces and format
+                    onEntrySizeValueChange(
+                      round.id,
+                      entryId,
+                      fieldKey as EditableSampleField,
+                      size,
+                      value, // Store raw input as-is, preserve all spaces and format
+                      row.measurement?.id,
+                      row.pomCode
+                    );
+                  };
+
                   return (
                     <td
                       key={cellKey}
@@ -435,21 +524,9 @@ const getDiffToneClass = (value: string): string => {
                       style={outOfTolerance ? undefined : { backgroundColor: rowBgColor }}
                     >
                       <input
-                        type="number"
-                        inputMode="decimal"
-                        step="0.1"
-                        value={fieldValue}
-                        onChange={event =>
-                          onEntrySizeValueChange(
-                            round.id,
-                            entryId,
-                            fieldKey as EditableSampleField,
-                            size,
-                            event.target.value,
-                            row.measurement?.id,
-                            row.pomCode
-                          )
-                        }
+                        type="text"
+                        value={displayValue}
+                        onChange={event => handleInputChange(event.target.value)}
                         className={`w-full min-w-[90px] border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${diffToneClass}`}
                         placeholder="—"
                       />
@@ -503,4 +580,3 @@ const getDiffToneClass = (value: string): string => {
 };
 
 export default SampleMeasurementsTable;
-
