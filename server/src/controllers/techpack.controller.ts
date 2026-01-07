@@ -1254,10 +1254,7 @@ export class TechPackController {
         return sendError(res, 'Cannot share with yourself.', 400, 'BAD_REQUEST');
       }
 
-      // Prevent sharing with system admin or technical designer
-      if (targetUser.role === UserRole.Admin || techpack.technicalDesignerId?.toString() === userId) {
-        return sendError(res, 'Cannot share with system admin or the assigned technical designer.', 400, 'BAD_REQUEST');
-      }
+      // Prevent sharing with system admin removed; technicalDesignerId is now free text and not linked to users
 
       const existingShareIndex = techpack.sharedWith?.findIndex(s => s.userId.toString() === userId) || -1;
       let action: 'share_granted' | 'role_changed' = 'share_granted';
@@ -1435,11 +1432,16 @@ export class TechPackController {
       // - The technical designer
       // - Users already shared with
       // - The current user
-      const excludedUserIds = [
-        user._id.toString(),
-        techpack.technicalDesignerId?.toString(),
-        ...(techpack.sharedWith?.map(s => s?.userId && s.userId.toString()) || [])
-      ].filter(Boolean);
+      // Build excluded list and keep only valid ObjectIds to avoid BSON errors
+      const excludedUserIdsRaw = [
+        user._id?.toString(),
+        // technicalDesignerId is a free text string, ignore for shareable-users filtering
+        ...(techpack.sharedWith?.map((s) => (s?.userId ? s.userId.toString() : null)) || [])
+      ].filter(Boolean) as string[];
+
+      const excludedUserIds = excludedUserIdsRaw
+        .filter((id) => Types.ObjectId.isValid(id))
+        .map((id) => new Types.ObjectId(id));
 
       // ✅ Optimized: Parse query params and build single query
       const includeAdmins = String((req.query || {}).includeAdmins || 'false') === 'true';
@@ -1447,9 +1449,15 @@ export class TechPackController {
 
       // ✅ Optimized: Build single query instead of multiple queries
       const baseFilters: any = {
-        _id: { $nin: excludedUserIds },
         isActive: true
       };
+      // Exclude current user and already-shared users (only if valid ObjectId)
+      if (excludedUserIds.length > 0) {
+        baseFilters._id = { $nin: excludedUserIds };
+      } else {
+        // At minimum, exclude current user (always a valid ObjectId)
+        baseFilters._id = { $ne: user._id };
+      }
 
       // includeAll=true returns everyone except current/excluded
       if (!includeAll && !includeAdmins) {
