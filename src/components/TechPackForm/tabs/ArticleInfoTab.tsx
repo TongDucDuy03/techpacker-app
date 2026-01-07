@@ -5,6 +5,7 @@ import { api } from '../../../lib/api';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { showError, showWarning } from '../../../lib/toast';
 import { useSeasonSuggestions } from '../../../hooks/useSeasonSuggestions';
+import { useI18n } from '../../../lib/i18n';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001/api/v1';
 const API_UPLOAD_BASE = API_BASE_URL.replace(/\/api\/v1$/, '');
@@ -30,6 +31,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
   const { techPack, mode = 'create', onUpdate, setCurrentTab } = props;
   const validation = useFormValidation(articleInfoValidationSchema);
   const { articleInfo } = techPack ?? {};
+  const { t } = useI18n();
   const [designers, setDesigners] = useState<Array<{ value: string; label: string }>>([]);
   const [loadingDesigners, setLoadingDesigners] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -108,7 +110,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
         setIsDuplicate(exists);
         
         if (exists) {
-          showWarning('This article code already exists. Please use a different code.');
+          showWarning(t('validation.articleCodeExists'));
         }
       } catch (error: any) {
         // If 404, articleCode doesn't exist (good)
@@ -367,7 +369,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
   };
 
   const handleReset = () => {
-    const confirmed = window.confirm('Are you sure you want to reset all fields? This action cannot be undone.');
+    const confirmed = window.confirm(t('form.resetConfirm'));
     if (confirmed) {
       onUpdate?.({
         articleInfo: {
@@ -465,7 +467,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
   const handleSave = () => {
     // Check for duplicate articleCode before saving
     if (mode === 'create' && isDuplicate) {
-      showError('Cannot save: Article code already exists. Please use a different code.');
+      showError(t('validation.articleCodeExists'));
       return;
     }
 
@@ -492,8 +494,8 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
         season: 'Season',
         lifecycleStage: 'Lifecycle Stage'
       };
-      const fieldLabel = firstField ? (fieldLabelMap[firstField] || firstField) : 'Một trường bắt buộc';
-      showError(`Trường ${fieldLabel}, thuộc tab Article Info chưa được điền. Vui lòng điền đầy đủ thông tin.`);
+      const fieldLabel = firstField ? (fieldLabelMap[firstField] || firstField) : t('form.requiredField');
+      showError(t('form.fieldRequiredInTab').replace('{field}', fieldLabel).replace('{tab}', t('form.tab.articleInfo')));
       scrollToFirstError(errors);
       return;
     }
@@ -513,7 +515,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
     validateAndSave: () => {
       // Check for duplicate articleCode before saving
       if (mode === 'create' && isDuplicate) {
-        showError('Cannot save: Article code already exists. Please use a different code.');
+        showError(t('validation.articleCodeExists'));
         return false;
       }
 
@@ -538,8 +540,8 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
           season: 'Season',
           lifecycleStage: 'Lifecycle Stage'
         };
-        const fieldLabel = firstField ? (fieldLabelMap[firstField] || firstField) : 'Một trường bắt buộc';
-        showError(`Trường ${fieldLabel}, thuộc tab Article Info chưa được điền. Vui lòng điền đầy đủ thông tin.`);
+        const fieldLabel = firstField ? (fieldLabelMap[firstField] || firstField) : t('form.requiredField');
+        showError(t('form.fieldRequiredInTab').replace('{field}', fieldLabel).replace('{tab}', t('form.tab.articleInfo')));
         scrollToFirstError(errors);
         return false;
       }
@@ -618,14 +620,14 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Article Information</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{t('form.tab.articleInfo')}</h1>
             <p className="text-sm text-gray-600 mt-1">
-              Basic product information and technical specifications
+              {t('form.tab.articleInfo.description')}
             </p>
           </div>
           <div className="flex items-center space-x-2">
             <div className="text-sm text-gray-500">
-              Completion: <span className="font-medium text-blue-600">{completionPercentage}%</span>
+              {t('form.completion')}: <span className="font-medium text-blue-600">{completionPercentage}%</span>
             </div>
             <div className="w-24 bg-gray-200 rounded-full h-2">
               <div 
@@ -646,13 +648,13 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               <div className="md:col-span-2">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                   <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-                  Required Information
+                  {t('form.requiredInformation')}
                 </h3>
               </div>
 
               <div>
                 <Input
-                  label="Article Code"
+                  label={t('form.articleInfo.articleCode')}
                   value={safeArticleInfo.articleCode}
                   onChange={(value) => {
                     // Auto-uppercase articleCode
@@ -664,37 +666,37 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                   required
                   maxLength={50}
                   disabled={mode !== 'create'}
-                  error={validation.getFieldProps('articleCode').error || (isDuplicate ? 'This article code already exists' : undefined)}
+                  error={validation.getFieldProps('articleCode').error || (isDuplicate ? t('validation.articleCodeExists') : undefined)}
                   helperText={
                     checkingDuplicate 
-                      ? 'Checking availability...' 
+                      ? t('form.checkingAvailability') 
                       : isDuplicate 
-                        ? 'This article code is already in use' 
-                        : validation.getFieldProps('articleCode').helperText || 'Article code must be unique'
+                        ? t('validation.articleCodeExists') 
+                        : validation.getFieldProps('articleCode').helperText || t('form.articleCodeMustBeUnique')
                   }
                 />
                 {checkingDuplicate && (
                   <div className="flex items-center text-xs text-blue-600 mt-1">
                     <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1"></div>
-                    Checking availability...
+                    {t('form.checkingAvailability')}
                   </div>
                 )}
                 {!checkingDuplicate && isDuplicate && (
                   <div className="flex items-center text-xs text-red-600 mt-1">
                     <AlertCircle className="w-3 h-3 mr-1" />
-                    This article code already exists
+                    {t('validation.articleCodeExists')}
                   </div>
                 )}
                 {!checkingDuplicate && !isDuplicate && debouncedArticleCode && debouncedArticleCode.length >= 3 && (
                   <div className="flex items-center text-xs text-green-600 mt-1">
                     <CheckCircle className="w-3 h-3 mr-1" />
-                    Article code is available
+                    {t('form.articleCodeAvailable')}
                   </div>
                 )}
               </div>
 
               <Input
-                label="Article Name"
+                label={t('form.articleInfo.articleName')}
                 value={safeArticleInfo.articleName || (safeArticleInfo as any).productName || ''}
                 onChange={handleInputChange('articleName')}
                 onBlur={() => validation.setFieldTouched('articleName')}
@@ -709,12 +711,12 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               {/* Sample Type - Text input */}
               <div className="relative">
                 <Input
-                  label="Sample Type"
+                  label={t('form.articleInfo.sampleType')}
                   value={safeArticleInfo.sampleType || (safeArticleInfo as any).version || ''}
                   onChange={handleInputChange('sampleType')}
                   onBlur={() => validation.setFieldTouched('sampleType')}
                   type="text"
-                  placeholder="Enter sample type"
+                  placeholder={t('form.articleInfo.sampleTypePlaceholder')}
                   maxLength={120}
                   disabled={mode === 'view'}
                   error={validation.getFieldProps('sampleType').error}
@@ -728,7 +730,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               </div>
 
               <Select
-                label="Gender"
+                label={t('form.articleInfo.gender')}
                 value={safeArticleInfo.gender}
                 onChange={handleInputChange('gender')}
                 onBlur={() => validation.setFieldTouched('gender')}
@@ -740,7 +742,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               />
 
               <Select
-                label="Product Class"
+                label={t('form.articleInfo.category')}
                 value={safeArticleInfo.productClass}
                 onChange={handleInputChange('productClass')}
                 onBlur={() => validation.setFieldTouched('productClass')}
@@ -753,7 +755,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               />
 
               <Select
-                label="Fit Type"
+                label={t('form.articleInfo.fitType')}
                 value={safeArticleInfo.fitType}
                 onChange={handleInputChange('fitType')}
                 onBlur={() => validation.setFieldTouched('fitType')}
@@ -768,16 +770,16 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               <div className="md:col-span-2 mt-6">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                   <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                  Product Details
+                  {t('form.productDetails')}
                 </h3>
               </div>
 
               <Input
-                label="Supplier"
+                label={t('form.articleInfo.supplier')}
                 value={safeArticleInfo.supplier}
                 onChange={handleInputChange('supplier')}
                 onBlur={() => validation.setFieldTouched('supplier')}
-                placeholder="Supplier name or code"
+                placeholder={t('materials.placeholder.supplier')}
                 required
                 maxLength={255}
                 disabled={mode === 'view'}
@@ -786,11 +788,11 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               />
 
               <Input
-                label="Technical Designer"
+                label={t('form.articleInfo.technicalDesigner')}
                 value={safeArticleInfo.technicalDesignerId}
                 onChange={handleInputChange('technicalDesignerId')}
                 onBlur={() => validation.setFieldTouched('technicalDesignerId')}
-                placeholder="Enter designer name"
+                placeholder={t('form.articleInfo.technicalDesignerPlaceholder')}
                 required
                 maxLength={100}
                 disabled={mode === 'view'}
@@ -799,11 +801,11 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               />
 
               <Input
-                label="Season"
+                label={t('form.articleInfo.season')}
                 value={safeArticleInfo.season}
                 onChange={handleSeasonChange}
                 onBlur={() => validation.setFieldTouched('season')}
-                placeholder="e.g., SS25, FW26, Holiday 2026"
+                placeholder={t('form.season.placeholder')}
                 required
                 disabled={mode === 'view'}
                 error={validation.getFieldProps('season').error}
@@ -813,7 +815,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               />
 
               <Select
-                label="Lifecycle Stage"
+                label={t('form.articleInfo.lifecycleStage')}
                 value={safeArticleInfo.lifecycleStage}
                 onChange={handleInputChange('lifecycleStage')}
                 onBlur={() => validation.setFieldTouched('lifecycleStage')}
@@ -826,7 +828,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
 
               {/* Status field - only editable by Admin/Merchandiser */}
               <Select
-                label="Status"
+                label={t('form.articleInfo.status')}
                 value={safeArticleInfo.status || techPack?.status || 'Draft'}
                 onChange={(value) => {
                   const updatedArticleInfo = { ...safeArticleInfo, status: value as TechPackStatus };
@@ -837,23 +839,23 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 options={statusOptions}
                 disabled={mode === 'view'}
                 error={validation.getFieldProps('status').error}
-                helperText={validation.getFieldProps('status').helperText || 'Current status of this TechPack'}
+                helperText={validation.getFieldProps('status').helperText || t('form.articleInfo.statusHelper')}
               />
 
               {/* Optional Fields */}
               <div className="md:col-span-2 mt-6">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                   <span className="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
-                  Additional Information
+                  {t('form.additionalInformation')}
                 </h3>
               </div>
 
               <Input
-                label="Brand"
+                label={t('form.articleInfo.brand')}
                 value={safeArticleInfo.brand || ''}
                 onChange={handleInputChange('brand')}
                 onBlur={() => validation.setFieldTouched('brand')}
-                placeholder="Brand name"
+                placeholder={t('form.articleInfo.brandPlaceholder')}
                 maxLength={255}
                 disabled={mode === 'view'}
                 error={validation.getFieldProps('brand').error}
@@ -861,11 +863,11 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               />
 
               <Input
-                label="Collection"
+                label={t('form.articleInfo.collection')}
                 value={safeArticleInfo.collection || ''}
                 onChange={handleInputChange('collection')}
                 onBlur={() => validation.setFieldTouched('collection')}
-                placeholder="Collection name"
+                placeholder={t('form.articleInfo.collectionPlaceholder')}
                 maxLength={255}
                 disabled={mode === 'view'}
                 error={validation.getFieldProps('collection').error}
@@ -873,7 +875,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               />
 
               <Input
-                label="Target Market"
+                label={t('form.articleInfo.targetMarket')}
                 value={safeArticleInfo.targetMarket || ''}
                 onChange={handleInputChange('targetMarket')}
                 onBlur={() => validation.setFieldTouched('targetMarket')}
@@ -885,12 +887,12 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               />
 
               <Select
-                label="Price Point"
+                label={t('form.articleInfo.pricePoint')}
                 value={safeArticleInfo.pricePoint || ''}
                 onChange={handleInputChange('pricePoint')}
                 onBlur={() => validation.setFieldTouched('pricePoint')}
                 options={pricePointOptions}
-                placeholder="Select price range..."
+                placeholder={t('form.articleInfo.pricePointPlaceholder')}
                 disabled={mode === 'view'}
                 error={validation.getFieldProps('pricePoint').error}
                 helperText={validation.getFieldProps('pricePoint').helperText}
@@ -899,7 +901,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               {/* Currency and Retail Price */}
               <div className="grid grid-cols-2 gap-4">
                 <Select
-                  label="Currency"
+                  label={t('form.articleInfo.currency')}
                   value={safeArticleInfo.currency || 'USD'}
                   onChange={handleInputChange('currency')}
                   onBlur={() => validation.setFieldTouched('currency')}
@@ -909,7 +911,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                   helperText={validation.getFieldProps('currency').helperText}
                 />
                 <Input
-                  label="Retail Price"
+                  label={t('form.articleInfo.retailPrice')}
                   value={safeArticleInfo.retailPrice || ''}
                   onChange={handleInputChange('retailPrice')}
                   onBlur={() => validation.setFieldTouched('retailPrice')}
@@ -925,11 +927,11 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
 
               <div className="md:col-span-2">
                 <Textarea
-                  label="Fabric Description"
+                  label={t('form.articleInfo.fabricDescription')}
                   value={safeArticleInfo.fabricDescription}
                   onChange={handleInputChange('fabricDescription')}
                   onBlur={() => validation.setFieldTouched('fabricDescription')}
-                  placeholder="Detailed fabric composition, weight, and specifications..."
+                  placeholder={t('form.articleInfo.fabricDescriptionPlaceholder')}
                   required
                   rows={4}
                   maxLength={1000}
@@ -941,11 +943,11 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
 
               <div className="md:col-span-2">
                 <Textarea
-                  label="Product Description"
+                  label={t('form.articleInfo.productDescription')}
                   value={safeArticleInfo.productDescription}
                   onChange={handleInputChange('productDescription')}
                   onBlur={() => validation.setFieldTouched('productDescription')}
-                  placeholder="Detailed product description including design, functionality, materials, and style..."
+                  placeholder={t('form.articleInfo.productDescriptionPlaceholder')}
                   required
                   rows={4}
                   maxLength={1000}
@@ -958,7 +960,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               {/* Design Sketch Upload */}
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Design Sketch
+                  {t('form.articleInfo.designSketch')}
                   <span className="text-red-500 ml-1">*</span>
                 </label>
 
@@ -987,7 +989,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                               fallback={
                                 <div className="flex flex-col items-center justify-center text-gray-400 py-10">
                                   <UploadCloud className="w-10 h-10 mb-2" />
-                                  <p className="text-sm">Không thể hiển thị ảnh</p>
+                                  <p className="text-sm">{t('form.cannotDisplayImage')}</p>
                                 </div>
                               }
                             />
@@ -997,20 +999,20 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                                 validation.validateField('designSketchUrl', '');
                               }}
                               className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                              title="Remove image"
+                              title={t('form.removeImage')}
                             >
                               <XCircle className="w-4 h-4" />
                             </button>
                           </div>
                           <p className="text-xs text-green-600 flex items-center justify-center">
                             <CheckCircle className="w-3 h-3 mr-1" />
-                            Design sketch uploaded successfully
+                            {t('form.designSketchUploaded')}
                           </p>
                           <label
                             htmlFor="design-sketch-upload"
                             className="text-sm text-blue-600 hover:text-blue-500 cursor-pointer underline"
                           >
-                            Replace image
+                            {t('form.replaceImage')}
                           </label>
                           {/* Always-present hidden input to support Replace image */}
                           <input
@@ -1031,7 +1033,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                               htmlFor="design-sketch-upload"
                               className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
                             >
-                              <span>Upload a design sketch</span>
+                              <span>{t('form.uploadDesignSketch')}</span>
                               <input
                                 id="design-sketch-upload"
                                 name="design-sketch-upload"
@@ -1042,15 +1044,15 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                                 disabled={uploading}
                               />
                             </label>
-                            <p className="pl-1">or drag and drop</p>
+                            <p className="pl-1">{t('form.orDragAndDrop')}</p>
                           </div>
-                          <p className="text-xs text-gray-500">PNG, JPG, GIF, SVG up to 5MB</p>
+                          <p className="text-xs text-gray-500">{t('form.imageUploadHint')}</p>
                         </>
                       )}
                       {uploading && (
                         <div className="flex items-center justify-center text-xs text-blue-600">
                           <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-2"></div>
-                          Uploading...
+                          {t('form.uploading')}
                         </div>
                       )}
                       {uploadError && (
@@ -1085,7 +1087,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 )}
                 {!validation.getFieldProps('designSketchUrl').error && (
                   <p className="mt-1 text-xs text-gray-500">
-                    {validation.getFieldProps('designSketchUrl').helperText || 'Upload a design sketch image (required)'}
+                    {validation.getFieldProps('designSketchUrl').helperText || t('form.uploadDesignSketchRequired')}
                   </p>
                 )}
               </div>
@@ -1093,8 +1095,8 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               {/* Company Logo Upload */}
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Company Logo
-                  <span className="text-gray-400 text-xs ml-2">(Optional • used on every PDF page)</span>
+                  {t('form.articleInfo.companyLogo')}
+                  <span className="text-gray-400 text-xs ml-2">({t('common.optional')} • {t('form.companyLogoHint')})</span>
                 </label>
 
                 {mode !== 'view' && (
@@ -1122,7 +1124,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                               fallback={
                                 <div className="flex flex-col items-center justify-center text-gray-400 py-8">
                                   <UploadCloud className="w-8 h-8 mb-2" />
-                                  <p className="text-sm">Không thể hiển thị logo</p>
+                                  <p className="text-sm">{t('form.cannotDisplayLogo')}</p>
                                 </div>
                               }
                             />
@@ -1132,20 +1134,20 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                                 validation.validateField('companyLogoUrl', '');
                               }}
                               className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                              title="Remove logo"
+                              title={t('form.removeLogo')}
                             >
                               <XCircle className="w-4 h-4" />
                             </button>
                           </div>
                           <p className="text-xs text-green-600 flex items-center justify-center">
                             <CheckCircle className="w-3 h-3 mr-1" />
-                            Logo uploaded successfully
+                            {t('form.logoUploaded')}
                           </p>
                           <label
                             htmlFor="company-logo-upload"
                             className="text-sm text-blue-600 hover:text-blue-500 cursor-pointer underline"
                           >
-                            Replace logo
+                            {t('form.replaceLogo')}
                           </label>
                           <input
                             id="company-logo-upload"
@@ -1165,7 +1167,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                               htmlFor="company-logo-upload"
                               className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
                             >
-                              <span>Upload a company logo</span>
+                              <span>{t('form.uploadCompanyLogo')}</span>
                               <input
                                 id="company-logo-upload"
                                 name="company-logo-upload"
@@ -1176,10 +1178,10 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                                 disabled={logoUploading}
                               />
                             </label>
-                            <p className="pl-1">or drag and drop</p>
+                            <p className="pl-1">{t('form.orDragAndDrop')}</p>
                           </div>
                           <p className="text-xs text-gray-500">
-                            PNG, JPG, GIF, SVG up to 5MB. We’ll auto-resize to fit PDF headers.
+                            {t('form.companyLogoUploadHint')}
                           </p>
                         </>
                       )}
@@ -1187,7 +1189,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                       {logoUploading && (
                         <div className="flex items-center justify-center text-xs text-blue-600">
                           <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-2"></div>
-                          Uploading logo...
+                          {t('form.uploadingLogo')}
                         </div>
                       )}
                       {logoUploadError && (
@@ -1211,17 +1213,17 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 )}
 
                 <p className="mt-1 text-xs text-gray-500">
-                  Recommended: horizontal logo with transparent background. Logo will appear on the cover and every PDF page.
+                  {t('form.companyLogoRecommendation')}
                 </p>
               </div>
 
               <div className="md:col-span-2">
                 <Textarea
-                  label="Notes"
+                  label={t('form.articleInfo.notes')}
                   value={safeArticleInfo.notes || ''}
                   onChange={handleInputChange('notes')}
                   onBlur={() => validation.setFieldTouched('notes')}
-                  placeholder="Additional notes or special instructions..."
+                  placeholder={t('form.articleInfo.notesPlaceholder')}
                   rows={3}
                   maxLength={500}
                   disabled={mode === 'view'}
@@ -1236,45 +1238,45 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                   <div className="md:col-span-2 mt-6">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                       <Lock className="w-4 h-4 mr-2 text-gray-500" />
-                      System Information (Read-only)
+                      {t('form.systemInformation')}
                     </h3>
                   </div>
 
                   <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                     <div className="space-y-3">
                       <div>
-                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Created</label>
+                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{t('form.created')}</label>
                         <div className="mt-1 flex items-center text-sm text-gray-900">
                           <Calendar className="w-4 h-4 mr-2 text-gray-400" />
                           {safeArticleInfo.createdAt 
                             ? new Date(safeArticleInfo.createdAt).toLocaleString()
                             : safeArticleInfo.createdDate 
                             ? new Date(safeArticleInfo.createdDate).toLocaleString()
-                            : 'N/A'}
+                            : t('common.n/a')}
                         </div>
                         {safeArticleInfo.createdByName && (
                           <div className="mt-1 flex items-center text-xs text-gray-600">
                             <User className="w-3 h-3 mr-1 text-gray-400" />
-                            by {safeArticleInfo.createdByName}
+                            {t('form.by')} {safeArticleInfo.createdByName}
                           </div>
                         )}
                       </div>
                     </div>
                     <div className="space-y-3">
                       <div>
-                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Last Modified</label>
+                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{t('form.lastModified')}</label>
                         <div className="mt-1 flex items-center text-sm text-gray-900">
                           <Calendar className="w-4 h-4 mr-2 text-gray-400" />
                           {safeArticleInfo.updatedAt 
                             ? new Date(safeArticleInfo.updatedAt).toLocaleString()
                             : safeArticleInfo.lastModified 
                             ? new Date(safeArticleInfo.lastModified).toLocaleString()
-                            : 'N/A'}
+                            : t('common.n/a')}
                         </div>
                         {safeArticleInfo.updatedByName && (
                           <div className="mt-1 flex items-center text-xs text-gray-600">
                             <User className="w-3 h-3 mr-1 text-gray-400" />
-                            by {safeArticleInfo.updatedByName}
+                            {t('form.by')} {safeArticleInfo.updatedByName}
                           </div>
                         )}
                       </div>
@@ -1295,7 +1297,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                     className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
                     <RotateCcw className="w-4 h-4 mr-2" />
-                    Reset
+                    {t('common.reset')}
                   </button>
 
                   <button
@@ -1303,7 +1305,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                     className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
                     <Save className="w-4 h-4 mr-2" />
-                    Save Draft
+                    {t('form.saveDraft')}
                   </button>
                 </div>
 
@@ -1311,7 +1313,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                   onClick={handleNextTab}
                   className="flex items-center px-6 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                 >
-                  Next: Bill of Materials
+                  {t('form.next')}: {t('form.tab.bom')}
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </button>
               </div>
@@ -1322,18 +1324,18 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
         {/* Preview Sidebar */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Preview</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">{t('form.preview')}</h3>
             
             <div className="space-y-4">
               <div className="p-4 bg-gray-50 rounded-lg">
                 <h4 className="font-medium text-gray-900 mb-2">
-                  {safeArticleInfo.articleName || (safeArticleInfo as any).productName || 'Article Name'}
+                  {safeArticleInfo.articleName || (safeArticleInfo as any).productName || t('form.articleInfo.articleName')}
                 </h4>
                 <p className="text-sm text-gray-600 mb-2">
-                  {safeArticleInfo.articleCode || 'Article Code'}
+                  {safeArticleInfo.articleCode || t('form.articleInfo.articleCode')}
                 </p>
                 <div className="flex items-center text-xs text-gray-500 space-x-2">
-                  <span>{safeArticleInfo.sampleType || 'N/A'}</span>
+                  <span>{safeArticleInfo.sampleType || t('common.n/a')}</span>
                   <span>•</span>
                   <span>{safeArticleInfo.gender}</span>
                   <span>•</span>
@@ -1343,26 +1345,26 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
 
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Class:</span>
+                  <span className="text-gray-600">{t('form.preview.class')}:</span>
                   <span className="font-medium">{safeArticleInfo.productClass || '-'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Fit:</span>
+                  <span className="text-gray-600">{t('form.preview.fit')}:</span>
                   <span className="font-medium">{safeArticleInfo.fitType}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Stage:</span>
+                  <span className="text-gray-600">{t('form.preview.stage')}:</span>
                   <span className="font-medium">{safeArticleInfo.lifecycleStage}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Supplier:</span>
+                  <span className="text-gray-600">{t('form.preview.supplier')}:</span>
                   <span className="font-medium">{safeArticleInfo.supplier || '-'}</span>
                 </div>
               </div>
 
               {safeArticleInfo.fabricDescription && (
                 <div className="pt-4 border-t border-gray-200">
-                  <h5 className="text-sm font-medium text-gray-700 mb-2">Fabric</h5>
+                  <h5 className="text-sm font-medium text-gray-700 mb-2">{t('form.preview.fabric')}</h5>
                   <p className="text-xs text-gray-600 line-clamp-3">
                     {safeArticleInfo.fabricDescription}
                   </p>
@@ -1371,7 +1373,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
 
               {safeArticleInfo.productDescription && (
                 <div className="pt-4 border-t border-gray-200">
-                  <h5 className="text-sm font-medium text-gray-700 mb-2">Description</h5>
+                  <h5 className="text-sm font-medium text-gray-700 mb-2">{t('form.preview.description')}</h5>
                   <p className="text-xs text-gray-600 line-clamp-3">
                     {safeArticleInfo.productDescription}
                   </p>
@@ -1380,10 +1382,10 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
 
               {safeArticleInfo.designSketchUrl && (
                 <div className="pt-4 border-t border-gray-200">
-                  <h5 className="text-sm font-medium text-gray-700 mb-2">Design Sketch</h5>
+                  <h5 className="text-sm font-medium text-gray-700 mb-2">{t('form.articleInfo.designSketch')}</h5>
                   <ZoomableImage
                     src={getImageUrl(safeArticleInfo.designSketchUrl)}
-                    alt="Design Sketch Preview"
+                    alt={t('form.articleInfo.designSketch')}
                     containerClassName="w-full h-auto max-h-32 rounded border border-gray-200 bg-white"
                     className="max-h-32"
                     fallback={null}
@@ -1393,11 +1395,11 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
 
               {safeArticleInfo.companyLogoUrl && (
                 <div className="pt-4 border-t border-gray-200">
-                  <h5 className="text-sm font-medium text-gray-700 mb-2">Company Logo</h5>
+                  <h5 className="text-sm font-medium text-gray-700 mb-2">{t('form.articleInfo.companyLogo')}</h5>
                   <div className="w-full h-20 flex items-center justify-center border border-gray-200 bg-white rounded">
                     <img
                       src={getImageUrl(safeArticleInfo.companyLogoUrl)}
-                      alt="Company Logo Preview"
+                      alt={t('form.articleInfo.companyLogo')}
                       className="max-h-16 object-contain"
                     />
                   </div>
@@ -1407,11 +1409,11 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               <div className="pt-4 border-t border-gray-200 space-y-2 text-xs text-gray-500">
                 <div className="flex items-center">
                   <Calendar className="w-3 h-3 mr-1" />
-                  Created: {new Date(safeArticleInfo.createdDate).toLocaleDateString()}
+                  {t('form.created')}: {safeArticleInfo.createdDate ? new Date(safeArticleInfo.createdDate).toLocaleDateString() : t('common.n/a')}
                 </div>
                 <div className="flex items-center">
                   <User className="w-3 h-3 mr-1" />
-                  Designer: {designers.find(d => d.value === safeArticleInfo.technicalDesignerId)?.label || 'Not assigned'}
+                  {t('form.preview.designer')}: {designers.find(d => d.value === safeArticleInfo.technicalDesignerId)?.label || t('form.preview.notAssigned')}
                 </div>
               </div>
             </div>

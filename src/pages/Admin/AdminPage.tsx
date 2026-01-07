@@ -2,15 +2,17 @@ import React from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import UserListPage from './UserListPage';
+import { useI18n } from '../../lib/i18n';
 
 const AdminPage: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useI18n();
 
   if (user?.role !== 'admin') {
     return (
       <div style={{ padding: '20px' }}>
-        <h2>Access Denied</h2>
-        <p>You do not have permission to view this page.</p>
+        <h2>{t('admin.accessDenied.title')}</h2>
+        <p>{t('admin.accessDenied.message')}</p>
       </div>
     );
   }
@@ -18,9 +20,9 @@ const AdminPage: React.FC = () => {
   return (
     <div style={{ display: 'flex' }}>
       <nav style={{ width: '200px', borderRight: '1px solid #ccc', padding: '20px' }}>
-        <h3>Admin Menu</h3>
+        <h3>{t('admin.menu.title')}</h3>
         <ul>
-          <li><Link to="/admin/users">User Management</Link></li>
+          <li><Link to="/admin/users">{t('admin.menu.users')}</Link></li>
           {/* Add more admin links here */}
         </ul>
       </nav>

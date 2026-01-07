@@ -9,6 +9,7 @@ import {
 import { getMeasurementUnitSuffix, DEFAULT_MEASUREMENT_UNIT, MeasurementUnit } from '../../../types/techpack';
 import { SampleMeasurementRow } from '../../../types/measurements';
 import { parseTolerance, formatTolerance } from './measurementHelpers';
+import { useI18n } from '../../../lib/i18n';
 
 type EditableSampleField = 'measured' | 'diff' | 'revised' | 'comments';
 
@@ -43,17 +44,17 @@ const FIELD_SEQUENCE: Array<keyof MeasurementSampleEntry> = [
   'comments',
 ];
 
-const FIELD_LABELS: Record<keyof MeasurementSampleEntry, string> = {
-  requested: 'Requested',
-  measured: 'Measured',
-  diff: 'Diff',
-  revised: 'Revised',
-  comments: 'Comments',
-  id: 'ID',
-  point: 'Point',
-  pomCode: 'POM Code',
-  pomName: 'POM Name',
-  measurementId: 'Measurement ID',
+const FIELD_LABEL_KEYS: Record<keyof MeasurementSampleEntry, string> = {
+  requested: 'sample.requested',
+  measured: 'sample.measured',
+  diff: 'sample.diff',
+  revised: 'sample.revised',
+  comments: 'sample.comments',
+  id: 'sample.id',
+  point: 'sample.point',
+  pomCode: 'sample.pomCode',
+  pomName: 'sample.pomName',
+  measurementId: 'sample.measurementId',
 };
 
 const formatRoundDate = (value?: string) => {
@@ -173,16 +174,17 @@ const SampleMeasurementsTable: React.FC<SampleMeasurementsTableProps> = ({
   onDeleteRound,
   requestedSourceLabels,
 }) => {
+  const { t } = useI18n();
   const roundHeaderMeta = useMemo(
     () =>
       sampleRounds.map(round => ({
         id: round.id,
-        name: round.name || 'Sample Round',
+        name: round.name || t('sample.round'),
         reviewer: round.reviewer || '—',
         dateLabel: formatRoundDate(round.date),
         requestedSource: round.requestedSource || 'original',
       })),
-    [sampleRounds]
+    [sampleRounds, t]
   );
 
 const getDiffToneClass = (value: string): string => {
@@ -205,17 +207,17 @@ const getDiffToneClass = (value: string): string => {
             <th
               className="sticky left-0 z-30 bg-gray-50 px-4 py-3 text-left font-semibold min-w-[220px] border-r border-gray-200"
             >
-              Measurement Point
+              {t('form.measurement.pomNameColumn')}
             </th>
             <th
               className="sticky left-[220px] z-30 bg-gray-50 px-3 py-3 text-left font-semibold min-w-[70px] border-r border-gray-200"
             >
-              Size
+              {t('form.measurement.sizes')}
             </th>
             <th
               className="sticky left-[290px] z-30 bg-gray-50 px-3 py-3 text-left font-semibold min-w-[100px] border-r border-gray-200"
             >
-              Tolerance
+              {t('form.measurement.tolerance')}
             </th>
             {roundHeaderMeta.map(meta => (
               <th
@@ -226,8 +228,12 @@ const getDiffToneClass = (value: string): string => {
                 <div className="flex items-start justify-between gap-2">
                   <div className="text-left">
                     <div className="text-gray-900 text-sm">{meta.name}</div>
-                    <div className="text-[11px] text-gray-500">Date: {meta.dateLabel}</div>
-                    <div className="text-[11px] text-gray-500">Reviewer: {meta.reviewer || '—'}</div>
+                    <div className="text-[11px] text-gray-500">
+                      {t('form.measurement.date')}: {meta.dateLabel}
+                    </div>
+                    <div className="text-[11px] text-gray-500">
+                      {t('form.measurement.reviewer')}: {meta.reviewer || '—'}
+                    </div>
                     <div className="text-[11px] text-gray-500">
                       {requestedSourceLabels?.[meta.requestedSource] || meta.requestedSource}
                     </div>
@@ -236,7 +242,7 @@ const getDiffToneClass = (value: string): string => {
                     type="button"
                     onClick={() => onDeleteRound(meta.id)}
                     className="text-gray-400 hover:text-red-600 transition-colors"
-                    aria-label="Remove round"
+                    aria-label={t('sample.removeRoundAria')}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -254,7 +260,7 @@ const getDiffToneClass = (value: string): string => {
                   key={`${round.id}-${fieldKey}`}
                   className="px-2 py-2 text-center font-semibold text-[11px] text-gray-500 border-t border-r border-gray-200 bg-gray-50"
                 >
-                  {FIELD_LABELS[fieldKey]}
+                  {t(FIELD_LABEL_KEYS[fieldKey])}
                 </th>
               ))
             )}
@@ -345,7 +351,7 @@ const getDiffToneClass = (value: string): string => {
                               )
                             }
                             className="w-full min-w-[140px] border border-gray-300 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                            placeholder="Notes"
+                            placeholder={t('sample.comments')}
                           />
                         ) : (
                           <input
@@ -388,7 +394,7 @@ const getDiffToneClass = (value: string): string => {
                           }
                           rows={2}
                           className="w-full min-w-[140px] border border-gray-300 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                          placeholder="Notes"
+                          placeholder={t('sample.comments')}
                         />
                       </td>
                     );

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Button, Card, Row, Col, Typography, Space } from 'antd';
 import { PlusOutlined, CopyOutlined, FileAddOutlined, ClusterOutlined } from '@ant-design/icons';
+import { useI18n } from '../lib/i18n';
 
 const { Title, Text } = Typography;
 
@@ -18,6 +19,7 @@ export const CreateTechPackModal: React.FC<CreateTechPackModalProps> = ({
   onCreateFromExisting,
 }) => {
   const [selectedMode, setSelectedMode] = useState<'scratch' | 'existing' | null>(null);
+  const { t } = useI18n();
 
   const handleContinue = () => {
     if (selectedMode === 'scratch') {
@@ -38,7 +40,7 @@ export const CreateTechPackModal: React.FC<CreateTechPackModalProps> = ({
       title={
         <Space>
           <FileAddOutlined />
-          <span>Create a new TechPack</span>
+          <span>{t('techpack.create.title')}</span>
         </Space>
       }
       open={visible}
@@ -46,7 +48,7 @@ export const CreateTechPackModal: React.FC<CreateTechPackModalProps> = ({
       width={600}
       footer={[
         <Button key="cancel" onClick={handleCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>,
         <Button
           key="continue"
@@ -54,13 +56,13 @@ export const CreateTechPackModal: React.FC<CreateTechPackModalProps> = ({
           disabled={!selectedMode}
           onClick={handleContinue}
         >
-          Continue
+          {t('techpack.create.continue')}
         </Button>,
       ]}
     >
       <div style={{ padding: '16px 0' }}>
         <Text type="secondary" style={{ marginBottom: 24, display: 'block' }}>
-          Choose how you want to create your new TechPack:
+          {t('techpack.create.subtitle')}
         </Text>
 
         <Row gutter={[16, 16]}>
@@ -89,10 +91,10 @@ export const CreateTechPackModal: React.FC<CreateTechPackModalProps> = ({
                   }} 
                 />
                 <Title level={4} style={{ margin: '0 0 8px 0' }}>
-                  🆕 Create from scratch
+                  🆕 {t('techpack.create.fromScratch.title')}
                 </Title>
                 <Text type="secondary">
-                  Start a completely new TechPack with empty fields
+                  {t('techpack.create.fromScratch.description')}
                 </Text>
               </div>
             </Card>
@@ -123,10 +125,10 @@ export const CreateTechPackModal: React.FC<CreateTechPackModalProps> = ({
                   }} 
                 />
                 <Title level={4} style={{ margin: '0 0 8px 0' }}>
-                  ♻️ Create from existing TechPack
+                  ♻️ {t('techpack.create.fromExisting.title')}
                 </Title>
                 <Text type="secondary">
-                  Duplicate an existing TechPack to edit and reuse
+                  {t('techpack.create.fromExisting.description')}
                 </Text>
               </div>
             </Card>
@@ -137,7 +139,8 @@ export const CreateTechPackModal: React.FC<CreateTechPackModalProps> = ({
           <Space>
             <ClusterOutlined style={{ color: '#1890ff' }} />
             <Text type="secondary" style={{ fontSize: '12px' }}>
-              <strong>Tip:</strong> Creating from an existing TechPack is perfect when your new product only differs slightly in color, fabric, or measurements.
+              <strong>{t('techpack.create.tipLabel')}</strong>{' '}
+              {t('techpack.create.tipText')}
             </Text>
           </Space>
         </div>

@@ -4,6 +4,7 @@ import 'react-quill/dist/quill.snow.css';
 import { ApiTechPack, TechPack } from '../../../types/techpack';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Info, RefreshCcw } from 'lucide-react';
+import { useI18n } from '../../../lib/i18n';
 
 interface PackingTabProps {
   techPack: TechPack;
@@ -60,6 +61,7 @@ const quillFormats = [
 
 const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate }) => {
   const { user } = useAuth();
+  const { t } = useI18n();
   const canEdit = !(mode === 'view' || user?.role === 'viewer' || user?.role === 'merchandiser');
   const [value, setValue] = useState<string>(techPack.packingNotes || '');
 
@@ -91,15 +93,15 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate }) => 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-2xl font-semibold text-gray-900">Packing & Folding Guide</h2>
+            <h2 className="text-2xl font-semibold text-gray-900">{t('form.packing.title')}</h2>
             <p className="text-sm text-gray-600">
-              Paste diagrams, photos, checklists, tables, or instructions exactly as you want them to appear in the PDF.
+              {t('form.packing.subtitle')}
             </p>
           </div>
           <div className="flex items-center gap-3 text-sm text-gray-500">
-            <span>{wordCount} words</span>
+            <span>{t('form.packing.wordCount', { count: wordCount })}</span>
             <span>•</span>
-            <span>{Math.max(value?.length ?? 0, 0)} characters</span>
+            <span>{t('form.packing.charCount', { count: Math.max(value?.length ?? 0, 0) })}</span>
             <span>•</span>
             <button
               type="button"
@@ -108,7 +110,7 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate }) => 
               className="inline-flex items-center px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 disabled:opacity-50"
             >
               <RefreshCcw className="w-4 h-4 mr-2" />
-              Clear
+              {t('form.packing.clear')}
             </button>
           </div>
         </div>
@@ -121,7 +123,7 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate }) => 
             readOnly={!canEdit}
             modules={quillModules}
             formats={quillFormats}
-            placeholder="Drop in your packing workflow, folding diagrams, material breakdowns, QA checklist, carton labels, pallet layout, etc..."
+            placeholder={t('form.packing.placeholder')}
             className="min-h-[420px]"
           />
         </div>
@@ -130,12 +132,12 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate }) => 
           <div className="flex items-start">
             <Info className="w-5 h-5 text-blue-500 mr-3 mt-0.5" />
             <div className="text-sm text-blue-900 space-y-1">
-              <p className="font-medium">Tips</p>
+              <p className="font-medium">{t('form.packing.tipsTitle')}</p>
               <ul className="list-disc list-inside space-y-1">
-                <li>Paste directly from Word, Excel, PDF, or any website. Formatting, tables, and bullet points will be preserved.</li>
-                <li>Use the image tool or paste inline images to illustrate folding steps, carton layouts, or labeling requirements.</li>
-                <li>Checklists can be created using the checklist button or bullet lists.</li>
-                <li>All content is embedded in the Techpack PDF exactly as shown here.</li>
+                <li>{t('form.packing.tip1')}</li>
+                <li>{t('form.packing.tip2')}</li>
+                <li>{t('form.packing.tip3')}</li>
+                <li>{t('form.packing.tip4')}</li>
               </ul>
             </div>
           </div>

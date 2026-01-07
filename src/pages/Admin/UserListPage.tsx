@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button, Table, Input, Select, Tag, Space, Tooltip, Modal, message, Card, Row, Col, Statistic, Typography, Switch } from 'antd';
 import { ArrowLeftOutlined, PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, UserOutlined, TeamOutlined, RiseOutlined } from '@ant-design/icons';
 import { api } from '../../lib/api';
+import { useI18n } from '../../lib/i18n';
 import UserModal from './components/UserModal';
 import './UserListPage.css';
 
@@ -40,6 +41,7 @@ const UserListPage: React.FC = () => {
   const [filters, setFilters] = useState({ search: '', role: '' });
   const [sorter, setSorter] = useState({ field: 'createdAt', order: 'descend' });
   const [twoFactorLoadingIds, setTwoFactorLoadingIds] = useState<string[]>([]);
+  const { t } = useI18n();
 
   const fetchUsers = async () => {
     try {
@@ -55,7 +57,7 @@ const UserListPage: React.FC = () => {
       setUsers(response.users);
       setPagination(prev => ({ ...prev, total: response.pagination.total }));
     } catch (err) {
-      message.error('Failed to fetch users');
+      message.error(t('admin.users.fetchError'));
     } finally {
       setLoading(false);
     }
@@ -91,19 +93,19 @@ const UserListPage: React.FC = () => {
 
   const showDeleteConfirm = (user: User) => {
     Modal.confirm({
-      title: 'Are you sure you want to delete this user?',
-      content: `${user.firstName} ${user.lastName} will be permanently deleted.`,
-      okText: 'Yes, Delete',
+      title: t('admin.users.delete.title'),
+      content: t('admin.users.delete.content', { name: `${user.firstName} ${user.lastName}` }),
+      okText: t('admin.users.delete.ok'),
       okType: 'danger',
-      cancelText: 'No, Cancel',
+      cancelText: t('common.cancel'),
       onOk: async () => {
         try {
           await api.deleteUser(user._id);
-          message.success('User deleted successfully');
+          message.success(t('admin.users.delete.success'));
           fetchUsers();
           fetchStats();
         } catch (error) {
-          message.error('Failed to delete user');
+          message.error(t('admin.users.delete.error'));
         }
       },
     });
@@ -113,10 +115,14 @@ const UserListPage: React.FC = () => {
     setTwoFactorLoadingIds(prev => [...prev, user._id]);
     try {
       await api.updateUserTwoFactor(user._id, enabled);
-      message.success(`Two-factor authentication ${enabled ? 'enabled' : 'disabled'} for ${user.email}`);
+      message.success(
+        enabled
+          ? t('admin.users.twoFactor.enabled', { email: user.email })
+          : t('admin.users.twoFactor.disabled', { email: user.email })
+      );
       fetchUsers();
     } catch (error) {
-      message.error(`Failed to update 2FA for ${user.email}`);
+      message.error(t('admin.users.twoFactor.error', { email: user.email }));
     } finally {
       setTwoFactorLoadingIds(prev => prev.filter(id => id !== user._id));
     }
@@ -130,11 +136,11 @@ const UserListPage: React.FC = () => {
   };
 
   const columns = [
-    { title: 'Name', dataIndex: 'firstName', sorter: true, render: (text: string, record: User) => `${record.firstName} ${record.lastName}` },
-    { title: 'Email', dataIndex: 'email', sorter: true },
-    { title: 'Role', dataIndex: 'role', sorter: true, render: (role: string) => <Tag color={roleColors[role]}>{role.toUpperCase()}</Tag> },
-    { title: 'Created At', dataIndex: 'createdAt', sorter: true, render: (date: string) => new Date(date).toLocaleDateString() },
-    { title: 'Last Login', dataIndex: 'lastLogin', sorter: true, render: (date: string) => date ? new Date(date).toLocaleString() : 'N/A' },
+    { title: t('admin.users.columns.name'), dataIndex: 'firstName', sorter: true, render: (text: string, record: User) => `${record.firstName} ${record.lastName}` },
+    { title: t('admin.users.columns.email'), dataIndex: 'email', sorter: true },
+    { title: t('admin.users.columns.role'), dataIndex: 'role', sorter: true, render: (role: string) => <Tag color={roleColors[role]}>{role.toUpperCase()}</Tag> },
+    { title: t('admin.users.columns.createdAt'), dataIndex: 'createdAt', sorter: true, render: (date: string) => new Date(date).toLocaleDateString() },
+    { title: t('admin.users.columns.lastLogin'), dataIndex: 'lastLogin', sorter: true, render: (date: string) => date ? new Date(date).toLocaleString() : t('admin.users.na') },
     {
       title: '2FA',
       dataIndex: 'is2FAEnabled',
@@ -147,7 +153,7 @@ const UserListPage: React.FC = () => {
       ),
     },
     {
-      title: 'Actions',
+      title: t('common.actions'),
       key: 'actions',
       render: (_: any, record: User) => (
         <Space size="middle">
@@ -161,11 +167,11 @@ const UserListPage: React.FC = () => {
 
   const userStats = useMemo(() => (
     <Row gutter={16} className="stats-container">
-      <Col span={8}><Card><Statistic title="Total Users" value={stats?.totalUsers} prefix={<TeamOutlined />} /></Card></Col>
-      <Col span={8}><Card><Statistic title="Most Common Role" value={Object.keys(stats?.roleDistribution || {}).reduce((a, b) => (stats?.roleDistribution[a] || 0) > (stats?.roleDistribution[b] || 0) ? a : b, 'N/A')} prefix={<UserOutlined />} /></Card></Col>
-      <Col span={8}><Card><Statistic title="New Users (Last 7 Days)" value={stats?.recentUsers.length} prefix={<RiseOutlined />} /></Card></Col>
+      <Col span={8}><Card><Statistic title={t('admin.users.stats.totalUsers')} value={stats?.totalUsers} prefix={<TeamOutlined />} /></Card></Col>
+      <Col span={8}><Card><Statistic title={t('admin.users.stats.mostCommonRole')} value={Object.keys(stats?.roleDistribution || {}).reduce((a, b) => (stats?.roleDistribution[a] || 0) > (stats?.roleDistribution[b] || 0) ? a : b, t('admin.users.na'))} prefix={<UserOutlined />} /></Card></Col>
+      <Col span={8}><Card><Statistic title={t('admin.users.stats.newUsers')} value={stats?.recentUsers.length} prefix={<RiseOutlined />} /></Card></Col>
     </Row>
-  ), [stats]);
+  ), [stats, t]);
 
   return (
     <div className="user-list-page">
@@ -175,16 +181,16 @@ const UserListPage: React.FC = () => {
             <Space align="center">
               <Button icon={<ArrowLeftOutlined />} onClick={() => window.history.back()} />
               <div>
-                <Title level={3} style={{ marginBottom: 0 }}>User Management</Title>
-                <Text type="secondary">Administer users and roles</Text>
+                <Title level={3} style={{ marginBottom: 0 }}>{t('admin.users.title')}</Title>
+                <Text type="secondary">{t('admin.users.subtitle')}</Text>
               </div>
             </Space>
           </Col>
-          <Col>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => { setSelectedUser(null); setModalMode('create'); setIsModalOpen(true); }}>
-              Add New User
-            </Button>
-          </Col>
+            <Col>
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => { setSelectedUser(null); setModalMode('create'); setIsModalOpen(true); }}>
+                {t('admin.users.addNew')}
+              </Button>
+            </Col>
         </Row>
       </div>
 
@@ -193,15 +199,25 @@ const UserListPage: React.FC = () => {
       <Card className="table-card">
         <div className="table-header">
           <Row justify="space-between" align="middle">
-            <Col><Title level={4}>All Users</Title></Col>
+            <Col><Title level={4}>{t('admin.users.allUsers')}</Title></Col>
             <Col>
               <Space>
-                <Search placeholder="Search by name or email" onSearch={value => setFilters({ ...filters, search: value })} style={{ width: 250 }} allowClear />
-                <Select placeholder="Filter by role" onChange={value => setFilters({ ...filters, role: value })} style={{ width: 150 }} allowClear>
-                  <Option value="admin">Admin</Option>
-                  <Option value="designer">Designer</Option>
-                  <Option value="merchandiser">Merchandiser</Option>
-                  <Option value="viewer">Viewer</Option>
+                <Search
+                  placeholder={t('admin.users.searchPlaceholder')}
+                  onSearch={value => setFilters({ ...filters, search: value })}
+                  style={{ width: 250 }}
+                  allowClear
+                />
+                <Select
+                  placeholder={t('admin.users.filterByRole')}
+                  onChange={value => setFilters({ ...filters, role: value as string })}
+                  style={{ width: 150 }}
+                  allowClear
+                >
+                  <Option value="admin">{t('admin.users.roles.admin')}</Option>
+                  <Option value="designer">{t('admin.users.roles.designer')}</Option>
+                  <Option value="merchandiser">{t('admin.users.roles.merchandiser')}</Option>
+                  <Option value="viewer">{t('admin.users.roles.viewer')}</Option>
                 </Select>
               </Space>
             </Col>

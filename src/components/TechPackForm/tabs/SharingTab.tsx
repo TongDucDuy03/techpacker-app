@@ -4,6 +4,7 @@ import { api } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { User, Share2, Eye, Trash2, Crown, Shield, PenTool, Factory, UserPlus } from 'lucide-react';
 import { showSuccess, showError } from '../../../lib/toast';
+import { useI18n } from '../../../lib/i18n';
 
 interface SharingTabProps {
   techPack?: ApiTechPack;
@@ -22,6 +23,7 @@ const roleIcons: { [key in TechPackRole]: React.ReactNode } = {
 
 const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
   const { user: currentUser } = useAuth();
+  const { t } = useI18n();
   // Normalize currentUserId: prefer `id`, then `_id`, always string
   const currentUserId = String((currentUser as any)?.id || (currentUser as any)?._id || '');
   const [accessList, setAccessList] = useState<AccessListItem[]>([]);
@@ -220,7 +222,7 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
       console.error('Error in sharing tab useEffect:', error);
       if (isMounted) {
         setLoading(false);
-        showError('Failed to load sharing information.');
+        showError(t('form.sharing.loadError'));
       }
     });
 
@@ -237,12 +239,12 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
     setIsSubmitting(true);
     try {
       await api.shareTechPack(resolvedTechpackId, { userId: selectedUserId, role: selectedRole });
-      showSuccess('Access granted successfully.');
+      showSuccess(t('form.sharing.accessGranted'));
       setSelectedUserId('');
       setSelectedRole(TechPackRole.Viewer);
       fetchData(); // Refresh both lists
     } catch (error: any) {
-      showError(error.response?.data?.message || error.message || 'Failed to grant access.');
+      showError(error.response?.data?.message || error.message || t('form.sharing.grantFailed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -253,23 +255,23 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
 
     try {
       await api.updateShareRole(resolvedTechpackId, userId, { role });
-      showSuccess('Role updated successfully.');
+      showSuccess(t('form.sharing.roleUpdated'));
       fetchData();
     } catch (error: any) {
-      showError(error.response?.data?.message || error.message || 'Failed to update role.');
+      showError(error.response?.data?.message || error.message || t('form.sharing.updateRoleFailed'));
     }
   };
 
   const handleRevoke = async (userId: string, userName: string) => {
     if (!resolvedTechpackId) return;
-    if (!window.confirm(`Are you sure you want to remove access for ${userName}?`)) return;
+    if (!window.confirm(t('form.sharing.confirmRevoke', { userName }))) return;
 
     try {
       await api.revokeShare(resolvedTechpackId, userId);
-      showSuccess('Access removed successfully.');
+      showSuccess(t('form.sharing.accessRevoked'));
       fetchData();
     } catch (error: any) {
-      showError(error.response?.data?.message || error.message || 'Failed to remove access.');
+      showError(error.response?.data?.message || error.message || t('form.sharing.revokeFailed'));
     }
   };
 
@@ -277,8 +279,8 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
     return (
       <div className="p-8 text-center text-gray-500">
         <Share2 className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-        <h2 className="text-lg font-medium">Sharing is not available yet</h2>
-        <p className="mt-2">Please save the Tech Pack first to enable sharing options.</p>
+        <h2 className="text-lg font-medium">{t('form.sharing.notAvailableTitle')}</h2>
+        <p className="mt-2">{t('form.sharing.notAvailableDescription')}</p>
       </div>
     );
   }
@@ -299,18 +301,19 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
     return (
       <div className="p-8 text-center text-gray-500">
         <Eye className="w-12 h-12 mx-auto mb-4 text-blue-400" />
-        <h2 className="text-lg font-medium">You have view-only access to this TechPack</h2>
+        <h2 className="text-lg font-medium">{t('form.sharing.viewOnlyTitle')}</h2>
         <p className="mt-2">
           {currentUserTechPackRole === TechPackRole.Viewer
-            ? "You can view all content but cannot make changes or manage sharing."
+            ? t('form.sharing.viewOnlyViewer')
             : currentUserTechPackRole === TechPackRole.Editor
-            ? "You can edit content but cannot manage sharing settings."
-            : "Only the owner or administrators can manage sharing for this TechPack."
+            ? t('form.sharing.viewOnlyEditor')
+            : t('form.sharing.viewOnlyOther')
           }
         </p>
         <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
           <p className="text-sm text-blue-700">
-            <strong>Your current role:</strong> {currentUserTechPackRole || 'No access'} (Global: {currentUser?.role})
+            <strong>{t('form.sharing.currentRoleLabel')}</strong>{' '}
+            {currentUserTechPackRole || t('form.sharing.noAccess')} (Global: {currentUser?.role})
           </p>
         </div>
       </div>
@@ -321,7 +324,7 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
     return (
       <div className="p-8 text-center">
         <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="mt-4 text-gray-500">Loading Sharing Settings...</p>
+        <p className="mt-4 text-gray-500">{t('form.sharing.loading')}</p>
       </div>
     );
   }
@@ -329,28 +332,30 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Sharing & Access Control</h1>
-        <p className="text-sm text-gray-600 mt-1">Manage who can view or edit this Tech Pack.</p>
+        <h1 className="text-2xl font-bold text-gray-900">{t('form.sharing.title')}</h1>
+        <p className="text-sm text-gray-600 mt-1">{t('form.sharing.subtitle')}</p>
       </div>
 
       {/* Add New Share Section */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
           <UserPlus className="w-5 h-5 mr-2" />
-          Grant Access to a User
+          {t('form.sharing.grantTitle')}
         </h2>
         <div className="flex flex-col md:flex-row md:items-end md:space-x-4 space-y-4 md:space-y-0">
           <div className="flex-grow">
-            <label htmlFor="user-select" className="block text-sm font-medium text-gray-700 mb-1">User</label>
+            <label htmlFor="user-select" className="block text-sm font-medium text-gray-700 mb-1">
+              {t('form.sharing.userLabel')}
+            </label>
             <select
               id="user-select"
               value={selectedUserId}
               onChange={(e) => setSelectedUserId(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">Select a user...</option>
+              <option value="">{t('form.sharing.userPlaceholder')}</option>
               {shareableUsers.length === 0 ? (
-                <option value="" disabled>No users available to share</option>
+                <option value="" disabled>{t('form.sharing.noUsersOption')}</option>
               ) : (
                 shareableUsers.map((user) => (
                   <option key={user._id} value={user._id}>
@@ -361,7 +366,9 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
             </select>
           </div>
           <div className="w-full md:w-48">
-            <label htmlFor="role-select" className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+            <label htmlFor="role-select" className="block text-sm font-medium text-gray-700 mb-1">
+              {t('form.sharing.roleLabel')}
+            </label>
             <select
               id="role-select"
               value={selectedRole}
@@ -378,24 +385,24 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
             disabled={!selectedUserId || isSubmitting}
             className="w-full md:w-auto bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
-            {isSubmitting ? 'Adding...' : 'Add User'}
+            {isSubmitting ? t('form.sharing.adding') : t('form.sharing.addUser')}
           </button>
         </div>
         {shareableUsers.length === 0 && !loading && (
           <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-sm text-yellow-800">
-              <strong>No users available to share with.</strong>
+              <strong>{t('form.sharing.noUsersTitle')}</strong>
             </p>
             <div className="text-xs text-yellow-600 mt-1">
-              <p>This could be because:</p>
+              <p>{t('form.sharing.noUsersReasonTitle')}</p>
               <ul className="list-disc list-inside mt-2 space-y-1">
-                <li>All users have already been shared with this TechPack</li>
-                <li>There are no other users in the system</li>
-                <li>All users are either admins or the technical designer</li>
+                <li>{t('form.sharing.noUsersReason1')}</li>
+                <li>{t('form.sharing.noUsersReason2')}</li>
+                <li>{t('form.sharing.noUsersReason3')}</li>
               </ul>
             </div>
             <div className="mt-2 p-2 bg-gray-100 rounded text-xs">
-              <strong>Debug Info:</strong><br/>
+              <strong>{t('form.sharing.debugTitle')}</strong><br/>
               shareableUsers.length: {shareableUsers.length}<br/>
               canManage: {canManage.toString()}<br/>
               currentUserRole: {currentUser?.role}<br/>
@@ -405,7 +412,7 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
         )}
         {shareableUsers.length > 0 && (
           <p className="text-sm text-gray-500 mt-4">
-            {shareableUsers.length} user{shareableUsers.length !== 1 ? 's' : ''} available to share with.
+            {t('form.sharing.availableUsers', { count: shareableUsers.length })}
           </p>
         )}
       </div>
@@ -415,18 +422,28 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
         <div className="p-6 border-b">
           <h2 className="text-lg font-semibold text-gray-800 flex items-center">
             <User className="w-5 h-5 mr-2" />
-            Currently Shared With ({accessList.length})
+            {t('form.sharing.currentlySharedTitle', { count: accessList.length })}
           </h2>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shared By</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Shared</th>
-                <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  {t('form.sharing.table.user')}
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  {t('form.sharing.table.role')}
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  {t('form.sharing.table.sharedBy')}
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  {t('form.sharing.table.dateShared')}
+                </th>
+                <th scope="col" className="relative px-6 py-3">
+                  <span className="sr-only">{t('common.actions')}</span>
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -438,7 +455,9 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
                         <User className="w-4 h-4 text-gray-600" />
                       </div>
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{item.user?.firstName || 'Unknown'} {item.user?.lastName || ''}</div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {item.user?.firstName || t('form.sharing.unknownUser')} {item.user?.lastName || ''}
+                        </div>
                         <div className="text-sm text-gray-500">{item.user?.email || '—'}</div>
                       </div>
                     </div>
@@ -459,7 +478,9 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {item.sharedBy ? `${(item.sharedBy as any)?.firstName || ''} ${(item.sharedBy as any)?.lastName || ''}`.trim() : 'N/A'}
+                    {item.sharedBy
+                      ? `${(item.sharedBy as any)?.firstName || ''} ${(item.sharedBy as any)?.lastName || ''}`.trim()
+                      : t('form.sharing.notAvailable')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(item.sharedAt).toLocaleDateString()}
@@ -480,7 +501,9 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
           </table>
         </div>
         {accessList.length === 0 && (
-          <p className="text-center py-8 text-sm text-gray-500">This Tech Pack has not been shared with anyone yet.</p>
+          <p className="text-center py-8 text-sm text-gray-500">
+            {t('form.sharing.emptyAccessList')}
+          </p>
         )}
       </div>
     </div>

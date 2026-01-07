@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useI18n } from '../lib/i18n';
 import { api } from '../lib/api';
 import { Card, Button, Alert, Space, Typography } from 'antd';
 import { SafetyOutlined } from '@ant-design/icons';
@@ -8,6 +9,7 @@ const { Title, Text } = Typography;
 
 const ProfilePage: React.FC = () => {
   const { user, isLoading: authLoading, refreshUser } = useAuth();
+  const { t } = useI18n();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({ firstName: '', lastName: '' });
   const [loading, setLoading] = useState(false);
@@ -33,26 +35,26 @@ const ProfilePage: React.FC = () => {
     try {
       await api.updateProfile(formData);
       await refreshUser();
-      setSuccess('Profile updated successfully!');
+      setSuccess(t('success.updated'));
       setIsEditing(false);
     } catch (err: any) {
-      setError(err.message || 'Failed to update profile.');
+      setError(err.message || t('error.saveFailed'));
     } finally {
       setLoading(false);
     }
   };
 
   if (authLoading) {
-    return <div>Loading profile...</div>;
+    return <div>{t('common.loading')}</div>;
   }
 
   if (!user) {
-    return <div>User not found. Please log in.</div>;
+    return <div>{t('error.notFound')}</div>;
   }
 
   return (
     <div style={{ maxWidth: '800px', margin: '40px auto', padding: '20px' }}>
-      <Title level={2}>My Profile</Title>
+      <Title level={2}>{t('profile.title')}</Title>
 
       {error && (
         <Alert
@@ -78,21 +80,21 @@ const ProfilePage: React.FC = () => {
 
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {/* Profile Information */}
-        <Card title="Profile Information">
+        <Card title={t('profile.personalInfo')}>
           {!isEditing ? (
             <div>
-              <p><strong>First Name:</strong> {user.firstName}</p>
-              <p><strong>Last Name:</strong> {user.lastName}</p>
-              <p><strong>Email:</strong> {user.email}</p>
-              <p><strong>Role:</strong> {user.role}</p>
+              <p><strong>{t('profile.firstName')}:</strong> {user.firstName}</p>
+              <p><strong>{t('profile.lastName')}:</strong> {user.lastName}</p>
+              <p><strong>{t('profile.email')}:</strong> {user.email}</p>
+              <p><strong>{t('profile.role')}:</strong> {user.role}</p>
               <Button type="primary" onClick={() => setIsEditing(true)} style={{ marginTop: '20px' }}>
-                Edit Profile
+                {t('profile.updateProfile')}
               </Button>
             </div>
           ) : (
             <form onSubmit={handleUpdate}>
               <div style={{ marginBottom: '15px' }}>
-                <label htmlFor="firstName">First Name</label>
+                <label htmlFor="firstName">{t('profile.firstName')}</label>
                 <input
                   type="text"
                   id="firstName"
@@ -104,7 +106,7 @@ const ProfilePage: React.FC = () => {
                 />
               </div>
               <div style={{ marginBottom: '15px' }}>
-                <label htmlFor="lastName">Last Name</label>
+                <label htmlFor="lastName">{t('profile.lastName')}</label>
                 <input
                   type="text"
                   id="lastName"
@@ -117,9 +119,9 @@ const ProfilePage: React.FC = () => {
               </div>
               <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                 <Button type="primary" htmlType="submit" loading={loading}>
-                  Save Changes
+                  {t('profile.save')}
                 </Button>
-                <Button onClick={() => setIsEditing(false)}>Cancel</Button>
+                <Button onClick={() => setIsEditing(false)}>{t('common.cancel')}</Button>
               </div>
             </form>
           )}

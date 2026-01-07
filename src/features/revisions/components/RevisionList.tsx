@@ -3,6 +3,7 @@ import { Card, List, Badge, Space, Select, Input, Empty, Spin } from 'antd';
 import { Clock, User, FileText, Undo2, Search } from 'lucide-react';
 import { Revision, ChangeType } from '../types';
 import { useRevisions } from '../hooks/useRevisions';
+import { useI18n } from '../../../lib/i18n';
 
 const { Search: SearchInput } = Input;
 
@@ -19,6 +20,7 @@ export const RevisionList: React.FC<RevisionListProps> = ({
   onSelectRevision,
   canEdit
 }) => {
+  const { t } = useI18n();
   const [filters, setFilters] = useState<{ changeType?: ChangeType; createdBy?: string }>({});
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -53,7 +55,7 @@ export const RevisionList: React.FC<RevisionListProps> = ({
     return (
       <Card>
         <div className="text-center py-8 text-red-600">
-          <p>Failed to load revisions</p>
+          <p>{t('form.revision.loadError')}</p>
           <p className="text-sm text-gray-500 mt-2">{error}</p>
         </div>
       </Card>
@@ -65,9 +67,9 @@ export const RevisionList: React.FC<RevisionListProps> = ({
       title={
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Revision History</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t('form.tab.revisionHistory')}</h3>
             <p className="text-xs text-gray-500 mt-1">
-              {pagination.total || 0} revision{(pagination.total || 0) !== 1 ? 's' : ''}
+              {t('form.revision.count', { count: pagination.total || 0 })}
             </p>
           </div>
         </div>
@@ -78,7 +80,7 @@ export const RevisionList: React.FC<RevisionListProps> = ({
       {/* Filters */}
       <div className="p-4 border-b space-y-2">
         <SearchInput
-          placeholder="Search revisions..."
+          placeholder={t('form.revision.searchPlaceholder')}
           prefix={<Search className="w-4 h-4" />}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -86,16 +88,16 @@ export const RevisionList: React.FC<RevisionListProps> = ({
         />
         <Space className="w-full" wrap>
           <Select
-            placeholder="Filter by type"
+            placeholder={t('form.revision.filterByType')}
             allowClear
             style={{ width: 150 }}
             value={filters.changeType}
             onChange={(value) => setFilters({ ...filters, changeType: value })}
           >
-            <Select.Option value="auto">Auto</Select.Option>
-            <Select.Option value="manual">Manual</Select.Option>
-            <Select.Option value="approval">Approval</Select.Option>
-            <Select.Option value="rollback">Rollback</Select.Option>
+            <Select.Option value="auto">{t('form.revision.type.auto')}</Select.Option>
+            <Select.Option value="manual">{t('form.revision.type.manual')}</Select.Option>
+            <Select.Option value="approval">{t('form.revision.type.approval')}</Select.Option>
+            <Select.Option value="rollback">{t('form.revision.type.rollback')}</Select.Option>
           </Select>
         </Space>
       </div>
@@ -105,12 +107,12 @@ export const RevisionList: React.FC<RevisionListProps> = ({
         {loading ? (
           <div className="p-6 text-center">
             <Spin size="large" />
-            <p className="text-sm text-gray-500 mt-2">Loading...</p>
+            <p className="text-sm text-gray-500 mt-2">{t('common.loading')}</p>
           </div>
         ) : filteredRevisions.length === 0 ? (
           <div className="p-6 text-center">
             <Empty
-              description="No revisions found"
+              description={t('form.revision.emptyList')}
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             />
           </div>
@@ -135,13 +137,13 @@ export const RevisionList: React.FC<RevisionListProps> = ({
                       />
                       {index === 0 && (
                         <Badge
-                          count="Current"
+                          count={t('form.revision.current')}
                           style={{ backgroundColor: '#52c41a' }}
                         />
                       )}
                       {revision.changeType === 'rollback' && (
                         <Badge
-                          count="Rollback"
+                          count={t('form.revision.type.rollback')}
                           style={{ backgroundColor: '#fa8c16' }}
                           icon={<Undo2 className="w-3 h-3" />}
                         />
@@ -150,13 +152,13 @@ export const RevisionList: React.FC<RevisionListProps> = ({
                   </div>
 
                   <p className="text-xs text-gray-600 line-clamp-2 mb-2">
-                    {revision.description || revision.changes?.summary || 'No description'}
+                    {revision.description || revision.changes?.summary || t('form.revision.noDescription')}
                   </p>
 
                   <div className="flex items-center text-xs text-gray-500 gap-4">
                     <span className="flex items-center gap-1">
                       <User className="w-3 h-3" />
-                      {revision.createdByName || 'Unknown'}
+                      {revision.createdByName || t('form.revision.unknownUser')}
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />

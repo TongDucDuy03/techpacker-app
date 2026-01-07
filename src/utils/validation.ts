@@ -112,7 +112,8 @@ export const VALIDATION_PATTERNS = {
 
 // Validation messages
 export const VALIDATION_MESSAGES = {
-  required: 'This field is required',
+  // NOTE: hiển thị trực tiếp ở UI, hiện tại ưu tiên tiếng Việt theo yêu cầu
+  required: 'Trường này là bắt buộc',
   email: 'Please enter a valid email address',
   url: 'Please enter a valid URL',
   minLength: (min: number) => `Must be at least ${min} characters long`,
@@ -188,7 +189,7 @@ export function validateField(value: any, rules: ValidationRule, fieldName: stri
 
   // Pattern validation
   if (rules.pattern && !rules.pattern.test(stringValue)) {
-    return formatValidationMessage(fieldName, VALIDATION_MESSAGES.pattern);
+      return formatValidationMessage(fieldName, VALIDATION_MESSAGES.pattern);
   }
 
   return null;

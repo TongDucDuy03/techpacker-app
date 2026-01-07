@@ -23,6 +23,7 @@ import { MEASUREMENT_UNITS, DEFAULT_MEASUREMENT_UNIT, MeasurementUnit, getMeasur
 import { SIZE_PRESET_OPTIONS, getPresetById } from '../../../constants/sizePresets';
 import ConfirmationDialog from '../../ConfirmationDialog';
 import { DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR, DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR } from '../../../constants/measurementDisplay';
+import { useI18n } from '../../../lib/i18n';
 import { normalizeMeasurementBaseSizes } from '../../../utils/measurements';
 import Quill from 'quill';
 import ImageUploader from 'quill-image-uploader';
@@ -106,6 +107,7 @@ const sampleRoundQuillFormats = [
 ];
 
 const MeasurementTab: React.FC = () => {
+  const { t } = useI18n();
   const context = useTechPack();
   const {
     state,
@@ -427,7 +429,7 @@ type RoundModalFormState = {
     () => sampleMeasurementRounds[sampleMeasurementRounds.length - 1]?.id,
     [sampleMeasurementRounds]
   );
-  const previousRoundEditWarning = 'Bạn không thể chỉnh sửa round trước đó vì sẽ ảnh hưởng đến các round tiếp theo.';
+  const previousRoundEditWarning = t('form.measurement.previousRoundEditWarning');
 
   const isEditableRound = useCallback(
     (roundId?: string) => {
@@ -930,7 +932,7 @@ type RoundModalFormState = {
   const handleRemoveSize = (size: string) => {
     if (!updateMeasurementSizeRange) return;
     if (selectedSizes.length <= 1) {
-      showWarning('At least one size is required.');
+      showWarning(t('form.measurement.atLeastOneSizeRequired'));
       return;
     }
     updateMeasurementSizeRange(selectedSizes.filter(item => item !== size));
@@ -940,12 +942,12 @@ type RoundModalFormState = {
     if (!updateMeasurementSizeRange) return;
     const trimmed = newSizeLabel.trim();
     if (!trimmed) {
-      showWarning('Please provide a size label before adding.');
+      showWarning(t('form.measurement.sizeLabelRequired'));
       return;
     }
     const exists = selectedSizes.some(size => size.toLowerCase() === trimmed.toLowerCase());
     if (exists) {
-      showWarning('Size already exists in this range.');
+      showWarning(t('form.measurement.sizeAlreadyExists'));
       return;
     }
     updateMeasurementSizeRange([...selectedSizes, trimmed]);
@@ -957,7 +959,7 @@ type RoundModalFormState = {
     const preset = getPresetById(pendingPresetId);
     if (!preset) return;
     if (preset.sizes.length === 0) {
-      if (window.confirm('Apply an empty preset and clear all configured sizes?')) {
+      if (window.confirm(t('form.measurement.applyEmptyPresetConfirm'))) {
         updateMeasurementSizeRange([]);
       }
       return;
@@ -965,7 +967,7 @@ type RoundModalFormState = {
     const shouldConfirm = measurements.length > 0;
     if (shouldConfirm) {
       const confirmed = window.confirm(
-        'Applying a preset will replace the current size range for this techpack. Continue?'
+        t('form.measurement.applyPresetReplaceConfirm')
       );
       if (!confirmed) return;
     }
@@ -1022,15 +1024,18 @@ type RoundModalFormState = {
   // Helper to format validation alert message
   const formatValidationAlert = (fieldKey: string): string => {
     const FIELD_LABEL_MAP: Record<string, string> = {
-      pomCode: 'POM Code',
-      pomName: 'POM Name',
-      minusTolerance: 'Minus Tolerance',
-      plusTolerance: 'Plus Tolerance',
-      sizes: 'Size Measurements', // Changed from 'measurement' to 'sizes' to match UI
+      pomCode: t('form.measurement.field.pomCode'),
+      pomName: t('form.measurement.field.pomName'),
+      minusTolerance: t('form.measurement.field.minusTolerance'),
+      plusTolerance: t('form.measurement.field.plusTolerance'),
+      sizes: t('form.measurement.field.sizes'), // Changed from 'measurement' to 'sizes' to match UI
     };
     
     const fieldLabel = FIELD_LABEL_MAP[fieldKey] || fieldKey;
-    return `Trường ${fieldLabel}, thuộc tab Measurements chưa được điền. Vui lòng điền đầy đủ thông tin.`;
+    return t('form.fieldRequiredInTab', {
+      field: fieldLabel,
+      tab: t('form.tab.measurements'),
+    });
   };
 
   const handleSubmit = () => {
@@ -1064,8 +1069,8 @@ type RoundModalFormState = {
     });
 
     if (!formData.baseSize) {
-      validation.setFieldError('measurement', 'Please select a base size');
-      showError('Please select a base size for this measurement.');
+      validation.setFieldError('measurement', t('form.measurement.baseSizeRequired'));
+      showError(t('form.measurement.baseSizeRequiredLong'));
       return;
     }
 
@@ -1074,15 +1079,15 @@ type RoundModalFormState = {
     const hasValidMeasurements = sizeValues.some(v => v > 0);
     
     if (!hasValidMeasurements) {
-      validation.setFieldError('measurement', 'At least one size measurement must be greater than 0');
+      validation.setFieldError('measurement', t('form.measurement.atLeastOneMeasurement'));
       showError(formatValidationAlert('sizes'));
       return;
     }
 
     const baseMeasurementValue = sizes[formData.baseSize];
     if (baseMeasurementValue === undefined) {
-      validation.setFieldError('measurement', 'Enter the base measurement value');
-      showError('Base size measurement is required before saving.');
+      validation.setFieldError('measurement', t('form.measurement.enterBaseMeasurement'));
+      showError(t('form.measurement.baseMeasurementRequired'));
       return;
     }
 
@@ -1104,10 +1109,10 @@ type RoundModalFormState = {
 
     if (editingIndex !== null) {
       updateMeasurement(editingIndex, measurement);
-      showSuccess('Measurement updated successfully');
+      showSuccess(t('form.measurement.updated'));
     } else {
       addMeasurement(measurement);
-      showSuccess('Measurement added successfully');
+      showSuccess(t('form.measurement.added'));
     }
 
     resetForm();
@@ -1206,11 +1211,11 @@ type RoundModalFormState = {
 
   const addCommonMeasurements = () => {
     const commonMeasurements = [
-      { pomCode: 'CHEST', pomName: 'Chest 1" below armhole', method: 'Measure across chest 1 inch below armhole' },
-      { pomCode: 'LENGTH', pomName: 'Center Back Length', method: 'Measure from center back neck to hem' },
-      { pomCode: 'SLEEVE', pomName: 'Sleeve Length', method: 'Measure from shoulder point to cuff' },
-      { pomCode: 'SHOULDER', pomName: 'Shoulder Width', method: 'Measure from shoulder point to shoulder point' },
-      { pomCode: 'WAIST', pomName: 'Waist', method: 'Measure at natural waistline' },
+      { pomCode: 'CHEST', pomName: t('form.measurement.common.chestName'), method: t('form.measurement.common.chestMethod') },
+      { pomCode: 'LENGTH', pomName: t('form.measurement.common.lengthName'), method: t('form.measurement.common.lengthMethod') },
+      { pomCode: 'SLEEVE', pomName: t('form.measurement.common.sleeveName'), method: t('form.measurement.common.sleeveMethod') },
+      { pomCode: 'SHOULDER', pomName: t('form.measurement.common.shoulderName'), method: t('form.measurement.common.shoulderMethod') },
+      { pomCode: 'WAIST', pomName: t('form.measurement.common.waistName'), method: t('form.measurement.common.waistMethod') },
     ];
 
     commonMeasurements.forEach((measurement, index) => {
@@ -1236,7 +1241,7 @@ type RoundModalFormState = {
 
       addMeasurement(measurementPoint);
     });
-    showSuccess('Common measurements added');
+    showSuccess(t('form.measurement.commonAdded'));
   };
 
   return (
@@ -1245,20 +1250,20 @@ type RoundModalFormState = {
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Measurement Chart</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{t('form.measurement.title')}</h1>
             <p className="text-sm text-gray-600 mt-1">
-              Define measurement points and size specifications
+              {t('form.measurement.subtitle')}
             </p>
           </div>
           
           <div className="flex items-center space-x-2 text-sm">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">{measurements.length}</div>
-              <div className="text-gray-500">Points</div>
+              <div className="text-gray-500">{t('form.measurement.points')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">{selectedSizes.length}</div>
-              <div className="text-gray-500">Sizes</div>
+              <div className="text-gray-500">{t('form.measurement.sizes')}</div>
             </div>
           </div>
         </div>
@@ -1269,13 +1274,13 @@ type RoundModalFormState = {
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h3 className="text-lg font-semibold text-gray-800">Size Range Configuration</h3>
+              <h3 className="text-lg font-semibold text-gray-800">{t('form.measurement.sizeRangeTitle')}</h3>
               <p className="text-sm text-gray-500">
-                Manage custom sizes per techpack. Gender default: {articleInfo?.gender || 'Unisex'}
+                {t('form.measurement.sizeRangeDescription', { gender: articleInfo?.gender || t('form.measurement.unisex') })}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600">Preset:</label>
+              <label className="text-sm text-gray-600">{t('form.measurement.preset')}</label>
               <select
                 value={pendingPresetId}
                 onChange={(e) => setPendingPresetId(e.target.value)}
@@ -1291,14 +1296,14 @@ type RoundModalFormState = {
                 onClick={handleApplyPreset}
                 className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
               >
-                Apply
+                {t('form.measurement.applyPreset')}
               </button>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
             {selectedSizes.length === 0 && (
-              <span className="text-sm text-gray-500">No sizes configured yet.</span>
+              <span className="text-sm text-gray-500">{t('form.measurement.noSizesConfigured')}</span>
             )}
             {selectedSizes.map(size => {
               const isBase = measurementBaseSize === size;
@@ -1315,7 +1320,7 @@ type RoundModalFormState = {
                     type="button"
                     onClick={() => handleRemoveSize(size)}
                     className="text-gray-500 hover:text-gray-700"
-                    aria-label={`Remove size ${size}`}
+                    aria-label={t('form.measurement.removeSizeAria', { size })}
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1325,7 +1330,7 @@ type RoundModalFormState = {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Base Size</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.measurement.baseSizeLabel')}</label>
             <select
               value={baseSizeSelectorValue}
               onChange={(e) => handleBaseSizeSelectorChange(e.target.value)}
@@ -1340,12 +1345,12 @@ type RoundModalFormState = {
               ))}
             </select>
             <p className="text-xs text-gray-500 mt-2">
-              Base size drives the highlighted column, measurement jumps, and PDF export. Changing it updates every measurement point.
+              {t('form.measurement.baseSizeHint')}
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Measurement Unit</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('form.measurement.unitLabel')}</label>
             <Select
               value={tableUnit}
               onChange={async (value) => {
@@ -1378,7 +1383,7 @@ type RoundModalFormState = {
               className="w-full"
             />
             <p className="text-xs text-gray-500 mt-2">
-              Unit applies to all measurements in this techpack. Changing it updates all measurement values.
+              {t('form.measurement.unitHint')}
             </p>
           </div>
 
@@ -1386,7 +1391,7 @@ type RoundModalFormState = {
             <input
               value={newSizeLabel}
               onChange={(e) => setNewSizeLabel(e.target.value)}
-              placeholder="e.g., 2, 4, 6, 4XL"
+              placeholder={t('form.measurement.newSizePlaceholder')}
               className="flex-1 min-w-[200px] px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <button
@@ -1394,7 +1399,7 @@ type RoundModalFormState = {
               onClick={handleAddSize}
               className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
             >
-              Add Size
+              {t('form.measurement.addSize')}
             </button>
           </div>
         </div>
@@ -1409,7 +1414,7 @@ type RoundModalFormState = {
               className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               <Ruler className="w-4 h-4 mr-2" />
-              Add Common Points
+              {t('form.measurement.addCommonPoints')}
             </button>
             
           </div>
@@ -1417,18 +1422,18 @@ type RoundModalFormState = {
           <div className="flex items-center space-x-3">
             <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
               <Upload className="w-4 h-4 mr-2" />
-              Import Excel
+              {t('form.measurement.importExcel')}
             </button>
             <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
               <Download className="w-4 h-4 mr-2" />
-              Export Excel
+              {t('form.measurement.exportExcel')}
             </button>
             <button
               onClick={() => setShowAddForm(true)}
               className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add Measurement
+              {t('form.measurement.addMeasurement')}
             </button>
           </div>
         </div>
@@ -1438,34 +1443,34 @@ type RoundModalFormState = {
       {showAddForm && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-4">
-            {editingIndex !== null ? 'Edit Measurement Point' : 'Add New Measurement Point'}
+            {editingIndex !== null ? t('form.measurement.editPoint') : t('form.measurement.addPoint')}
           </h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <Input
-              label="POM Code *"
+              label={t('form.measurement.pomCodeLabel')}
               value={formData.pomCode || ''}
               onChange={handleInputChange('pomCode')}
               onBlur={() => validation.setFieldTouched('pomCode')}
-              placeholder="e.g., CHEST, LENGTH"
+              placeholder={t('form.measurement.pomCodePlaceholder')}
               required
               error={validation.getFieldProps('pomCode').error}
-              helperText={validation.getFieldProps('pomCode').helperText || 'Uppercase letters, numbers, hyphens, underscores'}
+              helperText={validation.getFieldProps('pomCode').helperText || t('form.measurement.pomCodeHelper')}
             />
 
             <Input
-              label="POM Name *"
+              label={t('form.measurement.pomNameLabel')}
               value={formData.pomName || ''}
               onChange={handleInputChange('pomName')}
               onBlur={() => validation.setFieldTouched('pomName')}
-              placeholder="e.g., Chest 1 inch below armhole"
+              placeholder={t('form.measurement.pomNamePlaceholder')}
               required
               error={validation.getFieldProps('pomName').error}
               helperText={validation.getFieldProps('pomName').helperText}
             />
 
             <Input
-              label={`Minus Tolerance (${getMeasurementUnitSuffix(tableUnit)}) *`}
+              label={`${t('form.measurement.minusToleranceLabel')} (${getMeasurementUnitSuffix(tableUnit)}) *`}
               value={formData.minusTolerance ?? ''}
               onChange={(value) => {
                 // value là string, giữ nguyên nếu là chuỗi rỗng hoặc số hợp lệ
@@ -1483,17 +1488,17 @@ type RoundModalFormState = {
               step="0.01"
               min="0"
               max="50"
-              placeholder="e.g., 1.0"
+              placeholder={t('form.measurement.tolerancePlaceholder')}
               required
               error={validation.getFieldProps('minusTolerance').error}
               helperText={
                 validation.getFieldProps('minusTolerance').helperText
-                || `Tolerance in ${getMeasurementUnitSuffix(formData.unit as MeasurementUnit)}`
+                || t('form.measurement.toleranceHelper', { unit: getMeasurementUnitSuffix(formData.unit as MeasurementUnit) })
               }
             />
 
             <Input
-              label={`Plus Tolerance (${getMeasurementUnitSuffix(tableUnit)}) *`}
+              label={`${t('form.measurement.plusToleranceLabel')} (${getMeasurementUnitSuffix(tableUnit)}) *`}
               value={formData.plusTolerance ?? ''}
               onChange={(value) => {
                 // value là string, giữ nguyên nếu là chuỗi rỗng hoặc số hợp lệ
@@ -1511,21 +1516,21 @@ type RoundModalFormState = {
               step="0.01"
               min="0"
               max="50"
-              placeholder="e.g., 1.0"
+              placeholder={t('form.measurement.tolerancePlaceholder')}
               required
               error={validation.getFieldProps('plusTolerance').error}
               helperText={
                 validation.getFieldProps('plusTolerance').helperText
-                || `Tolerance in ${getMeasurementUnitSuffix(formData.unit as MeasurementUnit)}`
+                || t('form.measurement.toleranceHelper', { unit: getMeasurementUnitSuffix(formData.unit as MeasurementUnit) })
               }
             />
 
             <div className="md:col-span-2">
               <Input
-                label="Measurement Method"
+                label={t('form.measurement.methodLabel')}
                 value={formData.measurementMethod || ''}
                 onChange={handleInputChange('measurementMethod')}
-                placeholder="Brief description of how to measure"
+                placeholder={t('form.measurement.methodPlaceholder')}
                 error={validation.getFieldProps('notes').error}
                 helperText={validation.getFieldProps('notes').helperText}
               />
@@ -1535,29 +1540,29 @@ type RoundModalFormState = {
           {/* Size Measurements Grid */}
           <div className="mb-6">
             <h4 className="text-md font-medium text-gray-800 mb-3">
-              Base Size &amp; Jump ({getMeasurementUnitSuffix(tableUnit)})
+              {t('form.measurement.baseAndJumpTitle', { unit: getMeasurementUnitSuffix(tableUnit) })}
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 block">Base Size</label>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">{t('form.measurement.baseSizeLabel')}</label>
                 <select
                   value={formData.baseSize || ''}
                   onChange={(e) => handleBaseSizeSelect(e.target.value)}
                   className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100 cursor-not-allowed"
                   disabled
                 >
-                  {selectedSizes.length === 0 && <option value="">Select at least one size</option>}
+                  {selectedSizes.length === 0 && <option value="">{t('form.measurement.selectAtLeastOneSize')}</option>}
                   {selectedSizes.map(size => (
                     <option key={size} value={size}>
                       {size}
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-500 mt-2">Managed in Size Range Configuration. Base size controls the highlighted column and jump calculations.</p>
+                <p className="text-xs text-gray-500 mt-2">{t('form.measurement.baseSizeManagedHint')}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-1 block">
-                  Base Measurement ({getMeasurementUnitSuffix(tableUnit)})
+                  {t('form.measurement.baseMeasurementLabel', { unit: getMeasurementUnitSuffix(tableUnit) })}
                 </label>
                 <input
                   type="number"
@@ -1569,7 +1574,7 @@ type RoundModalFormState = {
                   className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     validation.getFieldProps('measurement').error ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder="e.g., 30"
+                  placeholder={t('form.measurement.baseMeasurementPlaceholder')}
                 />
                 <p className="text-xs text-gray-500 mt-2">Enter the actual measurement for the base size; other sizes will follow the jumps.</p>
               </div>
@@ -1582,12 +1587,12 @@ type RoundModalFormState = {
                 if (isBase) {
                   return (
                     <div key={size} className="border border-blue-200 bg-blue-50 rounded-md p-3">
-                      <div className="text-xs uppercase font-semibold text-blue-600">Base</div>
+                      <div className="text-xs uppercase font-semibold text-blue-600">{t('form.measurement.baseBadge')}</div>
                       <div className="text-lg font-semibold text-blue-900">{size}</div>
                       <div className="text-sm text-blue-800 mt-1">
                         {baseValue !== undefined && !Number.isNaN(baseValue)
                           ? `${formatMeasurementValue(baseValue)} ${getMeasurementUnitSuffix(tableUnit)}`
-                          : 'Enter a base value'}
+                          : t('form.measurement.enterBaseValue')}
                       </div>
                     </div>
                   );
@@ -1598,17 +1603,19 @@ type RoundModalFormState = {
 
                 return (
                   <div key={size} className="flex flex-col border rounded-md p-3">
-                    <label className="text-sm font-medium text-gray-700 mb-1">{size} Jump</label>
+                    <label className="text-sm font-medium text-gray-700 mb-1">
+                      {t('form.measurement.sizeJumpLabel', { size })}
+                    </label>
                     <input
                       type="text"
                       value={adjustmentValue}
                       onChange={(e) => handleSizeAdjustmentChange(size, e.target.value)}
                       onBlur={() => validation.setFieldTouched('measurement')}
                       className="px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="+0.5 / +1/2 / -0.25"
+                      placeholder={t('form.measurement.jumpPlaceholder')}
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Actual:{' '}
+                      {t('form.measurement.actual')}{' '}
                       <span className="font-medium text-gray-700">
                         {displayActual !== '-'
                           ? `${displayActual} ${getMeasurementUnitSuffix(tableUnit)}`
@@ -1627,12 +1634,12 @@ type RoundModalFormState = {
           </div>
 
           <div className="mb-4">
-            <label className="text-sm font-medium text-gray-700 mb-1 block">Notes</label>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">{t('form.measurement.notesLabel')}</label>
             <textarea
               value={formData.notes || ''}
               onChange={(e) => handleInputChange('notes')(e.target.value)}
               onBlur={() => validation.setFieldTouched('notes')}
-              placeholder="Additional notes or special instructions..."
+              placeholder={t('form.measurement.notesPlaceholder')}
               rows={2}
               className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 validation.getFieldProps('notes').error ? 'border-red-500' : 'border-gray-300'
@@ -1652,7 +1659,7 @@ type RoundModalFormState = {
                 </div>
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-red-800">
-                    Please fix the following errors:
+                    {t('form.bom.fixErrors')}
                   </h3>
                   <div className="mt-2 text-sm text-red-700">
                     <ul className="list-disc pl-5 space-y-1">
@@ -1673,7 +1680,7 @@ type RoundModalFormState = {
               onClick={resetForm}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               onClick={handleSubmit}
@@ -1684,7 +1691,7 @@ type RoundModalFormState = {
                   : 'text-gray-400 bg-gray-200 cursor-not-allowed'
               }`}
             >
-              {editingIndex !== null ? 'Update' : 'Add'} Measurement
+              {editingIndex !== null ? t('common.update') : t('common.add')} {t('form.measurement.measurement')}
             </button>
           </div>
         </div>
@@ -1697,13 +1704,13 @@ type RoundModalFormState = {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">
-                  POM Code
+                  {t('form.measurement.pomCodeColumn')}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-48">
-                  POM Name
+                  {t('form.measurement.pomNameColumn')}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tolerance
+                  {t('form.measurement.toleranceColumn')}
                 </th>
                 {selectedSizes.map(size => {
                   const isBaseHeader = highlightedColumn === size;
@@ -1720,7 +1727,7 @@ type RoundModalFormState = {
                   );
                 })}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
+                  {t('common.actions')}
                 </th>
               </tr>
             </thead>
@@ -1728,7 +1735,7 @@ type RoundModalFormState = {
               {measurements.length === 0 ? (
                 <tr>
                   <td colSpan={selectedSizes.length + 4} className="px-6 py-12 text-center text-sm text-gray-500">
-                    No measurement points defined. Add measurements to get started.
+                    {t('form.measurement.noPoints')}
                   </td>
                 </tr>
               ) : (
@@ -1813,19 +1820,19 @@ type RoundModalFormState = {
                             onClick={() => handleEdit(measurement, index)}
                             className="text-blue-600 hover:text-blue-900"
                           >
-                            Edit
+                            {t('common.edit')}
                           </button>
                           <button
                             onClick={() => handleDuplicateMeasurement(measurement, index)}
                             className="text-indigo-600 hover:text-indigo-900"
                           >
-                            Duplicate
+                            {t('form.measurement.duplicate')}
                           </button>
                           <button
                             onClick={() => handleDelete(measurement, index)}
                             className="text-red-600 hover:text-red-900"
                           >
-                            Delete
+                            {t('common.delete')}
                           </button>
                         </div>
                       </td>
@@ -1842,11 +1849,11 @@ type RoundModalFormState = {
       <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Sample Rounds</h3>
-            <p className="text-sm text-gray-500">Record requested vs measured values for each prototype round</p>
+            <h3 className="text-lg font-semibold text-gray-900">{t('form.measurement.sampleRoundsTitle')}</h3>
+            <p className="text-sm text-gray-500">{t('form.measurement.sampleRoundsDescription')}</p>
             {!canAddNewRound && sampleMeasurementRounds.length > 0 && (
               <p className="text-xs text-amber-600 mt-1">
-                Please complete the current round before creating another.
+                {t('form.measurement.completeCurrentRound')}
               </p>
             )}
           </div>
@@ -1858,10 +1865,10 @@ type RoundModalFormState = {
                 ? 'text-white bg-indigo-600 hover:bg-indigo-700'
                 : 'text-gray-400 bg-gray-200 cursor-not-allowed'
             }`}
-            title={!canAddNewRound ? 'Please complete the previous round before creating a new one.' : ''}
+            title={!canAddNewRound ? t('form.measurement.completePreviousRound') : ''}
           >
             <Plus className="w-4 h-4 mr-2" />
-            Add Sample Round
+            {t('form.measurement.addSampleRound')}
           </button>
         </div>
         {sampleMeasurementRounds.length > 0 && (
@@ -1873,28 +1880,28 @@ type RoundModalFormState = {
                     className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={round.name}
                     onChange={(e) => handleRoundFieldChange(round.id, 'name', e.target.value)}
-                    placeholder="Round name"
+                    placeholder={t('form.measurement.roundNamePlaceholder')}
                   />
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleSaveSampleRound(round.id)}
                       className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors"
-                      title="Save this round. Unfilled sizes will keep their original requested values."
+                      title={t('form.measurement.saveRoundTitle')}
                     >
                       <Save className="w-3 h-3 mr-1.5" />
-                      Save
+                      {t('common.save')}
                     </button>
                     <button
                       className="text-red-500 hover:text-red-600 text-xs font-medium"
                       onClick={() => handleDeleteSampleRound(round.id)}
                     >
-                      Remove
+                      {t('common.remove')}
                     </button>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">{t('form.measurement.date')}</label>
                     <input
                       type="date"
                       value={getDateInputValue(round.date)}
@@ -1903,20 +1910,20 @@ type RoundModalFormState = {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Reviewer</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">{t('form.measurement.reviewer')}</label>
                     <input
                       value={round.reviewer || ''}
                       onChange={(e) => handleRoundFieldChange(round.id, 'reviewer', e.target.value)}
                       className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Name"
+                      placeholder={t('form.measurement.reviewerPlaceholder')}
                     />
                   </div>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">
-                    Requested Source: {requestedSourceLabels[round.requestedSource || 'original']}
+                    {t('form.measurement.requestedSourceLabel')}: {requestedSourceLabels[round.requestedSource || 'original']}
                   </p>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Overall Comments</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{t('form.measurement.overallComments')}</label>
                   <div className="rounded-md border border-gray-200 bg-white">
                     <ReactQuill
                       theme="snow"
@@ -1924,7 +1931,7 @@ type RoundModalFormState = {
                       onChange={(content) => handleRoundFieldChange(round.id, 'overallComments', content)}
                       modules={sampleRoundQuillModules}
                       formats={sampleRoundQuillFormats}
-                      placeholder="Summary of findings..."
+                      placeholder={t('form.measurement.overallCommentsPlaceholder')}
                       readOnly={!isEditableRound(round.id)}
                       className="min-h-[120px] rounded-md bg-white"
                     />
@@ -1937,11 +1944,11 @@ type RoundModalFormState = {
 
         {measurementRows.length === 0 ? (
           <div className="text-sm text-gray-500">
-            Add measurement points to start tracking sample rounds.
+            {t('form.measurement.addPointsForRounds')}
           </div>
         ) : sampleMeasurementRounds.length === 0 ? (
           <div className="text-sm text-gray-500">
-            No sample rounds yet. Click &ldquo;Add Sample Round&rdquo; to create the first round.
+            {t('form.measurement.noSampleRounds')}
           </div>
         ) : (
           <SampleMeasurementsTable
@@ -1963,7 +1970,7 @@ type RoundModalFormState = {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Create New Sample Round</h3>
+              <h3 className="text-lg font-semibold text-gray-900">{t('form.measurement.createSampleRoundTitle')}</h3>
               <button
                 onClick={handleCloseRoundModal}
                 className="text-gray-400 hover:text-gray-600"
@@ -1974,19 +1981,19 @@ type RoundModalFormState = {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Round Name
+                  {t('form.measurement.roundName')}
                 </label>
                 <input
                   type="text"
                   value={roundForm.name}
                   onChange={(e) => handleRoundFormFieldChange('name', e.target.value)}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., 1st Proto, 2nd Proto"
+                  placeholder={t('form.measurement.roundNamePlaceholder')}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Date
+                  {t('form.measurement.date')}
                 </label>
                 <input
                   type="date"
@@ -1997,19 +2004,19 @@ type RoundModalFormState = {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Reviewer
+                  {t('form.measurement.reviewer')}
                 </label>
                 <input
                   type="text"
                   value={roundForm.reviewer}
                   onChange={(e) => handleRoundFormFieldChange('reviewer', e.target.value)}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Reviewer name"
+                  placeholder={t('form.measurement.reviewerPlaceholder')}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Requested Source
+                  {t('form.measurement.requestedSourceLabel')}
                 </label>
                 <div className="space-y-2">
                   <label className="flex items-center">
@@ -2021,7 +2028,7 @@ type RoundModalFormState = {
                       onChange={(e) => handleRoundFormFieldChange('requestedSource', e.target.value)}
                       className="mr-2"
                     />
-                    <span className="text-sm text-gray-700">Original Spec (from Measurement Chart)</span>
+                    <span className="text-sm text-gray-700">{t('form.measurement.requestedSourceOriginal')}</span>
                   </label>
                   <label className="flex items-center">
                     <input
@@ -2034,13 +2041,13 @@ type RoundModalFormState = {
                       className="mr-2 disabled:opacity-50"
                     />
                     <span className={`text-sm ${hasPreviousRound ? 'text-gray-700' : 'text-gray-400'}`}>
-                      From Previous Round (use Revised values from last round)
+                      {t('form.measurement.requestedSourcePrevious')}
                     </span>
                   </label>
                 </div>
                 {!hasPreviousRound && (
                   <p className="text-xs text-gray-500 mt-1 ml-6">
-                    Available after creating the first round
+                    {t('form.measurement.requestedSourceHint')}
                   </p>
                 )}
               </div>
@@ -2050,13 +2057,13 @@ type RoundModalFormState = {
                 onClick={handleCloseRoundModal}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleCreateRound}
                 className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
               >
-                Create Round
+                {t('form.measurement.createRound')}
               </button>
             </div>
           </div>
@@ -2068,13 +2075,13 @@ type RoundModalFormState = {
         <div className="flex items-start">
           <Info className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
           <div className="text-sm text-blue-800">
-            <p className="font-medium mb-1">Measurement Guidelines:</p>
+            <p className="font-medium mb-1">{t('form.measurement.guidelinesTitle')}</p>
             <ul className="list-disc list-inside space-y-1 text-blue-700">
-              <li>All measurements use the same unit selected at the table level</li>
-              <li>Tolerance values follow the selected unit (e.g., 1.0 means ±1.0 {getMeasurementUnitSuffix(tableUnit)})</li>
-              <li>Use consistent tolerance values across similar measurement points</li>
-              <li>Zero values are preserved - use empty field to indicate "not measured"</li>
-              <li>Complete all measurements in a round before creating a new round</li>
+              <li>{t('form.measurement.guidelineUnit')}</li>
+              <li>{t('form.measurement.guidelineTolerance', { unit: getMeasurementUnitSuffix(tableUnit) })}</li>
+              <li>{t('form.measurement.guidelineConsistentTolerance')}</li>
+              <li>{t('form.measurement.guidelineZeroValues')}</li>
+              <li>{t('form.measurement.guidelineCompleteRound')}</li>
             </ul>
           </div>
         </div>
@@ -2082,10 +2089,10 @@ type RoundModalFormState = {
 
       <ConfirmationDialog
         isOpen={showBaseSizeConfirm}
-        title="Change Base Size"
-        message={`Change base size to ${pendingBaseSize || 'this size'}? This will update all related measurements and PDF exports.`}
-        confirmText="Change Base Size"
-        cancelText="Keep Current"
+        title={t('form.measurement.changeBaseSizeTitle')}
+        message={t('form.measurement.changeBaseSizeMessage', { size: pendingBaseSize || t('form.measurement.thisSize') })}
+        confirmText={t('form.measurement.changeBaseSizeConfirm')}
+        cancelText={t('form.measurement.changeBaseSizeCancel')}
         onConfirm={handleConfirmBaseSizeChange}
         onCancel={handleCancelBaseSizeChange}
         type="warning"
@@ -2119,7 +2126,13 @@ export const validateMeasurementsForSave = (
         // Check required
         if (rule.required) {
           if (value === null || value === undefined || value === '') {
-            error = `${fieldKey === 'pomCode' ? 'POM Code' : fieldKey === 'pomName' ? 'POM Name' : fieldKey} is required`;
+            const label =
+              fieldKey === 'pomCode'
+                ? t('form.measurement.pomCode')
+                : fieldKey === 'pomName'
+                ? t('form.measurement.pomName')
+                : fieldKey;
+            error = t('validation.fieldRequired', { field: label });
           }
         }
         
@@ -2131,20 +2144,20 @@ export const validateMeasurementsForSave = (
         // Check minLength/maxLength for strings
         if (!error && typeof value === 'string' && value) {
           if (rule.minLength && value.length < rule.minLength) {
-            error = `Must be at least ${rule.minLength} characters long`;
+            error = t('validation.minLength', { count: rule.minLength });
           }
           if (rule.maxLength && value.length > rule.maxLength) {
-            error = `Must be no more than ${rule.maxLength} characters long`;
+            error = t('validation.maxLength', { count: rule.maxLength });
           }
         }
         
         // Check min/max for numbers
         if (!error && typeof value === 'number') {
           if (rule.min !== undefined && value < rule.min) {
-            error = `Must be at least ${rule.min}`;
+            error = t('validation.min', { value: rule.min });
           }
           if (rule.max !== undefined && value > rule.max) {
-            error = `Must be no more than ${rule.max}`;
+            error = t('validation.max', { value: rule.max });
           }
         }
         
@@ -2159,7 +2172,7 @@ export const validateMeasurementsForSave = (
     const sizeValues = Object.values(item.sizes || {});
     const hasValidMeasurements = sizeValues.some(v => v !== undefined && v !== null && v > 0);
     if (!hasValidMeasurements) {
-      itemErrors.sizes = 'At least one size measurement must be greater than 0';
+      itemErrors.sizes = t('form.measurement.atLeastOneSizeRequired');
     }
 
     const filledSizeKeys = Object.keys(item.sizes || {}).filter((size) => {
@@ -2170,9 +2183,9 @@ export const validateMeasurementsForSave = (
     if (filledSizeKeys.length > 0) {
       const trimmedBase = item.baseSize?.trim();
       if (!trimmedBase) {
-        itemErrors.baseSize = 'Base size is required';
+        itemErrors.baseSize = t('form.measurement.baseSizeRequiredShort');
       } else if (!item.sizes || item.sizes[trimmedBase] === undefined || item.sizes[trimmedBase] === null) {
-        itemErrors.baseSize = 'Base size measurement value is required';
+        itemErrors.baseSize = t('form.measurement.baseMeasurementRequired');
       }
     }
     

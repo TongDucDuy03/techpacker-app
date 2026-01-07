@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTechPack } from '../../contexts/TechPackContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useI18n } from '../../lib/i18n';
 import { ApiTechPack, Colorway, SIZE_RANGES, DEFAULT_MEASUREMENT_UNIT } from '../../types/techpack';
 import ArticleInfoTab, { ArticleInfoTabRef } from './tabs/ArticleInfoTab';
 import BomTab, { BomTabRef } from './tabs/BomTab';
@@ -43,6 +44,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
   const { state, setCurrentTab, updateFormState, saveTechPack, exportToPDF, resetFormState } = context ?? {};
   const { currentTab = 0, techpack, isSaving = false, lastSaved, hasUnsavedChanges = false } = state ?? {};
   const { user } = useAuth();
+  const { t } = useI18n();
   const articleInfoTabRef = useRef<ArticleInfoTabRef>(null);
   const bomTabRef = useRef<BomTabRef>(null);
   const constructionTabRef = useRef<ConstructionTabRef>(null);
@@ -274,52 +276,52 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
   const tabs = [
     {
       id: 0,
-      name: 'Article Info',
+      name: t('form.tab.articleInfo'),
       icon: FileText,
       component: ArticleInfoTab,
-      description: 'Basic product information',
+      description: t('form.tab.articleInfo.description'),
     },
     {
       id: 1,
-      name: 'Bill of Materials',
+      name: t('form.tab.bom'),
       icon: Package,
       component: () => <BomTab ref={bomTabRef} />,
-      description: 'Materials and components',
+      description: t('form.tab.bom.description'),
     },
     {
       id: 2,
-      name: 'Measurements',
+      name: t('form.tab.measurements'),
       icon: Ruler,
       component: MeasurementTab,
-      description: 'Size specifications',
+      description: t('form.tab.measurements.description'),
     },
     {
       id: 3,
-      name: 'Construction',
+      name: t('form.tab.construction'),
       icon: BookOpen,
       component: () => <ConstructionTab ref={constructionTabRef} />,
-      description: 'Construction instructions',
+      description: t('form.tab.construction.description'),
     },
     {
       id: 4,
-      name: 'Colorways',
+      name: t('form.tab.colorways'),
       icon: Palette,
       component: ColorwayTab,
-      description: 'Color variations',
+      description: t('form.tab.colorways.description'),
     },
     {
       id: 5,
-      name: 'Packing',
+      name: t('form.tab.packing'),
       icon: Archive,
       component: PackingTab,
-      description: 'Packing & folding instructions',
+      description: t('form.tab.packing.description'),
     },
     {
       id: 6,
-      name: 'Revision History',
+      name: t('form.tab.revisionHistory'),
       icon: Clock,
       component: (props: any) => <RevisionTab onBackToList={onBackToList} {...props} />,
-      description: 'Change tracking',
+      description: t('form.tab.revisionHistory.description'),
     },
     {
       id: 7,
@@ -563,10 +565,10 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
                   }
                   if (hasUnsavedChanges) {
                     Modal.confirm({
-                      title: 'Thoát mà không lưu?',
-                      content: 'Bạn có muốn thoát mà không lưu các thay đổi?',
-                      okText: 'Thoát',
-                      cancelText: 'Tiếp tục chỉnh sửa',
+                      title: t('form.unsavedChanges.title'),
+                      content: t('form.unsavedChanges.content'),
+                      okText: t('form.unsavedChanges.okText'),
+                      cancelText: t('form.unsavedChanges.cancelText'),
                       onOk: () => onBackToList()
                     });
                   } else {
@@ -576,17 +578,17 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
                 className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to List
+                {t('app.backToList')}
               </button>
               <div className="border-l border-gray-300 h-6"></div>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">
-                  {techpack.articleInfo.articleName || 'New Tech Pack'}
+                  {techpack.articleInfo.articleName || t('form.newTechPack')}
                 </h1>
                 <div className="flex items-center space-x-4 text-sm text-gray-600">
-                  <span>{techpack.articleInfo.articleCode || 'No Article Code'}</span>
+                  <span>{techpack.articleInfo.articleCode || t('form.noArticleCode')}</span>
                   <span>•</span>
-                  <span>Version {techpack.articleInfo.version}</span>
+                  <span>{t('form.version')} {techpack.articleInfo.version}</span>
                   <span>•</span>
                   {/* Normalize server enums to friendly display and color */}
                   {(() => {
@@ -594,11 +596,11 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
                     const normalized = String(status).toLowerCase();
                     let colorClass = 'text-gray-600';
                     let label: string = String(status);
-                    if (normalized === 'approved') { colorClass = 'text-green-600'; label = 'Approved'; }
-                    else if (normalized === 'in review' || normalized === 'inreview' || normalized === 'in_review') { colorClass = 'text-yellow-600'; label = 'In Review'; }
-                    else if (normalized === 'draft') { colorClass = 'text-gray-600'; label = 'Draft'; }
-                    else if (normalized === 'rejected') { colorClass = 'text-red-600'; label = 'Rejected'; }
-                    else if (normalized === 'archived') { colorClass = 'text-gray-400'; label = 'Archived'; }
+                    if (normalized === 'approved') { colorClass = 'text-green-600'; label = t('status.approved'); }
+                    else if (normalized === 'in review' || normalized === 'inreview' || normalized === 'in_review') { colorClass = 'text-yellow-600'; label = t('status.inReview'); }
+                    else if (normalized === 'draft') { colorClass = 'text-gray-600'; label = t('status.draft'); }
+                    else if (normalized === 'rejected') { colorClass = 'text-red-600'; label = t('status.rejected'); }
+                    else if (normalized === 'archived') { colorClass = 'text-gray-400'; label = t('status.archived'); }
 
                     return (
                       <span className={`font-medium ${colorClass}`}>{label}</span>
@@ -609,7 +611,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
 
               {/* Progress Bar */}
               <div className="flex items-center space-x-3">
-                <div className="text-sm text-gray-600">Progress:</div>
+                <div className="text-sm text-gray-600">{t('form.progress')}:</div>
                 <div className="w-32 bg-gray-200 rounded-full h-2">
                   <div
                     className="bg-blue-600 h-2 rounded-full transition-all duration-300"
@@ -626,17 +628,17 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
                 {isSaving ? (
                   <div className="flex items-center text-blue-600">
                     <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                    Saving...
+                    {t('form.saving')}
                   </div>
                 ) : hasUnsavedChanges ? (
                   <div className="flex items-center text-yellow-600">
                     <AlertCircle className="w-4 h-4 mr-1" />
-                    Unsaved changes
+                    {t('form.unsavedChanges.label')}
                   </div>
                 ) : lastSaved ? (
                   <div className="flex items-center text-green-600">
                     <CheckCircle className="w-4 h-4 mr-1" />
-                    Saved {new Date(lastSaved).toLocaleTimeString()}
+                    {t('form.saved')} {new Date(lastSaved).toLocaleTimeString()}
                   </div>
                 ) : null}
               </div>
@@ -651,17 +653,17 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
                   }}
                   disabled={isSaving}
                   className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={isSaving ? 'Đang lưu...' : mode === 'edit' ? 'Cập nhật TechPack' : 'Lưu TechPack mới'}
+                  title={isSaving ? t('form.saving') : mode === 'edit' ? t('form.updateTechPack') : t('form.createTechPack')}
                 >
                   <Save className="w-4 h-4 mr-2" />
-                  {mode === 'edit' ? 'Update' : 'Save'}
+                  {mode === 'edit' ? t('common.update') : t('common.save')}
                 </button>
               )}
 
               {isReadOnly && (
                 <div className="flex items-center px-3 py-2 text-sm text-gray-500 bg-gray-100 rounded-md">
                   <Eye className="w-4 h-4 mr-2" />
-                  Read Only Mode
+                  {t('form.readOnlyMode')}
                 </div>
               )}
 
@@ -676,12 +678,12 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Đang tạo PDF...
+                    {t('form.exportingPDF')}
                   </>
                 ) : (
                   <>
                 <Download className="w-4 h-4 mr-2" />
-                Export PDF
+                {t('form.exportPDF')}
                   </>
                 )}
               </button>
@@ -763,7 +765,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
         <div className="fixed bottom-4 right-4 z-50">
           <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg shadow-lg flex items-center">
             <CheckCircle className="w-5 h-5 mr-2" />
-            <span className="text-sm font-medium">Tech pack saved successfully!</span>
+            <span className="text-sm font-medium">{t('success.techPackUpdated')}</span>
           </div>
         </div>
       )}

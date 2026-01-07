@@ -38,7 +38,7 @@ export const articleInfoValidationSchema: FormValidationConfig = {
     required: true,
     minLength: 1,
     custom: (value: string) => {
-      if (!value || value.trim().length === 0) return 'Please select a technical designer';
+      if (!value || value.trim().length === 0) return 'Article Info • Technical Designer: Vui lòng chọn nhà thiết kế kỹ thuật';
       return null;
     }
   },
@@ -68,7 +68,7 @@ export const articleInfoValidationSchema: FormValidationConfig = {
     minLength: 2,
     maxLength: 255,
     custom: (value: string) => {
-      if (!value || value.trim().length < 2) return 'Supplier is required and must be at least 2 characters long';
+      if (!value || value.trim().length < 2) return 'Article Info / Colorways • Supplier: Nhà cung cấp là bắt buộc và phải có ít nhất 2 ký tự';
       return null;
     }
   },
@@ -179,11 +179,11 @@ export const bomItemValidationSchema: FormValidationConfig = {
 export const measurementValidationSchema: FormValidationConfig = {
   pomCode: {
     required: true,
-    minLength: 2,
+    minLength: 1,
     maxLength: 20,
     custom: (value: string) => {
-      if (!value || value.trim().length < 2) {
-        return 'POM Code must be at least 2 characters long';
+      if (!value || value.trim().length === 0) {
+        return 'Measurements • POM Code: Mã POM là bắt buộc';
       }
       if (!/^[A-Z0-9_-]+$/.test(value.toUpperCase())) {
         return 'POM Code must contain only uppercase letters, numbers, hyphens, and underscores';
@@ -193,11 +193,11 @@ export const measurementValidationSchema: FormValidationConfig = {
   },
   pomName: {
     required: true,
-    minLength: 2,
+    minLength: 1,
     maxLength: 100,
     custom: (value: string) => {
-      if (!value || value.trim().length < 2) {
-        return 'POM Name must be at least 2 characters long';
+      if (!value || value.trim().length === 0) {
+        return 'Measurements • POM Name: Tên POM là bắt buộc';
       }
       return null;
     }
@@ -243,11 +243,11 @@ export const measurementValidationSchema: FormValidationConfig = {
 export const colorwayFormValidationSchema: FormValidationConfig = {
   name: {
     required: true,
-    minLength: 2,
+    minLength: 1,
     maxLength: 100,
     custom: (value: string) => {
-      if (!value || value.trim().length < 2) {
-        return 'Colorway name must be at least 2 characters long';
+      if (!value || value.trim().length === 0) {
+        return 'Colorways • Colorway Name: Colorway name is required';
       }
       return null;
     }
@@ -258,7 +258,7 @@ export const colorwayFormValidationSchema: FormValidationConfig = {
     maxLength: 50,
     custom: (value: string) => {
       if (!value || value.trim().length === 0) {
-        return 'Colorway code is required';
+        return 'Colorways • Colorway Code: Mã phối màu là bắt buộc';
       }
       return null;
     }

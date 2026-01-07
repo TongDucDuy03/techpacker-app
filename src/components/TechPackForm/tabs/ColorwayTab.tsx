@@ -8,6 +8,7 @@ import { Plus, Palette, Copy, Upload, Image as ImageIcon, Trash2 } from 'lucide-
 import { showError, showSuccess } from '../../../lib/toast';
 import { api } from '../../../lib/api';
 import ZoomableImage from '../../common/ZoomableImage';
+import { useI18n } from '../../../lib/i18n';
 
 const API_UPLOAD_BASE =
   (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001/api/v1').replace(/\/api\/v1$/, '');
@@ -28,6 +29,7 @@ const ColorwayTab: React.FC = () => {
   const context = useTechPack();
   const { state, addColorway, updateColorway, deleteColorway } = context ?? {};
   const { colorways = [] } = state?.techpack ?? {};
+  const { t } = useI18n();
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -100,10 +102,10 @@ const ColorwayTab: React.FC = () => {
   //   { value: 'Applique', label: 'Applique' },
   // ];
 
-  const renderImagePlaceholder = (subtitle = 'Upload an image to display') => (
+  const renderImagePlaceholder = (subtitle = t('form.colorway.imageSubtitle')) => (
     <div className="flex flex-col items-center justify-center text-gray-400">
       <ImageIcon className="w-12 h-12 mb-2" />
-      <p className="text-sm">No Image</p>
+      <p className="text-sm">{t('form.bom.noImage')}</p>
       {subtitle && <p className="text-xs mt-1">{subtitle}</p>}
     </div>
   );
@@ -324,14 +326,17 @@ const ColorwayTab: React.FC = () => {
   // Helper to format validation alert message
   const formatValidationAlert = (fieldKey: string): string => {
     const FIELD_LABEL_MAP: Record<string, string> = {
-      name: 'Colorway Name',
-      code: 'Colorway Code',
-      placement: 'Placement',
-      materialType: 'Material Type',
+      name: t('form.colorway.name'),
+      code: t('form.colorway.code'),
+      placement: t('form.colorway.placement'),
+      materialType: t('form.colorway.materialType'),
     };
     
     const fieldLabel = FIELD_LABEL_MAP[fieldKey] || fieldKey;
-    return `Trường ${fieldLabel}, thuộc tab Colorways chưa được điền. Vui lòng điền đầy đủ thông tin.`;
+    return t('form.fieldRequiredInTab', {
+      field: fieldLabel,
+      tab: t('form.colorways'),
+    });
   };
 
   const handleSubmit = () => {
@@ -543,9 +548,9 @@ const ColorwayTab: React.FC = () => {
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Colorways</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{t('form.colorways')}</h1>
             <p className="text-sm text-gray-600 mt-1">
-              Manage color variations and Pantone specifications
+              {t('form.colorway.subtitle')}
             </p>
           </div>
           
@@ -578,7 +583,7 @@ const ColorwayTab: React.FC = () => {
               className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add Colorway
+              {t('form.colorway.addColorway')}
             </button>
           </div>
         </div>
@@ -588,12 +593,12 @@ const ColorwayTab: React.FC = () => {
       {showAddForm && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-4">
-            {editingIndex !== null ? 'Edit Colorway' : 'Add New Colorway'}
+            {editingIndex !== null ? t('form.colorway.editTitle') : t('form.colorway.addTitle')}
           </h3>
           
           {/* Image Upload Section */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Colorway Image</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('form.colorway.imageLabel')}</label>
             <div className="relative">
               {/* Image Preview */}
               <div className="w-full h-[180px] rounded-xl border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center relative">
@@ -629,7 +634,7 @@ const ColorwayTab: React.FC = () => {
                   ) : (
                     <>
                       <Upload className="w-4 h-4" />
-                      {formData.imageUrl || imagePreview ? 'Change Image' : 'Upload Image'}
+                      {formData.imageUrl || imagePreview ? t('form.colorway.changeImage') : t('form.uploadImage')}
                     </>
                   )}
                 </button>
@@ -640,33 +645,33 @@ const ColorwayTab: React.FC = () => {
                     className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-md hover:bg-red-50 transition-colors flex items-center gap-2"
                   >
                     <Trash2 className="w-4 h-4" />
-                    Remove
+                    {t('form.removeImage')}
                   </button>
                 )}
               </div>
-              <p className="text-xs text-gray-500 mt-1">Supported formats: JPEG, PNG, GIF, SVG, WebP (Max 5MB)</p>
+              <p className="text-xs text-gray-500 mt-1">{t('form.imageUploadHint')}</p>
             </div>
           </div>
 
           {/* Colorway Basic Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <Input
-              label="Colorway Name"
+              label={t('form.colorway.name')}
               value={formData.name || ''}
               onChange={handleInputChange('name')}
               onBlur={validation.getFieldProps('name').onBlur}
-              placeholder="e.g., Navy Blazer"
+              placeholder={t('form.colorway.namePlaceholder')}
               required
               error={validation.getFieldProps('name').error}
               helperText={validation.getFieldProps('name').helperText}
             />
 
             <Input
-              label="Colorway Code"
+              label={t('form.colorway.code')}
               value={formData.code || ''}
               onChange={handleInputChange('code')}
               onBlur={validation.getFieldProps('code').onBlur}
-              placeholder="e.g., NVY001"
+              placeholder={t('form.colorway.codePlaceholder')}
               required
               error={validation.getFieldProps('code').error}
               helperText={validation.getFieldProps('code').helperText}
@@ -971,14 +976,14 @@ const ColorwayTab: React.FC = () => {
               onClick={resetForm}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               onClick={handleSubmit}
               disabled={!validation.isValid}
               className={`px-4 py-2 text-sm font-medium text-white border border-transparent rounded-md ${!validation.isValid ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
             >
-              {editingIndex !== null ? 'Update' : 'Add'} Colorway
+              {editingIndex !== null ? t('common.update') : t('common.add')} {t('form.colorway.name')}
             </button>
           </div>
         </div>
@@ -989,8 +994,8 @@ const ColorwayTab: React.FC = () => {
         {colorways.length === 0 ? (
           <div className="col-span-full text-center py-12 text-gray-500">
             <Palette className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-            <p className="text-lg font-medium mb-2">No colorways defined</p>
-            <p className="text-sm">Add colorways to define different color variations for this tech pack.</p>
+            <p className="text-lg font-medium mb-2">{t('form.colorway.emptyTitle')}</p>
+            <p className="text-sm">{t('form.colorway.emptyDescription')}</p>
           </div>
         ) : (
           colorways.map((colorway, index) => (
@@ -1010,10 +1015,10 @@ const ColorwayTab: React.FC = () => {
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">
-                      {colorway.name || 'Untitled colorway'}
+                      {colorway.name || t('form.colorway.untitled')}
                     </h3>
                     <p className="text-sm text-gray-600 mt-1">
-                      Code:{' '}
+                      {t('form.colorway.codeLabel')}{' '}
                       <span className="font-mono text-gray-800">
                         {colorway.code || '—'}
                       </span>
@@ -1023,21 +1028,21 @@ const ColorwayTab: React.FC = () => {
                     <button
                       onClick={() => handleDuplicate(colorway)}
                       className="text-gray-500 hover:text-gray-800"
-                      title="Duplicate"
+                      title={t('form.colorway.duplicate')}
                     >
                       <Copy className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleEdit(colorway, index)}
                       className="text-blue-600 hover:text-blue-800"
-                      title="Edit"
+                      title={t('common.edit')}
                     >
                       <Palette className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(colorway, index)}
                       className="text-red-500 hover:text-red-700"
-                      title="Delete"
+                      title={t('common.delete')}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -1060,10 +1065,10 @@ export const validateColorwaysForSave = (colorways: Colorway[]): { isValid: bool
     const itemErrors: Record<string, string> = {};
     
     if (!item.name || item.name.trim().length < 2) {
-      itemErrors.name = 'Colorway name must be at least 2 characters long';
+      itemErrors.name = 'colorway.name.minLength';
     }
     if (!item.code || item.code.trim().length === 0) {
-      itemErrors.code = 'Colorway code is required';
+      itemErrors.code = 'colorway.code.required';
     }
     
     if (Object.keys(itemErrors).length > 0) {

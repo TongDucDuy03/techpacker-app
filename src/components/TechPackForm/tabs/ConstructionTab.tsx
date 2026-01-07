@@ -11,6 +11,7 @@ import { Plus, Upload, Download, Search, Filter, AlertCircle, X, Copy, RotateCcw
 import ZoomableImage from '../../common/ZoomableImage';
 import { showSuccess, showError, showWarning, showUndoToast } from '../../../lib/toast';
 import { api } from '../../../lib/api';
+import { useI18n } from '../../../lib/i18n';
 
 // Generate UUID v4
 const generateUUID = (): string => {
@@ -193,6 +194,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
   const context = useTechPack();
   const { state, addHowToMeasure, updateHowToMeasureById, deleteHowToMeasureById, insertHowToMeasureAt, updateFormState } = context ?? {};
   const { howToMeasures = [], measurements = [] } = state?.techpack ?? {};
+  const { t } = useI18n();
 
   const measurementNameMap = useMemo(() => {
     return new Map((measurements as MeasurementPoint[]).map(m => [m.pomCode, m.pomName || '']));
@@ -667,57 +669,11 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
     showSuccess('Duplicated construction. Please edit and save.');
   };
 
-  const handleExport = () => {
-    if (constructions.length === 0) {
-      showWarning('No constructions to export');
-      return;
-    }
-    
-    const csvContent = exportToCSV(constructions);
-    downloadCSV(csvContent, `constructions_export_${new Date().toISOString().split('T')[0]}.csv`);
-    showSuccess('Constructions exported successfully');
-  };
+  // CSV export/import disabled per request
+  const handleExport = () => {};
 
-  const handleImport = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      const rows = parseCSV(text);
-      
-      if (rows.length === 0) {
-        showError('No data found in CSV file');
-        return;
-      }
-      
-      // Extract headers from first row
-      const headers = Object.keys(rows[0] || {});
-      setCsvHeaders(headers);
-      setRawCsvData(rows);
-      
-      // Auto-detect column mapping
-      const autoMapping: Record<string, keyof Construction | ''> = {};
-      const constructionFields: (keyof Construction)[] = ['pomCode', 'description', 'steps', 'imageUrl', 'videoUrl', 'language', 'status', 'comments'];
-      
-      headers.forEach(header => {
-        const lowerHeader = header.toLowerCase().trim();
-        if (lowerHeader.includes('pom') && lowerHeader.includes('code')) autoMapping[header] = 'pomCode';
-        else if (lowerHeader.includes('description')) autoMapping[header] = 'description';
-        else if (lowerHeader.includes('step')) autoMapping[header] = 'steps';
-        else if (lowerHeader.includes('image')) autoMapping[header] = 'imageUrl';
-        else if (lowerHeader.includes('video')) autoMapping[header] = 'videoUrl';
-        else if (lowerHeader.includes('language')) autoMapping[header] = 'language';
-        else if (lowerHeader.includes('status')) autoMapping[header] = 'status';
-        else if (lowerHeader.includes('comment')) autoMapping[header] = 'comments';
-        else autoMapping[header] = '';
-      });
-      
-      setColumnMapping(autoMapping);
-      
-      // Show mapping modal first
-      setShowMappingModal(true);
-    };
-    reader.readAsText(file);
-  };
+  // CSV import disabled per request
+  const handleImport = (_file: File) => {};
 
   const handleConfirmMapping = () => {
     // Map CSV columns to Construction fields using user mapping
@@ -835,9 +791,9 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Construction</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{t('form.construction.title')}</h1>
             <p className="text-sm text-gray-600 mt-1">
-              Construction instructions and details
+              {t('form.construction.subtitle')}
             </p>
           </div>
           
@@ -855,7 +811,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Search constructions..."
+                placeholder={t('form.construction.searchPlaceholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -867,36 +823,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
           </div>
 
           <div className="flex items-center space-x-3">
-            {/* Import/Export */}
-            <div className="relative">
-              <input
-                type="file"
-                accept=".csv"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleImport(file);
-                  e.target.value = '';
-                }}
-                className="hidden"
-                id="construction-import-input"
-              />
-              <label
-                htmlFor="construction-import-input"
-                className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Import
-              </label>
-            </div>
-            <button
-              onClick={handleExport}
-              className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </button>
-
-            {/* Add Button */}
+            {/* CSV import/export hidden per request */}
             <button
               onClick={() => {
                 resetForm();
@@ -905,7 +832,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
               className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add Construction
+              {t('form.construction.add')}
             </button>
           </div>
         </div>
@@ -917,7 +844,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
           <div className="flex items-center">
             <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
             <span className="text-sm text-red-800">
-              Có {Object.keys(validationErrors).length} construction(s) có lỗi validation. Vui lòng kiểm tra và sửa trước khi lưu.
+              {t('form.construction.validationSummary', { count: Object.keys(validationErrors).length })}
             </span>
           </div>
         </div>
@@ -927,7 +854,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
       <Modal
         isOpen={showModal}
         onClose={resetForm}
-        title={editingId ? 'Edit Construction' : 'Detail Construction'}
+        title={editingId ? t('form.construction.editTitle') : t('form.construction.detailTitle')}
         size="lg"
         footer={
           <>
@@ -935,13 +862,13 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
               onClick={resetForm}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               onClick={() => handleSubmit(false)}
               className="px-4 py-2 text-sm font-medium text-white bg-gray-600 border border-transparent rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
             >
-              Save Draft
+              {t('form.saveDraft')}
             </button>
             {/* Approval button removed */}
           </>
@@ -951,7 +878,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
           {/* Image Upload */}
           <div>
             <label className="text-sm font-medium text-gray-700 mb-2 block">
-              Illustration Image
+              {t('form.construction.imageLabel')}
             </label>
             <div
               className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md transition-colors ${
@@ -975,7 +902,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
                         fallback={
                           <div className="flex flex-col items-center justify-center text-gray-400 py-12">
                             <Upload className="w-10 h-10 mb-2" />
-                            <p className="text-sm">Không thể hiển thị ảnh</p>
+                            <p className="text-sm">{t('form.cannotDisplayImage')}</p>
                           </div>
                         }
                       />
@@ -1002,7 +929,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
                         htmlFor={`construction-image-upload-${editingId || 'new'}`}
                         className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500"
                       >
-                        <span>Upload an image</span>
+                        <span>{t('form.uploadImage')}</span>
                         <input
                           id={`construction-image-upload-${editingId || 'new'}`}
                           type="file"
@@ -1012,15 +939,15 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
                           disabled={uploading}
                         />
                       </label>
-                      <p className="pl-1">or drag and drop</p>
+                      <p className="pl-1">{t('form.orDragAndDrop')}</p>
                     </div>
-                    <p className="text-xs text-gray-500">PNG, JPG, GIF, SVG up to 5MB</p>
+                    <p className="text-xs text-gray-500">{t('form.imageUploadHint')}</p>
                   </>
                 )}
                 {uploading && (
                   <div className="flex items-center justify-center text-xs text-blue-600">
                     <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-2"></div>
-                    Uploading...
+                    {t('form.uploading')}
                   </div>
                 )}
                 {uploadError && (
@@ -1037,10 +964,10 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
           </div>
 
           <Textarea
-            label="Note"
+            label={t('form.construction.note')}
             value={(formData as any).note || ''}
             onChange={handleInputChange('note')}
-            placeholder="Ghi chú thêm..."
+            placeholder={t('form.construction.notePlaceholder')}
             rows={2}
           />
         </div>
@@ -1049,24 +976,24 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
       {/* Constructions List */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="p-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-800">Constructions List</h3>
+          <h3 className="text-lg font-semibold text-gray-800">{t('form.construction.listTitle')}</h3>
         </div>
         
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Image</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Note</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('form.construction.imageColumn')}</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('form.construction.noteColumn')}</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {paginatedConstructions.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="px-6 py-12 text-center text-sm text-gray-500">
-                    No constructions added yet. Click 'Add Construction' to get started.
-                  </td>
+                    <td colSpan={3} className="px-6 py-12 text-center text-sm text-gray-500">
+                      {t('form.construction.empty')}
+                    </td>
                 </tr>
               ) : (
                 paginatedConstructions.map((item) => {
@@ -1083,12 +1010,12 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
                         <div className="w-32 h-32 border border-gray-200 rounded-md bg-gray-50 flex items-center justify-center overflow-hidden">
                           <ZoomableImage
                             src={getImageUrl(item.imageUrl || '')}
-                            alt={item.pomCode ? `Construction ${item.pomCode}` : 'Construction image'}
+                            alt={item.pomCode ? `Construction ${item.pomCode}` : t('form.construction.imageAlt')}
                             containerClassName="w-full h-full flex items-center justify-center"
                             className="object-contain"
                             fallback={
                               <span className="text-xs text-gray-400 px-2 text-center leading-tight">
-                                No image
+                                {t('form.bom.noImage')}
                               </span>
                             }
                           />
@@ -1101,7 +1028,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
                         {(item as any).note ? (
                           <p className="whitespace-pre-wrap">{(item as any).note}</p>
                         ) : (
-                          <span className="text-gray-400 italic">Chưa có ghi chú</span>
+                          <span className="text-gray-400 italic">{t('form.construction.noNote')}</span>
                         )}
                         {hasErrors && errors.comments && (
                           <div className="mt-1 text-xs text-red-600">{errors.comments}</div>
@@ -1112,21 +1039,21 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
                           <button
                             onClick={() => handleEdit(item)}
                             className="text-blue-600 hover:text-blue-900"
-                            title="Edit"
+                            title={t('common.edit')}
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDuplicate(item)}
                             className="text-purple-600 hover:text-purple-900"
-                            title="Duplicate"
+                            title={t('form.construction.duplicate')}
                           >
                             <Copy className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(item)}
                             className="text-red-600 hover:text-red-900"
-                            title="Delete"
+                            title={t('common.delete')}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -1180,7 +1107,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
           setCsvHeaders([]);
           setColumnMapping({});
         }}
-        title="Map CSV Columns to Construction Fields"
+        title={t('form.construction.mapCsvTitle')}
         size="lg"
         footer={
           <>
@@ -1193,20 +1120,20 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
               }}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               onClick={handleConfirmMapping}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
             >
-              Continue to Preview
+              {t('form.construction.continueToPreview')}
             </button>
           </>
         }
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            Map each CSV column to a Construction field. Leave unmapped if not needed.
+            {t('form.construction.mapCsvDescription')}
           </p>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {csvHeaders.map(header => (
@@ -1223,13 +1150,13 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                   >
-                    <option value="">-- Not mapped --</option>
-                    <option value="pomCode">POM Code</option>
-                    <option value="description">Description</option>
-                    <option value="steps">Steps</option>
-                    <option value="imageUrl">Image URL</option>
-                    <option value="videoUrl">Video URL</option>
-                    <option value="language">Language</option>
+                    <option value="">{t('form.construction.notMapped')}</option>
+                    <option value="pomCode">{t('form.construction.pomCode')}</option>
+                    <option value="description">{t('form.construction.description')}</option>
+                    <option value="steps">{t('form.construction.steps')}</option>
+                    <option value="imageUrl">{t('form.construction.imageUrl')}</option>
+                    <option value="videoUrl">{t('form.construction.videoUrl')}</option>
+                    <option value="language">{t('form.construction.language')}</option>
                     {/* Status mapping removed */}
                     <option value="comments">Comments</option>
                   </select>
@@ -1248,7 +1175,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
           setImportPreview([]);
           setImportErrors([]);
         }}
-        title="Import Preview"
+        title={t('form.construction.importPreviewTitle')}
         size="xl"
         footer={
           <>
@@ -1265,12 +1192,12 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
                     ...errorRows.map(r => `"${r.Row}","${r.Errors.replace(/"/g, '""')}"`)
                   ].join('\n');
                   downloadCSV(errorCsv, `import_errors_${new Date().toISOString().split('T')[0]}.csv`);
-                  showSuccess('Error report downloaded');
+                  showSuccess(t('form.bom.errorReportDownloaded'));
                 }}
                 className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-300 rounded-md hover:bg-red-100"
               >
                 <Download className="w-4 h-4 mr-2 inline" />
-                Download Errors
+                {t('form.construction.downloadErrors')}
               </button>
             )}
             <button
@@ -1281,13 +1208,13 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
               }}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               onClick={handleConfirmImport}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
             >
-              Import {importPreview.length - importErrors.length} Valid Items
+              {t('form.construction.importValidItems', { count: importPreview.length - importErrors.length })}
             </button>
           </>
         }
@@ -1295,14 +1222,16 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
         <div className="space-y-4">
           {importErrors.length > 0 && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-md">
-              <h4 className="text-sm font-medium text-red-800 mb-2">
-                {importErrors.length} row(s) have errors:
-              </h4>
+                  <h4 className="text-sm font-medium text-red-800 mb-2">
+                    {t('form.construction.rowsHaveErrors', { count: importErrors.length })}
+                  </h4>
               <div className="max-h-40 overflow-y-auto">
                 <ul className="text-sm text-red-700 space-y-1">
                   {importErrors.map(({ row, errors }) => (
                     <li key={row} className="flex items-start">
-                      <span className="font-medium mr-2">Row {row}:</span>
+                        <span className="font-medium mr-2">
+                          {t('form.construction.rowLabel', { row })}
+                        </span>
                       <div className="flex-1">
                         {Object.entries(errors).map(([field, msg]) => (
                           <div key={field} className="text-xs">
@@ -1321,10 +1250,10 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Row</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">POM Code</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Description</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Steps</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">{t('form.construction.rowHeader')}</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">{t('form.construction.pomCode')}</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">{t('form.construction.description')}</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">{t('form.construction.steps')}</th>
                   {/* Status column removed */}
                 </tr>
               </thead>

@@ -5,6 +5,7 @@ import { useFormValidation } from '../../../hooks/useFormValidation';
 import { bomItemValidationSchema } from '../../../utils/validationSchemas';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useI18n } from '../../../lib/i18n';
 import DataTable from '../shared/DataTable';
 import Input from '../shared/Input';
 import Select from '../shared/Select';
@@ -208,6 +209,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   const bom = techpack?.bom ?? [];
   const colorways = techpack?.colorways ?? [];
   const { user } = useAuth();
+  const { t } = useI18n();
 
   const [showModal, setShowModal] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -729,7 +731,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       }
     });
 
-    showSuccess(`Duplicated ${selectedItems.length} material(s)`);
+    showSuccess(t('form.bom.duplicatedMaterials', { count: selectedItems.length }));
     clearBomSelection();
   };
 
@@ -747,8 +749,8 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     });
 
     const confirmationMessage = totalImpactedColorways > 0
-      ? `${selectedItems.length} material(s) selected. ${totalImpactedColorways} colorway assignment(s) will be removed. Continue?`
-      : `Are you sure you want to delete ${selectedItems.length} selected material(s)?`;
+      ? t('form.bom.bulkDeleteWithColorways', { count: selectedItems.length, colorwayCount: totalImpactedColorways })
+      : t('form.bom.bulkDeleteConfirm', { count: selectedItems.length });
 
     if (window.confirm(confirmationMessage)) {
       // Clear previous undo timeout if exists
@@ -780,7 +782,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
         }
       });
 
-      showSuccess(`Deleted ${selectedItems.length} material(s)`);
+      showSuccess(t('form.bom.deletedMaterials', { count: selectedItems.length }));
       clearBomSelection();
     }
   };
@@ -837,15 +839,15 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   const handleClearAssignment = () => {
     if (!colorAssignmentModal || !removeColorwayAssignment) return;
     removeColorwayAssignment(colorAssignmentModal.colorway.id, colorAssignmentModal.bomItemId);
-    showSuccess('Color assignment removed.');
+      showSuccess(t('form.bom.colorAssignmentRemoved'));
     closeColorAssignmentModal();
   };
 
   const handleDelete = (item: BomItem, index: number) => {
     const impactedColorways = countColorwayAssignments(item);
     const confirmationMessage = impactedColorways > 0
-      ? `Material "${item.part} - ${item.materialName}" is linked to ${impactedColorways} colorway${impactedColorways > 1 ? 's' : ''}. Deleting it will remove those color assignments. Continue?`
-      : `Are you sure you want to delete "${item.part} - ${item.materialName}"?`;
+      ? t('form.bom.deleteWithColorways', { part: item.part, material: item.materialName, count: impactedColorways })
+      : t('form.bom.deleteConfirm', { part: item.part, material: item.materialName });
     if (window.confirm(confirmationMessage)) {
       // Clear previous undo timeout if exists
       if (deletedItem?.timeoutId) {
@@ -880,7 +882,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       
       // Show undo toast
       showUndoToast(
-        `Material "${item.part} - ${item.materialName}" deleted`,
+        t('form.bom.materialDeleted', { part: item.part, material: item.materialName }),
         () => {
           // Restore item at original index using context method
           if (deletedItemData && insertBomItemAt) {
@@ -945,13 +947,13 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
 
   const handleExport = () => {
     if (bom.length === 0) {
-      showWarning('No materials to export');
+      showWarning(t('form.bom.noMaterialsToExport'));
       return;
     }
     
     const csvContent = exportToCSV(bom, canViewPrice);
     downloadCSV(csvContent, `bom_export_${new Date().toISOString().split('T')[0]}.csv`);
-    showSuccess('BOM exported successfully');
+    showSuccess(t('form.bom.exportedSuccessfully'));
   };
 
   const handleExportSample = () => {
@@ -974,7 +976,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     ];
     const csvContent = exportToCSV(sampleData, canViewPrice);
     downloadCSV(csvContent, 'bom_sample.csv');
-    showSuccess('Sample CSV downloaded');
+    showSuccess(t('form.bom.sampleCsvDownloaded'));
   };
 
   const handleImport = (file: File) => {
@@ -1120,9 +1122,9 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     });
     
     if (errorCount > 0) {
-      showWarning(`${successCount} items imported, ${errorCount} items skipped due to errors`);
+      showWarning(t('form.bom.importedWithErrors', { success: successCount, errors: errorCount }));
     } else {
-      showSuccess(`${successCount} items imported successfully`);
+      showSuccess(t('form.bom.importedSuccessfully', { count: successCount }));
     }
     
     setShowImportModal(false);
@@ -1194,63 +1196,63 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     const baseColumns: ColumnType[] = [
     {
       key: 'part' as keyof BomItem,
-      header: 'Part',
+      header: t('form.bom.part'),
       width: '15%',
       sortable: true,
     },
     {
       key: 'materialName' as keyof BomItem,
-      header: 'Material Name',
+      header: t('form.bom.materialName'),
       width: '20%',
       sortable: true,
     },
     {
       key: 'imageUrl' as keyof BomItem,
-      header: 'Image',
+      header: t('form.bom.image'),
       width: '120px',
       render: (value: string, item: BomItem) => {
         const resolvedSrc = getMaterialImageUrl(value);
         return (
           <ZoomableImage
             src={resolvedSrc}
-            alt={`${item.materialName || item.part} preview`}
+            alt={`${item.materialName || item.part} ${t('form.bom.preview')}`}
             fit="contain"
             containerClassName="w-20 h-20 rounded-md border border-gray-200 overflow-hidden bg-white flex items-center justify-center text-[10px] text-gray-400"
             className="object-contain"
-            fallback={<span className="px-2 text-center leading-tight">No Image</span>}
+            fallback={<span className="px-2 text-center leading-tight">{t('form.bom.noImage')}</span>}
           />
         );
       },
     },
     {
       key: 'placement' as keyof BomItem,
-      header: 'Placement',
+      header: t('form.bom.placement'),
       width: '15%',
     },
     {
       key: 'size' as keyof BomItem,
-      header: 'Size/Width/Usage',
+      header: t('form.bom.size'),
       width: '8%',
     },
     {
       key: 'quantity' as keyof BomItem,
-      header: 'Qty',
+      header: t('form.bom.quantityShort'),
       width: '8%',
       render: (value: number | null | undefined) => (value !== undefined && value !== null) ? value.toFixed(2) : '-',
     },
     {
       key: 'uom' as keyof BomItem,
-      header: 'UOM',
+      header: t('form.bom.uom'),
       width: '8%',
     },
     {
       key: 'supplier' as keyof BomItem,
-      header: 'Supplier',
+      header: t('form.bom.supplier'),
       width: '15%',
     },
     {
       key: 'comments' as keyof BomItem,
-      header: 'Comments',
+      header: t('form.bom.comments'),
       width: '11%',
       render: (value: string) => (
         <span className="text-xs text-gray-600 truncate" title={value}>
@@ -1265,7 +1267,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       baseColumns.push(
         {
           key: 'unitPrice' as keyof BomItem,
-          header: 'Unit Price',
+          header: t('form.bom.unitPrice'),
           width: '10%',
           render: (value: number) =>
             value !== undefined && value !== null
@@ -1274,7 +1276,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
         },
         {
           key: 'totalPrice' as keyof BomItem,
-          header: 'Total Price',
+          header: t('form.bom.totalPrice'),
           width: '10%',
           render: (value: number) => {
             // totalPrice is already calculated in tableDataWithErrors
@@ -1352,9 +1354,9 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Bill of Materials</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{t('form.tab.bom')}</h1>
             <p className="text-sm text-gray-600 mt-1">
-              Manage materials and components for this tech pack
+              {t('form.tab.bom.description')}
             </p>
           </div>
           
@@ -1362,11 +1364,11 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
           <div className="flex items-center space-x-6 text-sm">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">{totals.totalItems}</div>
-              <div className="text-gray-500">Items</div>
+              <div className="text-gray-500">{t('form.bom.items')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">{totals.uniqueSuppliers}</div>
-              <div className="text-gray-500">Suppliers</div>
+              <div className="text-gray-500">{t('form.bom.suppliers')}</div>
             </div>
           </div>
         </div>
@@ -1381,7 +1383,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Search materials..."
+                placeholder={t('form.bom.searchPlaceholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -1396,7 +1398,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                 onChange={(e) => setFilterByPart(e.target.value)}
                 className="pl-10 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value="">All Parts</option>
+                <option value="">{t('form.bom.allParts')}</option>
                 {uniqueParts.map(part => (
                   <option key={part} value={part}>{part}</option>
                 ))}
@@ -1469,7 +1471,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add Material
+              {t('form.bom.addMaterial')}
             </button>
           </div>
         </div>
@@ -1478,8 +1480,8 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
           <div className="mt-6 border-t border-gray-100 pt-4">
             <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
               <div>
-                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Colorway Columns</p>
-                <p className="text-xs text-gray-500">Toggle which colorways appear in the BOM grid for quick color checks.</p>
+                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{t('form.bom.colorwayColumns')}</p>
+                <p className="text-xs text-gray-500">{t('form.bom.colorwayColumnsDescription')}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -1489,14 +1491,14 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                   }
                   className="px-3 py-1 text-xs border border-gray-300 rounded-full text-gray-600 hover:bg-gray-50"
                 >
-                  Show all
+                  {t('form.bom.showAll')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setVisibleColorwayIds([])}
                   className="px-3 py-1 text-xs border border-gray-300 rounded-full text-gray-600 hover:bg-gray-50"
                 >
-                  Hide all
+                  {t('form.bom.hideAll')}
                 </button>
               </div>
             </div>
@@ -1524,7 +1526,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       <Modal
         isOpen={showModal}
         onClose={resetForm}
-        title={editingIndex !== null ? 'Edit Material' : 'Add New Material'}
+        title={editingIndex !== null ? t('form.bom.editMaterial') : t('form.bom.addMaterial')}
         size="lg"
         footer={
           <>
@@ -1532,7 +1534,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               onClick={resetForm}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               onClick={handleSubmit}
@@ -1542,7 +1544,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                   : 'text-gray-700 bg-gray-100'
               }`}
             >
-              {editingIndex !== null ? 'Update' : 'Add'} Material
+              {editingIndex !== null ? t('common.update') : t('common.add')} {t('form.bom.material')}
             </button>
           </>
         }
@@ -1550,7 +1552,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
         <div ref={formRef} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Select
-              label="Part"
+              label={t('form.bom.part')}
               value={formData.part || ''}
               onChange={handleInputChange('part')}
               onBlur={() => validation.setFieldTouched('part')}
@@ -1562,11 +1564,11 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             />
 
             <Input
-              label="Material Name"
+              label={t('form.bom.materialName')}
               value={formData.materialName || ''}
               onChange={handleInputChange('materialName')}
               onBlur={() => validation.setFieldTouched('materialName')}
-              placeholder="e.g., Cotton Oxford"
+              placeholder={t('materials.placeholder.name')}
               required
               error={validation.getFieldProps('materialName').error}
               helperText={validation.getFieldProps('materialName').helperText}
@@ -1574,17 +1576,17 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             />
 
             <Input
-              label="Placement"
+              label={t('form.bom.placement')}
               value={formData.placement || ''}
               onChange={handleInputChange('placement')}
               onBlur={() => validation.setFieldTouched('placement')}
-              placeholder="e.g., Body, Sleeve, Collar"
+              placeholder={t('materials.placeholder.position')}
               error={validation.getFieldProps('placement').error}
               helperText={validation.getFieldProps('placement').helperText}
             />
 
             <Input
-              label="Size/Width/Usage"
+              label={t('form.bom.size')}
               value={formData.size || ''}
               onChange={handleInputChange('size')}
               onBlur={() => validation.setFieldTouched('size')}
@@ -1594,7 +1596,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             />
 
             <Input
-              label="Quantity"
+              label={t('form.bom.quantity')}
               value={formData.quantity !== undefined && formData.quantity !== null ? formData.quantity : ''}
               onChange={handleInputChange('quantity')}
               onBlur={() => validation.setFieldTouched('quantity')}
@@ -1608,7 +1610,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             />
 
             <Select
-              label="Unit of Measure"
+              label={t('form.bom.unit')}
               value={formData.uom || 'm'}
               onChange={handleInputChange('uom')}
               onBlur={() => validation.setFieldTouched('uom')}
@@ -1622,7 +1624,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             {canViewPrice && (
               <>
                 <Input
-                  label="Unit Price"
+                  label={t('form.bom.unitPrice')}
                   value={formData.unitPrice ?? ''}
                   onChange={handleInputChange('unitPrice')}
                   onBlur={() => validation.setFieldTouched('unitPrice')}
@@ -1635,7 +1637,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                 />
                 
                 <Input
-                  label="Total Price"
+                  label={t('form.bom.totalPrice')}
                   value={formData.totalPrice ?? ''}
                   type="number"
                   disabled
@@ -1646,11 +1648,11 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             )}
             
             <Input
-              label="Supplier"
+              label={t('form.bom.supplier')}
               value={formData.supplier || ''}
               onChange={handleInputChange('supplier')}
               onBlur={() => validation.setFieldTouched('supplier')}
-              placeholder="Supplier name"
+              placeholder={t('materials.placeholder.supplier')}
               required
               error={validation.getFieldProps('supplier').error}
               helperText={validation.getFieldProps('supplier').helperText}
@@ -1658,11 +1660,11 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             />
 
             <Input
-              label="Supplier Code"
+              label={t('form.bom.supplierCode')}
               value={formData.supplierCode || ''}
               onChange={handleInputChange('supplierCode')}
               onBlur={() => validation.setFieldTouched('supplierCode')}
-              placeholder="Enter supplier code"
+              placeholder={t('form.bom.supplierCode')}
               required
               error={validation.getFieldProps('supplierCode').error}
               helperText={validation.getFieldProps('supplierCode').helperText}
@@ -1670,7 +1672,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             />
 
             <Input
-              label="Color Code"
+              label={t('form.bom.colorCode')}
               value={formData.colorCode || ''}
               onChange={handleInputChange('colorCode')}
               onBlur={() => validation.setFieldTouched('colorCode')}
@@ -1681,14 +1683,14 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
 
             <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
               <div className="md:col-span-2">
-                <p className="text-sm font-medium text-gray-700 mb-2">Ảnh vật tư (upload)</p>
+                <p className="text-sm font-medium text-gray-700 mb-2">{t('form.bom.materialImage')}</p>
                 <div className="flex flex-wrap items-center gap-2">
                   <label
                     htmlFor={`bom-image-upload-${editingId ?? 'new'}`}
                     className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
                   >
                     <Upload className="w-3.5 h-3.5" />
-                    {isUploadingImage ? 'Đang tải...' : 'Upload ảnh'}
+                    {isUploadingImage ? t('common.loading') : t('form.bom.uploadImage')}
                   </label>
                   <input
                     id={`bom-image-upload-${editingId ?? 'new'}`}
@@ -1705,7 +1707,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                       className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
                     >
                       <X className="w-3 h-3" />
-                      Xoá ảnh
+                      {t('form.bom.removeImage')}
                     </button>
                   )}
                 </div>
@@ -1733,11 +1735,11 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                     fit="contain"
                     containerClassName="w-full h-full flex items-center justify-center text-xs text-gray-400 bg-white"
                     className="object-contain"
-                    fallback={<span className="text-[11px] text-gray-400 px-2 text-center leading-tight">Chưa có ảnh</span>}
+                    fallback={<span className="text-[11px] text-gray-400 px-2 text-center leading-tight">{t('form.bom.noImage')}</span>}
                   />
                   {isUploadingImage && (
                     <div className="absolute inset-0 bg-white/70 flex items-center justify-center text-xs font-medium text-gray-700">
-                      Đang tải ảnh...
+                      {t('form.bom.uploadingImage')}
                     </div>
                   )}
                 </div>
@@ -1746,11 +1748,11 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
 
             <div className="md:col-span-2">
               <Input
-                label="Material Composition"
+                label={t('form.bom.materialComposition')}
                 value={formData.materialComposition || ''}
                 onChange={handleInputChange('materialComposition')}
                 onBlur={() => validation.setFieldTouched('materialComposition')}
-                placeholder="e.g., 100% Cotton, 65% Cotton 35% Polyester"
+                placeholder={t('materials.placeholder.composition')}
                 error={validation.getFieldProps('materialComposition').error}
                 helperText={validation.getFieldProps('materialComposition').helperText}
               />
@@ -1758,11 +1760,11 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
 
             <div className="md:col-span-3">
               <Textarea
-                label="Comments"
+                label={t('form.bom.comments')}
                 value={formData.comments || ''}
                 onChange={handleInputChange('comments')}
                 onBlur={() => validation.setFieldTouched('comments')}
-                placeholder="Additional notes or specifications..."
+                placeholder={t('materials.placeholder.notes')}
                 rows={2}
                 error={validation.getFieldProps('comments').error}
                 helperText={validation.getFieldProps('comments').helperText}
@@ -1779,7 +1781,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                 </div>
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-red-800">
-                    Vui lòng sửa các lỗi sau:
+                    {t('form.bom.fixErrors')}
                   </h3>
                   <div className="mt-2 text-sm text-red-700">
                     <ul className="list-disc pl-5 space-y-1">
@@ -1803,7 +1805,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
         <Modal
           isOpen={!!colorAssignmentModal}
           onClose={closeColorAssignmentModal}
-          title={`Assign Color • ${colorAssignmentModal.bomItem.part}`}
+          title={`${t('form.bom.assignColor')} • ${colorAssignmentModal.bomItem.part}`}
           size="lg"
           footer={
             <>
@@ -1813,7 +1815,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                   onClick={handleClearAssignment}
                   className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700"
                 >
-                  Clear
+                  {t('form.bom.clear')}
                 </button>
               )}
               <button
@@ -1821,14 +1823,14 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                 onClick={closeColorAssignmentModal}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
                 onClick={handleSaveColorAssignment}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
               >
-                Save
+                {t('common.save')}
               </button>
             </>
           }
@@ -1840,7 +1842,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                 <p className="text-gray-500">{colorAssignmentModal.bomItem.materialName}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs uppercase text-gray-500">Colorway</p>
+                <p className="text-xs uppercase text-gray-500">{t('form.tab.colorways')}</p>
                 <p className="text-sm font-semibold text-gray-800">{colorAssignmentModal.colorway.name}</p>
               </div>
             </div>
@@ -1855,7 +1857,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                   onChange={() => setAssignmentMode('existing')}
                   disabled={!colorAssignmentModal.colorway.parts || colorAssignmentModal.colorway.parts.length === 0}
                 />
-                <span>Use existing color</span>
+                <span>{t('form.bom.useExistingColor')}</span>
               </label>
               <label className="inline-flex items-center space-x-2 text-sm text-gray-700">
                 <input
@@ -1865,7 +1867,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                   checked={assignmentMode === 'new'}
                   onChange={() => setAssignmentMode('new')}
                 />
-                <span>Create new color</span>
+                <span>{t('form.bom.createNewColor')}</span>
               </label>
             </div>
 
@@ -1873,14 +1875,14 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               colorAssignmentModal.colorway.parts && colorAssignmentModal.colorway.parts.length > 0 ? (
                 <div className="space-y-3">
                   <Select
-                    label="Colorway Parts"
+                    label={t('form.bom.colorwayParts')}
                     value={selectedPartId}
                     onChange={setSelectedPartId}
                     options={colorAssignmentModal.colorway.parts.map(part => ({
                       value: part.id,
                       label: `${part.partName} • ${part.colorName}`,
                     }))}
-                    placeholder="Select a colorway part..."
+                    placeholder={t('form.bom.selectColorwayPart')}
                   />
                   {selectedPartId && (
                     <div className="p-3 border border-gray-200 rounded-md text-sm flex items-center justify-between">
@@ -1913,26 +1915,26 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                 </div>
               ) : (
                 <p className="text-sm text-gray-500">
-                  No colorway parts available. Switch to “Create new color” to define one for this BOM item.
+                  {t('form.bom.noColorwayPartsAvailable')}
                 </p>
               )
             ) : (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
-                    label="Color Name"
+                    label={t('form.bom.colorName')}
                     value={newAssignmentForm.colorName}
                     onChange={(value) => setNewAssignmentForm(prev => ({ ...prev, colorName: String(value) }))}
-                    placeholder="e.g., Navy Blazer"
+                    placeholder={t('form.bom.colorNamePlaceholder')}
                   />
                   <Input
-                    label="Pantone Code"
+                    label={t('form.bom.pantoneCode')}
                     value={newAssignmentForm.pantoneCode}
                     onChange={(value) => setNewAssignmentForm(prev => ({ ...prev, pantoneCode: String(value) }))}
-                    placeholder="19-4052 TPX"
+                    placeholder={t('form.bom.pantoneCodePlaceholder')}
                   />
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Hex Color</label>
+                    <label className="text-sm font-medium text-gray-700">{t('form.bom.hexColor')}</label>
                     <div className="flex items-center space-x-2 mt-1">
                       <input
                         type="color"
@@ -1950,7 +1952,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                     </div>
                   </div>
                   <Select
-                    label="Color Type"
+                    label={t('form.bom.colorType')}
                     value={newAssignmentForm.colorType}
                     onChange={(value) =>
                       setNewAssignmentForm(prev => ({ ...prev, colorType: value as ColorwayPart['colorType'] }))
@@ -1999,12 +2001,12 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
           {importErrors.length > 0 && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-md">
               <h4 className="text-sm font-medium text-red-800 mb-2">
-                {importErrors.length} row(s) have errors:
+                {t('form.bom.rowsHaveErrors', { count: importErrors.length })}
               </h4>
               <ul className="text-sm text-red-700 space-y-1">
                 {importErrors.map(({ row, errors }) => (
                   <li key={row}>
-                    Row {row}: {Object.values(errors).join(', ')}
+                    {t('form.bom.rowError', { row, errors: Object.values(errors).join(', ') })}
                   </li>
                 ))}
               </ul>
@@ -2040,9 +2042,9 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                       <td className="px-4 py-2 text-sm">{item.supplier || '-'}</td>
                       <td className="px-4 py-2 text-sm">
                         {isValid ? (
-                          <span className="text-green-600">✓ Valid</span>
+                          <span className="text-green-600">✓ {t('form.bom.valid')}</span>
                         ) : (
-                          <span className="text-red-600">✗ Error</span>
+                          <span className="text-red-600">✗ {t('form.bom.error')}</span>
                         )}
                       </td>
                     </tr>
@@ -2057,13 +2059,13 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       {/* Data Table with Error Highlighting */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
         <div className="p-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-800">Materials List</h3>
+          <h3 className="text-lg font-semibold text-gray-800">{t('form.bom.materialsList')}</h3>
           {Object.keys(validationErrors).length > 0 && (
             <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-md">
               <div className="flex items-center">
                 <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
                 <span className="text-sm text-red-800">
-                  {Object.keys(validationErrors).length} item(s) have validation errors. Please fix them before saving.
+                  {t('form.bom.validationErrors', { count: Object.keys(validationErrors).length })}
                 </span>
               </div>
             </div>
@@ -2075,7 +2077,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
           <div className="px-4 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium text-blue-900">
-                Selected: {selectedBomIds.size} item(s)
+                {t('form.bom.selected', { count: selectedBomIds.size })}
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -2084,20 +2086,20 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                 className="px-3 py-1.5 text-sm font-medium text-blue-700 bg-white border border-blue-300 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <Copy className="w-4 h-4 inline mr-1.5" />
-                Duplicate
+                {t('form.bom.duplicate')}
               </button>
               <button
                 onClick={handleBulkDeleteBom}
                 className="px-3 py-1.5 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500"
               >
                 <X className="w-4 h-4 inline mr-1.5" />
-                Delete
+                {t('common.delete')}
               </button>
               <button
                 onClick={clearBomSelection}
                 className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
               >
-                Clear Selection
+                {t('form.bom.clearSelection')}
               </button>
             </div>
           </div>
@@ -2111,7 +2113,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                   <button
                     onClick={toggleSelectAllBom}
                     className="flex items-center justify-center w-5 h-5 text-gray-400 hover:text-gray-600 focus:outline-none"
-                    title={selectedBomIds.size === filteredBom.length && filteredBom.length > 0 ? 'Deselect all' : 'Select all'}
+                    title={selectedBomIds.size === filteredBom.length && filteredBom.length > 0 ? t('form.bom.deselectAll') : t('form.bom.selectAll')}
                   >
                     {selectedBomIds.size === filteredBom.length && filteredBom.length > 0 ? (
                       <CheckSquare className="w-5 h-5 text-blue-600" />
@@ -2139,7 +2141,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               {filteredBom.length === 0 ? (
                 <tr>
                   <td colSpan={columns.length + 2} className="px-6 py-12 text-center text-sm text-gray-500">
-                    No materials added yet. Click 'Add Material' to get started or use a template.
+                    {t('form.bom.noMaterialsYet')}
                   </td>
                 </tr>
               ) : (
@@ -2196,21 +2198,21 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                           <button
                             onClick={() => handleEdit(item, originalIndex)}
                             className="text-blue-600 hover:text-blue-900"
-                            title="Edit"
+                            title={t('common.edit')}
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDuplicateBomItem(item, originalIndex)}
                             className="text-gray-600 hover:text-gray-900"
-                            title="Duplicate"
+                            title={t('form.bom.duplicate')}
                           >
                             <Copy className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(item, originalIndex)}
                             className="text-red-600 hover:text-red-900"
-                            title="Delete"
+                            title={t('common.delete')}
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -2253,7 +2255,11 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
           <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-700">
-                Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredBom.length)} of {filteredBom.length} items
+                {t('form.bom.showingItems', { 
+                  from: (currentPage - 1) * itemsPerPage + 1, 
+                  to: Math.min(currentPage * itemsPerPage, filteredBom.length), 
+                  total: filteredBom.length 
+                })}
               </span>
               <select
                 value={itemsPerPage}
@@ -2263,10 +2269,10 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                 }}
                 className="ml-4 px-2 py-1 border border-gray-300 rounded text-sm"
               >
-                <option value={25}>25 per page</option>
-                <option value={50}>50 per page</option>
-                <option value={100}>100 per page</option>
-                <option value={200}>200 per page</option>
+                <option value={25}>{t('form.bom.perPage', { count: 25 })}</option>
+                <option value={50}>{t('form.bom.perPage', { count: 50 })}</option>
+                <option value={100}>{t('form.bom.perPage', { count: 100 })}</option>
+                <option value={200}>{t('form.bom.perPage', { count: 200 })}</option>
               </select>
             </div>
             <div className="flex items-center space-x-2">
@@ -2278,7 +2284,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <span className="text-sm text-gray-700">
-                Page {currentPage} of {totalPages}
+                {t('form.bom.pageOf', { current: currentPage, total: totalPages })}
               </span>
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
@@ -2301,7 +2307,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
           setCsvHeaders([]);
           setColumnMapping({});
         }}
-        title="Map CSV Columns to BOM Fields"
+        title={t('form.bom.mapCsvColumns')}
         size="lg"
         footer={
           <>
@@ -2314,20 +2320,20 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               }}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               onClick={handleConfirmMapping}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
             >
-              Continue to Preview
+              {t('form.bom.continueToPreview')}
             </button>
           </>
         }
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            Map each CSV column to a BOM field. Leave unmapped if not needed.
+            {t('form.bom.mapCsvColumnsDescription')}
           </p>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {csvHeaders.map(header => (
@@ -2344,21 +2350,21 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                   >
-                    <option value="">-- Not mapped --</option>
-                    <option value="part">Part</option>
-                    <option value="materialName">Material Name</option>
-                    <option value="supplierCode">Supplier Code</option>
-                    <option value="placement">Placement</option>
-                    <option value="size">Size/Width/Usage</option>
-                    <option value="quantity">Quantity</option>
-                    <option value="uom">Unit of Measure</option>
-                    <option value="supplier">Supplier</option>
-                    <option value="colorCode">Color Code</option>
-                    <option value="materialComposition">Material Composition</option>
-                    <option value="imageUrl">Material Image URL</option>
-                    <option value="comments">Comments</option>
-                    <option value="unitPrice">Unit Price</option>
-                    <option value="totalPrice">Total Price</option>
+                    <option value="">{t('form.bom.notMapped')}</option>
+                    <option value="part">{t('form.bom.part')}</option>
+                    <option value="materialName">{t('form.bom.materialName')}</option>
+                    <option value="supplierCode">{t('form.bom.supplierCode')}</option>
+                    <option value="placement">{t('form.bom.placement')}</option>
+                    <option value="size">{t('form.bom.size')}</option>
+                    <option value="quantity">{t('form.bom.quantity')}</option>
+                    <option value="uom">{t('form.bom.uom')}</option>
+                    <option value="supplier">{t('form.bom.supplier')}</option>
+                    <option value="colorCode">{t('form.bom.colorCode')}</option>
+                    <option value="materialComposition">{t('form.bom.materialComposition')}</option>
+                    <option value="imageUrl">{t('form.bom.materialImageUrl')}</option>
+                    <option value="comments">{t('form.bom.comments')}</option>
+                    <option value="unitPrice">{t('form.bom.unitPrice')}</option>
+                    <option value="totalPrice">{t('form.bom.totalPrice')}</option>
                   </select>
                 </div>
               </div>
@@ -2392,7 +2398,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                     ...errorRows.map(r => `"${r.Row}","${r.Errors.replace(/"/g, '""')}"`)
                   ].join('\n');
                   downloadCSV(errorCsv, `import_errors_${new Date().toISOString().split('T')[0]}.csv`);
-                  showSuccess('Error report downloaded');
+                  showSuccess(t('form.bom.errorReportDownloaded'));
                 }}
                 className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-300 rounded-md hover:bg-red-100"
               >

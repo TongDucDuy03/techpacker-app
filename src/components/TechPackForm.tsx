@@ -92,17 +92,17 @@ export const TechPackForm: React.FC<TechPackFormProps> = ({ techPack, onSave, on
     const newErrors: Record<string,string> = {};
     const required = [
       { key: 'name', label: t('form.productName') },
-      { key: 'articleCode', label: 'Article Code' },
+      { key: 'articleCode', label: t('form.articleCode') },
       { key: 'technicalDesignerId', label: t('form.designer') },
-      { key: 'supplier', label: 'Supplier' },
-      { key: 'fabricDescription', label: 'Fabric Description' },
-      { key: 'productDescription', label: 'Product Description' },
+      { key: 'supplier', label: t('form.articleInfo.supplier') },
+      { key: 'fabricDescription', label: t('form.articleInfo.fabricDescription') },
+      { key: 'productDescription', label: t('form.articleInfo.productDescription') },
       { key: 'season', label: t('form.season') }
     ];
     required.forEach(r => {
       // @ts-ignore
       if (!formData[r.key] || String((formData as any)[r.key]).trim() === '') {
-        newErrors[r.key] = `${r.label} is required`;
+        newErrors[r.key] = t('validation.fieldRequired', { field: r.label });
       }
     });
 

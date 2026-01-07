@@ -3,6 +3,7 @@ import { TechPack } from '../../../types/techpack';
 import { RevisionManager } from '../../../features/revisions/components/RevisionManager';
 import { useRevisionPermissions } from '../../../features/revisions/utils/permissions';
 import { FileText } from 'lucide-react';
+import { useI18n } from '../../../lib/i18n';
 
 interface RevisionTabProps {
   techPack?: TechPack;
@@ -19,6 +20,7 @@ export interface RevisionTabRef {
 const RevisionTab = forwardRef<RevisionTabRef, RevisionTabProps>((props, ref) => {
   const { techPack, mode = 'create', onBackToList } = props;
   const { canView, canEdit } = useRevisionPermissions(techPack);
+  const { t } = useI18n();
 
   // Validate and save function for parent component
   useImperativeHandle(ref, () => ({
@@ -32,8 +34,8 @@ const RevisionTab = forwardRef<RevisionTabRef, RevisionTabProps>((props, ref) =>
       <div className="space-y-6">
         <div className="text-center py-12 text-gray-500">
           <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No Revisions Yet</h3>
-          <p>Revisions will appear here after you save your first TechPack.</p>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">{t('form.revision.emptyTitle')}</h3>
+          <p>{t('form.revision.emptyDescription')}</p>
         </div>
       </div>
     );
@@ -43,9 +45,9 @@ const RevisionTab = forwardRef<RevisionTabRef, RevisionTabProps>((props, ref) =>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Revision History</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{t('form.tab.revisionHistory')}</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Track changes and revert to previous versions of your TechPack
+            {t('form.revision.subtitle')}
           </p>
         </div>
       </div>

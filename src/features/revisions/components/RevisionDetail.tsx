@@ -5,6 +5,7 @@ import { Revision, RevertResponse } from '../types';
 import { RevertModal } from './RevertModal';
 import { CommentsSection } from './CommentsSection';
 import { useRevert } from '../hooks/useRevert';
+import { useI18n } from '../../../lib/i18n';
 import { useRevision } from '../hooks/useRevision';
 import ZoomableImage from '../../../components/common/ZoomableImage';
 
@@ -29,6 +30,7 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
 }) => {
   const { revert, loading: reverting, error: revertError } = useRevert();
   const { revision: detailedRevision, refetch } = useRevision(revision?._id);
+  const { t } = useI18n();
   const activeRevision = detailedRevision || revision;
   const [showRevertModal, setShowRevertModal] = useState(false);
 
@@ -36,7 +38,7 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
     return (
       <Card>
         <div className="text-center py-12 text-gray-500">
-          <p>Select a revision to view details</p>
+          <p>{t('form.revision.selectPrompt')}</p>
         </div>
       </Card>
     );

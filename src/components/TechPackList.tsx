@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, memo } from 'react';
 import { ApiTechPack } from '../types/techpack';
 import { useAuth } from '../contexts/AuthContext';
 import { useTechPack } from '../contexts/TechPackContext';
+import { useI18n } from '../lib/i18n';
 import { useDebounce } from '../hooks/useDebounce';
 import CreateTechPackWorkflow from './CreateTechPackWorkflow';
 import {
@@ -57,6 +58,7 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
 }) => {
   const { loadTechPacks, addTechPackToList } = useTechPack();
   const { user } = useAuth();
+  const { t } = useI18n();
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
   const [statusFilter, setStatusFilter] = useState('');
@@ -119,22 +121,22 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
 
   const showDeleteConfirm = (id: string) => {
     Modal.confirm({
-      title: 'Are you sure you want to delete this Tech Pack?',
+      title: t('techpack.list.deleteConfirm'),
       icon: <ExclamationCircleOutlined />,
-      content: 'This action cannot be undone.',
-      okText: 'Yes, Delete',
+      content: t('common.warning'),
+      okText: t('common.yes'),
       okType: 'danger',
-      cancelText: 'No, Cancel',
+      cancelText: t('common.no'),
       onOk: () => {
         onDeleteTechPack?.(id);
-        message.success('Tech Pack deleted successfully');
+        message.success(t('techpack.list.deleteSuccess'));
       },
     });
   };
 
   const columns = [
     {
-      title: 'Article Name',
+      title: t('techpack.list.title'),
       dataIndex: 'name',
       sorter: (a: any, b: any) => {
         const aName = a.articleName || a.articleInfo?.articleName || (a as any).productName || a.name || '';
@@ -145,7 +147,7 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
         const articleInfo = record.articleInfo || {};
         const articleName = record.articleName || articleInfo.articleName || (record as any).productName || record.name || '';
         return (
-          <Tooltip title={articleInfo.productDescription || record.productDescription || 'No description'}>
+            <Tooltip title={articleInfo.productDescription || record.productDescription || t('techpack.list.noDescription')}>
             <Text strong>{articleName}</Text>
             <br />
             <Text type="secondary">{articleInfo.productClass || record.productClass || record.metadata?.category}</Text>
@@ -154,44 +156,44 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
       }
     },
     { 
-      title: 'Article Code', 
+      title: t('techpack.list.articleCode'), 
       dataIndex: 'articleCode', 
       sorter: (a: any, b: any) => (a.articleCode || '').localeCompare(b.articleCode || '') 
     },
     {
-      title: 'Status',
+      title: t('techpack.list.status'),
       dataIndex: 'status',
       filters: [...new Set(safeTechPacks.map(tp => tp.status))].map((s) => ({ text: s, value: s })),
       onFilter: (value: any, record: any) => record.status.indexOf(value) === 0,
       render: (status: string) => <Tag color={getStatusColor(status)} className="status-tag">{status.toUpperCase()}</Tag>
     },
     { 
-      title: 'Season', 
+      title: t('techpack.list.season'), 
       dataIndex: 'season', 
       sorter: (a: any, b: any) => ((a.season || '') || (a.metadata?.season || '')).localeCompare((b.season || '') || (b.metadata?.season || '')), 
       render: (s: string, r: any) => s || r.metadata?.season || '—' 
     },
     {
-      title: 'Created Date',
+      title: t('techpack.list.createdDate'),
       dataIndex: 'createdAt',
       defaultSortOrder: 'descend' as 'ascend' | 'descend' | undefined,
       sorter: (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
       render: (date: string) => formatDateTime(date),
     },
     {
-      title: 'Last Updated',
+      title: t('techpack.list.lastUpdated'),
       dataIndex: 'updatedAt',
       sorter: (a: any, b: any) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
       render: (date: string) => formatDateTime(date),
     },
     {
-      title: 'Actions',
+      title: t('techpack.list.actions'),
       key: 'actions',
       render: (_: any, record: ApiTechPack) => (
         <Space className="action-buttons">
-          <Tooltip title="View"><Button icon={<EyeOutlined />} onClick={() => onViewTechPack?.(record)} /></Tooltip>
-          {canEdit && <Tooltip title="Edit"><Button icon={<EditOutlined />} onClick={() => onEditTechPack?.(record)} /></Tooltip>}
-          {canDelete && <Tooltip title="Delete"><Button icon={<DeleteOutlined />} danger onClick={() => showDeleteConfirm(record._id)} /></Tooltip>}
+          <Tooltip title={t('techpack.list.action.view')}><Button icon={<EyeOutlined />} onClick={() => onViewTechPack?.(record)} /></Tooltip>
+          {canEdit && <Tooltip title={t('techpack.list.action.edit')}><Button icon={<EditOutlined />} onClick={() => onEditTechPack?.(record)} /></Tooltip>}
+          {canDelete && <Tooltip title={t('techpack.list.action.delete')}><Button icon={<DeleteOutlined />} danger onClick={() => showDeleteConfirm(record._id)} /></Tooltip>}
         </Space>
       ),
     },
@@ -200,15 +202,15 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
   return (
     <div className="techpack-list-container">
       <div className="techpack-header">
-        <Title level={2}>Tech Packs</Title>
-        <Text>Manage your fashion tech packs from draft to production.</Text>
+        <Title level={2}>{t('nav.techpacks')}</Title>
+        <Text>{t('tpl.header.subtitle')}</Text>
       </div>
 
       <Row gutter={16} className="techpack-stats">
-        <Col span={6}><Card><Statistic title="Total Packs" value={safeTechPacks.length} prefix={<FileTextOutlined />} /></Card></Col>
-        <Col span={6}><Card><Statistic title="Draft" value={safeTechPacks.filter(tp => (tp.status || '').toLowerCase() === 'draft').length} prefix={<EditOutlined />} /></Card></Col>
-        <Col span={6}><Card><Statistic title="In Review" value={safeTechPacks.filter(tp => (tp.status || '').toLowerCase() === 'pending_approval').length} prefix={<ClockCircleOutlined />} /></Card></Col>
-        <Col span={6}><Card><Statistic title="Approved" value={safeTechPacks.filter(tp => (tp.status || '').toLowerCase() === 'approved').length} prefix={<CheckCircleOutlined />} /></Card></Col>
+        <Col span={6}><Card><Statistic title={t('dash.stat.total')} value={safeTechPacks.length} prefix={<FileTextOutlined />} /></Card></Col>
+        <Col span={6}><Card><Statistic title={t('status.draft')} value={safeTechPacks.filter(tp => (tp.status || '').toLowerCase() === 'draft').length} prefix={<EditOutlined />} /></Card></Col>
+        <Col span={6}><Card><Statistic title={t('status.inReview')} value={safeTechPacks.filter(tp => (tp.status || '').toLowerCase() === 'pending_approval').length} prefix={<ClockCircleOutlined />} /></Card></Col>
+        <Col span={6}><Card><Statistic title={t('status.approved')} value={safeTechPacks.filter(tp => (tp.status || '').toLowerCase() === 'approved').length} prefix={<CheckCircleOutlined />} /></Card></Col>
       </Row>
 
       <Card className="techpack-table-card">
@@ -216,14 +218,14 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
           <Row justify="space-between" align="middle">
             <Col>
               <Space>
-                <Search placeholder="Search by name or code" onSearch={setSearchTerm} style={{ width: 250 }} allowClear enterButton />
-                <Select placeholder="Filter by status" onChange={setStatusFilter} style={{ width: 150 }} allowClear>
+                <Search placeholder={t('tpl.search.placeholder')} onSearch={setSearchTerm} style={{ width: 250 }} allowClear enterButton />
+                <Select placeholder={`${t('common.filter')} ${t('techpack.list.status').toLowerCase()}`} onChange={setStatusFilter} style={{ width: 150 }} allowClear>
                   {[...new Set(safeTechPacks.map(tp => tp.status))].map((s) => <Option key={s} value={s}>{s}</Option>)}
                 </Select>
-                <Select placeholder="Filter by category" onChange={setCategoryFilter} style={{ width: 150 }} allowClear>
+                <Select placeholder={`${t('common.filter')} ${t('form.category').toLowerCase()}`} onChange={setCategoryFilter} style={{ width: 150 }} allowClear>
                   {[...new Set(safeTechPacks.map(tp => (tp as any).productClass || (tp as any).category || tp.metadata?.category))].filter(Boolean).map((c) => <Option key={c} value={c}>{c}</Option>)}
                 </Select>
-                <Select placeholder="Filter by season" onChange={setSeasonFilter} style={{ width: 150 }} allowClear>
+                <Select placeholder={`${t('common.filter')} ${t('techpack.list.season').toLowerCase()}`} onChange={setSeasonFilter} style={{ width: 150 }} allowClear>
                   {[...new Set(safeTechPacks.map(tp => (tp as any).season || tp.metadata?.season))].filter(Boolean).map((s) => <Option key={s} value={s}>{s}</Option>)}
                 </Select>
               </Space>
@@ -231,7 +233,7 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
             <Col>
               {canCreate && (
                 <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowCreateWorkflow(true)}>
-                  Create New Tech Pack
+                  {t('tpl.new')}
                 </Button>
               )}
             </Col>

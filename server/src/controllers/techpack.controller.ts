@@ -353,7 +353,7 @@ export class TechPackController {
           }
         } catch (secondError) {
           console.error('Error in manual populate fallback:', secondError);
-          techpack = null;
+        techpack = null;
         }
       }
 
@@ -702,9 +702,9 @@ export class TechPackController {
 
       // technicalDesignerId is now a string field, no need to populate
       // Only populate createdBy and sharedWith
-      techpack = await TechPack.findById(id)
-        .populate('createdBy', 'firstName lastName email')
-        .populate('sharedWith.userId', 'firstName lastName email');
+        techpack = await TechPack.findById(id)
+          .populate('createdBy', 'firstName lastName email')
+          .populate('sharedWith.userId', 'firstName lastName email');
       if (!techpack) {
         return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
       }
@@ -1120,10 +1120,10 @@ export class TechPackController {
       }
 
       const isOwner = originalTechPack.createdBy?.toString() === user._id.toString();
-      // Duplicating a techpack is an operation akin to edit/create. Only Admin, Owner or explicitly shared editors/admins should be allowed.
-      const sharerAccess = originalTechPack.sharedWith?.find((s: any) => s.userId.toString() === user._id.toString());
-      const hasEditPermission = !!sharerAccess && ['owner','admin','editor'].includes(sharerAccess.role);
-      const hasPermission = user.role === UserRole.Admin || isOwner || hasEditPermission;
+  // Duplicating a techpack is an operation akin to edit/create. Only Admin, Owner or explicitly shared editors/admins should be allowed.
+  const sharerAccess = originalTechPack.sharedWith?.find((s: any) => s.userId.toString() === user._id.toString());
+  const hasEditPermission = !!sharerAccess && ['owner','admin','editor'].includes(sharerAccess.role);
+  const hasPermission = user.role === UserRole.Admin || isOwner || hasEditPermission;
 
       if (!hasPermission) {
         return sendError(res, 'Access denied. You do not have permission to duplicate this tech pack.', 403, 'FORBIDDEN');

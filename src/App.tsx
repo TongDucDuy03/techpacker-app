@@ -4,9 +4,11 @@ import { Link } from 'react-router-dom';
 import { TechPackList } from './components/TechPackList';
 import { TechPackDetail } from './components/TechPackDetail';
 import TechPackTabs from './components/TechPackForm/TechPackTabs';
+import LanguageSwitcher from './components/LanguageSwitcher';
 import { ApiTechPack } from './types/techpack';
 import { useTechPack } from './contexts/TechPackContext';
 import { useAuth } from './contexts/AuthContext';
+import { useI18n } from './lib/i18n';
 
 import { Plus, List, Settings, LogOut, User } from 'lucide-react';
 
@@ -80,6 +82,7 @@ function AppContent() {
   const context = useTechPack();
   const { techPacks = [], updateTechPack, deleteTechPack, getTechPack, pagination } = context ?? {};
   const { user } = useAuth();
+  const { t } = useI18n();
 
   // Permission checks based on user role
   const canCreate = user?.role === 'admin' || user?.role === 'designer';
@@ -220,7 +223,7 @@ function AppContent() {
             <div className="flex items-center justify-center min-h-screen">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-600">Đang tải dữ liệu TechPack...</p>
+                <p className="text-gray-600">{t('common.loading')}</p>
               </div>
             </div>
           );
@@ -228,7 +231,7 @@ function AppContent() {
         return selectedTechPack ? (
           <TechPackTabs onBackToList={handleBackToList} mode="edit" techPack={selectedTechPack} />
         ) : (
-          <div>Tech pack not found</div>
+          <div>{t('app.techPackNotFound')}</div>
         );
       case 'view':
         if (loadingTechPack) {
@@ -236,7 +239,7 @@ function AppContent() {
             <div className="flex items-center justify-center min-h-screen">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-600">Đang tải dữ liệu TechPack...</p>
+                <p className="text-gray-600">{t('common.loading')}</p>
               </div>
             </div>
           );
@@ -244,7 +247,7 @@ function AppContent() {
         return selectedTechPack ? (
           <TechPackTabs onBackToList={handleBackToList} mode="view" techPack={selectedTechPack} />
         ) : (
-          <div>Tech pack not found</div>
+          <div>{t('app.techPackNotFound')}</div>
         );
       case 'detail':
         return selectedTechPack ? (
@@ -255,7 +258,7 @@ function AppContent() {
             onDelete={handleDelete}
           />
         ) : (
-          <div>Tech pack not found</div>
+          <div>{t('app.techPackNotFound')}</div>
         );
       default:
         return (
@@ -284,7 +287,7 @@ function AppContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-gray-900">TechPacker Pro</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{t('app.title')}</h1>
             </div>
             
             {/* Tab Navigation */}
@@ -299,7 +302,7 @@ function AppContent() {
                   }`}
                 >
                   <List className="w-4 h-4" />
-                  Tech Packs
+                  {t('nav.techpacks')}
                 </button>
                 {canCreate && (
                   <button
@@ -311,10 +314,11 @@ function AppContent() {
                     }`}
                   >
                     <Plus className="w-4 h-4" />
-                    Create New
+                    {t('form.createTechPack')}
                   </button>
                 )}
               </div>
+              <LanguageSwitcher />
               <AdminNavigation />
               <UserMenu />
             </div>
