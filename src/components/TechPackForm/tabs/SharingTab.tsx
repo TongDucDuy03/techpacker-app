@@ -171,9 +171,9 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
 
       if (shouldTryFetchShareable) {
         try {
-          console.log('📋 Fetching shareable users...', { techpackId: resolvedTechpackId, includeAdmins: true });
-          // Fetching shareable users for techpack (include admins to avoid empty list in small envs)
-          const usersRes = await api.getShareableUsers(resolvedTechpackId, { includeAdmins: true });
+          console.log('📋 Fetching shareable users...', { techpackId: resolvedTechpackId, includeAdmins: false });
+          // Do NOT include admins to avoid showing them in dropdown
+          const usersRes = await api.getShareableUsers(resolvedTechpackId, { includeAdmins: false });
           console.log('✅ Shareable users response:', usersRes);
           const users = (usersRes as any).data || usersRes;
           console.log('📋 Shareable users:', users);
@@ -244,7 +244,12 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
       setSelectedRole(TechPackRole.Viewer);
       fetchData(); // Refresh both lists
     } catch (error: any) {
-      showError(error.response?.data?.message || error.message || t('form.sharing.grantFailed'));
+      const apiMsg = error.response?.data?.message || error.message;
+      const localized =
+        apiMsg === 'Cannot share with system admin or the assigned technical designer.'
+          ? t('form.sharing.cannotShareAdminOrDesigner')
+          : apiMsg;
+      showError(localized || t('form.sharing.grantFailed'));
     } finally {
       setIsSubmitting(false);
     }

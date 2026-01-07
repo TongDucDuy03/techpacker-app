@@ -632,11 +632,11 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     if (editingId) {
       // Use ID-based update for better reliability
       updateBomItemById(editingId, bomItem);
-      showSuccess('Material updated successfully');
+      showSuccess(t('form.bom.materialUpdated'));
     } else if (editingIndex !== null) {
       // Fallback to index-based for backward compatibility
       updateBomItem(editingIndex, bomItem);
-      showSuccess('Material updated successfully');
+      showSuccess(t('form.bom.materialUpdated'));
     } else {
       addBomItem(bomItem);
       showSuccess('Material added successfully');

@@ -671,7 +671,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
 
   // CSV export/import disabled per request
   const handleExport = () => {};
-
+      
   // CSV import disabled per request
   const handleImport = (_file: File) => {};
 
@@ -991,9 +991,9 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
             <tbody className="bg-white divide-y divide-gray-200">
               {paginatedConstructions.length === 0 ? (
                 <tr>
-                    <td colSpan={3} className="px-6 py-12 text-center text-sm text-gray-500">
+                  <td colSpan={3} className="px-6 py-12 text-center text-sm text-gray-500">
                       {t('form.construction.empty')}
-                    </td>
+                  </td>
                 </tr>
               ) : (
                 paginatedConstructions.map((item) => {
@@ -1222,9 +1222,9 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
         <div className="space-y-4">
           {importErrors.length > 0 && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-md">
-                  <h4 className="text-sm font-medium text-red-800 mb-2">
+              <h4 className="text-sm font-medium text-red-800 mb-2">
                     {t('form.construction.rowsHaveErrors', { count: importErrors.length })}
-                  </h4>
+              </h4>
               <div className="max-h-40 overflow-y-auto">
                 <ul className="text-sm text-red-700 space-y-1">
                   {importErrors.map(({ row, errors }) => (

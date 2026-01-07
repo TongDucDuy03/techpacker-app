@@ -189,7 +189,7 @@ export function validateField(value: any, rules: ValidationRule, fieldName: stri
 
   // Pattern validation
   if (rules.pattern && !rules.pattern.test(stringValue)) {
-      return formatValidationMessage(fieldName, VALIDATION_MESSAGES.pattern);
+    return formatValidationMessage(fieldName, VALIDATION_MESSAGES.pattern);
   }
 
   return null;

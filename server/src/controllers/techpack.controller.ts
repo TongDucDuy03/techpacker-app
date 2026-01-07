@@ -1418,7 +1418,9 @@ export class TechPackController {
       // Global Admin always has access
       // Check if user has permission to share
       const isOwner = techpack.createdBy?.toString() === user._id.toString();
-      const userAccess = techpack.sharedWith?.find(s => s.userId.toString() === user._id.toString());
+      const userAccess = techpack.sharedWith?.find(
+        (s) => s?.userId && s.userId.toString() === user._id.toString()
+      );
       
       // Global Admin OR Owner OR Shared Admin can share
       const canShare = user.role === UserRole.Admin || isOwner ||
@@ -1436,7 +1438,7 @@ export class TechPackController {
       const excludedUserIds = [
         user._id.toString(),
         techpack.technicalDesignerId?.toString(),
-        ...(techpack.sharedWith?.map(s => s.userId.toString()) || [])
+        ...(techpack.sharedWith?.map(s => s?.userId && s.userId.toString()) || [])
       ].filter(Boolean);
 
       // ✅ Optimized: Parse query params and build single query

@@ -1331,7 +1331,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         api.updateTechPack(id, data), // Sử dụng PUT thay vì PATCH để đảm bảo tạo revision
         {
           loading: 'Updating tech pack...',
-          success: 'Tech pack updated successfully!',
+          success: t('techpack.updateSuccess'),
           error: (err) => err.message || 'Failed to update tech pack',
         }
       );
