@@ -44,6 +44,9 @@ const translations: Record<LanguageCode, TranslationDict> = {
     'form.createNewTechPackTitle': 'Create New Tech Pack',
     'form.editTechPackTitle': 'Edit Tech Pack',
     'form.cancel': 'Cancel',
+    'form.requiredInformation': 'Required Information',
+    'form.productDetails': 'Product Details',
+    'form.additionalInformation': 'Additional Information',
 
     'materials.bom': 'Bill of Materials',
     'materials.addRow': 'Add Row',
