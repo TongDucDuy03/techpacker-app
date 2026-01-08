@@ -926,6 +926,10 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
       updatedByName: typeof (apiTechPack as any).updatedBy === 'object'
         ? `${(apiTechPack as any).updatedBy?.firstName || ''} ${(apiTechPack as any).updatedBy?.lastName || ''}`.trim()
         : (apiTechPack as any).updatedByName || '',
+      // Preserve sharedWith for permission checking
+      sharedWith: Array.isArray((apiTechPack as any).sharedWith) 
+        ? (apiTechPack as any).sharedWith 
+        : [],
     },
     bom: Array.isArray((apiTechPack as any).bom) 
       ? ((apiTechPack as any).bom || []).map((item: any, index: number) => ({
@@ -1257,27 +1261,31 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
       // Ensure response.data is always an array
       const techPacksData = Array.isArray(response.data) ? response.data : [];
       
-      // Merge with current list to preserve optimistically added techpacks
-      // that might not be in server response yet (due to cache delay)
-      setTechPacks(prev => {
-        const serverIds = new Set(techPacksData.map(tp => (tp as any)._id || (tp as any).id));
-        // Keep optimistically added techpacks that aren't in server response yet
-        const optimisticTechPacks = prev.filter(tp => {
-          const tpId = (tp as any)._id || (tp as any).id;
-          return tpId && !serverIds.has(tpId);
-        });
-        // Combine: server data first, then optimistic updates
-        return [...techPacksData, ...optimisticTechPacks];
-      });
+      // Replace current list with server data (don't merge to avoid showing techpacks user no longer has access to)
+      // This ensures that if a user is revoked from a techpack, it disappears from their list immediately
+      setTechPacks(techPacksData);
       
       setPagination({ total: response.total, page: response.page, totalPages: response.totalPages });
     } catch (error: any) {
+      // If access denied, clear localStorage cache to force fresh fetch
+      if (error.response?.status === 403 || error.message?.includes('Access denied')) {
+        try {
+          localStorage.removeItem(TECHPACK_LIST_CACHE_KEY);
+          localStorage.removeItem(TECHPACK_LIST_PAGINATION_CACHE_KEY);
+        } catch (e) {
+          console.warn('Failed to clear localStorage cache', e);
+        }
+      }
+      
       showError(error.message || 'Failed to load tech packs');
-      // On error, fallback to cached data (if available) without clearing current state
+      // On error, only fallback to cached data if we have no current state
+      // This prevents showing techpacks that user no longer has access to
       setTechPacks(prev => {
         if (prev.length === 0) {
           return loadCachedTechPacks();
         }
+        // If we have current state but got an error, keep current state but don't add cached data
+        // This prevents showing techpacks that were revoked
         return prev;
       });
       setPagination(prev => {

@@ -6,6 +6,7 @@ import { useDebounce } from '../../../hooks/useDebounce';
 import { showError, showWarning } from '../../../lib/toast';
 import { useSeasonSuggestions } from '../../../hooks/useSeasonSuggestions';
 import { useI18n } from '../../../lib/i18n';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001/api/v1';
 const API_UPLOAD_BASE = API_BASE_URL.replace(/\/api\/v1$/, '');
@@ -21,6 +22,8 @@ interface ArticleInfoTabProps {
   mode?: 'create' | 'edit' | 'view';
   onUpdate?: (updates: Partial<TechPack>) => void;
   setCurrentTab?: (tab: number) => void;
+  canEdit?: boolean;
+  isReadOnly?: boolean;
 }
 
 export interface ArticleInfoTabRef {
@@ -28,10 +31,15 @@ export interface ArticleInfoTabRef {
 }
 
 const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps, ref) => {
-  const { techPack, mode = 'create', onUpdate, setCurrentTab } = props;
+  const { techPack, mode = 'create', onUpdate, setCurrentTab, canEdit: propCanEdit, isReadOnly: propIsReadOnly } = props;
+  
+  // Use canEdit from props if provided, otherwise fallback to mode check
+  const canEdit = propCanEdit !== undefined ? propCanEdit : (mode !== 'view');
+  const isReadOnly = propIsReadOnly !== undefined ? propIsReadOnly : (mode === 'view');
   const validation = useFormValidation(articleInfoValidationSchema);
   const { articleInfo } = techPack ?? {};
   const { t } = useI18n();
+  const { user } = useAuth();
   const [designers, setDesigners] = useState<Array<{ value: string; label: string }>>([]);
   const [loadingDesigners, setLoadingDesigners] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -62,9 +70,19 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
     lastModified: new Date().toISOString(),
   };
 
-  // Fetch designers on component mount
+  // Fetch designers on component mount (only for preview display)
+  // Note: technicalDesignerId is now a free text field, so this is optional
+  // Only fetch if user has admin role to avoid 403 errors
   useEffect(() => {
     const fetchDesigners = async () => {
+      // Skip fetching if user is not admin (to avoid 403 errors)
+      // technicalDesignerId is now free text, so designers list is only for preview
+      if (user?.role !== 'admin') {
+        setDesigners([]);
+        setLoadingDesigners(false);
+        return;
+      }
+      
       setLoadingDesigners(true);
       try {
         const response = await api.getAllUsers({ role: 'designer' });
@@ -73,15 +91,18 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
           label: `${user.firstName} ${user.lastName}`
         }));
         setDesigners(designerOptions);
-      } catch (error) {
+      } catch (error: any) {
         // Failed to fetch designers - handle silently
+        // This is expected for non-admin users since technicalDesignerId is now free text
+        console.log('[ArticleInfoTab] Could not fetch designers:', error.message);
+        setDesigners([]); // Set empty array instead of leaving undefined
       } finally {
         setLoadingDesigners(false);
       }
     };
 
     fetchDesigners();
-  }, []);
+  }, [user?.role]);
 
   // Debounce articleCode for duplicate check
   const debouncedArticleCode = useDebounce(safeArticleInfo.articleCode, 500);
@@ -665,7 +686,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                   placeholder="e.g., SHRT-001-SS25"
                   required
                   maxLength={50}
-                  disabled={mode !== 'create'}
+                  disabled={!canEdit}
                   error={validation.getFieldProps('articleCode').error || (isDuplicate ? t('validation.articleCodeExists') : undefined)}
                   helperText={
                     checkingDuplicate 
@@ -703,7 +724,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 placeholder="e.g., Men's Oxford Button-Down Shirt"
                 required
                 maxLength={255}
-                disabled={mode === 'view'}
+                disabled={!canEdit}
                 error={validation.getFieldProps('articleName').error}
                 helperText={validation.getFieldProps('articleName').helperText}
               />
@@ -718,7 +739,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                   type="text"
                   placeholder={t('form.articleInfo.sampleTypePlaceholder')}
                   maxLength={120}
-                  disabled={mode === 'view'}
+                  disabled={!canEdit}
                   error={validation.getFieldProps('sampleType').error}
                   helperText={validation.getFieldProps('sampleType').helperText}
                 />
@@ -736,7 +757,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 onBlur={() => validation.setFieldTouched('gender')}
                 options={genderOptions}
                 required
-                disabled={mode === 'view'}
+                disabled={!canEdit}
                 error={validation.getFieldProps('gender').error}
                 helperText={validation.getFieldProps('gender').helperText}
               />
@@ -749,7 +770,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 options={productClassOptions}
                 placeholder="Select product category..."
                 required
-                disabled={mode === 'view'}
+                disabled={!canEdit}
                 error={validation.getFieldProps('productClass').error}
                 helperText={validation.getFieldProps('productClass').helperText}
               />
@@ -761,7 +782,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 onBlur={() => validation.setFieldTouched('fitType')}
                 options={fitTypeOptions}
                 required
-                disabled={mode === 'view'}
+                disabled={!canEdit}
                 error={validation.getFieldProps('fitType').error}
                 helperText={validation.getFieldProps('fitType').helperText}
               />
@@ -782,7 +803,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 placeholder={t('materials.placeholder.supplier')}
                 required
                 maxLength={255}
-                disabled={mode === 'view'}
+                disabled={!canEdit}
                 error={validation.getFieldProps('supplier').error}
                 helperText={validation.getFieldProps('supplier').helperText}
               />
@@ -795,7 +816,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 placeholder={t('form.articleInfo.technicalDesignerPlaceholder')}
                 required
                 maxLength={100}
-                disabled={mode === 'view'}
+                disabled={!canEdit}
                 error={validation.getFieldProps('technicalDesignerId').error}
                 helperText={validation.getFieldProps('technicalDesignerId').helperText}
               />
@@ -807,7 +828,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 onBlur={() => validation.setFieldTouched('season')}
                 placeholder={t('form.season.placeholder')}
                 required
-                disabled={mode === 'view'}
+                disabled={!canEdit}
                 error={validation.getFieldProps('season').error}
                 helperText={validation.getFieldProps('season').helperText}
                 datalistOptions={seasonDatalistOptions}
@@ -821,7 +842,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 onBlur={() => validation.setFieldTouched('lifecycleStage')}
                 options={lifecycleOptions}
                 required
-                disabled={mode === 'view'}
+                disabled={!canEdit}
                 error={validation.getFieldProps('lifecycleStage').error}
                 helperText={validation.getFieldProps('lifecycleStage').helperText}
               />
@@ -837,7 +858,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 }}
                 onBlur={() => validation.setFieldTouched('status')}
                 options={statusOptions}
-                disabled={mode === 'view'}
+                disabled={!canEdit}
                 error={validation.getFieldProps('status').error}
                 helperText={validation.getFieldProps('status').helperText || t('form.articleInfo.statusHelper')}
               />
@@ -857,7 +878,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 onBlur={() => validation.setFieldTouched('brand')}
                 placeholder={t('form.articleInfo.brandPlaceholder')}
                 maxLength={255}
-                disabled={mode === 'view'}
+                disabled={!canEdit}
                 error={validation.getFieldProps('brand').error}
                 helperText={validation.getFieldProps('brand').helperText}
               />
@@ -869,7 +890,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 onBlur={() => validation.setFieldTouched('collection')}
                 placeholder={t('form.articleInfo.collectionPlaceholder')}
                 maxLength={255}
-                disabled={mode === 'view'}
+                disabled={!canEdit}
                 error={validation.getFieldProps('collection').error}
                 helperText={validation.getFieldProps('collection').helperText}
               />
@@ -881,7 +902,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 onBlur={() => validation.setFieldTouched('targetMarket')}
                 placeholder="e.g., US, EU, Asia"
                 maxLength={255}
-                disabled={mode === 'view'}
+                disabled={!canEdit}
                 error={validation.getFieldProps('targetMarket').error}
                 helperText={validation.getFieldProps('targetMarket').helperText}
               />
@@ -893,7 +914,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 onBlur={() => validation.setFieldTouched('pricePoint')}
                 options={pricePointOptions}
                 placeholder={t('form.articleInfo.pricePointPlaceholder')}
-                disabled={mode === 'view'}
+                disabled={!canEdit}
                 error={validation.getFieldProps('pricePoint').error}
                 helperText={validation.getFieldProps('pricePoint').helperText}
               />
@@ -906,7 +927,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                   onChange={handleInputChange('currency')}
                   onBlur={() => validation.setFieldTouched('currency')}
                   options={currencyOptions}
-                  disabled={mode === 'view'}
+                  disabled={!canEdit}
                   error={validation.getFieldProps('currency').error}
                   helperText={validation.getFieldProps('currency').helperText}
                 />
@@ -919,7 +940,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                   min={0}
                   step={0.01}
                   placeholder="0.00"
-                  disabled={mode === 'view'}
+                  disabled={!canEdit}
                   error={validation.getFieldProps('retailPrice').error}
                   helperText={validation.getFieldProps('retailPrice').helperText}
                 />
@@ -935,7 +956,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                   required
                   rows={4}
                   maxLength={1000}
-                  disabled={mode === 'view'}
+                  disabled={!canEdit}
                   error={validation.getFieldProps('fabricDescription').error}
                   helperText={validation.getFieldProps('fabricDescription').helperText}
                 />
@@ -951,7 +972,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                   required
                   rows={4}
                   maxLength={1000}
-                  disabled={mode === 'view'}
+                  disabled={!canEdit}
                   error={validation.getFieldProps('productDescription').error}
                   helperText={validation.getFieldProps('productDescription').helperText}
                 />
@@ -1226,7 +1247,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                   placeholder={t('form.articleInfo.notesPlaceholder')}
                   rows={3}
                   maxLength={500}
-                  disabled={mode === 'view'}
+                  disabled={!canEdit}
                   error={validation.getFieldProps('notes').error}
                   helperText={validation.getFieldProps('notes').helperText}
                 />

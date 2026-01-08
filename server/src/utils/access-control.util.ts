@@ -101,11 +101,36 @@ export function hasEditAccess(techpack: any, user: any): boolean {
   const isOwner = techpack.createdBy?.toString() === user._id.toString();
   if (isOwner) return true; // Owner has full access
   
-  const sharedAccess = techpack.sharedWith?.find((s: any) => s.userId?.toString() === user._id.toString());
+  const sharedAccess = techpack.sharedWith?.find((s: any) => {
+    const shareUserId = s.userId?._id?.toString() || s.userId?.toString();
+    return shareUserId === user._id.toString();
+  });
+  
   if (sharedAccess) {
+    // Normalize sharedAccess.role to string for getEffectiveRole
+    const sharedRoleStr = typeof sharedAccess.role === 'string' 
+      ? sharedAccess.role 
+      : String(sharedAccess.role);
+    
     // Get effective role (may be downgraded if it exceeds System Role limit)
-    const effectiveRole = getEffectiveRole(user.role, sharedAccess.role);
-    return ['owner', 'admin', 'editor'].includes(effectiveRole);
+    const effectiveRole = getEffectiveRole(user.role, sharedRoleStr);
+    
+    // Normalize effectiveRole to string for comparison (handle both enum and string)
+    const roleStr = typeof effectiveRole === 'string' 
+      ? effectiveRole.toLowerCase() 
+      : String(effectiveRole).toLowerCase();
+    
+    console.log('[hasEditAccess] Role check:', {
+      userId: user._id.toString(),
+      userRole: user.role,
+      sharedRole: sharedAccess.role,
+      sharedRoleStr,
+      effectiveRole,
+      roleStr,
+      hasEditAccess: ['owner', 'admin', 'editor'].includes(roleStr)
+    });
+    
+    return ['owner', 'admin', 'editor'].includes(roleStr);
   }
   return false;
 }

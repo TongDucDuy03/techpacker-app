@@ -4,6 +4,7 @@ import User, { UserRole } from '../models/user.model';
 import { sendSuccess, sendError, formatValidationErrors } from '../utils/response.util';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { auditLogService } from '../services/audit-log.service';
+import { normalizeTechPackPermissionsForUser } from '../utils/techpack-permission-normalizer.util';
 
 class AdminController {
   constructor() {
@@ -163,6 +164,10 @@ class AdminController {
         }
       }
 
+      // Store old role before update
+      const oldRole = user.role;
+      const roleChanged = role && role !== oldRole;
+
       // Update user fields
       if (firstName) user.firstName = firstName;
       if (lastName) user.lastName = lastName;
@@ -180,6 +185,19 @@ class AdminController {
       delete (userResponse as any).password;
       delete (userResponse as any).refreshTokens;
 
+      // Normalize TechPack permissions if role changed
+      if (roleChanged && role) {
+        // Run normalization asynchronously (don't block response)
+        normalizeTechPackPermissionsForUser(user._id, role, oldRole)
+          .then((result) => {
+            console.log(`[AdminController] Normalized TechPack permissions for user ${user._id}`, result);
+          })
+          .catch((error) => {
+            console.error(`[AdminController] Error normalizing TechPack permissions for user ${user._id}:`, error);
+            // Don't fail the request if normalization fails
+          });
+      }
+
       // Log admin action
       await auditLogService.log({
         user: req.user!,
@@ -188,7 +206,10 @@ class AdminController {
         resourceId: user._id.toString(),
         details: {
           updatedFields: { firstName, lastName, email, role },
-          previousEmail: user.email
+          previousEmail: user.email,
+          roleChanged,
+          oldRole: roleChanged ? oldRole : undefined,
+          newRole: roleChanged ? role : undefined,
         },
         req
       });
@@ -305,8 +326,23 @@ class AdminController {
       }
 
       const oldRole = user.role;
+      const roleChanged = role !== oldRole;
+      
       user.role = role;
       await user.save();
+
+      // Normalize TechPack permissions if role changed
+      if (roleChanged) {
+        // Run normalization asynchronously (don't block response)
+        normalizeTechPackPermissionsForUser(user._id, role, oldRole)
+          .then((result) => {
+            console.log(`[AdminController] Normalized TechPack permissions for user ${user._id}`, result);
+          })
+          .catch((error) => {
+            console.error(`[AdminController] Error normalizing TechPack permissions for user ${user._id}:`, error);
+            // Don't fail the request if normalization fails
+          });
+      }
 
       // Log admin action
       await auditLogService.log({

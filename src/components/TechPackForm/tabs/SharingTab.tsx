@@ -233,33 +233,132 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
 
   // Removed duplicate shareable users fetch to avoid overwriting state
 
-  // Helper function to check if a role is higher than Viewer
-  const isRoleHigherThanViewer = (role: TechPackRole): boolean => {
-    // Role hierarchy: Owner > Admin > Editor > Viewer > Factory
-    // Viewer can only share with Viewer or Factory (not Editor, Admin, Owner)
-    return role === TechPackRole.Editor || role === TechPackRole.Admin || role === TechPackRole.Owner;
+  // Role hierarchy: Owner > Admin > Editor > Viewer > Factory
+  const getRoleLevel = (role: TechPackRole | string | undefined): number => {
+    if (!role) return 0;
+    
+    // Normalize role to string for comparison (handle both enum and string)
+    const roleStr = typeof role === 'string' ? role.toLowerCase() : String(role).toLowerCase();
+    
+    const levels: { [key: string]: number } = {
+      'owner': 5,
+      'admin': 4,
+      'editor': 3,
+      'viewer': 2,
+      'factory': 1,
+    };
+    return levels[roleStr] || 0;
   };
 
-  // Get allowed roles for current user based on their global role
-  const getAllowedRoles = (): TechPackRole[] => {
-    // If current user is a viewer (global role), they can only share with Viewer or Factory
-    if (currentUser?.role?.toLowerCase() === 'viewer') {
-      return [TechPackRole.Viewer, TechPackRole.Factory];
+  // Map global role to equivalent techpack role level
+  const getGlobalRoleToTechPackRoleLevel = (globalRole: string | undefined): number => {
+    if (!globalRole) return 0;
+    const roleStr = globalRole.toLowerCase();
+    // Map: admin -> Admin (4), designer -> Editor (3), merchandiser -> Viewer (2), viewer -> Viewer (2)
+    const mapping: { [key: string]: number } = {
+      'admin': 4,      // Admin global role -> Admin techpack role
+      'designer': 3,   // Designer global role -> Editor techpack role
+      'merchandiser': 2, // Merchandiser global role -> Viewer techpack role
+      'viewer': 2,     // Viewer global role -> Viewer techpack role
+    };
+    return mapping[roleStr] || 0;
+  };
+
+  // Check if a role is higher than the current user's techpack role
+  const isRoleHigherThanCurrent = (role: TechPackRole | string): boolean => {
+    if (!currentUserTechPackRole) {
+      console.log('[SharingTab] isRoleHigherThanCurrent - no currentUserTechPackRole');
+      return false;
     }
-    // Other roles (admin, designer, merchandiser) can share with any role except Owner
-    return Object.values(TechPackRole).filter(r => r !== TechPackRole.Owner);
+    const roleLevel = getRoleLevel(role);
+    const currentLevel = getRoleLevel(currentUserTechPackRole);
+    const isHigher = roleLevel > currentLevel;
+    console.log('[SharingTab] isRoleHigherThanCurrent - role:', role, 'level:', roleLevel, 'current:', currentUserTechPackRole, 'currentLevel:', currentLevel, 'isHigher:', isHigher);
+    return isHigher;
+  };
+
+  // Get allowed roles for current user based on their techpack role AND target user's global role
+  const getAllowedRoles = (targetUserId?: string): TechPackRole[] => {
+    // Debug logging
+    console.log('[SharingTab] getAllowedRoles - currentUserTechPackRole:', currentUserTechPackRole, 'targetUserId:', targetUserId);
+    
+    // First, filter by current user's techpack role
+    let baseAllowed: TechPackRole[] = [];
+    if (!currentUserTechPackRole) {
+      // If no techpack role, allow all except Owner
+      console.log('[SharingTab] No techpack role, allowing all except Owner');
+      baseAllowed = Object.values(TechPackRole).filter(r => r !== TechPackRole.Owner);
+    } else {
+      // User can only share with roles equal to or lower than their current role
+      const currentLevel = getRoleLevel(currentUserTechPackRole);
+      console.log('[SharingTab] Current user role:', currentUserTechPackRole, 'Current level:', currentLevel);
+      
+      baseAllowed = Object.values(TechPackRole).filter(role => {
+        const roleLevel = getRoleLevel(role);
+        const isAllowed = roleLevel <= currentLevel && role !== TechPackRole.Owner;
+        if (!isAllowed) {
+          console.log('[SharingTab] Role filtered out:', role, 'level:', roleLevel, 'reason: level > current or is Owner');
+        }
+        return isAllowed;
+      });
+    }
+    
+    // If target user is selected, also filter by their global role
+    if (targetUserId) {
+      const targetUser = shareableUsers.find(u => u._id === targetUserId);
+      if (targetUser && targetUser.role) {
+        const maxAllowedLevel = getGlobalRoleToTechPackRoleLevel(targetUser.role);
+        console.log('[SharingTab] Target user:', targetUser.email, 'Global role:', targetUser.role, 'Max allowed level:', maxAllowedLevel);
+        
+        baseAllowed = baseAllowed.filter(role => {
+          const roleLevel = getRoleLevel(role);
+          const isAllowed = roleLevel <= maxAllowedLevel;
+          if (!isAllowed) {
+            console.log('[SharingTab] Role filtered by target user global role:', role, 'level:', roleLevel, 'max allowed:', maxAllowedLevel);
+          }
+          return isAllowed;
+        });
+      }
+    }
+    
+    console.log('[SharingTab] Final allowed roles:', baseAllowed);
+    return baseAllowed;
   };
 
   const handleShare = async () => {
     if (!selectedUserId || !resolvedTechpackId) return;
 
-    // Validation: If current user is viewer, they cannot share with roles higher than Viewer
-    if (currentUser?.role?.toLowerCase() === 'viewer') {
-      if (isRoleHigherThanViewer(selectedRole)) {
-        showError(t('form.sharing.cannotShareHigherRole'));
+    // Debug logging
+    console.log('[SharingTab] handleShare - currentUserTechPackRole:', currentUserTechPackRole, 'selectedRole:', selectedRole);
+
+    // Validation 1: User cannot share with a role higher than their current techpack role
+    if (isRoleHigherThanCurrent(selectedRole)) {
+      console.log('[SharingTab] Blocked: Selected role is higher than current role');
+      showError(t('form.sharing.cannotShareHigherRole', { currentRole: currentUserTechPackRole || 'unknown' }));
+      return;
+    }
+
+    // Validation 2: Cannot share with a techpack role higher than target user's global role
+    const targetUser = shareableUsers.find(u => u._id === selectedUserId);
+    if (targetUser && targetUser.role) {
+      const targetUserGlobalRole = targetUser.role; // Get global role from user object
+      const maxAllowedTechPackRoleLevel = getGlobalRoleToTechPackRoleLevel(targetUserGlobalRole);
+      const selectedRoleLevel = getRoleLevel(selectedRole);
+      
+      console.log('[SharingTab] Target user:', targetUser.email, 'Global role:', targetUserGlobalRole, 'Max allowed techpack role level:', maxAllowedTechPackRoleLevel, 'Selected role level:', selectedRoleLevel);
+      
+      if (maxAllowedTechPackRoleLevel > 0 && selectedRoleLevel > maxAllowedTechPackRoleLevel) {
+        console.log('[SharingTab] Blocked: Selected techpack role is higher than target user global role allows');
+        showError(t('form.sharing.cannotShareHigherThanUserGlobalRole', { 
+          userEmail: targetUser.email, 
+          userGlobalRole: targetUserGlobalRole,
+          selectedRole: selectedRole 
+        }));
         return;
       }
     }
+
+    console.log('[SharingTab] Validation passed, proceeding with share');
 
     setIsSubmitting(true);
     try {
@@ -270,10 +369,31 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
       fetchData(); // Refresh both lists
     } catch (error: any) {
       const apiMsg = error.response?.data?.message || error.message;
-      const localized =
-        apiMsg === 'Cannot share with system admin or the assigned technical designer.'
-          ? t('form.sharing.cannotShareAdminOrDesigner')
-          : apiMsg;
+      let localized = apiMsg;
+      
+      // Localize common error messages
+      if (apiMsg === 'Cannot share with system admin or the assigned technical designer.') {
+        localized = t('form.sharing.cannotShareAdminOrDesigner');
+      } else if (apiMsg?.includes('Cannot share with a role higher than your current access level')) {
+        // Extract currentRole from message if available
+        const match = apiMsg.match(/\(([^)]+)\)/);
+        const currentRole = match ? match[1] : 'unknown';
+        localized = t('form.sharing.cannotShareHigherRole', { currentRole });
+      } else if (apiMsg?.includes('Cannot share with role') && apiMsg?.includes('because user') && apiMsg?.includes('has global role')) {
+        // Extract user email, global role, and selected role from message
+        const userMatch = apiMsg.match(/user\s+([^\s]+)/);
+        const roleMatch = apiMsg.match(/role\s+"([^"]+)"/);
+        const globalRoleMatch = apiMsg.match(/global role\s+"([^"]+)"/);
+        const userEmail = userMatch ? userMatch[1] : 'unknown';
+        const selectedRole = roleMatch ? roleMatch[1] : 'unknown';
+        const userGlobalRole = globalRoleMatch ? globalRoleMatch[1] : 'unknown';
+        localized = t('form.sharing.cannotShareHigherThanUserGlobalRole', { 
+          userEmail, 
+          userGlobalRole, 
+          selectedRole 
+        });
+      }
+      
       showError(localized || t('form.sharing.grantFailed'));
     } finally {
       setIsSubmitting(false);
@@ -283,10 +403,27 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
   const handleUpdateRole = async (userId: string, role: TechPackRole) => {
     if (!resolvedTechpackId) return;
 
-    // Validation: If current user is viewer, they cannot update to roles higher than Viewer
-    if (currentUser?.role?.toLowerCase() === 'viewer') {
-      if (isRoleHigherThanViewer(role)) {
-        showError(t('form.sharing.cannotUpdateToHigherRole'));
+    // Validation: User cannot update to a role higher than their current techpack role
+    if (isRoleHigherThanCurrent(role)) {
+      showError(t('form.sharing.cannotUpdateToHigherRole', { currentRole: currentUserTechPackRole || 'unknown' }));
+      return;
+    }
+
+    // Validation: Cannot update to a techpack role higher than target user's global role
+    const targetUserFromShareable = shareableUsers.find(u => u._id === userId);
+    if (targetUserFromShareable && targetUserFromShareable.role) {
+      const maxAllowedLevel = getGlobalRoleToTechPackRoleLevel(targetUserFromShareable.role);
+      const selectedRoleLevel = getRoleLevel(role);
+      
+      console.log('[SharingTab] handleUpdateRole - Target user:', targetUserFromShareable.email, 'Global role:', targetUserFromShareable.role, 'Max allowed level:', maxAllowedLevel, 'Selected role level:', selectedRoleLevel);
+      
+      if (maxAllowedLevel > 0 && selectedRoleLevel > maxAllowedLevel) {
+        console.log('[SharingTab] Blocked: Selected techpack role is higher than target user global role allows');
+        showError(t('form.sharing.cannotShareHigherThanUserGlobalRole', { 
+          userEmail: targetUserFromShareable.email, 
+          userGlobalRole: targetUserFromShareable.role,
+          selectedRole: role 
+        }));
         return;
       }
     }
@@ -296,7 +433,31 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
       showSuccess(t('form.sharing.roleUpdated'));
       fetchData();
     } catch (error: any) {
-      showError(error.response?.data?.message || error.message || t('form.sharing.updateRoleFailed'));
+      const apiMsg = error.response?.data?.message || error.message;
+      let localized = apiMsg;
+      
+      // Localize common error messages
+      if (apiMsg?.includes('Cannot update to a role higher than your current access level')) {
+        // Extract currentRole from message if available
+        const match = apiMsg.match(/\(([^)]+)\)/);
+        const currentRole = match ? match[1] : 'unknown';
+        localized = t('form.sharing.cannotUpdateToHigherRole', { currentRole });
+      } else if (apiMsg?.includes('Cannot update to role') && apiMsg?.includes('because user') && apiMsg?.includes('has global role')) {
+        // Extract user email, global role, and selected role from message
+        const userMatch = apiMsg.match(/user\s+([^\s]+)/);
+        const roleMatch = apiMsg.match(/role\s+"([^"]+)"/);
+        const globalRoleMatch = apiMsg.match(/global role\s+"([^"]+)"/);
+        const userEmail = userMatch ? userMatch[1] : 'unknown';
+        const selectedRole = roleMatch ? roleMatch[1] : 'unknown';
+        const userGlobalRole = globalRoleMatch ? globalRoleMatch[1] : 'unknown';
+        localized = t('form.sharing.cannotShareHigherThanUserGlobalRole', { 
+          userEmail, 
+          userGlobalRole, 
+          selectedRole 
+        });
+      }
+      
+      showError(localized || t('form.sharing.updateRoleFailed'));
     }
   };
 
@@ -388,7 +549,18 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
             <select
               id="user-select"
               value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value)}
+              onChange={(e) => {
+                const newUserId = e.target.value;
+                setSelectedUserId(newUserId);
+                // Reset role to Viewer when user changes, and update allowed roles based on new user's global role
+                const allowedRoles = getAllowedRoles(newUserId);
+                if (allowedRoles.length > 0) {
+                  // Select the first allowed role (usually Viewer)
+                  setSelectedRole(allowedRoles[0]);
+                } else {
+                  setSelectedRole(TechPackRole.Viewer);
+                }
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">{t('form.sharing.userPlaceholder')}</option>
@@ -410,10 +582,21 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
             <select
               id="role-select"
               value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value as TechPackRole)}
+              onChange={(e) => {
+                const newRole = e.target.value as TechPackRole;
+                console.log('[SharingTab] Role changed to:', newRole, 'Current user role:', currentUserTechPackRole);
+                // If user tries to select a role higher than their current role, reset to Viewer
+                if (isRoleHigherThanCurrent(newRole)) {
+                  console.log('[SharingTab] Blocked role selection, resetting to Viewer');
+                  showError(t('form.sharing.cannotShareHigherRole', { currentRole: currentUserTechPackRole || 'unknown' }));
+                  setSelectedRole(TechPackRole.Viewer);
+                } else {
+                  setSelectedRole(newRole);
+                }
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {getAllowedRoles().map(role => (
+              {getAllowedRoles(selectedUserId).map(role => (
                 <option key={role} value={role} className="capitalize">{role}</option>
               ))}
             </select>

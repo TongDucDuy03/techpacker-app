@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../../lib/api';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface User {
   _id: string;
@@ -19,6 +20,7 @@ interface Props {
 }
 
 const UserModal: React.FC<Props> = ({ user, mode, onClose, onSave }) => {
+  const { user: currentUser, refreshUser } = useAuth();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -107,11 +109,19 @@ const UserModal: React.FC<Props> = ({ user, mode, onClose, onSave }) => {
       } else if (mode === 'edit' && user) {
         const { password, ...updateData } = formData;
         const finalData: any = updateData;
+        const roleChanged = updateData.role && updateData.role !== user.role;
+        
         // Only include password if it's been changed
         if (password) {
           await api.resetUserPassword(user._id, password);
         }
         await api.updateUser(user._id, finalData);
+        
+        // If role changed and this is the current user, refresh their data
+        if (roleChanged && currentUser && user._id === currentUser._id) {
+          console.log('[UserModal] Role changed for current user, refreshing user data...');
+          await refreshUser();
+        }
       }
       onSave();
     } catch (err: any) {

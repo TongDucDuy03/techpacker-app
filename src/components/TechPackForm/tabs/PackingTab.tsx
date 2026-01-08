@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { ApiTechPack, TechPack } from '../../../types/techpack';
@@ -10,6 +10,8 @@ interface PackingTabProps {
   techPack: TechPack;
   mode?: 'create' | 'edit' | 'view';
   onUpdate?: (updates: Partial<ApiTechPack>) => void;
+  canEdit?: boolean;
+  isReadOnly?: boolean;
 }
 
 const quillModules = {
@@ -59,10 +61,65 @@ const quillFormats = [
   'video',
 ];
 
-const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate }) => {
+const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate, canEdit: propCanEdit, isReadOnly: propIsReadOnly }) => {
   const { user } = useAuth();
   const { t } = useI18n();
-  const canEdit = !(mode === 'view' || user?.role === 'viewer' || user?.role === 'merchandiser');
+  const quillRef = useRef<ReactQuill>(null);
+  
+  // Use canEdit from props if provided, otherwise calculate it
+  let canEdit: boolean;
+  if (propCanEdit !== undefined) {
+    canEdit = propCanEdit;
+  } else {
+    // Fallback: calculate canEdit based on mode and user role
+    // Get user's techpack role for this specific techpack
+    const getUserTechPackRole = (): string | undefined => {
+      if (!user || !techPack) return undefined;
+      
+      const userId = String((user as any)?.id || (user as any)?._id || '');
+      
+      // Check if user is owner
+      const createdBy = (techPack as any).createdBy;
+      const createdById = createdBy && typeof createdBy === 'object' ? createdBy._id : createdBy;
+      if (createdById && String(createdById) === userId) {
+        return 'owner';
+      }
+      
+      // Check if user is global admin
+      if (user.role?.toLowerCase() === 'admin') {
+        return 'admin';
+      }
+      
+      // Check sharedWith array - also check in techpack state if available
+      let sharedWith = (techPack as any).sharedWith || [];
+      const shared = sharedWith.find((s: any) => {
+        const shareUserId = s.userId?._id?.toString() || s.userId?.toString();
+        return shareUserId === userId;
+      });
+      
+      return shared?.role?.toLowerCase();
+    };
+    
+    const userTechPackRole = getUserTechPackRole();
+    
+    // Allow edit if:
+    // 1. Mode is 'create' (new techpack) - always allow
+    // 2. User has global role admin/designer AND techpack role is owner/admin/editor
+    canEdit = mode === 'create' || (
+      (user?.role === 'admin' || user?.role === 'designer') &&
+      (userTechPackRole === 'owner' || userTechPackRole === 'admin' || userTechPackRole === 'editor')
+    );
+  }
+  // Debug logging
+  console.log('[PackingTab] Permission check:', {
+    mode,
+    userRole: user?.role,
+    propCanEdit,
+    canEdit,
+    techPackId: (techPack as any).id,
+    sharedWithCount: (techPack as any).sharedWith?.length || 0
+  });
+
   const [value, setValue] = useState<string>(techPack.packingNotes || '');
 
   useEffect(() => {
@@ -118,13 +175,15 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate }) => 
 
         <div className={`rounded-xl border ${canEdit ? 'border-gray-200' : 'border-gray-100 bg-gray-50'}`}>
           <ReactQuill
+            key={`quill-${canEdit ? 'editable' : 'readonly'}`}
+            ref={quillRef}
             theme="snow"
             value={value}
             onChange={handleChange}
             readOnly={!canEdit}
-            modules={quillModules}
+            modules={canEdit ? quillModules : { toolbar: false }}
             formats={quillFormats}
-            placeholder={t('form.packing.placeholder')}
+            placeholder={canEdit ? t('form.packing.placeholder') : ''}
             className="min-h-[420px]"
           />
         </div>

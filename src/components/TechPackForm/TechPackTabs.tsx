@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTechPack } from '../../contexts/TechPackContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useI18n } from '../../lib/i18n';
@@ -51,10 +51,72 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
 
   const [showSaveNotification, setShowSaveNotification] = useState(false);
 
-  // Permission checks based on user role
-  // Allow edit if user is admin/designer, OR if mode is 'create' (new techpack)
-  const canEdit = (user?.role === 'admin' || user?.role === 'designer') || mode === 'create';
-  const isReadOnly = (user?.role === 'merchandiser' || user?.role === 'viewer') && mode !== 'create';
+  // Permission checks based on user role AND techpack sharing role
+  // Get user's techpack role for this specific techpack
+  // Use useMemo to recalculate when techpack or user changes
+  const userTechPackRole = useMemo((): string | undefined => {
+    if (!user || !techpack) {
+      console.log('[TechPackTabs] getUserTechPackRole - no user or techpack');
+      return undefined;
+    }
+    
+    const userId = String((user as any)?.id || (user as any)?._id || '');
+    console.log('[TechPackTabs] getUserTechPackRole - userId:', userId, 'user.role:', user.role);
+    
+    // Check if user is owner
+    const createdBy = (techpack as any).createdBy;
+    const createdById = createdBy && typeof createdBy === 'object' ? createdBy._id : createdBy;
+    if (createdById && String(createdById) === userId) {
+      console.log('[TechPackTabs] getUserTechPackRole - user is owner');
+      return 'owner'; // Owner has full access
+    }
+    
+    // Check if user is global admin
+    if (user.role?.toLowerCase() === 'admin') {
+      console.log('[TechPackTabs] getUserTechPackRole - user is global admin');
+      return 'admin'; // Global admin has admin access
+    }
+    
+    // Check sharedWith array - also check in initialTechPack if techpack.sharedWith is empty
+    let sharedWith = (techpack as any).sharedWith || [];
+    if (sharedWith.length === 0 && initialTechPack) {
+      sharedWith = (initialTechPack as any).sharedWith || [];
+    }
+    console.log('[TechPackTabs] getUserTechPackRole - sharedWith:', sharedWith, 'techpack.sharedWith:', (techpack as any).sharedWith);
+    const shared = sharedWith.find((s: any) => {
+      const shareUserId = s.userId?._id?.toString() || s.userId?.toString();
+      const matches = shareUserId === userId;
+      if (matches) {
+        console.log('[TechPackTabs] getUserTechPackRole - found shared access:', s.role);
+      }
+      return matches;
+    });
+    
+    const role = shared?.role?.toLowerCase();
+    console.log('[TechPackTabs] getUserTechPackRole - final role:', role);
+    return role;
+  }, [user, techpack, initialTechPack]);
+  
+  // Allow edit if:
+  // 1. Mode is 'create' (new techpack) - always allow
+  // 2. User has global role admin/designer AND techpack role is owner/admin/editor
+  const canEdit = useMemo(() => {
+    const result = mode === 'create' || (
+      (user?.role === 'admin' || user?.role === 'designer') &&
+      (userTechPackRole === 'owner' || userTechPackRole === 'admin' || userTechPackRole === 'editor')
+    );
+    console.log('[TechPackTabs] Permission check:', {
+      mode,
+      userRole: user?.role,
+      userTechPackRole,
+      canEdit: result,
+      sharedWithCount: (techpack as any)?.sharedWith?.length || (initialTechPack as any)?.sharedWith?.length || 0
+    });
+    return result;
+  }, [mode, user?.role, userTechPackRole, techpack, initialTechPack]);
+  
+  // Read-only if user has viewer role in techpack, or if global role is merchandiser/viewer
+  const isReadOnly = !canEdit && mode !== 'create';
 
   useEffect(() => {
     if ((mode === 'edit' || mode === 'view') && initialTechPack) {
@@ -204,6 +266,10 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
           updatedByName: typeof (initialTechPack as any).updatedBy === 'object'
             ? `${(initialTechPack as any).updatedBy?.firstName || ''} ${(initialTechPack as any).updatedBy?.lastName || ''}`.trim()
             : (initialTechPack as any).updatedByName || '',
+          // Preserve sharedWith for permission checking
+          sharedWith: Array.isArray((initialTechPack as any).sharedWith) 
+            ? (initialTechPack as any).sharedWith 
+            : [],
         },
         bom: Array.isArray((initialTechPack as any).bom) 
           ? ((initialTechPack as any).bom || []).map((item: any, index: number) => ({
@@ -801,6 +867,8 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
               mode={mode}
               onUpdate={updateFormState}
               setCurrentTab={setCurrentTab}
+              canEdit={canEdit}
+              isReadOnly={isReadOnly}
             />
           ) : null
         }

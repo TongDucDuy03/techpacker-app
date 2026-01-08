@@ -11,6 +11,7 @@ import { useAuth } from './contexts/AuthContext';
 import { useI18n } from './lib/i18n';
 
 import { Plus, List, Settings, LogOut, User } from 'lucide-react';
+import { showError } from './lib/toast';
 
 // Admin Navigation Component
 const AdminNavigation: React.FC = () => {
@@ -127,9 +128,20 @@ function AppContent() {
         setSelectedTechPack(techPack);
         setCurrentTab('view');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[App] Failed to fetch full techpack for view:', error);
-      // Fallback: dùng data từ list nếu fetch fail
+      // If access denied (403), don't show the techpack - user no longer has access
+      if (error.response?.status === 403 || error.message?.includes('Access denied')) {
+        showError('Access denied. You do not have permission to access this TechPack.');
+        // Remove this techpack from the list if it exists
+        if (context?.deleteTechPack && techPackId) {
+          context.deleteTechPack(techPackId);
+        }
+        // Go back to list instead of showing the techpack
+        handleBackToList();
+        return;
+      }
+      // For other errors, fallback: dùng data từ list nếu fetch fail
       setSelectedTechPack(techPack);
       setCurrentTab('view');
     } finally {

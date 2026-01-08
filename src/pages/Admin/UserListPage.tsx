@@ -4,6 +4,8 @@ import { Button, Table, Input, Select, Tag, Space, Tooltip, Modal, message, Card
 import { ArrowLeftOutlined, PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, UserOutlined, TeamOutlined, RiseOutlined } from '@ant-design/icons';
 import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import { useAuth } from '../../contexts/AuthContext';
+import { useTechPack } from '../../contexts/TechPackContext';
 import UserModal from './components/UserModal';
 import './UserListPage.css';
 
@@ -42,6 +44,8 @@ const UserListPage: React.FC = () => {
   const [sorter, setSorter] = useState({ field: 'createdAt', order: 'descend' });
   const [twoFactorLoadingIds, setTwoFactorLoadingIds] = useState<string[]>([]);
   const { t } = useI18n();
+  const { user: currentUser, refreshUser } = useAuth();
+  const { loadTechPacks } = useTechPack();
 
   const fetchUsers = async () => {
     try {
@@ -85,10 +89,21 @@ const UserListPage: React.FC = () => {
     setSorter({ field: sorter.field || 'createdAt', order: sorter.order || 'descend' });
   };
 
-  const handleUserSaved = () => {
+  const handleUserSaved = async () => {
     setIsModalOpen(false);
-    fetchUsers();
-    fetchStats();
+    await fetchUsers();
+    await fetchStats();
+    
+    // If current user's role was changed, refresh their data and techpack list
+    if (selectedUser && currentUser && selectedUser._id === currentUser._id) {
+      const updatedUser = users.find(u => u._id === selectedUser._id);
+      if (updatedUser && updatedUser.role !== currentUser.role) {
+        console.log('[UserListPage] Current user role changed, refreshing user data and techpack list...');
+        await refreshUser();
+        // Reload techpack list to reflect permission changes
+        await loadTechPacks();
+      }
+    }
   };
 
   const showDeleteConfirm = (user: User) => {

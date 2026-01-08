@@ -69,8 +69,51 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
   const safeTechPacks = Array.isArray(techPacks) ? techPacks : [];
 
   const canCreate = user?.role === 'admin' || user?.role === 'designer';
-  const canEdit = user?.role === 'admin' || user?.role === 'designer';
-  const canDelete = user?.role === 'admin' || user?.role === 'designer';
+  
+  // Helper function to get user's techpack role for a specific techpack
+  const getUserTechPackRole = (techpack: ApiTechPack): string | undefined => {
+    if (!user || !techpack) return undefined;
+    
+    const userId = String((user as any)?.id || (user as any)?._id || '');
+    
+    // Check if user is owner
+    const createdBy = (techpack as any).createdBy;
+    const createdById = createdBy && typeof createdBy === 'object' ? createdBy._id : createdBy;
+    if (createdById && String(createdById) === userId) {
+      return 'owner'; // Owner has full access
+    }
+    
+    // Check if user is global admin
+    if (user.role?.toLowerCase() === 'admin') {
+      return 'admin'; // Global admin has admin access
+    }
+    
+    // Check sharedWith array
+    const sharedWith = (techpack as any).sharedWith || [];
+    const shared = sharedWith.find((s: any) => {
+      const shareUserId = s.userId?._id?.toString() || s.userId?.toString();
+      return shareUserId === userId;
+    });
+    
+    return shared?.role?.toLowerCase();
+  };
+  
+  // Helper function to check if user can edit a specific techpack
+  const canEditTechPack = (techpack: ApiTechPack): boolean => {
+    // Global admin and designer can edit if they have Editor role or higher
+    if (user?.role === 'admin' || user?.role === 'designer') {
+      const techPackRole = getUserTechPackRole(techpack);
+      // Can edit if role is owner, admin, or editor
+      return techPackRole === 'owner' || techPackRole === 'admin' || techPackRole === 'editor';
+    }
+    return false;
+  };
+  
+  // Helper function to check if user can delete a specific techpack
+  const canDeleteTechPack = (techpack: ApiTechPack): boolean => {
+    // Only global admin can delete
+    return user?.role === 'admin';
+  };
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -189,13 +232,17 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
     {
       title: t('techpack.list.actions'),
       key: 'actions',
-      render: (_: any, record: ApiTechPack) => (
-        <Space className="action-buttons">
-          <Tooltip title={t('techpack.list.action.view')}><Button icon={<EyeOutlined />} onClick={() => onViewTechPack?.(record)} /></Tooltip>
-          {canEdit && <Tooltip title={t('techpack.list.action.edit')}><Button icon={<EditOutlined />} onClick={() => onEditTechPack?.(record)} /></Tooltip>}
-          {canDelete && <Tooltip title={t('techpack.list.action.delete')}><Button icon={<DeleteOutlined />} danger onClick={() => showDeleteConfirm(record._id)} /></Tooltip>}
-        </Space>
-      ),
+      render: (_: any, record: ApiTechPack) => {
+        const canEditThis = canEditTechPack(record);
+        const canDeleteThis = canDeleteTechPack(record);
+        return (
+          <Space className="action-buttons">
+            <Tooltip title={t('techpack.list.action.view')}><Button icon={<EyeOutlined />} onClick={() => onViewTechPack?.(record)} /></Tooltip>
+            {canEditThis && <Tooltip title={t('techpack.list.action.edit')}><Button icon={<EditOutlined />} onClick={() => onEditTechPack?.(record)} /></Tooltip>}
+            {canDeleteThis && <Tooltip title={t('techpack.list.action.delete')}><Button icon={<DeleteOutlined />} danger onClick={() => showDeleteConfirm(record._id)} /></Tooltip>}
+          </Space>
+        );
+      },
     },
   ];
 

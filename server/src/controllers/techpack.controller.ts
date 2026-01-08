@@ -277,7 +277,11 @@ export class TechPackController {
       if (cachedTechpack) {
         // Kiểm tra quyền truy cập từ cached data (technicalDesignerId is no longer used for access control)
         const isOwner = cachedTechpack.createdBy?._id?.toString() === requestUser._id.toString();
-        const sharedAccess = cachedTechpack.sharedWith?.find((s: any) => s.userId._id?.toString() === requestUser._id.toString());
+        // Check if user is shared with - handle both populated object and ObjectId
+        const sharedAccess = cachedTechpack.sharedWith?.find((s: any) => {
+          const shareUserId = s.userId?._id?.toString() || s.userId?.toString();
+          return shareUserId === requestUser._id.toString();
+        });
         
         // Access control tương tự như logic chính:
         // - Admin: có quyền xem tất cả
@@ -377,7 +381,11 @@ export class TechPackController {
 
       const currentUser = req.user!;
       const isOwner = techpack.createdBy?.toString() === currentUser._id.toString();
-      const isSharedWith = techpack.sharedWith?.some((s: any) => s.userId.toString() === currentUser._id.toString()) || false;
+      // Check if user is shared with - handle both populated object and ObjectId
+      const isSharedWith = techpack.sharedWith?.some((s: any) => {
+        const shareUserId = s.userId?._id?.toString() || s.userId?.toString();
+        return shareUserId === currentUser._id.toString();
+      }) || false;
 
       // Access control:
       // - Admin: có quyền xem tất cả
@@ -399,6 +407,22 @@ export class TechPackController {
 
       // Lưu vào cache với TTL trung bình (30 phút)
       await cacheService.set(cacheKey, techpack, CacheTTL.MEDIUM);
+
+      // Debug: Log để kiểm tra data có đầy đủ không
+      console.log('[getTechPack] Returning techpack data:', {
+        id: techpack._id,
+        hasBom: Array.isArray((techpack as any).bom) && (techpack as any).bom.length > 0,
+        bomCount: Array.isArray((techpack as any).bom) ? (techpack as any).bom.length : 0,
+        hasMeasurements: Array.isArray((techpack as any).measurements) && (techpack as any).measurements.length > 0,
+        measurementsCount: Array.isArray((techpack as any).measurements) ? (techpack as any).measurements.length : 0,
+        hasColorways: Array.isArray((techpack as any).colorways) && (techpack as any).colorways.length > 0,
+        colorwaysCount: Array.isArray((techpack as any).colorways) ? (techpack as any).colorways.length : 0,
+        hasHowToMeasures: Array.isArray((techpack as any).howToMeasure) && (techpack as any).howToMeasure.length > 0,
+        hasSampleRounds: Array.isArray((techpack as any).sampleMeasurementRounds) && (techpack as any).sampleMeasurementRounds.length > 0,
+        userRole: currentUser.role,
+        isSharedWith,
+        isOwner
+      });
 
       // Trả về full data cho tất cả các role có quyền xem (không filter fields theo role)
       // Merchandiser và Viewer có quyền xem full data, chỉ không có quyền edit
@@ -745,9 +769,25 @@ export class TechPackController {
       }
 
       // Check access permissions using centralized helper
+      // Debug logging to help diagnose permission issues
+      console.log('[updateTechPack] Permission check:', {
+        userId: user._id.toString(),
+        userRole: user.role,
+        techpackId: techpack._id,
+        createdBy: techpack.createdBy?.toString(),
+        sharedWithCount: techpack.sharedWith?.length || 0,
+        sharedWith: techpack.sharedWith?.map((s: any) => ({
+          userId: s.userId?._id?.toString() || s.userId?.toString(),
+          role: s.role
+        })) || []
+      });
+      
       if (!hasEditAccess(techpack, user)) {
+        console.log('[updateTechPack] Access denied for user:', user._id.toString(), 'role:', user.role);
         return sendError(res, 'Access denied. You do not have permission to edit this tech pack.', 403, 'FORBIDDEN');
       }
+      
+      console.log('[updateTechPack] Access granted for user:', user._id.toString());
 
       // Define whitelist of updatable fields to prevent schema validation errors
       // Support both old field names (productName, version) and new field names (articleName, sampleType) for backward compatibility
@@ -997,6 +1037,9 @@ export class TechPackController {
 
       // Save the TechPack document once, with both user updates and the new version
       const updatedTechPack = await techpack.save();
+
+      // Populate sharedWith before returning to ensure frontend has access control data
+      await updatedTechPack.populate('sharedWith.userId', 'firstName lastName email');
 
       // Invalidate caches so subsequent fetches return the latest data (including logo updates)
       await CacheInvalidationUtil.invalidateTechPackCache(id);
@@ -1284,6 +1327,56 @@ export class TechPackController {
         return sendError(res, 'Cannot share with yourself.', 400, 'BAD_REQUEST');
       }
 
+      // Validation: Cannot share with a techpack role higher than target user's global role
+      const globalRoleToTechPackRoleLevel: { [key: string]: number } = {
+        'admin': 4,      // Admin global role -> Admin techpack role
+        'designer': 3,   // Designer global role -> Editor techpack role
+        'merchandiser': 2, // Merchandiser global role -> Viewer techpack role
+        'viewer': 2,     // Viewer global role -> Viewer techpack role
+      };
+      const techPackRoleLevels: { [key in TechPackRole]: number } = {
+        [TechPackRole.Owner]: 5,
+        [TechPackRole.Admin]: 4,
+        [TechPackRole.Editor]: 3,
+        [TechPackRole.Viewer]: 2,
+        [TechPackRole.Factory]: 1,
+      };
+      
+      const targetUserGlobalRole = targetUser.role?.toLowerCase() || '';
+      const maxAllowedTechPackRoleLevel = globalRoleToTechPackRoleLevel[targetUserGlobalRole] || 0;
+      const selectedRoleLevel = techPackRoleLevels[role as TechPackRole] || 0;
+      
+      if (maxAllowedTechPackRoleLevel > 0 && selectedRoleLevel > maxAllowedTechPackRoleLevel) {
+        return sendError(res, `Cannot share with role "${role}" because user ${targetUser.email} has global role "${targetUser.role}" which is lower. You can only share with roles equal to or lower than the user's global role.`, 403, 'FORBIDDEN');
+      }
+
+      // Get sharer's current techpack role
+      let sharerTechPackRole: TechPackRole | undefined;
+      if (isOwner) {
+        sharerTechPackRole = TechPackRole.Owner;
+      } else if (sharer.role === UserRole.Admin) {
+        sharerTechPackRole = TechPackRole.Admin;
+      } else if (sharerAccess && Object.values(TechPackRole).includes(sharerAccess.role as TechPackRole)) {
+        sharerTechPackRole = sharerAccess.role as TechPackRole;
+      }
+
+      // Validation: User cannot share with a role higher than their current techpack role
+      if (sharerTechPackRole) {
+        const roleLevels: { [key in TechPackRole]: number } = {
+          [TechPackRole.Owner]: 5,
+          [TechPackRole.Admin]: 4,
+          [TechPackRole.Editor]: 3,
+          [TechPackRole.Viewer]: 2,
+          [TechPackRole.Factory]: 1,
+        };
+        const sharerLevel = roleLevels[sharerTechPackRole as TechPackRole] || 0;
+        const targetLevel = roleLevels[role as TechPackRole] || 0;
+        
+        if (targetLevel > sharerLevel) {
+          return sendError(res, `Cannot share with a role higher than your current access level (${sharerTechPackRole}).`, 403, 'FORBIDDEN');
+        }
+      }
+
       // Prevent sharing with system admin removed; technicalDesignerId is now free text and not linked to users
 
       const existingShareIndex = techpack.sharedWith?.findIndex(s => s.userId.toString() === userId) || -1;
@@ -1323,6 +1416,11 @@ export class TechPackController {
       });
 
       await techpack.save();
+
+      // Invalidate cache for this techpack and techpack list to ensure the shared user sees it
+      await CacheInvalidationUtil.invalidateTechPackCache(id);
+      // Also invalidate cache for the shared user's techpack list
+      await CacheInvalidationUtil.invalidateUserCache(userId);
 
       // Log activity
       await logActivity({
@@ -1388,6 +1486,11 @@ export class TechPackController {
       });
 
       await techpack.save();
+
+      // Invalidate cache for this techpack and techpack list to ensure the revoked user no longer sees it
+      await CacheInvalidationUtil.invalidateTechPackCache(id);
+      // Also invalidate cache for the revoked user's techpack list
+      await CacheInvalidationUtil.invalidateUserCache(userId);
 
       // Log activity
       await logActivity({
@@ -1633,6 +1736,56 @@ export class TechPackController {
         return sendError(res, 'Target user not found', 404, 'NOT_FOUND');
       }
 
+      // Validation: Cannot update to a techpack role higher than target user's global role
+      const globalRoleToTechPackRoleLevel: { [key: string]: number } = {
+        'admin': 4,      // Admin global role -> Admin techpack role
+        'designer': 3,   // Designer global role -> Editor techpack role
+        'merchandiser': 2, // Merchandiser global role -> Viewer techpack role
+        'viewer': 2,     // Viewer global role -> Viewer techpack role
+      };
+      const techPackRoleLevels: { [key in TechPackRole]: number } = {
+        [TechPackRole.Owner]: 5,
+        [TechPackRole.Admin]: 4,
+        [TechPackRole.Editor]: 3,
+        [TechPackRole.Viewer]: 2,
+        [TechPackRole.Factory]: 1,
+      };
+      
+      const targetUserGlobalRole = targetUser.role?.toLowerCase() || '';
+      const maxAllowedTechPackRoleLevel = globalRoleToTechPackRoleLevel[targetUserGlobalRole] || 0;
+      const selectedRoleLevel = techPackRoleLevels[role as TechPackRole] || 0;
+      
+      if (maxAllowedTechPackRoleLevel > 0 && selectedRoleLevel > maxAllowedTechPackRoleLevel) {
+        return sendError(res, `Cannot update to role "${role}" because user ${targetUser.email} has global role "${targetUser.role}" which is lower. You can only assign roles equal to or lower than the user's global role.`, 403, 'FORBIDDEN');
+      }
+
+      // Get updater's current techpack role
+      let updaterTechPackRole: TechPackRole | undefined;
+      if (isOwner) {
+        updaterTechPackRole = TechPackRole.Owner;
+      } else if (updater.role === UserRole.Admin) {
+        updaterTechPackRole = TechPackRole.Admin;
+      } else if (updaterAccess && Object.values(TechPackRole).includes(updaterAccess.role as TechPackRole)) {
+        updaterTechPackRole = updaterAccess.role as TechPackRole;
+      }
+
+      // Validation: User cannot update to a role higher than their current techpack role
+      if (updaterTechPackRole) {
+        const roleLevels: { [key in TechPackRole]: number } = {
+          [TechPackRole.Owner]: 5,
+          [TechPackRole.Admin]: 4,
+          [TechPackRole.Editor]: 3,
+          [TechPackRole.Viewer]: 2,
+          [TechPackRole.Factory]: 1,
+        };
+        const updaterLevel = roleLevels[updaterTechPackRole as TechPackRole] || 0;
+        const targetLevel = roleLevels[role as TechPackRole] || 0;
+        
+        if (targetLevel > updaterLevel) {
+          return sendError(res, `Cannot update to a role higher than your current access level (${updaterTechPackRole}).`, 403, 'FORBIDDEN');
+        }
+      }
+
       // Update the role
       const oldRole = techpack.sharedWith![shareIndex].role;
       techpack.sharedWith![shareIndex].role = role;
@@ -1655,6 +1808,11 @@ export class TechPackController {
       });
 
       await techpack.save();
+
+      // Invalidate cache for this techpack and techpack list to ensure changes are reflected
+      await CacheInvalidationUtil.invalidateTechPackCache(id);
+      // Also invalidate cache for the updated user's techpack list
+      await CacheInvalidationUtil.invalidateUserCache(userId);
 
       // Log activity
       await logActivity({

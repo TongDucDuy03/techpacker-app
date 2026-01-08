@@ -8,7 +8,8 @@ const LoginPage = lazy(() => import('../pages/LoginPage'));
 // Registration page removed (registration disabled). If you need to re-enable, restore this import.
 const ProfilePage = lazy(() => import('../pages/ProfilePage'));
 const AdminPage = lazy(() => import('../pages/Admin/AdminPage'));
-const AppContent = lazy(() => import('../App'));
+// AppContent should not be lazy loaded as it uses TechPackContext which needs to be available immediately
+import AppContent from '../App';
 
 const AppRouter: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
