@@ -278,7 +278,21 @@ export class TechPackController {
         // Kiểm tra quyền truy cập từ cached data (technicalDesignerId is no longer used for access control)
         const isOwner = cachedTechpack.createdBy?._id?.toString() === requestUser._id.toString();
         const sharedAccess = cachedTechpack.sharedWith?.find((s: any) => s.userId._id?.toString() === requestUser._id.toString());
-        const hasAccess = requestUser.role === UserRole.Admin || isOwner || sharedAccess;
+        
+        // Access control tương tự như logic chính:
+        // - Admin: có quyền xem tất cả
+        // - Viewer: CHỈ xem nếu được share (KHÔNG xem ngay cả khi là owner)
+        // - Designer/Merchandiser: xem nếu là owner hoặc được share
+        let hasAccess = false;
+        if (requestUser.role === UserRole.Admin) {
+          hasAccess = true;
+        } else if (requestUser.role === UserRole.Viewer) {
+          // Viewer CHỈ xem được nếu được share
+          hasAccess = !!sharedAccess;
+        } else {
+          // Designer, Merchandiser: xem nếu là owner hoặc được share
+          hasAccess = isOwner || !!sharedAccess;
+        }
 
         if (hasAccess) {
           return sendSuccess(res, cachedTechpack, 'TechPack retrieved from cache');
@@ -365,13 +379,29 @@ export class TechPackController {
       const isOwner = techpack.createdBy?.toString() === currentUser._id.toString();
       const isSharedWith = techpack.sharedWith?.some((s: any) => s.userId.toString() === currentUser._id.toString()) || false;
 
-      if (currentUser.role !== UserRole.Admin && !isOwner && !isSharedWith) {
-        return sendError(res, 'Access denied', 403, 'FORBIDDEN');
+      // Access control:
+      // - Admin: có quyền xem tất cả
+      // - Designer/Merchandiser: xem nếu là owner hoặc được share
+      // - Viewer: CHỈ xem nếu được share (KHÔNG xem ngay cả khi là owner, trừ khi được share)
+      if (currentUser.role === UserRole.Admin) {
+        // Admin có quyền xem tất cả
+      } else if (currentUser.role === UserRole.Viewer) {
+        // Viewer CHỈ xem được nếu được share (KHÔNG xem ngay cả khi là owner)
+        if (!isSharedWith) {
+          return sendError(res, 'Access denied', 403, 'FORBIDDEN');
+        }
+      } else {
+        // Designer, Merchandiser: xem nếu là owner hoặc được share
+        if (!isOwner && !isSharedWith) {
+          return sendError(res, 'Access denied', 403, 'FORBIDDEN');
+        }
       }
 
       // Lưu vào cache với TTL trung bình (30 phút)
       await cacheService.set(cacheKey, techpack, CacheTTL.MEDIUM);
 
+      // Trả về full data cho tất cả các role có quyền xem (không filter fields theo role)
+      // Merchandiser và Viewer có quyền xem full data, chỉ không có quyền edit
       sendSuccess(res, techpack);
     } catch (error: any) {
       console.error('Get TechPack error:', error);

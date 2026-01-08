@@ -233,8 +233,33 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
 
   // Removed duplicate shareable users fetch to avoid overwriting state
 
+  // Helper function to check if a role is higher than Viewer
+  const isRoleHigherThanViewer = (role: TechPackRole): boolean => {
+    // Role hierarchy: Owner > Admin > Editor > Viewer > Factory
+    // Viewer can only share with Viewer or Factory (not Editor, Admin, Owner)
+    return role === TechPackRole.Editor || role === TechPackRole.Admin || role === TechPackRole.Owner;
+  };
+
+  // Get allowed roles for current user based on their global role
+  const getAllowedRoles = (): TechPackRole[] => {
+    // If current user is a viewer (global role), they can only share with Viewer or Factory
+    if (currentUser?.role?.toLowerCase() === 'viewer') {
+      return [TechPackRole.Viewer, TechPackRole.Factory];
+    }
+    // Other roles (admin, designer, merchandiser) can share with any role except Owner
+    return Object.values(TechPackRole).filter(r => r !== TechPackRole.Owner);
+  };
+
   const handleShare = async () => {
     if (!selectedUserId || !resolvedTechpackId) return;
+
+    // Validation: If current user is viewer, they cannot share with roles higher than Viewer
+    if (currentUser?.role?.toLowerCase() === 'viewer') {
+      if (isRoleHigherThanViewer(selectedRole)) {
+        showError(t('form.sharing.cannotShareHigherRole'));
+        return;
+      }
+    }
 
     setIsSubmitting(true);
     try {
@@ -257,6 +282,14 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
 
   const handleUpdateRole = async (userId: string, role: TechPackRole) => {
     if (!resolvedTechpackId) return;
+
+    // Validation: If current user is viewer, they cannot update to roles higher than Viewer
+    if (currentUser?.role?.toLowerCase() === 'viewer') {
+      if (isRoleHigherThanViewer(role)) {
+        showError(t('form.sharing.cannotUpdateToHigherRole'));
+        return;
+      }
+    }
 
     try {
       await api.updateShareRole(resolvedTechpackId, userId, { role });
@@ -380,7 +413,7 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
               onChange={(e) => setSelectedRole(e.target.value as TechPackRole)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {Object.values(TechPackRole).filter(r => r !== TechPackRole.Owner).map(role => (
+              {getAllowedRoles().map(role => (
                 <option key={role} value={role} className="capitalize">{role}</option>
               ))}
             </select>
@@ -476,7 +509,7 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
                         className="ml-2 capitalize border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
                         disabled={item.role === TechPackRole.Owner || !canManage}
                       >
-                        {Object.values(TechPackRole).map(role => (
+                        {getAllowedRoles().map(role => (
                           <option key={role} value={role} disabled={role === TechPackRole.Owner}>{role}</option>
                         ))}
                       </select>

@@ -658,8 +658,8 @@ type RoundModalFormState = {
           const parsedValue = parseMeasurementValue(storedValue);
           if (parsedValue !== undefined && !Number.isNaN(parsedValue)) {
             nextMap[sizeKey] = String(parsedValue);
-          } else {
-            nextMap[sizeKey] = storedValue;
+      } else {
+        nextMap[sizeKey] = storedValue;
           }
         } else {
           nextMap[sizeKey] = storedValue;
@@ -904,7 +904,7 @@ type RoundModalFormState = {
         
         // ✅ FIXED: Đợi thêm một chút để đảm bảo round được cập nhật
         await new Promise(resolve => setTimeout(resolve, 100));
-        
+      
         // ✅ FIXED: Lưu với final measurements đã được merge
         const techpackWithUpdatedMeasurements = {
           ...state?.techpack,
@@ -913,7 +913,7 @@ type RoundModalFormState = {
         
         await saveTechPack(techpackWithUpdatedMeasurements);
       } else {
-        await saveTechPack();
+      await saveTechPack();
       }
       
       if (hasUpdates) {
@@ -1009,7 +1009,7 @@ type RoundModalFormState = {
       // For other units, parse as decimal
       const parsed = parseFloat(normalized);
       if (!Number.isNaN(parsed)) {
-        updateSizesWithBase({ baseValue: parsed });
+    updateSizesWithBase({ baseValue: parsed });
       }
     }
   };

@@ -293,6 +293,21 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
         createdAt: (initialTechPack as any).createdAt,
         updatedAt: (initialTechPack as any).updatedAt,
       };
+      
+      // Debug: Log để kiểm tra data có đầy đủ không
+      console.log('[TechPackTabs] Mapping techpack data:', {
+        hasBom: Array.isArray((initialTechPack as any).bom) && (initialTechPack as any).bom.length > 0,
+        bomCount: Array.isArray((initialTechPack as any).bom) ? (initialTechPack as any).bom.length : 0,
+        hasMeasurements: Array.isArray((initialTechPack as any).measurements) && (initialTechPack as any).measurements.length > 0,
+        measurementsCount: Array.isArray((initialTechPack as any).measurements) ? (initialTechPack as any).measurements.length : 0,
+        hasColorways: Array.isArray((initialTechPack as any).colorways) && (initialTechPack as any).colorways.length > 0,
+        colorwaysCount: Array.isArray((initialTechPack as any).colorways) ? (initialTechPack as any).colorways.length : 0,
+        hasHowToMeasures: Array.isArray((initialTechPack as any).howToMeasure) && (initialTechPack as any).howToMeasure.length > 0,
+        hasPackingNotes: !!(initialTechPack as any).packingNotes,
+        userRole: user?.role,
+        mode,
+      });
+      
       // Load từ server - không set hasUnsavedChanges (skipUnsavedFlag = true)
       // Note: initialTechPack đã được fetch full detail từ App.tsx trước khi truyền vào đây
       updateFormState(mappedTechPack, true);

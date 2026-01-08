@@ -107,6 +107,19 @@ function AppContent() {
     try {
       const fullTechPack = await getTechPack(techPackId);
       if (fullTechPack) {
+        // Debug: Log để kiểm tra data từ API có đầy đủ không
+        console.log('[App] Full techpack fetched for view:', {
+          id: fullTechPack._id || fullTechPack.id,
+          hasBom: Array.isArray((fullTechPack as any).bom) && (fullTechPack as any).bom.length > 0,
+          bomCount: Array.isArray((fullTechPack as any).bom) ? (fullTechPack as any).bom.length : 0,
+          hasMeasurements: Array.isArray((fullTechPack as any).measurements) && (fullTechPack as any).measurements.length > 0,
+          measurementsCount: Array.isArray((fullTechPack as any).measurements) ? (fullTechPack as any).measurements.length : 0,
+          hasColorways: Array.isArray((fullTechPack as any).colorways) && (fullTechPack as any).colorways.length > 0,
+          colorwaysCount: Array.isArray((fullTechPack as any).colorways) ? (fullTechPack as any).colorways.length : 0,
+          hasHowToMeasures: Array.isArray((fullTechPack as any).howToMeasure) && (fullTechPack as any).howToMeasure.length > 0,
+          hasPackingNotes: !!(fullTechPack as any).packingNotes,
+          userRole: user?.role,
+        });
         setSelectedTechPack(fullTechPack);
         setCurrentTab('view');
       } else {
