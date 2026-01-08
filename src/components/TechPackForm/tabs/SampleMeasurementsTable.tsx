@@ -158,7 +158,7 @@ const getToleranceDisplay = (row: SampleMeasurementRow, tableUnit: MeasurementUn
       unitSuffix,
     };
   }
-  
+
   // For other units, use no-round format to preserve precision
   const minusFormatted = formatMeasurementValueNoRound(minus, tableUnit);
   const plusFormatted = formatMeasurementValueNoRound(plus, tableUnit);
@@ -413,9 +413,9 @@ const getDiffToneClass = (value: string): string => {
                                 type="text"
                                 value=""
                                 onChange={event => handleEmptyInputChange(event.target.value)}
-                                className="w-full min-w-[90px] border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="—"
-                              />
+                            className="w-full min-w-[90px] border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="—"
+                          />
                             );
                           })()
                         )}

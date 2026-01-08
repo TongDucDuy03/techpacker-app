@@ -492,6 +492,10 @@ const translations: Record<LanguageCode, TranslationDict> = {
     'form.bom.imagePath': 'Image Path',
     'form.bom.preview': 'Preview',
     'form.bom.fixErrors': 'Please fix the following errors:',
+    'form.bom.materialsList': 'Materials List',
+    'form.bom.selected': 'Selected: {count} items',
+    'form.bom.duplicate': 'Duplicate',
+    'form.bom.clearSelection': 'Clear Selection',
 
     // Measurements Tab
     'form.measurement.title': 'Measurement Chart',
@@ -608,6 +612,8 @@ const translations: Record<LanguageCode, TranslationDict> = {
     'form.measurement.common.waistMethod': 'Measure at natural waistline',
     'form.measurement.commonAdded': 'Common measurements added',
     'form.measurement.duplicate': 'Duplicate',
+    'form.measurement.duplicatedMeasurements': 'Duplicated {count} measurement(s)',
+    'form.measurement.deletedMeasurements': 'Deleted {count} measurement(s)',
 
     // Colorways fields
     'form.colorway.name': 'Colorway Name',
@@ -1453,6 +1459,8 @@ const translations: Record<LanguageCode, TranslationDict> = {
     'form.measurement.common.waistMethod': 'Đo tại vòng eo tự nhiên',
     'form.measurement.commonAdded': 'Đã thêm các điểm đo thường dùng',
     'form.measurement.duplicate': 'Nhân đôi',
+    'form.measurement.duplicatedMeasurements': 'Đã nhân đôi {count} điểm đo',
+    'form.measurement.deletedMeasurements': 'Đã xóa {count} điểm đo',
 
     // Colorways fields
     'form.colorway.name': 'Tên phối màu',

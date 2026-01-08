@@ -219,22 +219,22 @@ export const formatStepValue = (value: number | undefined, unit?: MeasurementUni
   // For inch-16/32, allow fraction format
   // For other units (inch-10/cm/mm), use decimal format without rounding
   if (unit === 'inch-16' || unit === 'inch-32') {
-    const sign = value > 0 ? '+' : '-';
-    const absValue = Math.abs(value);
-    const integerPart = Math.floor(absValue);
-    const decimalPart = absValue - integerPart;
+  const sign = value > 0 ? '+' : '-';
+  const absValue = Math.abs(value);
+  const integerPart = Math.floor(absValue);
+  const decimalPart = absValue - integerPart;
 
-    const fraction = findNearestFraction(decimalPart);
+  const fraction = findNearestFraction(decimalPart);
 
-    if (!fraction) {
-      return `${sign}${absValue.toFixed(2).replace(/\.00$/, '')}`;
-    }
+  if (!fraction) {
+    return `${sign}${absValue.toFixed(2).replace(/\.00$/, '')}`;
+  }
 
-    const fractionText = `${fraction.numerator}/${fraction.denominator}`;
-    if (integerPart === 0) {
-      return `${sign}${fractionText}`;
-    }
-    return `${sign}${integerPart} ${fractionText}`;
+  const fractionText = `${fraction.numerator}/${fraction.denominator}`;
+  if (integerPart === 0) {
+    return `${sign}${fractionText}`;
+  }
+  return `${sign}${integerPart} ${fractionText}`;
   }
   
   // For other units, use decimal format without rounding

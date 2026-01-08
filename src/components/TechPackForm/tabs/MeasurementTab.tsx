@@ -14,7 +14,7 @@ import { useFormValidation } from '../../../hooks/useFormValidation';
 import { measurementValidationSchema } from '../../../utils/validationSchemas';
 import Input from '../shared/Input';
 import Select from '../shared/Select';
-import { Plus, AlertTriangle, AlertCircle, X, Save } from 'lucide-react';
+import { Plus, AlertTriangle, AlertCircle, X, Save, CheckSquare, Square, Copy } from 'lucide-react';
 import { showSuccess, showWarning, showError } from '../../../lib/toast';
 import SampleMeasurementsTable from './SampleMeasurementsTable';
 import { SampleMeasurementRow } from '../../../types/measurements';
@@ -131,6 +131,7 @@ const MeasurementTab: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showRoundModal, setShowRoundModal] = useState(false);
+  const [selectedMeasurementIds, setSelectedMeasurementIds] = useState<Set<string>>(new Set());
   const [roundForm, setRoundForm] = useState<RoundModalFormState>(() => ({
     name: '',
     date: new Date().toISOString().slice(0, 10),
@@ -1336,6 +1337,90 @@ type RoundModalFormState = {
     }
   };
 
+  // Selection handlers
+  const toggleMeasurementSelection = (measurementId: string) => {
+    setSelectedMeasurementIds(prev => {
+      const next = new Set(prev);
+      if (next.has(measurementId)) {
+        next.delete(measurementId);
+      } else {
+        next.add(measurementId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAllMeasurements = () => {
+    if (selectedMeasurementIds.size === measurements.length) {
+      setSelectedMeasurementIds(new Set());
+    } else {
+      // Use measurement.id if available, otherwise use index as fallback
+      const allIds = measurements.map((m, idx) => m.id || `measurement-${idx}`);
+      setSelectedMeasurementIds(new Set(allIds));
+    }
+  };
+
+  const clearMeasurementSelection = () => {
+    setSelectedMeasurementIds(new Set());
+  };
+
+  // Bulk duplicate measurements
+  const handleBulkDuplicateMeasurements = () => {
+    if (selectedMeasurementIds.size === 0) return;
+    
+    // Match by id or fallback to index-based id
+    const selectedItems = measurements.filter((m, idx) => {
+      const measurementId = m.id || `measurement-${idx}`;
+      return selectedMeasurementIds.has(measurementId);
+    });
+    if (selectedItems.length === 0) return;
+
+    selectedItems.forEach((item, idx) => {
+      const originalIndex = measurements.findIndex(m => m.id === item.id);
+      const duplicated: MeasurementPoint = {
+        ...item,
+        id: `measurement-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 8)}`,
+        pomCode: item.pomCode ? `${item.pomCode}-COPY${idx > 0 ? `-${idx + 1}` : ''}` : item.pomCode,
+      };
+      
+      if (insertMeasurementAt && originalIndex >= 0) {
+        insertMeasurementAt(originalIndex + 1 + idx, duplicated);
+      } else {
+        addMeasurement(duplicated);
+      }
+    });
+
+    showSuccess(t('form.measurement.duplicatedMeasurements', { count: selectedItems.length }));
+    clearMeasurementSelection();
+  };
+
+  // Bulk delete measurements
+  const handleBulkDeleteMeasurements = () => {
+    if (selectedMeasurementIds.size === 0) return;
+    
+    // Match by id or fallback to index-based id
+    const selectedItems = measurements.filter((m, idx) => {
+      const measurementId = m.id || `measurement-${idx}`;
+      return selectedMeasurementIds.has(measurementId);
+    });
+    if (selectedItems.length === 0) return;
+
+    // Delete in reverse order to maintain indices
+    selectedItems.reverse().forEach(item => {
+      const index = measurements.findIndex((m, idx) => {
+        const measurementId = m.id || `measurement-${idx}`;
+        const itemId = item.id || `measurement-${measurements.indexOf(item)}`;
+        return measurementId === itemId;
+      });
+      if (index >= 0 && deleteMeasurement) {
+        deleteMeasurement(index);
+      }
+    });
+
+    showSuccess(t('form.measurement.deletedMeasurements', { count: selectedItems.length }));
+    clearMeasurementSelection();
+  };
+
   const handleDuplicateMeasurement = (measurement: MeasurementPoint, index: number) => {
     if (!insertMeasurementAt) return;
     const duplicate: MeasurementPoint = {
@@ -1943,10 +2028,61 @@ type RoundModalFormState = {
 
       {/* Measurements Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        {/* Selection toolbar */}
+        {selectedMeasurementIds.size > 0 && (
+          <div className="px-4 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-blue-900">
+                {t('form.bom.selected', { count: selectedMeasurementIds.size })}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleBulkDuplicateMeasurements}
+                className="px-3 py-1.5 text-sm font-medium text-blue-700 bg-white border border-blue-300 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <Copy className="w-4 h-4 inline mr-1.5" />
+                {t('form.bom.duplicate')}
+              </button>
+              <button
+                onClick={handleBulkDeleteMeasurements}
+                className="px-3 py-1.5 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500"
+              >
+                <X className="w-4 h-4 inline mr-1.5" />
+                {t('common.delete')}
+              </button>
+              <button
+                onClick={clearMeasurementSelection}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              >
+                {t('form.bom.clearSelection')}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th scope="col" className="px-4 py-3 w-12">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleSelectAllMeasurements();
+                    }}
+                    className="flex items-center justify-center w-5 h-5 text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
+                    title={selectedMeasurementIds.size === measurements.length && measurements.length > 0 ? t('form.bom.deselectAll') : t('form.bom.selectAll')}
+                  >
+                    {selectedMeasurementIds.size === measurements.length && measurements.length > 0 ? (
+                      <CheckSquare className="w-5 h-5 text-blue-600" />
+                    ) : (
+                      <Square className="w-5 h-5" />
+                    )}
+                  </button>
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">
                   {t('form.measurement.pomCodeColumn')}
                 </th>
@@ -1978,7 +2114,7 @@ type RoundModalFormState = {
             <tbody className="bg-white divide-y divide-gray-200">
               {measurements.length === 0 ? (
                 <tr>
-                  <td colSpan={selectedSizes.length + 4} className="px-6 py-12 text-center text-sm text-gray-500">
+                  <td colSpan={selectedSizes.length + 5} className="px-6 py-12 text-center text-sm text-gray-500">
                     {t('form.measurement.noPoints')}
                   </td>
                 </tr>
@@ -2010,15 +2146,37 @@ type RoundModalFormState = {
                         ? '#ffffff'
                         : rowStripeColor;
                   
+                  // Use measurement.id if available, otherwise use index as fallback
+                  const measurementId = measurement.id || `measurement-${index}`;
+                  const isSelected = selectedMeasurementIds.has(measurementId);
+                  
                   return (
                     <tr 
-                      key={measurement.id || `measurement-${index}`} 
-                      className="transition-colors duration-150 hover:brightness-95"
-                      style={{ backgroundColor: rowBackgroundColor }}
+                      key={measurementId} 
+                      className={`transition-colors duration-150 hover:brightness-95 ${isSelected ? 'bg-blue-50' : ''}`}
+                      style={isSelected ? undefined : { backgroundColor: rowBackgroundColor }}
                     >
+                      <td className="px-4 py-4">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleMeasurementSelection(measurementId);
+                          }}
+                          className="flex items-center justify-center w-5 h-5 text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
+                          title={isSelected ? 'Deselect' : 'Select'}
+                        >
+                          {isSelected ? (
+                            <CheckSquare className="w-5 h-5 text-blue-600" />
+                          ) : (
+                            <Square className="w-5 h-5" />
+                          )}
+                        </button>
+                      </td>
                       <td
                         className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0"
-                        style={{ backgroundColor: rowBackgroundColor }}
+                        style={isSelected ? undefined : { backgroundColor: rowBackgroundColor }}
                       >
                         <div className="flex items-center">
                           {measurement.pomCode}
