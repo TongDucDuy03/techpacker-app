@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useCallback, memo } from 'react';
+import React, { useState, useMemo, useCallback, memo, useEffect } from 'react';
 import { ApiTechPack } from '../types/techpack';
 import { useAuth } from '../contexts/AuthContext';
 import { useTechPack } from '../contexts/TechPackContext';
 import { useI18n } from '../lib/i18n';
 import { useDebounce } from '../hooks/useDebounce';
+import { api } from '../lib/api';
 import CreateTechPackWorkflow from './CreateTechPackWorkflow';
 import {
   Table,
@@ -65,8 +66,54 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
   const [categoryFilter, setCategoryFilter] = useState('');
   const [seasonFilter, setSeasonFilter] = useState('');
   const [showCreateWorkflow, setShowCreateWorkflow] = useState(false);
+  const [stats, setStats] = useState<{ total: number; draft: number; inReview: number; approved: number } | null>(null);
 
   const safeTechPacks = Array.isArray(techPacks) ? techPacks : [];
+
+  // Load stats from server when component mounts or pagination changes
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const statsData = await api.getTechPackStats();
+        setStats(statsData);
+      } catch (error) {
+        console.error('Failed to load techpack stats:', error);
+        // Fallback to calculating from current page data
+        setStats(null);
+      }
+    };
+    
+    if (externalPagination) {
+      loadStats();
+    }
+  }, [externalPagination?.total]); // Reload stats when total changes
+
+  // Reload from server when debounced search term changes (only if using server-side pagination)
+  // Status filter is handled by onChange handler, so we only need to handle debounced search here
+  const prevSearchRef = React.useRef('');
+  
+  useEffect(() => {
+    if (externalPagination && loadTechPacks && prevSearchRef.current !== debouncedSearchTerm) {
+      prevSearchRef.current = debouncedSearchTerm;
+      
+      // Reload with debounced search term
+      const params: any = {
+        page: 1,
+        limit: 10, // Match frontend pageSize
+        q: debouncedSearchTerm || undefined,
+        status: statusFilter || undefined, // Include current status filter
+      };
+      
+      loadTechPacks(params).catch(error => {
+        console.error('Failed to reload techpacks with search:', error);
+      });
+      
+      // Notify parent to update page
+      if (onPageChange) {
+        onPageChange(1);
+      }
+    }
+  }, [debouncedSearchTerm, externalPagination, loadTechPacks, onPageChange, statusFilter]);
 
   const canCreate = user?.role === 'admin' || user?.role === 'designer';
   
@@ -139,7 +186,16 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
     });
   }, []);
 
+  // When server-side pagination is used, don't filter client-side
+  // Server already handles pagination and filtering
+  // Only filter client-side if no server pagination (local data mode)
   const filteredTechPacks = useMemo(() => {
+    // If using server-side pagination, return data as-is (server already filtered)
+    if (externalPagination) {
+      return safeTechPacks;
+    }
+    
+    // Otherwise, filter client-side for local data
     const filtered = safeTechPacks.filter(tp => {
       const articleName = tp.articleName || (tp as any).articleInfo?.articleName || (tp as any).productName || tp.name || '';
       const articleCode = tp.articleCode || '';
@@ -160,7 +216,7 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
       const bCreated = new Date(b.createdAt || 0).getTime();
       return bCreated - aCreated;
     });
-  }, [safeTechPacks, debouncedSearchTerm, statusFilter, categoryFilter, seasonFilter]);
+  }, [safeTechPacks, debouncedSearchTerm, statusFilter, categoryFilter, seasonFilter, externalPagination]);
 
   const showDeleteConfirm = (id: string) => {
     Modal.confirm({
@@ -254,10 +310,43 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
       </div>
 
       <Row gutter={16} className="techpack-stats">
-        <Col span={6}><Card><Statistic title={t('dash.stat.total')} value={safeTechPacks.length} prefix={<FileTextOutlined />} /></Card></Col>
-        <Col span={6}><Card><Statistic title={t('status.draft')} value={safeTechPacks.filter(tp => (tp.status || '').toLowerCase() === 'draft').length} prefix={<EditOutlined />} /></Card></Col>
-        <Col span={6}><Card><Statistic title={t('status.inReview')} value={safeTechPacks.filter(tp => (tp.status || '').toLowerCase() === 'pending_approval').length} prefix={<ClockCircleOutlined />} /></Card></Col>
-        <Col span={6}><Card><Statistic title={t('status.approved')} value={safeTechPacks.filter(tp => (tp.status || '').toLowerCase() === 'approved').length} prefix={<CheckCircleOutlined />} /></Card></Col>
+        {/* Use stats from server API when available, otherwise fallback to pagination or local data */}
+        <Col span={6}>
+          <Card>
+            <Statistic 
+              title={t('dash.stat.total')} 
+              value={stats?.total ?? externalPagination?.total ?? safeTechPacks.length} 
+              prefix={<FileTextOutlined />} 
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic 
+              title={t('status.draft')} 
+              value={stats?.draft ?? safeTechPacks.filter(tp => (tp.status || '').toLowerCase() === 'draft').length} 
+              prefix={<EditOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic 
+              title={t('status.inReview')} 
+              value={stats?.inReview ?? safeTechPacks.filter(tp => (tp.status || '').toLowerCase() === 'pending_approval' || (tp.status || '').toLowerCase() === 'in review').length} 
+              prefix={<ClockCircleOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic 
+              title={t('status.approved')} 
+              value={stats?.approved ?? safeTechPacks.filter(tp => (tp.status || '').toLowerCase() === 'approved').length} 
+              prefix={<CheckCircleOutlined />}
+            />
+          </Card>
+        </Col>
       </Row>
 
       <Card className="techpack-table-card">
@@ -265,14 +354,65 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
           <Row justify="space-between" align="middle">
             <Col>
               <Space>
-                <Search placeholder={t('tpl.search.placeholder')} onSearch={setSearchTerm} style={{ width: 250 }} allowClear enterButton />
-                <Select placeholder={`${t('common.filter')} ${t('techpack.list.status').toLowerCase()}`} onChange={setStatusFilter} style={{ width: 150 }} allowClear>
+                <Search 
+                  placeholder={t('tpl.search.placeholder')} 
+                  onSearch={(value) => {
+                    setSearchTerm(value);
+                    // Reload from server with search term when using server-side pagination
+                    if (externalPagination && loadTechPacks) {
+                      loadTechPacks({ page: 1, limit: 10, q: value || undefined }).catch(console.error);
+                      if (onPageChange) onPageChange(1);
+                    }
+                  }}
+                  onChange={(e) => {
+                    // Update search term for immediate UI feedback
+                    setSearchTerm(e.target.value);
+                  }}
+                  value={searchTerm}
+                  style={{ width: 250 }} 
+                  allowClear 
+                  enterButton 
+                />
+                <Select 
+                  placeholder={`${t('common.filter')} ${t('techpack.list.status').toLowerCase()}`} 
+                  onChange={(value) => {
+                    setStatusFilter(value || '');
+                    // Reload from server with status filter when using server-side pagination
+                    if (externalPagination && loadTechPacks) {
+                      loadTechPacks({ page: 1, limit: 10, status: value || undefined }).catch(console.error);
+                      if (onPageChange) onPageChange(1);
+                    }
+                  }}
+                  value={statusFilter || undefined}
+                  style={{ width: 150 }} 
+                  allowClear
+                >
                   {[...new Set(safeTechPacks.map(tp => tp.status))].map((s) => <Option key={s} value={s}>{s}</Option>)}
                 </Select>
-                <Select placeholder={`${t('common.filter')} ${t('form.category').toLowerCase()}`} onChange={setCategoryFilter} style={{ width: 150 }} allowClear>
+                <Select 
+                  placeholder={`${t('common.filter')} ${t('form.category').toLowerCase()}`} 
+                  onChange={(value) => {
+                    setCategoryFilter(value || '');
+                    // Note: Category filter may need backend support
+                    // For now, keep client-side filtering for category
+                  }}
+                  value={categoryFilter || undefined}
+                  style={{ width: 150 }} 
+                  allowClear
+                >
                   {[...new Set(safeTechPacks.map(tp => (tp as any).productClass || (tp as any).category || tp.metadata?.category))].filter(Boolean).map((c) => <Option key={c} value={c}>{c}</Option>)}
                 </Select>
-                <Select placeholder={`${t('common.filter')} ${t('techpack.list.season').toLowerCase()}`} onChange={setSeasonFilter} style={{ width: 150 }} allowClear>
+                <Select 
+                  placeholder={`${t('common.filter')} ${t('techpack.list.season').toLowerCase()}`} 
+                  onChange={(value) => {
+                    setSeasonFilter(value || '');
+                    // Note: Season filter may need backend support
+                    // For now, keep client-side filtering for season
+                  }}
+                  value={seasonFilter || undefined}
+                  style={{ width: 150 }} 
+                  allowClear
+                >
                   {[...new Set(safeTechPacks.map(tp => (tp as any).season || tp.metadata?.season))].filter(Boolean).map((s) => <Option key={s} value={s}>{s}</Option>)}
                 </Select>
               </Space>
@@ -293,11 +433,37 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
           pagination={{
             pageSize: 10,
             total: externalPagination?.total ?? filteredTechPacks.length,
-            current: externalPagination?.page ?? 1,
+            // Fix: If no data (total === 0), always show page 1
+            // Also ensure current page doesn't exceed total pages
+            current: (() => {
+              const total = externalPagination?.total ?? filteredTechPacks.length;
+              const requestedPage = externalPagination?.page ?? 1;
+              const totalPages = Math.ceil(total / 10) || 1;
+              
+              if (total === 0 || requestedPage > totalPages) {
+                return 1;
+              }
+              return requestedPage;
+            })(),
             showSizeChanger: true,
-            onChange: (page) => {
+            onChange: (page, pageSize) => {
+              // Reload with correct page and limit
+              // Always send limit parameter to match frontend pageSize
+              if (loadTechPacks) {
+                loadTechPacks({ page, limit: pageSize || 10 }).catch(console.error);
+              }
+              // Notify parent component about page change
               if (onPageChange) {
                 onPageChange(page);
+              }
+            },
+            onShowSizeChange: (current, size) => {
+              // When user changes page size, reload with new limit and reset to page 1
+              if (loadTechPacks) {
+                loadTechPacks({ page: 1, limit: size }).catch(console.error);
+              }
+              if (onPageChange) {
+                onPageChange(1);
               }
             },
           }}
@@ -324,9 +490,9 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
             addTechPackToList(newTechPack);
           }
           
-          loadTechPacks({ page: 1 }).catch(error => {
+          loadTechPacks({ page: 1, limit: 10 }).catch(error => {
             console.error('Failed to refresh techpack list:', error);
-            loadTechPacks().catch(fallbackError => {
+            loadTechPacks({ page: 1, limit: 10 }).catch(fallbackError => {
               console.error('Failed to refresh techpack list (fallback):', fallbackError);
             });
           });

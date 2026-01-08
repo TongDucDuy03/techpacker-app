@@ -1265,7 +1265,19 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
       // This ensures that if a user is revoked from a techpack, it disappears from their list immediately
       setTechPacks(techPacksData);
       
-      setPagination({ total: response.total, page: response.page, totalPages: response.totalPages });
+      // Fix pagination: if no data or page is out of range, reset to page 1
+      const total = response.total || 0;
+      const totalPages = response.totalPages || 1;
+      const requestedPage = response.page || 1;
+      
+      // If no data or requested page is beyond available pages, reset to page 1
+      const currentPage = (total === 0 || requestedPage > totalPages) ? 1 : requestedPage;
+      
+      setPagination({ 
+        total, 
+        page: currentPage, 
+        totalPages: Math.max(1, totalPages) // Ensure at least 1 page
+      });
     } catch (error: any) {
       // If access denied, clear localStorage cache to force fresh fetch
       if (error.response?.status === 403 || error.message?.includes('Access denied')) {
@@ -1351,7 +1363,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     // If user is not authenticated we skip loading to avoid triggering protected API calls
     // that return "Access denied. No token provided." on first render.
     if (auth && !auth.isLoading && auth.isAuthenticated) {
-      loadTechPacks();
+      loadTechPacks({ page: 1, limit: 10 }); // Match frontend pageSize
     }
   }, [loadTechPacks, auth.isLoading, auth.isAuthenticated]);
 
@@ -1365,7 +1377,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           error: (err) => err.message || 'Failed to create tech pack',
         }
       );
-      await loadTechPacks();
+      await loadTechPacks({ page: 1, limit: 10 }); // Match frontend pageSize
       return newTechPack;
     } catch (error) {
       // Error is already handled by showPromise

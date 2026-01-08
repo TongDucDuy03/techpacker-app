@@ -349,6 +349,15 @@ class ApiClient {
   }
 
   // Tech Pack methods
+  async getTechPackStats(): Promise<{ total: number; draft: number; inReview: number; approved: number; rejected: number; archived: number }> {
+    const response = await this.axiosInstance.get<ApiResponse<{ total: number; draft: number; inReview: number; approved: number; rejected: number; archived: number }>>('/techpacks/stats');
+    const stats = response.data?.data;
+    if (!stats) {
+      throw new Error('Invalid tech pack stats response');
+    }
+    return stats;
+  }
+
   async listTechPacks(params: { page?: number; limit?: number; q?: string; status?: string; designer?: string; } = {}): Promise<TechPackListResponse> {
     console.log('📡 API: listTechPacks called with params:', params);
     const response = await this.axiosInstance.get<ApiResponse<ApiTechPack[]>>('/techpacks', { params });

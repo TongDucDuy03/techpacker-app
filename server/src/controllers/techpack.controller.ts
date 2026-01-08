@@ -90,6 +90,7 @@ function mergeSubdocumentArray<T extends { _id?: Types.ObjectId; id?: string }>(
 export class TechPackController {
   constructor() {
     this.checkArticleCode = this.checkArticleCode.bind(this);
+    this.getTechPackStats = this.getTechPackStats.bind(this);
     this.getTechPacks = this.getTechPacks.bind(this);
     this.getTechPack = this.getTechPack.bind(this);
     this.createTechPack = this.createTechPack.bind(this);
@@ -108,6 +109,94 @@ export class TechPackController {
   }
 
 
+  /**
+   * Get TechPack statistics (total count and counts by status)
+   * GET /api/v1/techpacks/stats
+   */
+  async getTechPackStats(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const user = req.user!;
+      
+      // Validate user._id is a valid ObjectId
+      if (!user._id || !Types.ObjectId.isValid(user._id)) {
+        return sendError(res, 'Invalid user ID', 400, 'VALIDATION_ERROR');
+      }
+      
+      const userId = new Types.ObjectId(user._id);
+      const userRole = user.role?.toString().toLowerCase();
+      const isAdmin = userRole === UserRole.Admin?.toString().toLowerCase() || userRole === 'admin';
+      
+      // Build query based on user role (same logic as getTechPacks)
+      let query: any = {};
+      
+      if (isAdmin) {
+        // Admins can view all TechPacks
+        query = {};
+      } else if (userRole === UserRole.Designer?.toString().toLowerCase() || userRole === 'designer') {
+        query.$or = [
+          { createdBy: userId },
+          { 'sharedWith.userId': userId }
+        ];
+      } else if (userRole === UserRole.Viewer?.toString().toLowerCase() || userRole === 'viewer') {
+        query = { 'sharedWith.userId': userId };
+      } else if (userRole === UserRole.Merchandiser?.toString().toLowerCase() || userRole === 'merchandiser') {
+        query.$or = [
+          { createdBy: userId },
+          { 'sharedWith.userId': userId }
+        ];
+      } else {
+        query = { 'sharedWith.userId': userId };
+      }
+      
+      // Exclude archived by default
+      query.status = { $ne: 'Archived' };
+      
+      // Get counts by status using aggregation
+      const stats = await TechPack.aggregate([
+        { $match: query },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+      
+      // Get total count
+      const total = await TechPack.countDocuments(query);
+      
+      // Format stats
+      const statsMap: Record<string, number> = {
+        total,
+        draft: 0,
+        inReview: 0,
+        approved: 0,
+        rejected: 0,
+        archived: 0
+      };
+      
+      stats.forEach((stat: any) => {
+        const status = (stat._id || '').toLowerCase();
+        if (status === 'draft') {
+          statsMap.draft = stat.count;
+        } else if (status === 'pending_approval' || status === 'in review') {
+          statsMap.inReview = stat.count;
+        } else if (status === 'approved') {
+          statsMap.approved = stat.count;
+        } else if (status === 'rejected') {
+          statsMap.rejected = stat.count;
+        } else if (status === 'archived') {
+          statsMap.archived = stat.count;
+        }
+      });
+      
+      sendSuccess(res, statsMap, 'TechPack statistics retrieved successfully');
+    } catch (error: any) {
+      console.error('Get TechPack Stats error:', error);
+      sendError(res, 'Failed to retrieve tech pack statistics');
+    }
+  }
+
   async getTechPacks(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { page = 1, limit = config.defaultPageSize, q = '', status, season, brand, sortBy = 'updatedAt', sortOrder = 'desc' } = req.query;
@@ -122,9 +211,25 @@ export class TechPackController {
       const limitNum = Math.min(config.maxPageSize, Math.max(1, parseInt(limit as string)));
       const skip = (pageNum - 1) * limitNum;
 
-      // Tạo cache key dựa trên query parameters và user ID
+      // Normalize user role for consistent comparison (case-insensitive)
+      const userRole = user.role?.toString().toLowerCase();
+      const isAdmin = userRole === UserRole.Admin?.toString().toLowerCase() || userRole === 'admin';
+      
+      // Debug logging for admin access
+      if (isAdmin) {
+        console.log('[TechPackController] Admin user detected:', {
+          userId: user._id,
+          role: user.role,
+          normalizedRole: userRole,
+          willSeeAllTechPacks: true
+        });
+      }
+      
+      // Tạo cache key dựa trên query parameters, user ID và role
+      // Include role in cache key to ensure admin queries are cached separately
       const queryString = JSON.stringify({
         userId: user._id,
+        role: userRole, // Include role in cache key
         page: pageNum,
         limit: limitNum,
         q,
@@ -136,10 +241,18 @@ export class TechPackController {
       });
       const cacheKey = CacheKeys.techpackList(queryString);
 
-      // Thử lấy từ cache trước
-      const cachedResult = await cacheService.get(cacheKey);
-      if (cachedResult) {
-        return sendSuccess(res, cachedResult, 'TechPacks retrieved from cache');
+      // Check for cache bypass parameter (from frontend _nocache timestamp)
+      const bypassCache = req.query._nocache !== undefined;
+      
+      // Thử lấy từ cache trước (skip if bypass requested)
+      if (!bypassCache) {
+        const cachedResult = await cacheService.get(cacheKey);
+        if (cachedResult) {
+          console.log('[TechPackController] Returning cached result for:', { page: pageNum, cacheKey: cacheKey.substring(0, 50) });
+          return sendSuccess(res, cachedResult, 'TechPacks retrieved from cache');
+        }
+      } else {
+        console.log('[TechPackController] Cache bypassed due to _nocache parameter');
       }
 
       let query: any = {};
@@ -148,19 +261,20 @@ export class TechPackController {
       // Ensure user._id is converted to ObjectId for proper querying
       const userId = new Types.ObjectId(user._id);
       
-      if (user.role === UserRole.Admin) {
+      if (isAdmin) {
         // Admins can view all TechPacks without restriction
+        // Explicitly set empty query to ensure no filtering
         query = {};
-      } else if (user.role === UserRole.Designer) {
+      } else if (userRole === UserRole.Designer?.toString().toLowerCase() || userRole === 'designer') {
         // Designers can see TechPacks they created or are shared with
         query.$or = [
           { createdBy: userId },
           { 'sharedWith.userId': userId }
         ];
-      } else if (user.role === UserRole.Viewer) {
+      } else if (userRole === UserRole.Viewer?.toString().toLowerCase() || userRole === 'viewer') {
         // Viewers can ONLY see TechPacks that are explicitly shared with them
         query = { 'sharedWith.userId': userId };
-      } else if (user.role === UserRole.Merchandiser) {
+      } else if (userRole === UserRole.Merchandiser?.toString().toLowerCase() || userRole === 'merchandiser') {
         // Merchandisers can see TechPacks they created or are shared with
         query.$or = [
           { createdBy: userId },
@@ -172,23 +286,67 @@ export class TechPackController {
       }
 
       // Additional search and filter criteria
-      const filterQuery: any = {};
+      // Build filter conditions separately to combine properly
+      const filterConditions: any = {};
+      
+      // Status filter - exclude archived by default unless explicitly requested
+      if (status) {
+        filterConditions.status = status;
+      } else {
+        filterConditions.status = { $ne: 'Archived' };
+      }
+
+      if (season) filterConditions.season = season;
+      if (brand) filterConditions.brand = brand;
+
+      // Search query - handle $or properly when combining with access control query
       if (q) {
         const searchRegex = { $regex: q, $options: 'i' };
-        filterQuery.$or = [{ articleName: searchRegex }, { articleCode: searchRegex }, { supplier: searchRegex }];
-      }
-
-      if (status) {
-        filterQuery.status = status;
+        const searchConditions = [
+          { articleName: searchRegex }, 
+          { articleCode: searchRegex }, 
+          { supplier: searchRegex }
+        ];
+        
+        // If access control query already has $or, we need to combine properly using $and
+        if (query.$or) {
+          // Access control has $or (e.g., Designer can see own or shared)
+          // Need to combine: (access control) AND (search) AND (other filters)
+          const andConditions: any[] = [
+            query, // Access control: { $or: [...] }
+            { $or: searchConditions } // Search: { $or: [...] }
+          ];
+          
+          // Add other filter conditions
+          if (Object.keys(filterConditions).length > 0) {
+            andConditions.push(filterConditions);
+          }
+          
+          query = { $and: andConditions };
+        } else {
+          // No $or in access control (admin or simple query)
+          // Can combine directly: access control AND search AND filters
+          filterConditions.$or = searchConditions;
+          query = { ...query, ...filterConditions };
+        }
       } else {
-        filterQuery.status = { $ne: 'Archived' };
+        // No search, just combine access control with filters
+        query = { ...query, ...filterConditions };
       }
-
-      if (season) filterQuery.season = season;
-      if (brand) filterQuery.brand = brand;
-
-      // Combine access control query with filter query
-      query = { ...query, ...filterQuery };
+      
+      // Debug logging for admin queries
+      if (isAdmin) {
+        console.log('[TechPackController] Admin query:', {
+          page: pageNum,
+          limit: limitNum,
+          skip,
+          accessControlQuery: isAdmin ? '{} (all techpacks)' : (query.$or ? 'has $or' : query),
+          filterConditions,
+          finalQuery: JSON.stringify(query, null, 2),
+          hasAnd: !!query.$and,
+          hasOr: !!query.$or
+        });
+      }
 
       const sortOptions: any = { [sortBy as string]: sortOrder === 'asc' ? 1 : -1 };
 
@@ -208,6 +366,33 @@ export class TechPackController {
 
       const pagination = { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) };
       const result = { data: techpacks, pagination };
+      
+      // Debug logging for all queries (not just admin) to help diagnose pagination issues
+      console.log('[TechPackController] Query results:', {
+        userId: user._id,
+        role: userRole,
+        isAdmin,
+        page: pageNum,
+        limit: limitNum,
+        skip,
+        totalTechPacks: total,
+        returnedTechPacks: techpacks.length,
+        totalPages: pagination.totalPages,
+        queryKeys: Object.keys(query),
+        hasAnd: !!query.$and,
+        hasOr: !!query.$or,
+        querySummary: JSON.stringify(query).substring(0, 200) // First 200 chars of query
+      });
+      
+      // Additional debug for admin
+      if (isAdmin) {
+        console.log('[TechPackController] Admin detailed query:', {
+          fullQuery: JSON.stringify(query, null, 2),
+          expectedTotal: total,
+          actualReturned: techpacks.length,
+          shouldReturn: Math.min(limitNum, total - skip)
+        });
+      }
 
       // Lưu kết quả vào cache với TTL ngắn (5 phút)
       await cacheService.set(cacheKey, result, CacheTTL.SHORT);

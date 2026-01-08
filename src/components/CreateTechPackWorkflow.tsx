@@ -98,10 +98,10 @@ const CreateTechPackWorkflowComponent: React.FC<CreateTechPackWorkflowProps> = (
       // Refresh the techpack list from server to ensure consistency
       // This will run in background and update the list with server data
       // The optimistic update above ensures user sees the new techpack immediately
-      loadTechPacks({ page: 1 }).catch(error => {
+      loadTechPacks({ page: 1, limit: 10 }).catch(error => {
         console.error('Failed to refresh techpack list:', error);
-        // Fallback: try reloading without params
-        loadTechPacks().catch(fallbackError => {
+        // Fallback: try reloading with default params
+        loadTechPacks({ page: 1, limit: 10 }).catch(fallbackError => {
           console.error('Failed to refresh techpack list (fallback):', fallbackError);
         });
       });

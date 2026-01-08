@@ -192,7 +192,7 @@ function AppContent() {
     if (context?.loadTechPacks) {
       try {
         const pageToLoad = savedPage ?? pagination?.page ?? 1;
-        await context.loadTechPacks({ page: pageToLoad });
+        await context.loadTechPacks({ page: pageToLoad, limit: 10 }); // Match frontend pageSize
         // Reset savedPage sau khi đã load
         setSavedPage(null);
       } catch (error) {
@@ -233,7 +233,7 @@ function AppContent() {
             pagination={pagination}
             onPageChange={(page) => {
               if (context?.loadTechPacks) {
-                context.loadTechPacks({ page });
+                context.loadTechPacks({ page, limit: 10 }); // Match frontend pageSize
               }
             }}
           />
@@ -297,7 +297,7 @@ function AppContent() {
             pagination={pagination}
             onPageChange={(page) => {
               if (context?.loadTechPacks) {
-                context.loadTechPacks({ page });
+                context.loadTechPacks({ page, limit: 10 }); // Match frontend pageSize
               }
             }}
           />

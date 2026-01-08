@@ -406,6 +406,17 @@ const revokeValidation = [
 router.get('/check-article-code/:articleCode', requireAuth, techpackController.checkArticleCode);
 
 /**
+ * @route GET /api/techpacks/stats
+ * @desc Get TechPack statistics (total and counts by status)
+ * @access Private (All authenticated users can view)
+ */
+router.get(
+  '/stats',
+  requireAuth,
+  techpackController.getTechPackStats
+);
+
+/**
  * @route GET /api/techpacks
  * @desc Get all TechPacks with pagination, search, and filters
  * @access Private (All authenticated users can view)
