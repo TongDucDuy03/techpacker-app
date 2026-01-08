@@ -463,41 +463,34 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
             })(),
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'], // Available page size options
-            onChange: (page) => {
-              // onChange is called when page number changes
-              // Use pageSizeRef to get the most up-to-date value
-              if (loadTechPacks) {
-                loadTechPacks({ page, limit: pageSizeRef.current }).catch(console.error);
+            onChange: (page, newPageSize) => {
+              // onChange is called when page number changes OR when page size changes
+              // newPageSize will be provided when size changes, otherwise undefined
+              const effectivePageSize = newPageSize || pageSizeRef.current;
+              
+              // Update ref if page size changed
+              if (newPageSize && newPageSize !== pageSizeRef.current) {
+                pageSizeRef.current = newPageSize;
+                setPageSize(newPageSize);
               }
+              
+              // Load data with correct page and size
+              if (loadTechPacks) {
+                loadTechPacks({ page, limit: effectivePageSize }).catch(console.error);
+              }
+              
               // Notify parent component about page change
               if (onPageChange) {
                 onPageChange(page);
               }
             },
             onShowSizeChange: (current, size) => {
-              // onShowSizeChange is called when user changes page size from dropdown
-              // Update both state and ref immediately (ref update is synchronous)
-              pageSizeRef.current = size; // Update ref first (synchronous)
-              setPageSize(size); // Update state (async, but ref is already updated)
-              
-              // When user changes page size, reload with new limit and reset to page 1
-              // Use the new 'size' parameter directly to ensure correct value
-              if (loadTechPacks) {
-                console.log('[TechPackList] Changing page size:', { 
-                  from: pageSize, 
-                  to: size, 
-                  currentPage: current,
-                  willLoadWithLimit: size,
-                  refUpdated: pageSizeRef.current
-                });
-                // Use size parameter directly (not from state, state update is async)
-                loadTechPacks({ page: 1, limit: size }).catch(error => {
-                  console.error('Failed to reload techpacks with new page size:', error);
-                });
-              }
-              if (onPageChange) {
-                onPageChange(1);
-              }
+              // onShowSizeChange is also called, but we handle everything in onChange
+              // Just update the ref and state here to keep them in sync
+              pageSizeRef.current = size;
+              setPageSize(size);
+              // Note: onChange will be called automatically by Ant Design Table after this
+              // so we don't need to call loadTechPacks here (would cause double-load)
             },
           }}
           onRow={(record) => ({
