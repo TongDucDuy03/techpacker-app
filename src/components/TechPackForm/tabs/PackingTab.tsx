@@ -1,10 +1,85 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import Quill from 'quill';
 import { ApiTechPack, TechPack } from '../../../types/techpack';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Info } from 'lucide-react';
 import { useI18n } from '../../../lib/i18n';
+
+// Import Clipboard and Delta for custom plain text paste handler
+const Clipboard: any = Quill.import('modules/clipboard');
+const Delta: any = Quill.import('delta');
+
+// Track if paste handler is currently processing to prevent duplicate execution
+// Use WeakMap to track per-instance to avoid conflicts between multiple editors
+const pasteInProgress = new WeakMap<any, boolean>();
+
+// Custom clipboard class that forces plain text paste only
+// This prevents any HTML formatting, boxes, or duplicate content
+class PlainTextClipboard extends Clipboard {
+  onPaste(e: ClipboardEvent) {
+    // Check if paste is already in progress for this Quill instance
+    if (pasteInProgress.get(this.quill)) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      return false;
+    }
+
+    if (!e || !e.clipboardData) {
+      // Fallback to default if clipboard data unavailable
+      return super.onPaste(e);
+    }
+
+    // Mark as processing for this instance
+    pasteInProgress.set(this.quill, true);
+
+    try {
+      // Prevent default paste behavior completely
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      // Get plain text only - no HTML, no formatting
+      const text = e.clipboardData.getData('text/plain') || '';
+      
+      if (!text.trim()) {
+        pasteInProgress.delete(this.quill);
+        return false;
+      }
+
+      // Get current selection
+      const range = this.quill.getSelection(true);
+      const index = range ? range.index : this.quill.getLength();
+      const length = range ? range.length : 0;
+
+      // Insert plain text only - no formatting attributes
+      const delta = new Delta()
+        .retain(index)
+        .delete(length)
+        .insert(text);
+
+      // Use 'user' source but ensure it only fires once
+      this.quill.updateContents(delta, 'user');
+      this.quill.setSelection(index + text.length, 0, 'silent');
+      
+      // Clear the flag after a short delay to allow the operation to complete
+      setTimeout(() => {
+        pasteInProgress.delete(this.quill);
+      }, 100);
+      
+      return false; // Prevent further processing
+    } catch (error) {
+      pasteInProgress.delete(this.quill);
+      console.error('Paste error:', error);
+      return false;
+    }
+  }
+}
+
+// Register custom clipboard globally
+Quill.register('modules/clipboard', PlainTextClipboard, true);
 
 interface PackingTabProps {
   techPack: TechPack;

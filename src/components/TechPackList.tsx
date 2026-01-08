@@ -236,11 +236,11 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
         const canEditThis = canEditTechPack(record);
         const canDeleteThis = canDeleteTechPack(record);
         return (
-          <Space className="action-buttons">
+        <Space className="action-buttons">
             <Tooltip title={t('techpack.list.action.view')}><Button icon={<EyeOutlined />} onClick={() => onViewTechPack?.(record)} /></Tooltip>
             {canEditThis && <Tooltip title={t('techpack.list.action.edit')}><Button icon={<EditOutlined />} onClick={() => onEditTechPack?.(record)} /></Tooltip>}
             {canDeleteThis && <Tooltip title={t('techpack.list.action.delete')}><Button icon={<DeleteOutlined />} danger onClick={() => showDeleteConfirm(record._id)} /></Tooltip>}
-          </Space>
+        </Space>
         );
       },
     },

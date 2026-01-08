@@ -396,7 +396,7 @@ export class TechPackController {
       } else if (currentUser.role === UserRole.Viewer) {
         // Viewer CHỈ xem được nếu được share (KHÔNG xem ngay cả khi là owner)
         if (!isSharedWith) {
-          return sendError(res, 'Access denied', 403, 'FORBIDDEN');
+        return sendError(res, 'Access denied', 403, 'FORBIDDEN');
         }
       } else {
         // Designer, Merchandiser: xem nếu là owner hoặc được share
@@ -1374,7 +1374,7 @@ export class TechPackController {
         
         if (targetLevel > sharerLevel) {
           return sendError(res, `Cannot share with a role higher than your current access level (${sharerTechPackRole}).`, 403, 'FORBIDDEN');
-        }
+      }
       }
 
       // Prevent sharing with system admin removed; technicalDesignerId is now free text and not linked to users

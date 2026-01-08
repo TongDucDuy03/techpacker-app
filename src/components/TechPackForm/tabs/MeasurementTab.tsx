@@ -34,7 +34,83 @@ interface ProgressionValidation {
   errors: string[];
   warnings: string[];
 }
+// Register image uploader
 Quill.register('modules/imageUploader', ImageUploader);
+
+// Import Clipboard and Delta for custom plain text paste handler
+const Clipboard: any = Quill.import('modules/clipboard');
+const Delta: any = Quill.import('delta');
+
+// Track if paste handler is currently processing to prevent duplicate execution
+// Use WeakMap to track per-instance to avoid conflicts between multiple editors
+const pasteInProgress = new WeakMap<any, boolean>();
+
+// Custom clipboard class that forces plain text paste only
+// This prevents any HTML formatting, boxes, or duplicate content
+class PlainTextClipboard extends Clipboard {
+  onPaste(e: ClipboardEvent) {
+    // Check if paste is already in progress for this Quill instance
+    if (pasteInProgress.get(this.quill)) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      return false;
+    }
+
+    if (!e || !e.clipboardData) {
+      // Fallback to default if clipboard data unavailable
+      return super.onPaste(e);
+    }
+
+    // Mark as processing for this instance
+    pasteInProgress.set(this.quill, true);
+
+    try {
+      // Prevent default paste behavior completely
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      // Get plain text only - no HTML, no formatting
+      const text = e.clipboardData.getData('text/plain') || '';
+      
+      if (!text.trim()) {
+        pasteInProgress.delete(this.quill);
+        return false;
+      }
+
+      // Get current selection
+      const range = this.quill.getSelection(true);
+      const index = range ? range.index : this.quill.getLength();
+      const length = range ? range.length : 0;
+
+      // Insert plain text only - no formatting attributes
+      const delta = new Delta()
+        .retain(index)
+        .delete(length)
+        .insert(text);
+
+      // Use 'user' source but ensure it only fires once
+      this.quill.updateContents(delta, 'user');
+      this.quill.setSelection(index + text.length, 0, 'silent');
+      
+      // Clear the flag after a short delay to allow the operation to complete
+      setTimeout(() => {
+        pasteInProgress.delete(this.quill);
+      }, 100);
+      
+      return false; // Prevent further processing
+    } catch (error) {
+      pasteInProgress.delete(this.quill);
+      console.error('Paste error:', error);
+      return false;
+    }
+  }
+}
+
+// Register custom clipboard globally
+Quill.register('modules/clipboard', PlainTextClipboard, true);
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
 const API_UPLOAD_BASE = API_BASE_URL.replace(/\/api\/v1$/, '');
 const sampleRoundQuillModules = {
@@ -473,15 +549,77 @@ type RoundModalFormState = {
     return undefined;
   }, []);
 
+  // Normalize Quill content to remove duplicate blocks/paragraphs
+  const normalizeQuillContent = useCallback((content: string): string => {
+    if (!content || content === '<p><br></p>' || content === '<p></p>') {
+      return '';
+    }
+
+    // Parse HTML content
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(content, 'text/html');
+    const body = doc.body;
+
+    // Extract all paragraphs/blocks with their HTML structure
+    const blocks = Array.from(body.childNodes);
+    const blockContents: { text: string; html: string }[] = [];
+
+    blocks.forEach(block => {
+      if (block.nodeType === Node.ELEMENT_NODE) {
+        const element = block as Element;
+        const text = element.textContent?.trim() || '';
+        if (text) {
+          blockContents.push({
+            text,
+            html: element.outerHTML
+          });
+        }
+      } else if (block.nodeType === Node.TEXT_NODE) {
+        const text = block.textContent?.trim() || '';
+        if (text) {
+          blockContents.push({
+            text,
+            html: `<p>${text}</p>`
+          });
+        }
+      }
+    });
+
+    // Remove duplicates - keep only first occurrence of each unique text
+    const seenTexts = new Set<string>();
+    const uniqueBlocks: string[] = [];
+
+    for (const block of blockContents) {
+      if (!seenTexts.has(block.text)) {
+        seenTexts.add(block.text);
+        uniqueBlocks.push(block.html);
+      }
+    }
+
+    // If duplicates were found, return normalized content
+    if (uniqueBlocks.length < blockContents.length) {
+      return uniqueBlocks.join('');
+    }
+
+    // If no duplicates, return original content
+    return content;
+  }, []);
+
   const handleRoundFieldChange = useCallback(
     (roundId: string, field: keyof MeasurementSampleRound, value: string) => {
       if (!isEditableRound(roundId)) {
         showWarning(previousRoundEditWarning);
         return;
       }
-      updateSampleMeasurementRound?.(roundId, { [field]: value } as Partial<MeasurementSampleRound>);
+      
+      // Normalize content for overallComments field to remove duplicates
+      const normalizedValue = field === 'overallComments' 
+        ? normalizeQuillContent(value) 
+        : value;
+      
+      updateSampleMeasurementRound?.(roundId, { [field]: normalizedValue } as Partial<MeasurementSampleRound>);
     },
-    [isEditableRound, previousRoundEditWarning, showWarning, updateSampleMeasurementRound]
+    [isEditableRound, previousRoundEditWarning, showWarning, updateSampleMeasurementRound, normalizeQuillContent]
   );
 
   const handleRoundFormFieldChange = useCallback((field: keyof RoundModalFormState, value: string) => {
