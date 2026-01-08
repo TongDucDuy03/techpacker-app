@@ -67,8 +67,23 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
   const [seasonFilter, setSeasonFilter] = useState('');
   const [showCreateWorkflow, setShowCreateWorkflow] = useState(false);
   const [stats, setStats] = useState<{ total: number; draft: number; inReview: number; approved: number } | null>(null);
+  const [pageSize, setPageSize] = useState(10); // Track current page size
+  const pageSizeRef = React.useRef(10); // Use ref to track pageSize for immediate access
 
   const safeTechPacks = Array.isArray(techPacks) ? techPacks : [];
+  
+  // Sync ref with state
+  React.useEffect(() => {
+    pageSizeRef.current = pageSize;
+  }, [pageSize]);
+
+  // Sync pageSize with limit from pagination if available
+  useEffect(() => {
+    // If we have external pagination, try to infer page size from totalPages and total
+    // Or we can check if there's a limit in the pagination response
+    // For now, we'll keep the default 10 and let user change it
+    // The pageSize will be updated when user changes it via dropdown
+  }, [externalPagination]);
 
   // Load stats from server when component mounts or pagination changes
   useEffect(() => {
@@ -99,7 +114,7 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
       // Reload with debounced search term
       const params: any = {
         page: 1,
-        limit: 10, // Match frontend pageSize
+        limit: pageSizeRef.current, // Use current pageSize from ref (always up-to-date)
         q: debouncedSearchTerm || undefined,
         status: statusFilter || undefined, // Include current status filter
       };
@@ -157,7 +172,7 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
   };
   
   // Helper function to check if user can delete a specific techpack
-  const canDeleteTechPack = (techpack: ApiTechPack): boolean => {
+  const canDeleteTechPack = (_techpack: ApiTechPack): boolean => {
     // Only global admin can delete
     return user?.role === 'admin';
   };
@@ -360,7 +375,7 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
                     setSearchTerm(value);
                     // Reload from server with search term when using server-side pagination
                     if (externalPagination && loadTechPacks) {
-                      loadTechPacks({ page: 1, limit: 10, q: value || undefined }).catch(console.error);
+                      loadTechPacks({ page: 1, limit: pageSizeRef.current, q: value || undefined }).catch(console.error);
                       if (onPageChange) onPageChange(1);
                     }
                   }}
@@ -379,7 +394,7 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
                     setStatusFilter(value || '');
                     // Reload from server with status filter when using server-side pagination
                     if (externalPagination && loadTechPacks) {
-                      loadTechPacks({ page: 1, limit: 10, status: value || undefined }).catch(console.error);
+                      loadTechPacks({ page: 1, limit: pageSizeRef.current, status: value || undefined }).catch(console.error);
                       if (onPageChange) onPageChange(1);
                     }
                   }}
@@ -431,14 +446,15 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
           dataSource={filteredTechPacks}
           rowKey="_id"
           pagination={{
-            pageSize: 10,
+            pageSize: pageSize, // Use state instead of hardcoded 10
             total: externalPagination?.total ?? filteredTechPacks.length,
             // Fix: If no data (total === 0), always show page 1
             // Also ensure current page doesn't exceed total pages
             current: (() => {
               const total = externalPagination?.total ?? filteredTechPacks.length;
               const requestedPage = externalPagination?.page ?? 1;
-              const totalPages = Math.ceil(total / 10) || 1;
+              // Use totalPages from server if available, otherwise calculate
+              const totalPages = (externalPagination?.totalPages ?? Math.ceil(total / pageSize)) || 1;
               
               if (total === 0 || requestedPage > totalPages) {
                 return 1;
@@ -446,11 +462,12 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
               return requestedPage;
             })(),
             showSizeChanger: true,
-            onChange: (page, pageSize) => {
-              // Reload with correct page and limit
-              // Always send limit parameter to match frontend pageSize
+            pageSizeOptions: ['10', '20', '50', '100'], // Available page size options
+            onChange: (page) => {
+              // onChange is called when page number changes
+              // Use pageSizeRef to get the most up-to-date value
               if (loadTechPacks) {
-                loadTechPacks({ page, limit: pageSize || 10 }).catch(console.error);
+                loadTechPacks({ page, limit: pageSizeRef.current }).catch(console.error);
               }
               // Notify parent component about page change
               if (onPageChange) {
@@ -458,9 +475,25 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
               }
             },
             onShowSizeChange: (current, size) => {
+              // onShowSizeChange is called when user changes page size from dropdown
+              // Update both state and ref immediately (ref update is synchronous)
+              pageSizeRef.current = size; // Update ref first (synchronous)
+              setPageSize(size); // Update state (async, but ref is already updated)
+              
               // When user changes page size, reload with new limit and reset to page 1
+              // Use the new 'size' parameter directly to ensure correct value
               if (loadTechPacks) {
-                loadTechPacks({ page: 1, limit: size }).catch(console.error);
+                console.log('[TechPackList] Changing page size:', { 
+                  from: pageSize, 
+                  to: size, 
+                  currentPage: current,
+                  willLoadWithLimit: size,
+                  refUpdated: pageSizeRef.current
+                });
+                // Use size parameter directly (not from state, state update is async)
+                loadTechPacks({ page: 1, limit: size }).catch(error => {
+                  console.error('Failed to reload techpacks with new page size:', error);
+                });
               }
               if (onPageChange) {
                 onPageChange(1);
