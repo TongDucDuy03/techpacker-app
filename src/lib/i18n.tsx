@@ -47,6 +47,7 @@ const translations: Record<LanguageCode, TranslationDict> = {
     'form.requiredInformation': 'Main Information',
     'form.productDetails': 'Own the product',
     'form.additionalInformation': 'Additional Information',
+    'form.completion': 'Completion',
 
     'materials.bom': 'Bill of Materials',
     'materials.addRow': 'Add Row',

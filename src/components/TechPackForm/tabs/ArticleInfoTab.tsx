@@ -1313,13 +1313,14 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
             {mode !== 'view' && (
               <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
                 <div className="flex items-center space-x-4">
-                  <button
+                  {/* Hidden: Reset button */}
+                  {/* <button
                     onClick={handleReset}
                     className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
                     <RotateCcw className="w-4 h-4 mr-2" />
                     {t('common.reset')}
-                  </button>
+                  </button> */}
 
                   <button
                     onClick={handleSave}
@@ -1432,10 +1433,11 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                   <Calendar className="w-3 h-3 mr-1" />
                   {t('form.created')}: {safeArticleInfo.createdDate ? new Date(safeArticleInfo.createdDate).toLocaleDateString() : t('common.n/a')}
                 </div>
-                <div className="flex items-center">
+                {/* Hidden: Designer info */}
+                {/* <div className="flex items-center">
                   <User className="w-3 h-3 mr-1" />
                   {t('form.preview.designer')}: {designers.find(d => d.value === safeArticleInfo.technicalDesignerId)?.label || t('form.preview.notAssigned')}
-                </div>
+                </div> */}
               </div>
             </div>
           </div>
