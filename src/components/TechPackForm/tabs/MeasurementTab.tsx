@@ -241,8 +241,15 @@ const MeasurementTab: React.FC = () => {
   const [pendingBaseSize, setPendingBaseSize] = useState<string | null>(null);
   const [showBaseSizeConfirm, setShowBaseSizeConfirm] = useState(false);
   const measurementUnitOptions = useMemo(
-    () => MEASUREMENT_UNITS.map(unit => ({ value: unit.value, label: unit.label })),
-    []
+    () => MEASUREMENT_UNITS.map(unit => ({ 
+      value: unit.value, 
+      label: unit.value === 'mm' ? t('option.measurementUnit.mm') :
+             unit.value === 'cm' ? t('option.measurementUnit.cm') :
+             unit.value === 'inch-10' ? t('option.measurementUnit.inch10') :
+             unit.value === 'inch-16' ? t('option.measurementUnit.inch16') :
+             unit.value === 'inch-32' ? t('option.measurementUnit.inch32') : unit.label
+    })),
+    [t]
   );
 
   const configuredSizeRange = state?.techpack?.measurementSizeRange;
@@ -1663,7 +1670,7 @@ type RoundModalFormState = {
               >
                 {SIZE_PRESET_OPTIONS.map(preset => (
                   <option key={preset.id} value={preset.id}>
-                    {preset.label}
+                    {t(preset.labelKey)}
                   </option>
                 ))}
               </select>

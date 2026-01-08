@@ -744,6 +744,63 @@ const translations: Record<LanguageCode, TranslationDict> = {
     'admin.role.merchandiser': 'Merchandiser',
     'admin.role.factory': 'Factory',
 
+    // Options - Gender
+    'option.gender.men': 'Men',
+    'option.gender.women': 'Women',
+    'option.gender.unisex': 'Unisex',
+    'option.gender.kids': 'Kids',
+
+    // Options - Fit Type
+    'option.fitType.regular': 'Regular Fit',
+    'option.fitType.slim': 'Slim Fit',
+    'option.fitType.loose': 'Loose Fit',
+    'option.fitType.relaxed': 'Relaxed Fit',
+    'option.fitType.oversized': 'Oversized',
+
+    // Options - Lifecycle Stage
+    'option.lifecycle.concept': 'Concept',
+    'option.lifecycle.design': 'Design',
+    'option.lifecycle.development': 'Development',
+    'option.lifecycle.preProduction': 'Pre-production',
+    'option.lifecycle.production': 'Production',
+    'option.lifecycle.shipped': 'Shipped',
+
+    // Options - Price Point
+    'option.pricePoint.value': 'Value',
+    'option.pricePoint.midRange': 'Mid-range',
+    'option.pricePoint.premium': 'Premium',
+    'option.pricePoint.luxury': 'Luxury',
+
+    // Options - Status
+    'option.status.draft': 'Draft',
+    'option.status.inReview': 'In Review',
+    'option.status.approved': 'Approved',
+    'option.status.rejected': 'Rejected',
+    'option.status.archived': 'Archived',
+
+    // Options - Currency
+    'option.currency.usd': 'USD - US Dollar',
+    'option.currency.eur': 'EUR - Euro',
+    'option.currency.gbp': 'GBP - British Pound',
+    'option.currency.jpy': 'JPY - Japanese Yen',
+    'option.currency.cny': 'CNY - Chinese Yuan',
+    'option.currency.vnd': 'VND - Vietnamese Dong',
+
+    // Options - Size Presets
+    'option.sizePreset.standardUsAlpha': 'Standard US (Alpha)',
+    'option.sizePreset.standardUsNumeric': 'Standard US (Numeric)',
+    'option.sizePreset.standardEuNumeric': 'Standard EU (32-48)',
+    'option.sizePreset.extendedPlus': 'Extended Plus (1X-5X)',
+    'option.sizePreset.kidsUs': 'Kids US (2-16)',
+    'option.sizePreset.customBlank': 'Custom (Blank)',
+
+    // Options - Measurement Units
+    'option.measurementUnit.mm': 'Millimeters (mm)',
+    'option.measurementUnit.cm': 'Centimeters (cm)',
+    'option.measurementUnit.inch10': 'Inch 10',
+    'option.measurementUnit.inch16': 'Inch 16',
+    'option.measurementUnit.inch32': 'Inch 32',
+
     // Validation messages
     'validation.required': 'Trường này là bắt buộc',
     'validation.fieldRequired': '{{field}} là bắt buộc',
@@ -1592,6 +1649,63 @@ const translations: Record<LanguageCode, TranslationDict> = {
     'admin.role.viewer': 'Người xem',
     'admin.role.merchandiser': 'Merchandiser',
     'admin.role.factory': 'Nhà máy',
+
+    // Options - Gender
+    'option.gender.men': 'Nam',
+    'option.gender.women': 'Nữ',
+    'option.gender.unisex': 'Unisex',
+    'option.gender.kids': 'Trẻ em',
+
+    // Options - Fit Type
+    'option.fitType.regular': 'Vừa vặn cơ bản',
+    'option.fitType.slim': 'Ôm dáng',
+    'option.fitType.loose': 'Rộng rãi',
+    'option.fitType.relaxed': 'Thoải mái',
+    'option.fitType.oversized': 'Oversize',
+
+    // Options - Lifecycle Stage
+    'option.lifecycle.concept': 'Ý tưởng',
+    'option.lifecycle.design': 'Thiết kế',
+    'option.lifecycle.development': 'Phát triển',
+    'option.lifecycle.preProduction': 'Trước sản xuất',
+    'option.lifecycle.production': 'Sản xuất',
+    'option.lifecycle.shipped': 'Đã giao hàng',
+
+    // Options - Price Point
+    'option.pricePoint.value': 'Giá trị',
+    'option.pricePoint.midRange': 'Tầm trung',
+    'option.pricePoint.premium': 'Cao cấp',
+    'option.pricePoint.luxury': 'Sang trọng',
+
+    // Options - Status
+    'option.status.draft': 'Nháp',
+    'option.status.inReview': 'Đang duyệt',
+    'option.status.approved': 'Đã duyệt',
+    'option.status.rejected': 'Từ chối',
+    'option.status.archived': 'Đã lưu trữ',
+
+    // Options - Currency
+    'option.currency.usd': 'USD - Đô la Mỹ',
+    'option.currency.eur': 'EUR - Euro',
+    'option.currency.gbp': 'GBP - Bảng Anh',
+    'option.currency.jpy': 'JPY - Yên Nhật',
+    'option.currency.cny': 'CNY - Nhân dân tệ',
+    'option.currency.vnd': 'VND - Việt Nam Đồng',
+
+    // Options - Size Presets
+    'option.sizePreset.standardUsAlpha': 'Chuẩn Mỹ (Chữ)',
+    'option.sizePreset.standardUsNumeric': 'Chuẩn Mỹ (Số)',
+    'option.sizePreset.standardEuNumeric': 'Chuẩn EU (32-48)',
+    'option.sizePreset.extendedPlus': 'Size lớn (1X-5X)',
+    'option.sizePreset.kidsUs': 'Trẻ em Mỹ (2-16)',
+    'option.sizePreset.customBlank': 'Tùy chỉnh (Trống)',
+
+    // Options - Measurement Units
+    'option.measurementUnit.mm': 'Milimet (mm)',
+    'option.measurementUnit.cm': 'Xentimet (cm)',
+    'option.measurementUnit.inch10': 'Inch 10',
+    'option.measurementUnit.inch16': 'Inch 16',
+    'option.measurementUnit.inch32': 'Inch 32',
 
     // Validation messages
     'validation.required': 'Trường này là bắt buộc',

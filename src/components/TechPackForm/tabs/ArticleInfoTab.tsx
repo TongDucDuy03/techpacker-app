@@ -151,19 +151,19 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
 
   // Gender options
   const genderOptions = [
-    { value: 'Men', label: 'Men' },
-    { value: 'Women', label: 'Women' },
-    { value: 'Unisex', label: 'Unisex' },
-    { value: 'Kids', label: 'Kids' }
+    { value: 'Men', label: t('option.gender.men') },
+    { value: 'Women', label: t('option.gender.women') },
+    { value: 'Unisex', label: t('option.gender.unisex') },
+    { value: 'Kids', label: t('option.gender.kids') }
   ];
 
   // Fit type options
   const fitTypeOptions = [
-    { value: 'Regular', label: 'Regular Fit' },
-    { value: 'Slim', label: 'Slim Fit' },
-    { value: 'Loose', label: 'Loose Fit' },
-    { value: 'Relaxed', label: 'Relaxed Fit' },
-    { value: 'Oversized', label: 'Oversized' }
+    { value: 'Regular', label: t('option.fitType.regular') },
+    { value: 'Slim', label: t('option.fitType.slim') },
+    { value: 'Loose', label: t('option.fitType.loose') },
+    { value: 'Relaxed', label: t('option.fitType.relaxed') },
+    { value: 'Oversized', label: t('option.fitType.oversized') }
   ];
 
   const { seasonSuggestions, addSeasonSuggestion } = useSeasonSuggestions();
@@ -179,12 +179,12 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
 
   // Lifecycle stage options
   const lifecycleOptions = [
-    { value: 'Concept', label: 'Concept' },
-    { value: 'Design', label: 'Design' },
-    { value: 'Development', label: 'Development' },
-    { value: 'Pre-production', label: 'Pre-production' },
-    { value: 'Production', label: 'Production' },
-    { value: 'Shipped', label: 'Shipped' }
+    { value: 'Concept', label: t('option.lifecycle.concept') },
+    { value: 'Design', label: t('option.lifecycle.design') },
+    { value: 'Development', label: t('option.lifecycle.development') },
+    { value: 'Pre-production', label: t('option.lifecycle.preProduction') },
+    { value: 'Production', label: t('option.lifecycle.production') },
+    { value: 'Shipped', label: t('option.lifecycle.shipped') }
   ];
 
   // Product class options
@@ -192,29 +192,29 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
 
   // Price point options
   const pricePointOptions = [
-    { value: 'Value', label: 'Value' },
-    { value: 'Mid-range', label: 'Mid-range' },
-    { value: 'Premium', label: 'Premium' },
-    { value: 'Luxury', label: 'Luxury' }
+    { value: 'Value', label: t('option.pricePoint.value') },
+    { value: 'Mid-range', label: t('option.pricePoint.midRange') },
+    { value: 'Premium', label: t('option.pricePoint.premium') },
+    { value: 'Luxury', label: t('option.pricePoint.luxury') }
   ];
 
   // Status options (matching backend enum)
   const statusOptions: Array<{ value: TechPackStatus; label: string }> = [
-    { value: 'Draft', label: 'Draft' },
-    { value: 'In Review', label: 'In Review' },
-    { value: 'Approved', label: 'Approved' },
-    { value: 'Rejected', label: 'Rejected' },
-    { value: 'Archived', label: 'Archived' }
+    { value: 'Draft', label: t('option.status.draft') },
+    { value: 'In Review', label: t('option.status.inReview') },
+    { value: 'Approved', label: t('option.status.approved') },
+    { value: 'Rejected', label: t('option.status.rejected') },
+    { value: 'Archived', label: t('option.status.archived') }
   ];
 
   // Currency options
   const currencyOptions = [
-    { value: 'USD', label: 'USD - US Dollar' },
-    { value: 'EUR', label: 'EUR - Euro' },
-    { value: 'GBP', label: 'GBP - British Pound' },
-    { value: 'JPY', label: 'JPY - Japanese Yen' },
-    { value: 'CNY', label: 'CNY - Chinese Yuan' },
-    { value: 'VND', label: 'VND - Vietnamese Dong' }
+    { value: 'USD', label: t('option.currency.usd') },
+    { value: 'EUR', label: t('option.currency.eur') },
+    { value: 'GBP', label: t('option.currency.gbp') },
+    { value: 'JPY', label: t('option.currency.jpy') },
+    { value: 'CNY', label: t('option.currency.cny') },
+    { value: 'VND', label: t('option.currency.vnd') }
   ];
 
   const handleInputChange = (field: keyof ArticleInfo) => (value: string | number) => {
