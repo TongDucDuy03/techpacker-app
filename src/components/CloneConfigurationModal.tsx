@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal, Form, Input, Checkbox, Typography, Space, Card, Row, Col, Button, Divider } from 'antd';
 import { CopyOutlined, InfoCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { ApiTechPack } from '../types/techpack.types';
+import { useI18n } from '../lib/i18n';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -21,41 +22,41 @@ export interface CloneConfiguration {
   copySections: string[];
 }
 
-const COPY_SECTIONS = [
+const getCopySections = (t: (key: string) => string) => [
   {
     key: 'ArticleInfo',
-    label: 'Article Info',
-    description: 'Basic info (supplier, season, fabric description, etc.)',
+    label: t('clone.modal.section.articleInfo'),
+    description: t('clone.modal.section.articleInfoDesc'),
     defaultChecked: true,
   },
   {
     key: 'BOM',
-    label: 'Bill of Materials',
-    description: 'All material rows and specifications',
+    label: t('clone.modal.section.bom'),
+    description: t('clone.modal.section.bomDesc'),
     defaultChecked: true,
   },
   {
     key: 'Measurements',
-    label: 'Measurements',
-    description: 'Full measurement chart and specifications',
+    label: t('clone.modal.section.measurements'),
+    description: t('clone.modal.section.measurementsDesc'),
     defaultChecked: true,
   },
   {
     key: 'Construction',
-    label: 'Construction',
-    description: 'Construction instructions and guidelines',
+    label: t('clone.modal.section.construction'),
+    description: t('clone.modal.section.constructionDesc'),
     defaultChecked: true,
   },
   {
     key: 'Colorways',
-    label: 'Colorways',
-    description: 'Color variations and specifications',
+    label: t('clone.modal.section.colorways'),
+    description: t('clone.modal.section.colorwaysDesc'),
     defaultChecked: false,
   },
   {
     key: 'Packing',
-    label: 'Packing',
-    description: 'Packing & folding instructions',
+    label: t('clone.modal.section.packing'),
+    description: t('clone.modal.section.packingDesc'),
     defaultChecked: true,
   },
 ];
@@ -67,6 +68,8 @@ export const CloneConfigurationModal: React.FC<CloneConfigurationModalProps> = (
   onConfirm,
   loading = false,
 }) => {
+  const { t } = useI18n();
+  const COPY_SECTIONS = getCopySections(t);
   const [form] = Form.useForm();
   const [copySections, setCopySections] = useState<string[]>(
     COPY_SECTIONS.filter(section => section.defaultChecked).map(section => section.key)
@@ -100,9 +103,7 @@ export const CloneConfigurationModal: React.FC<CloneConfigurationModalProps> = (
   return (
     <Modal
       title={
-        <Space>
-          <CopyOutlined />
-          <span>Configure New TechPack</span>
+        <Space><span>{t('clone.modal.title')}</span>
         </Space>
       }
       open={visible}
@@ -110,7 +111,7 @@ export const CloneConfigurationModal: React.FC<CloneConfigurationModalProps> = (
       width={700}
       footer={[
         <Button key="cancel" onClick={handleCancel} disabled={loading}>
-          Cancel
+          {t('clone.modal.cancel')}
         </Button>,
         <Button
           key="create"
@@ -118,7 +119,8 @@ export const CloneConfigurationModal: React.FC<CloneConfigurationModalProps> = (
           onClick={handleConfirm}
           loading={loading}
         >
-          Create TechPack
+          {t('clone.modal.create')}
+       
         </Button>,
       ]}
     >
@@ -128,11 +130,11 @@ export const CloneConfigurationModal: React.FC<CloneConfigurationModalProps> = (
             <Space>
               <InfoCircleOutlined style={{ color: '#1890ff' }} />
               <div>
-                <Text strong>Cloning from: </Text>
+                <Text strong>{t('clone.modal.cloningFrom')} </Text>
                 <Text>{(sourceTechPack as any).productName || (sourceTechPack as any).name || 'TechPack'} ({sourceTechPack.articleCode})</Text>
                 <br />
                 <Text type="secondary" style={{ fontSize: '12px' }}>
-                  Version {sourceTechPack.version} • {(sourceTechPack as any).season || (sourceTechPack as any).metadata?.season || 'N/A'}
+                  {t('clone.modal.version')} {sourceTechPack.version} • {(sourceTechPack as any).season || (sourceTechPack as any).metadata?.season || 'N/A'}
                 </Text>
               </div>
             </Space>
@@ -146,41 +148,41 @@ export const CloneConfigurationModal: React.FC<CloneConfigurationModalProps> = (
             season: (sourceTechPack as any)?.season || (sourceTechPack as any)?.metadata?.season,
           }}
         >
-          <Title level={5}>New TechPack Details</Title>
+          <Title level={5}>{t('clone.modal.newTechPackDetails')}</Title>
           
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
                 name="newProductName"
-                label="Product Name"
-                rules={[{ required: true, message: 'Product name is required' }]}
+                label={t('clone.modal.productName')}
+                rules={[{ required: true, message: t('clone.modal.productNameRequired') }]}
               >
-                <Input placeholder="Enter new product name" />
+                <Input placeholder={t('clone.modal.productNamePlaceholder')} />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item
                 name="newArticleCode"
-                label="Article Code"
+                label={t('clone.modal.articleCode')}
                 rules={[
-                  { required: true, message: 'Article code is required' },
+                  { required: true, message: t('clone.modal.articleCodeRequired') },
                   {
                     pattern: /^[A-Z0-9_-]+$/,
-                    message: 'Article code can only contain uppercase letters, numbers, dash (-), and underscore (_)',
+                    message: t('clone.modal.articleCodePattern'),
                   },
                 ]}
                 normalize={(value) => value ? value.toUpperCase() : value}
               >
-                <Input placeholder="Enter new article code (e.g., ABC123)" />
+                <Input placeholder={t('clone.modal.articleCodePlaceholder')} />
               </Form.Item>
             </Col>
           </Row>
 
           <Form.Item
             name="season"
-            label="Season (Optional)"
+            label={t('clone.modal.season')}
           >
-            <Input placeholder="e.g., SS25, FW25" />
+            <Input placeholder={t('clone.modal.seasonPlaceholder')} />
           </Form.Item>
 
           <Divider />
@@ -188,11 +190,11 @@ export const CloneConfigurationModal: React.FC<CloneConfigurationModalProps> = (
           <Title level={5}>
             <Space>
               <CheckCircleOutlined />
-              Copy Sections
+              {t('clone.modal.copySections')}
             </Space>
           </Title>
           <Text type="secondary" style={{ marginBottom: 16, display: 'block' }}>
-            Select which sections you want to copy from the source TechPack:
+            {t('clone.modal.copySectionsDescription')}
           </Text>
 
           <Checkbox.Group
@@ -235,8 +237,7 @@ export const CloneConfigurationModal: React.FC<CloneConfigurationModalProps> = (
             <Space>
               <InfoCircleOutlined style={{ color: '#fa8c16' }} />
               <Text style={{ fontSize: '12px' }}>
-                <strong>Note:</strong> The new TechPack will start as a Draft with version v1.0. 
-                Revision history, sharing settings, and comments will not be copied.
+                <strong>{t('clone.modal.note')}</strong> {t('clone.modal.noteText')}
               </Text>
             </Space>
           </div>
