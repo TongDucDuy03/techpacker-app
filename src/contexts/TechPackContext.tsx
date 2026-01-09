@@ -891,7 +891,7 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
       })(),
       gender: resolvedGender,
       productClass: resolvedProductClass,
-      fitType: ((apiTechPack as any).fitType || 'Regular') as 'Regular' | 'Slim' | 'Loose' | 'Relaxed' | 'Oversized',
+      fitType: ((apiTechPack as any).fitType || (apiTechPack as any).articleInfo?.fitType || 'Regular') as 'Regular' | 'Slim' | 'Loose' | 'Relaxed' | 'Oversized',
       supplier: (apiTechPack as any).supplier || '',
       technicalDesignerId: typeof (apiTechPack as any).technicalDesignerId === 'object'
         ? (apiTechPack as any).technicalDesignerId?._id || ''

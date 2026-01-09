@@ -229,7 +229,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
           })(),
           gender: resolvedGender,
           productClass: resolvedProductClass,
-          fitType: 'Regular' as const,
+          fitType: ((initialTechPack as any).fitType || (initialTechPack as any).articleInfo?.fitType || 'Regular') as 'Regular' | 'Slim' | 'Loose' | 'Relaxed' | 'Oversized',
           supplier: (initialTechPack as any).supplier || '',
           technicalDesignerId: typeof (initialTechPack as any).technicalDesignerId === 'object'
             ? (initialTechPack as any).technicalDesignerId?._id || ''
