@@ -697,6 +697,7 @@ export class TechPackController {
             companyLogoUrl: sourceTechPack.companyLogoUrl || req.body.companyLogoUrl,
             category: sourceTechPack.category || req.body.category,
             gender: sourceTechPack.gender || req.body.gender,
+            fitType: (sourceTechPack as any).fitType || req.body.fitType || (req.body.articleInfo?.fitType),
             brand: sourceTechPack.brand || req.body.brand,
             collectionName: sourceTechPack.collectionName || req.body.collectionName,
             targetMarket: sourceTechPack.targetMarket || req.body.targetMarket,
@@ -854,6 +855,7 @@ export class TechPackController {
           // Additional fields from articleInfo
           category: articleInfo?.productClass || req.body.category || req.body.productClass,
           gender: articleInfo?.gender || req.body.gender,
+          fitType: articleInfo?.fitType || req.body.fitType,
           brand: articleInfo?.brand || req.body.brand,
           collectionName: articleInfo?.collection || articleInfo?.collectionName || req.body.collectionName,
           targetMarket: articleInfo?.targetMarket || req.body.targetMarket,
@@ -978,7 +980,7 @@ export class TechPackController {
       // Support both old field names (productName, version) and new field names (articleName, sampleType) for backward compatibility
       const allowedFields = [
         'articleName', 'productName', 'articleCode', 'sampleType', 'version', 'supplier', 'season',
-        'fabricDescription', 'productDescription', 'designSketchUrl', 'companyLogoUrl', 'status', 'category', 'gender', 'brand',
+        'fabricDescription', 'productDescription', 'designSketchUrl', 'companyLogoUrl', 'status', 'category', 'gender', 'fitType', 'brand',
         'technicalDesignerId', 'lifecycleStage', 'collectionName', 'targetMarket', 'pricePoint',
         'retailPrice', 'currency', 'description', 'notes', 'bom',
         'measurements', 'colorways', 'howToMeasure', 'sampleMeasurementRounds',

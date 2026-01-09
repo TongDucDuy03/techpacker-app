@@ -685,12 +685,12 @@ class PDFService {
     const imageMaxHeight = imageOptions?.maxHeight || 800;
     
     // technicalDesignerId is now stored as free-text (name) instead of populated user
-    const technicalDesignerName =
+    const technicalDesignerName = 
       typeof techpack.technicalDesignerId === 'string'
         ? (techpack.technicalDesignerId || '—')
         : ((techpack.technicalDesignerId as any)?.firstName &&
-           (techpack.technicalDesignerId as any)?.lastName
-          ? `${(techpack.technicalDesignerId as any).firstName} ${(techpack.technicalDesignerId as any).lastName}`
+      (techpack.technicalDesignerId as any)?.lastName
+        ? `${(techpack.technicalDesignerId as any).firstName} ${(techpack.technicalDesignerId as any).lastName}`
           : '—');
 
     const articleSummary = {

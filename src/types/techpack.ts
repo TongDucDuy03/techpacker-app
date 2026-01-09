@@ -297,6 +297,7 @@ export interface ApiTechPack {
   auditLogs: AuditLogEntry[];
   isDeleted: boolean;
   productClass?: string; // Alias được backend trả về cho category
+  fitType?: 'Regular' | 'Slim' | 'Loose' | 'Relaxed' | 'Oversized';
   metadata?: {
     description?: string;
     category?: string;

@@ -202,7 +202,7 @@ const ColorwayTab: React.FC = () => {
         },
       });
 
-        if (response.data.success) {
+      if (response.data.success) {
         const imageUrl = response.data.data.url;
         setFormData(prev => ({ ...prev, imageUrl: imageUrl || undefined }));
         // Keep local preview for immediate display, will be replaced by server URL on next render

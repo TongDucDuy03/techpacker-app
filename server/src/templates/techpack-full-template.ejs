@@ -415,9 +415,9 @@
                     !images.coverImage.includes('No Image'); %>
                     <% if (hasDesignSketch) { %>
                       <img src="<%= images.coverImage %>" alt="Product" />
-                    <% } else { %>
+                      <% } else { %>
                       <div style="width:100%; height:100%; border:1px solid #ccc; background:#f9f9f9;"></div>
-                    <% } %>
+                        <% } %>
                 </div>
               </td>
             </tr>
@@ -671,10 +671,10 @@
                                       <% } else if (item.color) { %>
                                         <span style="font-weight: 600; font-size: 11px;"><%= item.color %></span>
                                         <% if (item.pantone || item.hexCode) { %><br/><% } %>
-                                      <% } %>
+                                        <% } %>
                                       <% if (!item.colorCode && item.pantone) { %>
                                         <span style="font-size: 11px;"><%= item.pantone %></span><br/>
-                                      <% } %>
+                                        <% } %>
                                       <% if (item.hexCode) { %>
                                         <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
                                         <span style="font-size: 11px;"><%= item.hexCode %></span>
@@ -740,10 +740,10 @@
                                           <% } else if (item.color) { %>
                                             <span style="font-weight: 600; font-size: 11px;"><%= item.color %></span>
                                             <% if (item.pantone || item.hexCode) { %><br/><% } %>
-                                          <% } %>
+                                            <% } %>
                                           <% if (!item.colorCode && item.pantone) { %>
                                             <span style="font-size: 11px;"><%= item.pantone %></span><br/>
-                                          <% } %>
+                                            <% } %>
                                           <% if (item.hexCode) { %>
                                             <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
                                             <span style="font-size: 11px;"><%= item.hexCode %></span>
@@ -801,10 +801,10 @@
                                               <% } else if (item.color) { %>
                                                 <span style="font-weight: 600; font-size: 11px;"><%= item.color %></span>
                                                 <% if (item.pantone || item.hexCode) { %><br/><% } %>
-                                              <% } %>
+                                                <% } %>
                                               <% if (!item.colorCode && item.pantone) { %>
                                                 <span style="font-size: 11px;"><%= item.pantone %></span><br/>
-                                              <% } %>
+                                                <% } %>
                                               <% if (item.hexCode) { %>
                                                 <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
                                                 <span style="font-size: 11px;"><%= item.hexCode %></span>
@@ -862,10 +862,10 @@
                                                   <% } else if (item.color) { %>
                                                     <span style="font-weight: 600; font-size: 11px;"><%= item.color %></span>
                                                     <% if (item.pantone || item.hexCode) { %><br/><% } %>
-                                                  <% } %>
+                                                    <% } %>
                                                   <% if (!item.colorCode && item.pantone) { %>
                                                     <span style="font-size: 11px;"><%= item.pantone %></span><br/>
-                                                  <% } %>
+                                                    <% } %>
                                                   <% if (item.hexCode) { %>
                                                     <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
                                                     <span style="font-size: 11px;"><%= item.hexCode %></span>
@@ -1073,10 +1073,10 @@
                                   </div>
                                   <% if (color.imageUrl && color.imageUrl !== '—' && !color.imageUrl.includes('No Image')) { %>
                                     <div style="text-align: left; margin-top: 6px;">
-                                      <img src="<%= color.imageUrl %>" alt="Colorway Image"
+                                                <img src="<%= color.imageUrl %>" alt="Colorway Image"
                                         style="max-width: 80px; max-height: 80px; border: 1px solid #ccc; border-radius: 4px; object-fit: contain;" />
                                     </div>
-                                  <% } %>
+                                                <% } %>
                                 </div>
                                 <% }); %>
                             </div>

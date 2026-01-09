@@ -248,10 +248,10 @@ const HowToMeasureTab: React.FC = () => {
               className="min-w-40"
             />
             
-                  <div className="text-sm text-center">
-                    <div className="text-2xl font-bold text-blue-600">{filteredHowToMeasures.length}</div>
+            <div className="text-sm text-center">
+              <div className="text-2xl font-bold text-blue-600">{filteredHowToMeasures.length}</div>
                     <div className="text-gray-500">{t('form.howTo.instructionsCount')}</div>
-                  </div>
+            </div>
           </div>
         </div>
       </div>

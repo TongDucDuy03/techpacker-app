@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from './AuthContext';
+import { useI18n } from '../lib/i18n';
 import { ApiTechPack, CreateTechPackInput, TechPackListResponse, TechPackFormState, MeasurementPoint, HowToMeasure, BomItem, Colorway, ColorwayPart, MeasurementSampleRound, MeasurementSampleEntry, MeasurementSampleValueMap, MeasurementRequestedSource, SIZE_RANGES, DEFAULT_MEASUREMENT_UNIT, MeasurementUnit } from '../types/techpack';
 import { normalizeMeasurementBaseSizes } from '../utils/measurements';
 import { api } from '../lib/api';
@@ -890,7 +891,7 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
       })(),
       gender: resolvedGender,
       productClass: resolvedProductClass,
-      fitType: 'Regular' as const,
+      fitType: ((apiTechPack as any).fitType || 'Regular') as 'Regular' | 'Slim' | 'Loose' | 'Relaxed' | 'Oversized',
       supplier: (apiTechPack as any).supplier || '',
       technicalDesignerId: typeof (apiTechPack as any).technicalDesignerId === 'object'
         ? (apiTechPack as any).technicalDesignerId?._id || ''
@@ -1182,6 +1183,7 @@ const loadCachedPagination = (): Omit<TechPackListResponse, 'data'> => {
 export const TechPackProvider = ({ children }: { children: ReactNode }) => {
   // Access auth state to decide when to load protected data
   const auth = useAuth();
+  const { t } = useI18n();
   const [techPacks, setTechPacks] = useState<ApiTechPack[]>(() => loadCachedTechPacks());
   const [loading, setLoading] = useState<boolean>(true);
   const [pagination, setPagination] = useState<Omit<TechPackListResponse, 'data'>>(() => loadCachedPagination());
@@ -1683,6 +1685,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           status: techpackData.status,
           category: techpackData.articleInfo.productClass,
           gender: techpackData.articleInfo.gender,
+          fitType: techpackData.articleInfo.fitType as any,
           technicalDesignerId: techpackData.articleInfo.technicalDesignerId,
           lifecycleStage: techpackData.articleInfo.lifecycleStage as any,
           collectionName: (techpackData.articleInfo as any).collection,
@@ -1780,6 +1783,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           companyLogoUrl: (techpackData.articleInfo as any).companyLogoUrl || '',
             productClass: techpackData.articleInfo.productClass,
             gender: techpackData.articleInfo.gender,
+            fitType: techpackData.articleInfo.fitType as any,
             technicalDesignerId: techpackData.articleInfo.technicalDesignerId,
             lifecycleStage: techpackData.articleInfo.lifecycleStage as any,
             collection: (techpackData.articleInfo as any).collection,
@@ -2117,8 +2121,10 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         prev.techpack.measurementBaseSize ||
         (prev.techpack.measurementSizeRange && prev.techpack.measurementSizeRange[0]) ||
         '';
+      // Chỉ gán baseSize nếu measurement chưa có baseSize;
+      // không ép override baseSize đã được user chọn trong UI.
       const normalizedMeasurement =
-        baseSize && measurement.baseSize !== baseSize
+        baseSize && !measurement.baseSize
           ? { ...measurement, baseSize }
           : measurement;
       const nextMeasurements = [...prev.techpack.measurements, normalizedMeasurement];
@@ -2143,7 +2149,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         (prev.techpack.measurementSizeRange && prev.techpack.measurementSizeRange[0]) ||
         '';
       const normalizedMeasurement =
-        baseSize && measurement.baseSize !== baseSize
+        baseSize && !measurement.baseSize
           ? { ...measurement, baseSize }
           : measurement;
       const nextMeasurements = [...prev.techpack.measurements];
@@ -2170,7 +2176,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         (prev.techpack.measurementSizeRange && prev.techpack.measurementSizeRange[0]) ||
         '';
       const normalizedMeasurement =
-        baseSize && measurement.baseSize !== baseSize
+        baseSize && !measurement.baseSize
           ? { ...measurement, baseSize }
           : measurement;
       const nextMeasurements = prev.techpack.measurements.map((m, i) => (i === index ? normalizedMeasurement : m));

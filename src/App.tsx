@@ -128,10 +128,10 @@ function AppContent() {
         setSelectedTechPack(techPack);
         setCurrentTab('view');
       }
-      } catch (error: any) {
-        console.error('[App] Failed to fetch full techpack for view:', error);
-        // If access denied (403), don't show the techpack - user no longer has access
-        if (error.response?.status === 403 || error.message?.includes('Access denied')) {
+    } catch (error: any) {
+      console.error('[App] Failed to fetch full techpack for view:', error);
+      // If access denied (403), don't show the techpack - user no longer has access
+      if (error.response?.status === 403 || error.message?.includes('Access denied')) {
           showError(t('error.accessDeniedTechPack'));
         // Remove this techpack from the list if it exists
         if (context?.deleteTechPack && techPackId) {
