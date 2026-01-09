@@ -246,10 +246,10 @@ export class TechPackController {
       
       // Thử lấy từ cache trước (skip if bypass requested)
       if (!bypassCache) {
-        const cachedResult = await cacheService.get(cacheKey);
-        if (cachedResult) {
+      const cachedResult = await cacheService.get(cacheKey);
+      if (cachedResult) {
           console.log('[TechPackController] Returning cached result for:', { page: pageNum, cacheKey: cacheKey.substring(0, 50) });
-          return sendSuccess(res, cachedResult, 'TechPacks retrieved from cache');
+        return sendSuccess(res, cachedResult, 'TechPacks retrieved from cache');
         }
       } else {
         console.log('[TechPackController] Cache bypassed due to _nocache parameter');
@@ -323,7 +323,7 @@ export class TechPackController {
           }
           
           query = { $and: andConditions };
-        } else {
+      } else {
           // No $or in access control (admin or simple query)
           // Can combine directly: access control AND search AND filters
           filterConditions.$or = searchConditions;
@@ -1146,9 +1146,12 @@ export class TechPackController {
         }
       });
 
-      // Map lifecycleStage to status if sent
+      // Map lifecycleStage to status ONLY if status is not explicitly provided
+      // This ensures that when user explicitly sets status, it won't be overridden
       const lifecycleStage = (req.body as any).lifecycleStage;
-      if (lifecycleStage) {
+      const explicitStatus = req.body.status || updateData.status;
+      if (lifecycleStage && !explicitStatus) {
+        // Only auto-map lifecycleStage -> status if status was not explicitly set
         switch (lifecycleStage) {
           case 'Concept':
           case 'Design':

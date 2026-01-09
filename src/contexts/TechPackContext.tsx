@@ -906,7 +906,7 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
       pricePoint: (apiTechPack as any).pricePoint || undefined,
       notes: (apiTechPack as any).notes || (apiTechPack as any).description || '',
       lifecycleStage: (apiTechPack as any).lifecycleStage || undefined,
-      status: (apiTechPack as any).status || 'Draft',
+      status: (apiTechPack as any).status || (apiTechPack as any).articleInfo?.status || 'Draft',
       category: resolvedProductClass,
       currency: (apiTechPack as any).currency || 'USD',
       retailPrice: (apiTechPack as any).retailPrice || undefined,

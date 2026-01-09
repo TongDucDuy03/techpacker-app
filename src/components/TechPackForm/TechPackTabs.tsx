@@ -436,10 +436,10 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
     },
     {
       id: 7,
-      name: 'Sharing',
+      name: t('form.tab.sharing'),
       icon: Share2,
       component: SharingTab,
-      description: 'Access control and sharing',
+      description: t('form.tab.sharing.description'),
     },
   ];
 

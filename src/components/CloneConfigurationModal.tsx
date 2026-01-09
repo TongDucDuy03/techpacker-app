@@ -132,10 +132,6 @@ export const CloneConfigurationModal: React.FC<CloneConfigurationModalProps> = (
               <div>
                 <Text strong>{t('clone.modal.cloningFrom')} </Text>
                 <Text>{(sourceTechPack as any).productName || (sourceTechPack as any).name || 'TechPack'} ({sourceTechPack.articleCode})</Text>
-                <br />
-                <Text type="secondary" style={{ fontSize: '12px' }}>
-                  {t('clone.modal.version')} {sourceTechPack.version} • {(sourceTechPack as any).season || (sourceTechPack as any).metadata?.season || 'N/A'}
-                </Text>
               </div>
             </Space>
           </Card>
@@ -215,10 +211,6 @@ export const CloneConfigurationModal: React.FC<CloneConfigurationModalProps> = (
                     <Checkbox value={section.key} style={{ width: '100%' }}>
                       <div style={{ marginLeft: 8 }}>
                         <Text strong>{section.label}</Text>
-                        <br />
-                        <Text type="secondary" style={{ fontSize: '12px' }}>
-                          {section.description}
-                        </Text>
                       </div>
                     </Checkbox>
                   </Card>
@@ -226,21 +218,6 @@ export const CloneConfigurationModal: React.FC<CloneConfigurationModalProps> = (
               ))}
             </Row>
           </Checkbox.Group>
-
-          <div style={{ 
-            marginTop: 16, 
-            padding: '12px', 
-            backgroundColor: '#fff7e6', 
-            borderRadius: '6px',
-            border: '1px solid #ffd591'
-          }}>
-            <Space>
-              <InfoCircleOutlined style={{ color: '#fa8c16' }} />
-              <Text style={{ fontSize: '12px' }}>
-                <strong>{t('clone.modal.note')}</strong> {t('clone.modal.noteText')}
-              </Text>
-            </Space>
-          </div>
         </Form>
       </div>
     </Modal>

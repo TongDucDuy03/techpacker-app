@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Modal, Input, List, Card, Typography, Space, Tag, Button, Empty, Spin } from 'antd';
 import { SearchOutlined, FileTextOutlined, CalendarOutlined, UserOutlined } from '@ant-design/icons';
 import { useTechPack } from '../contexts/TechPackContext';
-import { ApiTechPack } from '../types/techpack.types';
+import { ApiTechPack } from '../types/techpack';
 import { useI18n } from '../lib/i18n';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { Search } = Input;
 
 interface TechPackSelectionModalProps {
@@ -25,10 +25,11 @@ export const TechPackSelectionModal: React.FC<TechPackSelectionModalProps> = ({
   const { t } = useI18n();
 
   useEffect(() => {
-    if (visible && techPacks.length === 0) {
-      loadTechPacks();
+    if (visible) {
+      // Load all techpacks (use large limit to get full list)
+      loadTechPacks({ limit: 1000, page: 1 });
     }
-  }, [visible, techPacks.length, loadTechPacks]);
+  }, [visible, loadTechPacks]);
 
   const filteredTechPacks = techPacks.filter(tp => {
     const productName = (tp as any).productName || (tp as any).name || '';
@@ -134,10 +135,13 @@ export const TechPackSelectionModal: React.FC<TechPackSelectionModalProps> = ({
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={{ flex: 1 }}>
-                        <Title level={5} style={{ margin: '0 0 8px 0' }}>
-                          {(techPack as any).productName || (techPack as any).name || t('techpack.common.defaultName')}
-                        </Title>
                         <Space direction="vertical" size={4}>
+                          <Text strong>
+                            {t('techpack.clone.productName')}: {(techPack as any).productName || 
+                           (techPack as any).articleName || 
+                           (techPack as any).name || 
+                           t('techpack.common.defaultName')}
+                          </Text>
                           <Text strong>
                             {t('techpack.clone.articleCode')}: {techPack.articleCode}
                           </Text>
@@ -153,12 +157,16 @@ export const TechPackSelectionModal: React.FC<TechPackSelectionModalProps> = ({
                           <Space>
                             <UserOutlined />
                             <Text type="secondary">
-                              {t('techpack.clone.createdBy')}: {techPack.createdByName || t('form.revision.unknownUser')}
+                              {t('techpack.clone.createdBy')}: {
+                                (techPack as any).createdBy 
+                                  ? `${(techPack as any).createdBy.firstName || ''} ${(techPack as any).createdBy.lastName || ''}`.trim() || t('form.revision.unknownUser')
+                                  : (techPack as any).createdByName || t('form.revision.unknownUser')
+                              }
                             </Text>
                           </Space>
-                          {techPack.description && (
+                          {(techPack as any).description && (
                             <Text type="secondary" ellipsis style={{ maxWidth: '400px' }}>
-                              {techPack.description}
+                              {(techPack as any).description}
                             </Text>
                           )}
                         </Space>
@@ -167,9 +175,6 @@ export const TechPackSelectionModal: React.FC<TechPackSelectionModalProps> = ({
                         <Tag color={getStatusColor(techPack.status)}>
                           {techPack.status || t('techpack.clone.status.draft')}
                         </Tag>
-                        <Text type="secondary" style={{ fontSize: '12px' }}>
-                          {(techPack as any).sampleType || techPack.version || ''}
-                        </Text>
                         <Text type="secondary" style={{ fontSize: '12px' }}>
                           {techPack.updatedAt
                             ? new Date(techPack.updatedAt).toLocaleDateString()
@@ -195,6 +200,7 @@ export const TechPackSelectionModal: React.FC<TechPackSelectionModalProps> = ({
             <Text strong style={{ color: '#1890ff' }}>
               {t('techpack.clone.selectedLabel')}:{" "}
               {(selectedTechPack as any).productName ||
+                (selectedTechPack as any).articleName ||
                 (selectedTechPack as any).name ||
                 t('techpack.common.defaultName')}{" "}
               ({selectedTechPack.articleCode})
