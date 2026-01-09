@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useI18n } from '../../../lib/i18n';
 
 interface User {
   _id: string;
@@ -21,6 +22,7 @@ interface Props {
 
 const UserModal: React.FC<Props> = ({ user, mode, onClose, onSave }) => {
   const { user: currentUser, refreshUser } = useAuth();
+  const { t } = useI18n();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -232,8 +234,10 @@ const UserModal: React.FC<Props> = ({ user, mode, onClose, onSave }) => {
           </div>
           {error && <p style={{ color: 'red' }}>{error}</p>}
           <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-            <button type="button" onClick={onClose} disabled={loading}>Cancel</button>
-            <button type="submit" disabled={loading}>{loading ? 'Saving...' : 'Save'}</button>
+            <button type="button" onClick={onClose} disabled={loading}>{t('common.cancel')}</button>
+            <button type="submit" disabled={loading}>
+              {loading ? t('form.saving') : t('common.save')}
+            </button>
           </div>
         </form>
       </div>

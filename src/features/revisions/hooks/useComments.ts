@@ -2,23 +2,25 @@ import { useState, useCallback } from 'react';
 import { api } from '../../../lib/api';
 import { showSuccess, showError, showLoading, dismissToast } from '../../../lib/toast';
 import { RevisionComment } from '../types';
+import { useI18n } from '../../../lib/i18n';
 
 export const useComments = (revisionId: string | undefined) => {
   const [comments, setComments] = useState<RevisionComment[]>([]);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useI18n();
 
   const addComment = useCallback(async (comment: string) => {
     if (!revisionId || !comment.trim()) {
-      setError('Comment is required');
+      setError(t('validation.commentRequired'));
       return;
     }
 
     setAdding(true);
     setError(null);
 
-    const toastId = showLoading('Adding comment...');
+    const toastId = showLoading(t('form.comments.adding'));
 
     try {
       const response = await api.addRevisionComment(revisionId, comment);
@@ -30,10 +32,10 @@ export const useComments = (revisionId: string | undefined) => {
       if (newComment) {
         setComments(prev => [...prev, newComment]);
         dismissToast(toastId);
-        showSuccess('Comment added successfully');
+        showSuccess(t('success.commentAdded'));
       }
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to add comment';
+      const errorMessage = err.response?.data?.message || err.message || t('error.addComment');
       setError(errorMessage);
       showError(errorMessage);
       dismissToast(toastId);

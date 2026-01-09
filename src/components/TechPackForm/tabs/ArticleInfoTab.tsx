@@ -238,12 +238,12 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
   const validateImageFile = (file: File): string | null => {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/svg+xml'];
     if (!allowedTypes.includes(file.type)) {
-      return 'Invalid file type. Please upload JPEG, PNG, GIF, or SVG image.';
+      return t('validation.image.invalidType');
     }
 
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
-      return 'File size exceeds 5MB limit. Please upload a smaller image.';
+      return t('validation.image.tooLarge');
     }
 
     return null;

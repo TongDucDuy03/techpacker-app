@@ -638,12 +638,12 @@ type RoundModalFormState = {
 
   const handleOpenRoundModal = useCallback(() => {
     if (sampleMeasurementRounds.length > 0 && hasUnsavedChanges) {
-      window.alert('Vui lòng lưu sample round hiện tại trước khi tạo round mới.');
+      window.alert(t('form.sampleRound.saveBeforeNew'));
       return;
     }
 
     if (!canAddNewRound) {
-      showWarning('Please complete the previous round before creating a new one.');
+      showWarning(t('form.sampleRound.completePrevious'));
       return;
     }
     setRoundForm({
@@ -1062,13 +1062,13 @@ type RoundModalFormState = {
       }
       
       if (hasUpdates) {
-        showSuccess('Sample round saved and measurements updated from revised values');
+        showSuccess(t('success.sampleRoundSavedWithRevised'));
       } else {
-        showSuccess('Sample measurement round saved successfully');
+        showSuccess(t('success.sampleRoundSaved'));
       }
     } catch (error: any) {
       console.error('❌ Error saving sample round:', error);
-      showError(error.message || 'Failed to save sample measurement round');
+      showError(error.message || t('error.saveSampleRound'));
     }
   }, [saveTechPack, sampleMeasurementRounds, measurements, state?.techpack, updateMeasurement, measurementBaseSize, deriveAdjustmentsFromSizes, recalcSizesFromBase, mergeRecalculatedSizes, selectedSizes, updateSampleMeasurementRound]);
 
@@ -1476,9 +1476,16 @@ type RoundModalFormState = {
   };
 
   const handleDelete = (measurement: MeasurementPoint, index: number) => {
-    if (window.confirm(`Are you sure you want to delete "${measurement.pomCode} - ${measurement.pomName}"?`)) {
+    if (
+      window.confirm(
+        t('form.measurement.deleteConfirm', {
+          pomCode: measurement.pomCode,
+          pomName: measurement.pomName || '',
+        })
+      )
+    ) {
       deleteMeasurement(index);
-      showSuccess('Measurement deleted');
+      showSuccess(t('success.measurementDeleted'));
     }
   };
 
@@ -1577,7 +1584,7 @@ type RoundModalFormState = {
       unit: (measurement.unit as MeasurementUnit) || DEFAULT_MEASUREMENT_UNIT,
     };
     insertMeasurementAt(index, duplicate);
-    showSuccess('Measurement duplicated');
+    showSuccess(t('success.measurementDuplicated'));
   };
 
   // Enhanced validation for display in table
@@ -1754,10 +1761,10 @@ type RoundModalFormState = {
                       measurementUnit: newUnit,
                     };
                     await saveTechPack(updatedTechpack);
-                    showSuccess('Measurement unit updated and saved');
+                    showSuccess(t('success.measurementUnitSaved'));
                   } catch (error: any) {
                     console.error('Failed to save measurement unit:', error);
-                    showError(error?.message || 'Failed to save measurement unit');
+                    showError(error?.message || t('error.saveMeasurementUnit'));
                   }
                 }
               }}

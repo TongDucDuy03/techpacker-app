@@ -194,7 +194,7 @@ const SharingTab: React.FC<SharingTabProps> = ({ techPack, mode }) => {
       console.log('Successfully loaded sharing data');
     } catch (error) {
       console.error('Failed to fetch sharing data:', error);
-      showError('Failed to load sharing information.');
+      showError(t('form.sharing.loadError'));
       // Reset states on error
       setAccessList([]);
       setShareableUsers([]);

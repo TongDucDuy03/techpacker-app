@@ -624,7 +624,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
     if (mode === 'edit') {
       // For update flow, require confirmation and skip when no changes
       if (!hasUnsavedChanges) {
-        showWarning('Chưa có gì thay đổi.');
+        showWarning(t('form.noChanges'));
         return;
       }
       Modal.confirm({

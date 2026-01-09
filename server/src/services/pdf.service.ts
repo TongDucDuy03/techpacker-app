@@ -368,6 +368,7 @@ class PDFService {
         colorways,
         // Add color fields for template compatibility
         color: item.color ? this.normalizeText(item.color) : undefined,
+        colorCode: item.colorCode ? this.normalizeText(item.colorCode) : undefined,
         hexCode: hexCode,
         pantone: item.pantoneCode ? this.normalizeText(item.pantoneCode) : undefined,
         pantoneCode: item.pantoneCode ? this.normalizeText(item.pantoneCode) : undefined,
@@ -683,11 +684,14 @@ class PDFService {
     const imageMaxWidth = imageOptions?.maxWidth || 1200;
     const imageMaxHeight = imageOptions?.maxHeight || 800;
     
-    const technicalDesignerName = 
-      (techpack.technicalDesignerId as any)?.firstName && 
-      (techpack.technicalDesignerId as any)?.lastName
-        ? `${(techpack.technicalDesignerId as any).firstName} ${(techpack.technicalDesignerId as any).lastName}`
-        : '—';
+    // technicalDesignerId is now stored as free-text (name) instead of populated user
+    const technicalDesignerName =
+      typeof techpack.technicalDesignerId === 'string'
+        ? (techpack.technicalDesignerId || '—')
+        : ((techpack.technicalDesignerId as any)?.firstName &&
+           (techpack.technicalDesignerId as any)?.lastName
+          ? `${(techpack.technicalDesignerId as any).firstName} ${(techpack.technicalDesignerId as any).lastName}`
+          : '—');
 
     const articleSummary = {
       generalInfo: {
@@ -704,7 +708,7 @@ class PDFService {
         retailPrice: techpack.retailPrice ? `${techpack.retailPrice} ${currency}` : '—',
       },
       technicalInfo: {
-        fitType: '—',
+        fitType: techpack.fitType || '—',
         productClass: techpack.category || '—',
         supplier: techpack.supplier || '—',
         technicalDesignerId: technicalDesignerName,
@@ -817,7 +821,7 @@ class PDFService {
         category: techpack.category || '—',
         productClass: techpack.category || '—',
         gender: techpack.gender || '—',
-        fitType: '—',
+        fitType: techpack.fitType || '—',
         collectionName: techpack.collectionName || '—',
         supplier: techpack.supplier || '—',
         updatedAt: this.formatDate(techpack.updatedAt),

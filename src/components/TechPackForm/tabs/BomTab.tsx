@@ -381,7 +381,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   const openColorAssignment = useCallback((colorway: Colorway, item: BomItem) => {
     const bomId = (item as any)?.id || (item as any)?._id;
     if (!bomId) {
-      showWarning('Please save this BOM item before assigning colors.');
+      showWarning(t('form.bom.saveBeforeAssignColor'));
       return;
     }
     setColorAssignmentModal({ colorway, bomItem: item, bomItemId: String(bomId) });
@@ -525,9 +525,9 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
         handleInputChange('imageUrl')(uploadedUrl);
         validation.validateField('imageUrl', uploadedUrl);
         setImagePreview(uploadedUrl ? getMaterialImageUrl(uploadedUrl) : null);
-        showSuccess('Tải ảnh vật tư thành công.');
+        showSuccess(t('success.bomImageUploaded'));
       } catch (error: any) {
-        const errorMessage = error.response?.data?.message || error.message || 'Không thể tải ảnh vật tư.';
+      const errorMessage = error.response?.data?.message || error.message || t('error.uploadImage');
         setImageUploadError(errorMessage);
         showError(errorMessage);
       } finally {
@@ -557,7 +557,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       });
       
       // Show error message
-      showError('Vui lòng điền đầy đủ các trường bắt buộc và sửa các lỗi validation.');
+      showError(t('validation.bom.fixErrors'));
       
       // Focus on first error field
       setTimeout(() => {
@@ -575,7 +575,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     const duplicates = checkDuplicates(formData, editingIndex ?? undefined);
     if (duplicates.length > 0) {
       const shouldMerge = window.confirm(
-        `Found ${duplicates.length} duplicate item(s) with same Part and Material Name. Do you want to merge quantities instead?`
+        t('form.bom.mergeDuplicatesConfirm', { count: duplicates.length })
       );
       
       if (shouldMerge) {
@@ -594,7 +594,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             quantity: existingQty + formQty,
           };
           updateBomItem(duplicateIndex, mergedItem);
-          showSuccess('Quantities merged successfully');
+          showSuccess(t('success.bomQuantitiesMerged'));
           resetForm();
           return;
         }
@@ -639,7 +639,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       showSuccess(t('form.bom.materialUpdated'));
     } else {
       addBomItem(bomItem);
-      showSuccess('Material added successfully');
+      showSuccess(t('success.materialAdded'));
     }
 
     resetForm();
@@ -812,7 +812,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     if (assignmentMode === 'existing') {
       const targetPart = colorway.parts?.find(part => part.id === selectedPartId);
       if (!targetPart) {
-        showError('Please select an existing colorway part.');
+        showError(t('validation.colorwayPartRequired'));
         return;
       }
       assignColorwayToBomItem(colorway.id, bomItemId, {
@@ -821,7 +821,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       });
     } else {
       if (!newAssignmentForm.colorName.trim() || !newAssignmentForm.hexCode.trim()) {
-        showError('Color name and hex code are required.');
+        showError(t('validation.colorNameAndHexRequired'));
         return;
       }
       assignColorwayToBomItem(colorway.id, bomItemId, {
@@ -832,7 +832,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
         colorType: newAssignmentForm.colorType,
       });
     }
-    showSuccess('Color assignment saved.');
+    showSuccess(t('success.colorAssignmentSaved'));
     closeColorAssignmentModal();
   };
 
@@ -986,7 +986,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       const rows = parseCSV(text);
       
       if (rows.length === 0) {
-        showError('No data found in CSV file');
+        showError(t('error.csvNoData'));
         return;
       }
       

@@ -1289,7 +1289,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         }
       }
       
-      showError(error.message || 'Failed to load tech packs');
+      showError(error.message || t('error.loadFailed'));
       // On error, only fallback to cached data if we have no current state
       // This prevents showing techpacks that user no longer has access to
       setTechPacks(prev => {
@@ -1440,7 +1440,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
       console.error('❌ getTechPack error:', error);
       if (!skipLoading) {
-      showError(error.message || 'Failed to fetch tech pack');
+        showError(error.message || t('error.loadFailed'));
       }
       return undefined;
     } finally {
@@ -1663,7 +1663,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
       const incompleteColorway = colorwaysPayload.find(cw => !cw.name || !cw.code);
       if (incompleteColorway) {
         setState(prev => ({ ...prev, isSaving: false }));
-        showError('Please complete all required colorway fields (name, code).');
+        showError(t('form.colorway.requiredFields'));
         return;
       }
 
@@ -1904,23 +1904,23 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         clearDraftFromStorage();
       }
   
-    } catch (error) {
+    } catch (error: any) {
       console.error('Save TechPack error:', error);
       setState(prev => ({ ...prev, isSaving: false }));
-      showError('Failed to save tech pack');
+      showError(error?.message || t('error.saveFailed'));
     }
   };
 
   const exportToPDF = async () => {
     try {
       if (!state.techpack.id) {
-        showError('Cannot export PDF: TechPack ID is missing. Please save the TechPack first.');
+        showError(t('error.exportPdfMissingId'));
         return;
       }
 
       // Set loading state
       setState(prev => ({ ...prev, isExportingPDF: true }));
-      showSuccess('Đang tạo PDF... Vui lòng đợi', { duration: 2000 });
+      showSuccess(t('form.exportingPDF'), { duration: 2000 });
 
       // Call PDF export API
       const blob = await api.exportTechPackPDF(state.techpack.id, {
@@ -1944,11 +1944,11 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      showSuccess('PDF exported successfully!');
+      showSuccess(t('success.exportPDF'));
     } catch (error: any) {
       console.error('PDF export error:', error);
-      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to export PDF';
-      showError(`PDF export failed: ${errorMessage}`);
+      const errorMessage = error?.response?.data?.message || error?.message || '';
+      showError(errorMessage || t('error.exportPDF'));
     } finally {
       setState(prev => ({ ...prev, isExportingPDF: false }));
     }
@@ -1976,7 +1976,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
       });
     } catch (error: any) {
       console.error('Failed to persist measurement settings:', error);
-      showError(error?.message || 'Không thể lưu cài đặt Measurements. Vui lòng thử lại.');
+      showError(error?.message || t('error.saveMeasurementsSettings'));
     }
   };
 

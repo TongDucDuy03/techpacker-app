@@ -386,7 +386,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
     // Validate file size (5MB limit)
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
-      setUploadError('File size exceeds 5MB limit. Please upload a smaller image.');
+      setUploadError(t('validation.image.tooLarge'));
       return;
     }
 
@@ -434,9 +434,9 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
           }
         }
         
-        showSuccess('Image uploaded successfully');
+        showSuccess(t('success.imageUploaded'));
       } else {
-        setUploadError(response.data.message || 'Failed to upload image.');
+        setUploadError(response.data.message || t('error.uploadImage'));
         setImagePreview(null);
       }
     } catch (error: any) {
@@ -546,16 +546,16 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
         // Approved lock removed
         
         updateHowToMeasureById(editingId, construction);
-        showSuccess('Construction updated successfully');
+        showSuccess(t('success.constructionUpdated'));
       } else {
         addHowToMeasure(construction);
-        showSuccess('Construction added successfully');
+        showSuccess(t('success.constructionAdded'));
       }
 
       resetForm();
-    } catch (error) {
+    } catch (error: any) {
       console.error('💥 [handleSubmit] ERROR:', error);
-      showError('Failed to save construction: ' + (error as Error).message);
+      showError(error?.message || t('error.saveConstruction'));
     }
   };
 
@@ -613,7 +613,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
     const index = constructions.findIndex(c => c.id === item.id);
     if (index === -1) return;
 
-    if (window.confirm(`Are you sure you want to delete construction for "${item.pomCode}"?`)) {
+    if (window.confirm(t('form.construction.deleteConfirm', { pomCode: item.pomCode }))) {
       // Clear previous undo timeout if exists
       if (deletedItem?.timeoutId) {
         clearTimeout(deletedItem.timeoutId);
@@ -631,7 +631,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
       
       // Show undo toast
       showUndoToast(
-        `Construction "${item.pomCode}" deleted`,
+        t('success.constructionDeleted', { pomCode: item.pomCode }),
         () => {
           // Restore item at original index using context method
           if (deletedItemData && insertHowToMeasureAt) {
@@ -640,7 +640,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
               clearTimeout(deletedItemData.timeoutId);
             }
             setDeletedItem(null);
-            showSuccess('Construction restored');
+            showSuccess(t('success.constructionRestored'));
           }
         },
         5000
@@ -666,7 +666,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
     setEditingId(null);
     setImagePreview(duplicated.imageUrl ? getImageUrl(duplicated.imageUrl) : null);
     setShowModal(true);
-    showSuccess('Duplicated construction. Please edit and save.');
+    showSuccess(t('success.constructionDuplicated'));
   };
 
   // CSV export/import disabled per request
@@ -752,7 +752,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
 
   const handleRequestApproval = (item: Construction) => {
     if ((item as any).status === 'Approved') {
-      showError('Item is already approved');
+      showError(t('error.constructionAlreadyApproved'));
       return;
     }
     
@@ -762,7 +762,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
       videoUrl: encodeMetadata(decoded.videoUrl, 'Requested', decoded.comments || (item as any).comments || '')
     };
     updateHowToMeasureById(item.id, updated);
-    showSuccess('Approval requested successfully');
+    showSuccess(t('success.constructionApprovalRequested'));
   };
 
   const handleApprove = (item: Construction) => {
@@ -772,7 +772,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
       videoUrl: encodeMetadata(decoded.videoUrl, 'Approved', decoded.comments || (item as any).comments || '')
     };
     updateHowToMeasureById(item.id, updated);
-    showSuccess('Construction approved');
+    showSuccess(t('success.constructionApproved'));
   };
 
   const handleRequestChanges = (item: Construction) => {
@@ -782,7 +782,7 @@ const ConstructionTabComponent = forwardRef<ConstructionTabRef>((props, ref) => 
       videoUrl: encodeMetadata(decoded.videoUrl, 'Draft', decoded.comments || (item as any).comments || '')
     };
     updateHowToMeasureById(item.id, updated);
-    showSuccess('Changes requested');
+    showSuccess(t('success.constructionChangesRequested'));
   };
 
   return (

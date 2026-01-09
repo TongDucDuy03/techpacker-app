@@ -170,14 +170,14 @@ const ColorwayTab: React.FC = () => {
     // Validate file type
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/svg+xml', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      showError('Invalid file type. Please upload JPEG, PNG, GIF, SVG, or WebP image.');
+      showError(t('validation.image.invalidType'));
       return;
     }
 
     // Validate file size (5MB limit)
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
-      showError('File size exceeds 5MB limit. Please upload a smaller image.');
+      showError(t('validation.image.tooLarge'));
       return;
     }
 
@@ -202,7 +202,7 @@ const ColorwayTab: React.FC = () => {
         },
       });
 
-      if (response.data.success) {
+        if (response.data.success) {
         const imageUrl = response.data.data.url;
         setFormData(prev => ({ ...prev, imageUrl: imageUrl || undefined }));
         // Keep local preview for immediate display, will be replaced by server URL on next render
@@ -213,9 +213,9 @@ const ColorwayTab: React.FC = () => {
             setImagePreview(resolvedUrl);
           }
         }
-        showSuccess('Image uploaded successfully');
+        showSuccess(t('success.imageUploaded'));
       } else {
-        showError(response.data.message || 'Failed to upload image.');
+        showError(response.data.message || t('error.uploadImage'));
         setImagePreview(null);
       }
     } catch (error: any) {

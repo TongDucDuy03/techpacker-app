@@ -16,6 +16,9 @@
       margin: 0;
       padding: 0;
       box-sizing: border-box;
+      /* Ensure colors print correctly in PDF */
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
 
     body {
@@ -24,6 +27,9 @@
       line-height: 1.4;
       background: white;
       padding: 20px;
+      /* Ensure colors print correctly in PDF */
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
 
     /* Image optimization for PDF size reduction */
@@ -46,8 +52,8 @@
     }
 
     .product-images img {
-      max-width: 500px;
-      max-height: 600px;
+      max-width: 400px;
+      max-height: 200px;
     }
 
     /* BOM thumbnail images */
@@ -82,9 +88,12 @@
       border: none;
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 15px;
+      margin-bottom: 5px;
       position: relative;
       z-index: 10;
+      page-break-inside: avoid;
+      page-break-after: avoid;
+      page-break-before: avoid;
     }
 
     .page-header table {
@@ -95,17 +104,19 @@
 
     .page-header td {
       border: 1px solid #000;
-      padding: 6px 8px;
+      padding: 5px 8px;
       font-size: 9px;
       vertical-align: top;
       word-wrap: break-word;
+      overflow-wrap: break-word;
+      word-break: break-word;
     }
 
     .page-title {
       text-align: center;
       font-weight: bold;
       font-size: 14px;
-      padding: 8px;
+      padding: 0px 8px 8px 8px;
       border-bottom: 2px solid #000;
       background: #fff;
     }
@@ -135,18 +146,79 @@
       padding: 4px;
     }
 
-    .product-images {
-      display: flex;
-      gap: 8px;
-      justify-content: center;
-      align-items: center;
+    .product-cell {
+      width: 80px;
+      text-align: center;
+      vertical-align: middle;
+      background: #fff;
+      border-left: 2px solid #000;
+      padding: 4px;
     }
 
-    .product-images img,
-    .product-images div {
-      width: 50px;
-      height: 65px;
-      object-fit: cover;
+    .product-images {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .product-images img {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      display: block;
+    }
+
+    /* Image box - reusable container for images that fit within a frame */
+    .image-box {
+      border: 1px solid #ddd;
+      background: #f9f9f9;
+      border-radius: 4px;
+      padding: 4px;
+      text-align: center;
+      vertical-align: middle;
+      margin-top: 10px;
+      /* Không set height cố định, để ảnh tự fit */
+      display: inline-block;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .image-box img {
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+      max-height: 400px;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      /* Đảm bảo ảnh không tràn ra ngoài container */
+      box-sizing: border-box;
+    }
+
+    /* Giới hạn kích thước ảnh Design Sketch để không nhảy xuống trang 2 */
+    .image-box--sketch {
+      max-height: 350px;
+      overflow: hidden;
+      page-break-inside: avoid;
+      page-break-before: avoid;
+      page-break-after: avoid;
+    }
+
+    .image-box--sketch img {
+      max-height: 330px;
+    }
+
+    .image-box--empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #999;
+      font-size: 11px;
+      min-height: 200px;
     }
 
     /* Section styles */
@@ -158,6 +230,18 @@
 
     .section:first-child {
       page-break-before: auto;
+    }
+
+    /* Article Information section - keep header and design sketch together on page 1 */
+    .section:first-child {
+      page-break-inside: avoid;
+    }
+
+    .section:first-child .page-header,
+    .section:first-child .image-box--sketch {
+      page-break-inside: avoid;
+      page-break-after: avoid;
+      page-break-before: avoid;
     }
 
     .section-content {
@@ -196,7 +280,7 @@
       width: 100%;
       border-collapse: collapse;
       margin-bottom: 15px;
-      font-size: 9px;
+      font-size: 11px; /* Match body font-size for consistency */
     }
 
     th {
@@ -241,15 +325,18 @@
 
     .notes {
       background: #fffacd;
-      border-left: 4px solid #ffd700;
-      padding: 12px;
-      margin: 15px 0;
+      border-left: 3px solid #ffd700;
+      padding: 8px 10px;
+      margin: 8px 0;
+      font-size: 9px;
+      line-height: 1.4;
     }
 
     .notes strong {
       display: block;
-      margin-bottom: 5px;
+      margin-bottom: 4px;
       font-weight: 600;
+      font-size: 9px;
     }
 
     .size-badge {
@@ -288,12 +375,12 @@
           <table>
             <colgroup>
               <col style="width: 8%;" />
+              <col style="width: 10%;" />
+              <col style="width: 19%;" />
               <col style="width: 12%;" />
-              <col style="width: 12%;" />
-              <col style="width: 12%;" />
-              <col style="width: 20%;" />
-              <col style="width: 12%;" />
-              <col style="width: 12%;" />
+              <col style="width: 21%;" />
+              <col style="width: 11%;" />
+              <col style="width: 11%;" />
               <col style="width: 8%;" />
             </colgroup>
             <tr>
@@ -310,39 +397,37 @@
                       <small style="font-size: 7px; display: block; text-align: center; color: #666;">Logo</small>
                       <% } %>
               </td>
-              <td class="label" style="width: 12%;">Article Code</td>
-              <td class="value" style="width: 12%;">
+              <td class="label" style="width: 10%;">Product Code</td>
+              <td class="value" style="width: 19%; word-break: break-word; overflow-wrap: break-word;">
                 <%= meta.articleCode || '-' %>
               </td>
               <td class="label" rowspan="2" style="width: 12%;">Description</td>
-              <td class="value" rowspan="2" colspan="2" style="width: 32%;">
+              <td class="value" rowspan="2" colspan="1" style="width: 21%; word-break: break-word; overflow-wrap: break-word;">
                 <%= meta.description || meta.productDescription || '' %>
               </td>
-              <td class="label" style="width: 12%;">Product Group</td>
-              <td class="value" style="width: 12%;">
+              <td class="label" style="width: 11%;">Product Type</td>
+              <td class="value" style="width: 11%;">
                 <%= meta.category || 'Tops' %>
               </td>
-              <td class="logo-cell" rowspan="4" style="width: 8%;">
+              <td class="logo-cell product-cell" rowspan="4" style="width: 8%;">
                 <div class="product-images">
-                  <% const hasDesignSketch=images && images.coverImage && images.coverImage !=='—' &&
+                  <% const hasDesignSketch = images && images.coverImage && images.coverImage !== '—' &&
                     !images.coverImage.includes('No Image'); %>
                     <% if (hasDesignSketch) { %>
-                      <img src="<%= images.coverImage %>" alt="Product"
-                        style="width: 50px; height: 65px; object-fit: contain; border: 1px solid #ccc; background: #f9f9f9;" />
-                      <% } else { %>
-                        <div style="width: 50px; height: 65px; border: 1px solid #ccc; background: #f9f9f9;"></div>
-                        <% } %>
-                          <div style="width: 50px; height: 65px; border: 1px solid #ccc; background: #f9f9f9;"></div>
+                      <img src="<%= images.coverImage %>" alt="Product" />
+                    <% } else { %>
+                      <div style="width:100%; height:100%; border:1px solid #ccc; background:#f9f9f9;"></div>
+                    <% } %>
                 </div>
               </td>
             </tr>
             <tr>
-              <td class="label">Article Name</td>
-              <td class="value" colspan="3">
+              <td class="label">Product Name</td>
+              <td class="value" style="width: 19%; word-break: break-word; overflow-wrap: break-word;">
                 <%= meta.productName || meta.articleName || '-' %>
               </td>
-              <td class="label">Product Sub-Category</td>
-              <td class="value">
+              <td class="label" style="width: 11%;">Product Sub-Category</td>
+              <td class="value" style="width: 11%;">
                 <%= meta.productSubCategory || 'Short Sleeve' %>
               </td>
             </tr>
@@ -352,7 +437,7 @@
                 <%= meta.createdAt || '-' %>
               </td>
               <td class="label" rowspan="2" style="width: 12%;">Material<br>Description</td>
-              <td class="value" rowspan="2" colspan="2" style="width: 32%;">
+              <td class="value" rowspan="2" colspan="1" style="width: 21%; word-break: break-word; overflow-wrap: break-word;">
                 <%= meta.fabricDescription || '-' %>
                   <% if (meta.materialComposition) { %><br>
                     <%= meta.materialComposition %>
@@ -360,8 +445,8 @@
                         <% if (meta.supplier) { %><br>Supplier: <%= meta.supplier %>
                             <% } %>
               </td>
-              <td class="label">Season</td>
-              <td class="value">
+              <td class="label" style="width: 11%;">Season</td>
+              <td class="value" style="width: 11%;">
                 <%= meta.season || 'Active Development' %>
               </td>
             </tr>
@@ -370,8 +455,8 @@
               <td class="value">
                 <%= meta.updatedAt || '-' %>
               </td>
-              <td class="label">Life Cycle Stage</td>
-              <td class="value">
+              <td class="label" style="width: 11%;">Product Progress</td>
+              <td class="value" style="width: 11%;">
                 <%= meta.lifecycleStage || meta.status || 'Production' %>
               </td>
             </tr>
@@ -380,9 +465,37 @@
         <% } %>
 
           <%# 1. ARTICLE INFORMATION %>
-            <div class="section">
-              <% renderSectionHeader('Article Information'); %>
-                <div class="section-content">
+            <div class="section" style="page-break-inside: avoid; page-break-after: avoid;">
+               <% renderSectionHeader('Product Info'); %>
+               <!-- Design Sketch Section - placed after header table -->
+                  <div style="margin-top: 10px; page-break-inside: avoid; page-break-before: avoid; margin-bottom: 5px; width: 100%; overflow: hidden;">
+                    <!-- <div style="font-weight: 700; font-size: 12px; text-transform: uppercase; border-bottom: 2px solid #333; padding-bottom: 5px;">
+                      DESIGN SKETCH
+                    </div> -->
+                    <% 
+                      const designSketchImg = images && images.designSketch ? images.designSketch : (meta.designSketchUrl || '');
+                     
+                      const hasDesignSketch = designSketchImg && 
+                        designSketchImg !== '—' && 
+                        !designSketchImg.includes('No Image') &&
+                        !designSketchImg.toLowerCase().includes('data:image/svg+xml') &&
+                        designSketchImg.trim() !== '' &&
+                        (designSketchImg.startsWith('data:image/jpeg') || 
+                         designSketchImg.startsWith('data:image/png') ||
+                         designSketchImg.startsWith('data:image/gif') ||
+                         designSketchImg.startsWith('http'));
+                    %>
+                    <% if (hasDesignSketch) { %>
+                      <div class="image-box image-box--sketch">
+                        <img src="<%= designSketchImg %>" alt="Design Sketch" />
+                      </div>
+                    <% } else { %>
+                      <div class="image-box image-box--sketch image-box--empty">
+                        No design sketch
+                      </div>
+                    <% } %>
+                  </div>
+                <div class="section-content" style ="page-break-inside: avoid;">
                   <div class="info-grid">
                     <div class="info-item">
                       <strong>Gender</strong>
@@ -391,15 +504,15 @@
                       </span>
                     </div>
                     <div class="info-item">
-                      <strong>Legacy Product Class</strong>
+                      <strong>Product Type</strong>
                       <span>
                         <%= meta.productClass || meta.category || '-' %>
                       </span>
                     </div>
                     <div class="info-item">
-                      <strong>Fit Type</strong>
+                      <strong>Product Fit</strong>
                       <span>
-                        <%= meta.fitType || 'Relaxed' %>
+                        <%= (meta.fitType && meta.fitType.trim()) ? meta.fitType : '—' %>
                       </span>
                     </div>
                     <div class="info-item">
@@ -421,7 +534,7 @@
                       </span>
                     </div>
                     <div class="info-item">
-                      <strong>Price Point</strong>
+                      <strong>Ranking</strong>
                       <span>
                         <%= meta.pricePoint || '-' %>
                       </span>
@@ -433,14 +546,7 @@
                       </span>
                     </div>
                   </div>
-                  <% if (meta.productDescription || meta.description) { %>
-                    <div style="margin-top: 15px">
-                      <strong>DESCRIPTION:</strong>
-                      <p style="margin-top: 5px; line-height: 1.6">
-                        <%= meta.productDescription || meta.description %>
-                      </p>
-                    </div>
-                    <% } %>
+                  <!-- Description section removed - already shown in header table -->
 
                       <!-- CHÈN NỘI DUNG CARE INSTRUCTIONS Ở ĐÂY -->
 
@@ -523,6 +629,7 @@
                                 <th style="width: 8%">UOM</th>
                                 <th style="width: 12%">Supplier</th>
                                 <th style="width: 14%">Comments</th>
+                                <th style="width: 12%">Color Code</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -555,16 +662,25 @@
                                   </td>
                                   <td>
                                     <%= item.comments || '-' %>
-                                    <% if (item.hexCode || item.pantone) { %>
-                                      <div style="margin-top:6px; font-size:9pt;">
-                                        <% if (item.hexCode) { %>
-                                          <span style="display:inline-block; width:12px; height:12px; border:1px solid #E0E0E0; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
-                                          <%= item.hexCode %>
-                                        <% } %>
-                                        <% if (item.pantone) { %>
-                                          <% if (item.hexCode) { %> / <% } %>Pantone: <%= item.pantone %>
-                                        <% } %>
-                                      </div>
+                                  </td>
+                                  <td style="font-size: 11px; line-height: 1.4; vertical-align: top;">
+                                    <% if (item.colorCode || item.color || item.pantone || item.hexCode) { %>
+                                      <% if (item.colorCode) { %>
+                                        <span style="font-weight: 600; font-size: 11px;"><%= item.colorCode %></span>
+                                        <% if (item.hexCode) { %><br/><% } %>
+                                      <% } else if (item.color) { %>
+                                        <span style="font-weight: 600; font-size: 11px;"><%= item.color %></span>
+                                        <% if (item.pantone || item.hexCode) { %><br/><% } %>
+                                      <% } %>
+                                      <% if (!item.colorCode && item.pantone) { %>
+                                        <span style="font-size: 11px;"><%= item.pantone %></span><br/>
+                                      <% } %>
+                                      <% if (item.hexCode) { %>
+                                        <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
+                                        <span style="font-size: 11px;"><%= item.hexCode %></span>
+                                      <% } %>
+                                    <% } else { %>
+                                      -
                                     <% } %>
                                   </td>
                                 </tr>
@@ -584,8 +700,9 @@
                                     <th style="width: 10%">Size</th>
                                     <th style="width: 8%">Qty</th>
                                     <th style="width: 8%">UOM</th>
-                                    <th style="width: 12%">Supplier</th>
+                                    <th style="width: 10%">Supplier</th>
                                     <th style="width: 12%">Comments</th>
+                                    <th style="width: 12%">Color Code</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -614,16 +731,25 @@
                                       </td>
                                       <td>
                                         <%= item.comments || '-' %>
-                                        <% if (item.hexCode || item.pantone) { %>
-                                          <div style="margin-top:6px; font-size:9pt;">
-                                            <% if (item.hexCode) { %>
-                                              <span style="display:inline-block; width:12px; height:12px; border:1px solid #E0E0E0; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
-                                              <%= item.hexCode %>
-                                            <% } %>
-                                            <% if (item.pantone) { %>
-                                              <% if (item.hexCode) { %> / <% } %>Pantone: <%= item.pantone %>
-                                            <% } %>
-                                          </div>
+                                      </td>
+                                      <td style="font-size: 11px; line-height: 1.4; vertical-align: top;">
+                                        <% if (item.colorCode || item.color || item.pantone || item.hexCode) { %>
+                                          <% if (item.colorCode) { %>
+                                            <span style="font-weight: 600; font-size: 11px;"><%= item.colorCode %></span>
+                                            <% if (item.hexCode) { %><br/><% } %>
+                                          <% } else if (item.color) { %>
+                                            <span style="font-weight: 600; font-size: 11px;"><%= item.color %></span>
+                                            <% if (item.pantone || item.hexCode) { %><br/><% } %>
+                                          <% } %>
+                                          <% if (!item.colorCode && item.pantone) { %>
+                                            <span style="font-size: 11px;"><%= item.pantone %></span><br/>
+                                          <% } %>
+                                          <% if (item.hexCode) { %>
+                                            <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
+                                            <span style="font-size: 11px;"><%= item.hexCode %></span>
+                                          <% } %>
+                                        <% } else { %>
+                                          -
                                         <% } %>
                                       </td>
                                     </tr>
@@ -643,6 +769,7 @@
                                         <th style="width: 8%">Qty</th>
                                         <th style="width: 8%">UOM</th>
                                         <th style="width: 22%">Comments</th>
+                                        <th style="width: 12%">Color Code</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -665,16 +792,25 @@
                                           </td>
                                           <td>
                                             <%= item.comments || '-' %>
-                                            <% if (item.hexCode || item.pantone) { %>
-                                              <div style="margin-top:6px; font-size:9pt;">
-                                                <% if (item.hexCode) { %>
-                                                  <span style="display:inline-block; width:12px; height:12px; border:1px solid #E0E0E0; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
-                                                  <%= item.hexCode %>
-                                                <% } %>
-                                                <% if (item.pantone) { %>
-                                                  <% if (item.hexCode) { %> / <% } %>Pantone: <%= item.pantone %>
-                                                <% } %>
-                                              </div>
+                                          </td>
+                                          <td style="font-size: 11px; line-height: 1.4; vertical-align: top;">
+                                            <% if (item.colorCode || item.color || item.pantone || item.hexCode) { %>
+                                              <% if (item.colorCode) { %>
+                                                <span style="font-weight: 600; font-size: 11px;"><%= item.colorCode %></span>
+                                                <% if (item.hexCode) { %><br/><% } %>
+                                              <% } else if (item.color) { %>
+                                                <span style="font-weight: 600; font-size: 11px;"><%= item.color %></span>
+                                                <% if (item.pantone || item.hexCode) { %><br/><% } %>
+                                              <% } %>
+                                              <% if (!item.colorCode && item.pantone) { %>
+                                                <span style="font-size: 11px;"><%= item.pantone %></span><br/>
+                                              <% } %>
+                                              <% if (item.hexCode) { %>
+                                                <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
+                                                <span style="font-size: 11px;"><%= item.hexCode %></span>
+                                              <% } %>
+                                            <% } else { %>
+                                              -
                                             <% } %>
                                           </td>
                                         </tr>
@@ -694,6 +830,7 @@
                                             <th style="width: 10%">UOM</th>
                                             <th style="width: 18%">Supplier</th>
                                             <th style="width: 22%">Comments</th>
+                                            <th style="width: 12%">Color Code</th>
                                           </tr>
                                         </thead>
                                         <tbody>
@@ -716,16 +853,25 @@
                                               </td>
                                               <td>
                                                 <%= item.comments || '-' %>
-                                                <% if (item.hexCode || item.pantone) { %>
-                                                  <div style="margin-top:6px; font-size:9pt;">
-                                                    <% if (item.hexCode) { %>
-                                                      <span style="display:inline-block; width:12px; height:12px; border:1px solid #E0E0E0; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
-                                                      <%= item.hexCode %>
-                                                    <% } %>
-                                                    <% if (item.pantone) { %>
-                                                      <% if (item.hexCode) { %> / <% } %>Pantone: <%= item.pantone %>
-                                                    <% } %>
-                                                  </div>
+                                              </td>
+                                              <td style="font-size: 11px; line-height: 1.4; vertical-align: top;">
+                                                <% if (item.colorCode || item.color || item.pantone || item.hexCode) { %>
+                                                  <% if (item.colorCode) { %>
+                                                    <span style="font-weight: 600; font-size: 11px;"><%= item.colorCode %></span>
+                                                    <% if (item.hexCode) { %><br/><% } %>
+                                                  <% } else if (item.color) { %>
+                                                    <span style="font-weight: 600; font-size: 11px;"><%= item.color %></span>
+                                                    <% if (item.pantone || item.hexCode) { %><br/><% } %>
+                                                  <% } %>
+                                                  <% if (!item.colorCode && item.pantone) { %>
+                                                    <span style="font-size: 11px;"><%= item.pantone %></span><br/>
+                                                  <% } %>
+                                                  <% if (item.hexCode) { %>
+                                                    <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
+                                                    <span style="font-size: 11px;"><%= item.hexCode %></span>
+                                                  <% } %>
+                                                <% } else { %>
+                                                  -
                                                 <% } %>
                                               </td>
                                             </tr>
@@ -740,14 +886,18 @@
                   <%# 3. MEASUREMENTS %>
                     <% if (measurements && measurements.rows && measurements.rows.length> 0) { %>
                       <div class="section">
-                        <% renderSectionHeader('Measurement'); %>
+                        <% renderSectionHeader('Measurements - Comments'); %>
                           <div class="section-content">
                             <% if (measurements.sizeRange && measurements.sizeRange.length> 0) { %>
                               <div style="margin-bottom: 15px">
                                 <strong>SIZE RANGE:</strong>
+                                <% if (measurements.unit) { %>
+                                  <span style="margin-left: 10px; color: #666; font-weight: normal;">(Unit: <%= measurements.unit %>)</span>
+                                <% } %>
                                 <div style="margin-top: 8px">
+                                  <% const baseSize = measurements.baseSize; %>
                                   <% measurements.sizeRange.forEach(size=> { %>
-                                    <span class="size-badge">
+                                    <span class="size-badge" style="<%= size === baseSize ? 'background: #79e5a5; color: #000;' : '' %>">
                                       <%= size %>
                                     </span>
                                     <% }); %>
@@ -786,10 +936,10 @@
                                             <%= row.pomName || '-' %>
                                           </td>
                                           <td>
-                                            <%= row.minusTolerance || '0' %>
+                                            <%= row.minusToleranceFormatted || (row.minusTolerance !== undefined ? row.minusTolerance : '0') %>
                                           </td>
                                           <td>
-                                            <%= row.plusTolerance || '0' %>
+                                            <%= row.plusToleranceFormatted || (row.plusTolerance !== undefined ? row.plusTolerance : '0') %>
                                           </td>
                                           <% if (measurements.sizeRange) { measurements.sizeRange.forEach(size=> { %>
                                             <td style="<%= size === baseSize ? 'background: #79e5a5;' : '' %>">
@@ -915,22 +1065,18 @@
                             <div class="info-grid" style="margin-bottom: 20px">
                               <% colorways.forEach(color=> { %>
                                 <div class="info-item">
-                                  <strong>
+                                  <div style="font-weight: 700; text-transform: uppercase; font-size: 11px; margin-bottom: 4px;">
                                     <%= color.name || 'Color' %>
-                                  </strong>
-                                  <span>
-                                    <span class="color-swatch"
-                                      style="background: <%= color.hexColor || '#FFFFFF' %>"></span>
-                                    Code: <%= color.code || '000' %><br />
-                                      <% if (color.pantoneCode) { %>Pantone: <%= color.pantoneCode %><br />
-                                          <% } %>
-                                            Hex: <%= color.hexColor || '#FFFFFF' %>
-                                              <% if (color.imageUrl) { %>
-                                                <br />
-                                                <img src="<%= color.imageUrl %>" alt="Colorway Image"
-                                                  style="margin-top:6px; max-width:80px; max-height:80px; border:1px solid #ccc; border-radius:4px; object-fit:contain;" />
-                                                <% } %>
-                                  </span>
+                                  </div>
+                                  <div style="font-size: 11px; margin-bottom: 6px;">
+                                    Code: <%= color.code || '000' %>
+                                  </div>
+                                  <% if (color.imageUrl && color.imageUrl !== '—' && !color.imageUrl.includes('No Image')) { %>
+                                    <div style="text-align: left; margin-top: 6px;">
+                                      <img src="<%= color.imageUrl %>" alt="Colorway Image"
+                                        style="max-width: 80px; max-height: 80px; border: 1px solid #ccc; border-radius: 4px; object-fit: contain;" />
+                                    </div>
+                                  <% } %>
                                 </div>
                                 <% }); %>
                             </div>
@@ -941,7 +1087,7 @@
                         <%# 5. CONSTRUCTION %>
                           <% if (howToMeasures && howToMeasures.length> 0) { %>
                             <div class="section">
-                              <% renderSectionHeader('Construction'); %>
+                              <% renderSectionHeader('Construction Details'); %>
                                 <div class="section-content">
                                   <% howToMeasures.forEach((item, index)=> { %>
                                     <div
@@ -1024,7 +1170,7 @@
                               <%# 6. PACKING %>
                                 <% if (packingNotes && packingNotes !=='—' ) { %>
                                   <div class="section">
-                                    <% renderSectionHeader('Packing'); %>
+                                    <% renderSectionHeader('Labels - Packing'); %>
                                       <div class="section-content">
                                         <div
                                           style="background: #f8fafc; border: 1px solid #e1e7ee; border-radius: 6px; padding: 20px; font-size: 10px; line-height: 1.6;">
