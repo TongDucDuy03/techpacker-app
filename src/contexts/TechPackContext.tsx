@@ -1503,6 +1503,49 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         ...restUpdates
       } = updates as any;
 
+      // Merge articleInfo carefully - preserve all existing fields, only update fields that are actually present in response
+      // CRITICAL: Don't overwrite existing values with undefined, null, or empty strings from response
+      // This ensures required fields (supplier, fabricDescription, productDescription, designSketchUrl, technicalDesignerId)
+      // are preserved even if backend doesn't return them in the response
+      const mergedArticleInfo = { ...(prev.techpack as any).articleInfo };
+      if (_articleInfo) {
+        Object.keys(_articleInfo).forEach(key => {
+          const newValue = (_articleInfo as any)[key];
+          const currentValue = mergedArticleInfo[key];
+          
+          // Only update if new value is explicitly provided (not undefined)
+          if (newValue !== undefined) {
+            // Special handling for required fields that should never be cleared:
+            const requiredFields = ['supplier', 'fabricDescription', 'productDescription', 'designSketchUrl', 'technicalDesignerId'];
+            const isRequiredField = requiredFields.includes(key);
+            
+            if (isRequiredField) {
+              // For required fields:
+              // - If new value is empty string/null and current value exists, preserve current value
+              // - Only update if new value is non-empty
+              if ((newValue === '' || newValue === null) && (currentValue !== undefined && currentValue !== '' && currentValue !== null)) {
+                // Keep current value, don't overwrite with empty/null
+                return;
+              }
+              // Update with new value (even if empty, but only if current is also empty)
+              mergedArticleInfo[key] = newValue;
+            } else {
+              // For non-required fields:
+              // - If new value is empty string and current value exists, preserve current value
+              // - Otherwise, update with new value
+              if (newValue === '' && (currentValue !== undefined && currentValue !== '')) {
+                // Keep current value, don't overwrite with empty string
+                return;
+              }
+              // Update with new value
+              mergedArticleInfo[key] = newValue;
+            }
+          }
+          // If newValue is undefined, keep current value (don't overwrite)
+        });
+      }
+      // If _articleInfo is not provided at all, keep all existing articleInfo fields
+
       const newState = {
         ...prev,
         techpack: {
@@ -1514,10 +1557,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           sampleMeasurementRounds: normalizedSampleRounds,
           howToMeasures: nextHowToMeasures,
           colorways: nextColorways,
-          articleInfo: {
-            ...(prev.techpack as any).articleInfo,
-            ...(_articleInfo || {}),
-          }
+          articleInfo: mergedArticleInfo,
         },
         // Nếu skipUnsavedFlag = true (load từ server), set hasUnsavedChanges = false
         // Nếu skipUnsavedFlag = false (user edit), set hasUnsavedChanges = true
@@ -1725,24 +1765,71 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
             // This ensures form shows data exactly like when entering Edit mode
             const mappedTechPack = mapApiTechPackToFormState(refreshedTechPack) as any;
             
-            console.log('🔄 Reloading TechPack after update:', {
-              id: techpackData.id,
-              articleName: mappedTechPack.articleInfo?.articleName,
-              hasBom: Array.isArray(mappedTechPack.bom) && mappedTechPack.bom.length > 0,
-              hasMeasurements: Array.isArray(mappedTechPack.measurements) && mappedTechPack.measurements.length > 0,
+            // CRITICAL FIX: Get current state before updating to preserve required fields
+            // This ensures required fields (supplier, fabricDescription, etc.) are preserved
+            // even if backend doesn't return them or they're missing from the mapped data
+            setState(prev => {
+              const currentState = prev.techpack;
+              const mergedTechPack = {
+                ...mappedTechPack,
+                articleInfo: {
+                  // Preserve current articleInfo fields that might be missing in response
+                  ...currentState.articleInfo,
+                  // Override with mapped values only if they exist and are non-empty
+                  ...Object.keys(mappedTechPack.articleInfo || {}).reduce((acc, key) => {
+                    const mappedValue = (mappedTechPack.articleInfo as any)[key];
+                    const currentValue = (currentState.articleInfo as any)?.[key];
+                    
+                    // For required fields, only update if mapped value is non-empty
+                    const requiredFields = ['supplier', 'fabricDescription', 'productDescription', 'designSketchUrl', 'technicalDesignerId'];
+                    if (requiredFields.includes(key)) {
+                      if (mappedValue !== undefined && mappedValue !== '' && mappedValue !== null) {
+                        acc[key] = mappedValue;
+                      } else if (currentValue !== undefined && currentValue !== '' && currentValue !== null) {
+                        // Preserve current value if mapped value is empty
+                        acc[key] = currentValue;
+                      } else {
+                        // Use mapped value (even if empty) if current is also empty
+                        acc[key] = mappedValue;
+                      }
+                    } else {
+                      // For non-required fields, prefer mapped value if it exists
+                      if (mappedValue !== undefined) {
+                        acc[key] = mappedValue;
+                      } else if (currentValue !== undefined) {
+                        acc[key] = currentValue;
+                      }
+                    }
+                    return acc;
+                  }, {} as any)
+                }
+              };
+              
+              console.log('🔄 Reloading TechPack after update:', {
+                id: techpackData.id,
+                articleName: mergedTechPack.articleInfo?.articleName,
+                supplier: mergedTechPack.articleInfo?.supplier,
+                fabricDescription: mergedTechPack.articleInfo?.fabricDescription,
+                productDescription: mergedTechPack.articleInfo?.productDescription,
+                designSketchUrl: mergedTechPack.articleInfo?.designSketchUrl,
+                technicalDesignerId: mergedTechPack.articleInfo?.technicalDesignerId,
+                hasBom: Array.isArray(mergedTechPack.bom) && mergedTechPack.bom.length > 0,
+                hasMeasurements: Array.isArray(mergedTechPack.measurements) && mergedTechPack.measurements.length > 0,
+              });
+              
+              // Use updateFormState logic inline to merge properly
+              return {
+                ...prev,
+                techpack: {
+                  ...prev.techpack,
+                  ...mergedTechPack,
+                  articleInfo: mergedTechPack.articleInfo,
+                },
+                isSaving: false,
+                hasUnsavedChanges: false,
+                lastSaved: new Date().toISOString(),
+              };
             });
-            
-            // ✅ FIXED: Use updateFormState with skipUnsavedFlag=true (same as Edit mode)
-            // This ensures the form state is updated exactly like when entering Edit mode
-            updateFormState(mappedTechPack, true); // skipUnsavedFlag = true
-            
-            // Update flags separately
-            setState(prev => ({
-              ...prev,
-              isSaving: false,
-              hasUnsavedChanges: false,
-              lastSaved: new Date().toISOString(),
-            }));
             
             // Clear draft AFTER state update
             clearDraftFromStorage(techpackData.id);
