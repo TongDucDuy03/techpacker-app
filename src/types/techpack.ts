@@ -22,7 +22,7 @@ export interface ArticleInfo {
   designSketchUrl?: string;
   companyLogoUrl?: string;
   season: string;
-  lifecycleStage: 'Concept' | 'Design' | 'Development' | 'Pre-production' | 'Production' | 'Shipped';
+  lifecycleStage: 'Concept' | 'Design' | 'Development' | 'Pre-production' | 'Production' | 'Sales';
   status?: TechPackStatus; // Backend status field
   category?: string; // Backend field name (maps to productClass)
   currency?: string; // Default 'USD'
@@ -32,7 +32,7 @@ export interface ArticleInfo {
   brand?: string;
   collection?: string;
   targetMarket?: string;
-  pricePoint?: 'Value' | 'Mid-range' | 'Premium' | 'Luxury';
+  pricePoint?: 'Mass' | 'Mid-range' | 'Premium' | 'Luxury';
   notes?: string;
   // Readonly fields (from backend)
   createdBy?: string;
