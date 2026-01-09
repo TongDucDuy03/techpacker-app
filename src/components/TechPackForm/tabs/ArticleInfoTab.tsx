@@ -40,6 +40,9 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
   const { articleInfo } = techPack ?? {};
   const { t } = useI18n();
   const { user } = useAuth();
+  
+  // Check if user can view Additional Information section (Admin or Merchandiser only)
+  const canViewAdditionalInfo = user?.role === 'admin' || user?.role?.toLowerCase() === 'merchandiser';
   const [designers, setDesigners] = useState<Array<{ value: string; label: string }>>([]);
   const [loadingDesigners, setLoadingDesigners] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -863,88 +866,95 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 helperText={validation.getFieldProps('status').helperText || t('form.articleInfo.statusHelper')}
               />
 
-              {/* Optional Fields */}
-              <div className="md:col-span-2 mt-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
-                  {t('form.additionalInformation')}
-                </h3>
-              </div>
+              {/* Optional Fields - Only visible to Admin and Merchandiser */}
+              {canViewAdditionalInfo && (
+                <>
+                  <div className="md:col-span-2 mt-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                      <span className="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
+                      {t('form.additionalInformation')}
+                    </h3>
+                    <div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-gray-600">
+                      {t('form.additionalInformation.restricted')}
+                    </div>
+                  </div>
 
-              <Input
-                label={t('form.articleInfo.brand')}
-                value={safeArticleInfo.brand || ''}
-                onChange={handleInputChange('brand')}
-                onBlur={() => validation.setFieldTouched('brand')}
-                placeholder={t('form.articleInfo.brandPlaceholder')}
-                maxLength={255}
-                disabled={!canEdit}
-                error={validation.getFieldProps('brand').error}
-                helperText={validation.getFieldProps('brand').helperText}
-              />
+                  <Input
+                    label={t('form.articleInfo.brand')}
+                    value={safeArticleInfo.brand || ''}
+                    onChange={handleInputChange('brand')}
+                    onBlur={() => validation.setFieldTouched('brand')}
+                    placeholder={t('form.articleInfo.brandPlaceholder')}
+                    maxLength={255}
+                    disabled={!canEdit}
+                    error={validation.getFieldProps('brand').error}
+                    helperText={validation.getFieldProps('brand').helperText}
+                  />
 
-              <Input
-                label={t('form.articleInfo.collection')}
-                value={safeArticleInfo.collection || ''}
-                onChange={handleInputChange('collection')}
-                onBlur={() => validation.setFieldTouched('collection')}
-                placeholder={t('form.articleInfo.collectionPlaceholder')}
-                maxLength={255}
-                disabled={!canEdit}
-                error={validation.getFieldProps('collection').error}
-                helperText={validation.getFieldProps('collection').helperText}
-              />
+                  <Input
+                    label={t('form.articleInfo.collection')}
+                    value={safeArticleInfo.collection || ''}
+                    onChange={handleInputChange('collection')}
+                    onBlur={() => validation.setFieldTouched('collection')}
+                    placeholder={t('form.articleInfo.collectionPlaceholder')}
+                    maxLength={255}
+                    disabled={!canEdit}
+                    error={validation.getFieldProps('collection').error}
+                    helperText={validation.getFieldProps('collection').helperText}
+                  />
 
-              <Input
-                label={t('form.articleInfo.targetMarket')}
-                value={safeArticleInfo.targetMarket || ''}
-                onChange={handleInputChange('targetMarket')}
-                onBlur={() => validation.setFieldTouched('targetMarket')}
-                placeholder="e.g., US, EU, Asia"
-                maxLength={255}
-                disabled={!canEdit}
-                error={validation.getFieldProps('targetMarket').error}
-                helperText={validation.getFieldProps('targetMarket').helperText}
-              />
+                  <Input
+                    label={t('form.articleInfo.targetMarket')}
+                    value={safeArticleInfo.targetMarket || ''}
+                    onChange={handleInputChange('targetMarket')}
+                    onBlur={() => validation.setFieldTouched('targetMarket')}
+                    placeholder="e.g., US, EU, Asia"
+                    maxLength={255}
+                    disabled={!canEdit}
+                    error={validation.getFieldProps('targetMarket').error}
+                    helperText={validation.getFieldProps('targetMarket').helperText}
+                  />
 
-              <Select
-                label={t('form.articleInfo.pricePoint')}
-                value={safeArticleInfo.pricePoint || ''}
-                onChange={handleInputChange('pricePoint')}
-                onBlur={() => validation.setFieldTouched('pricePoint')}
-                options={pricePointOptions}
-                placeholder={t('form.articleInfo.pricePointPlaceholder')}
-                disabled={!canEdit}
-                error={validation.getFieldProps('pricePoint').error}
-                helperText={validation.getFieldProps('pricePoint').helperText}
-              />
+                  <Select
+                    label={t('form.articleInfo.pricePoint')}
+                    value={safeArticleInfo.pricePoint || ''}
+                    onChange={handleInputChange('pricePoint')}
+                    onBlur={() => validation.setFieldTouched('pricePoint')}
+                    options={pricePointOptions}
+                    placeholder={t('form.articleInfo.pricePointPlaceholder')}
+                    disabled={!canEdit}
+                    error={validation.getFieldProps('pricePoint').error}
+                    helperText={validation.getFieldProps('pricePoint').helperText}
+                  />
 
-              {/* Currency and Retail Price */}
-              <div className="grid grid-cols-2 gap-4">
-                <Select
-                  label={t('form.articleInfo.currency')}
-                  value={safeArticleInfo.currency || 'USD'}
-                  onChange={handleInputChange('currency')}
-                  onBlur={() => validation.setFieldTouched('currency')}
-                  options={currencyOptions}
-                  disabled={!canEdit}
-                  error={validation.getFieldProps('currency').error}
-                  helperText={validation.getFieldProps('currency').helperText}
-                />
-                <Input
-                  label={t('form.articleInfo.retailPrice')}
-                  value={safeArticleInfo.retailPrice || ''}
-                  onChange={handleInputChange('retailPrice')}
-                  onBlur={() => validation.setFieldTouched('retailPrice')}
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  placeholder="0.00"
-                  disabled={!canEdit}
-                  error={validation.getFieldProps('retailPrice').error}
-                  helperText={validation.getFieldProps('retailPrice').helperText}
-                />
-              </div>
+                  {/* Currency and Retail Price */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <Select
+                      label={t('form.articleInfo.currency')}
+                      value={safeArticleInfo.currency || 'USD'}
+                      onChange={handleInputChange('currency')}
+                      onBlur={() => validation.setFieldTouched('currency')}
+                      options={currencyOptions}
+                      disabled={!canEdit}
+                      error={validation.getFieldProps('currency').error}
+                      helperText={validation.getFieldProps('currency').helperText}
+                    />
+                    <Input
+                      label={t('form.articleInfo.retailPrice')}
+                      value={safeArticleInfo.retailPrice || ''}
+                      onChange={handleInputChange('retailPrice')}
+                      onBlur={() => validation.setFieldTouched('retailPrice')}
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      placeholder="0.00"
+                      disabled={!canEdit}
+                      error={validation.getFieldProps('retailPrice').error}
+                      helperText={validation.getFieldProps('retailPrice').helperText}
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="md:col-span-2">
                 <Textarea
