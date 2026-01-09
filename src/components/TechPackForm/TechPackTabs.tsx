@@ -37,9 +37,10 @@ interface TechPackTabsProps {
   onBackToList: () => void;
   mode?: 'create' | 'edit' | 'view';
   techPack?: ApiTechPack;
+  onCreated?: (techPack: ApiTechPack) => void; // Callback when techpack is created successfully
 }
 
-const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'create', techPack: initialTechPack }) => {
+const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'create', techPack: initialTechPack, onCreated }) => {
   const context = useTechPack();
   const { state, setCurrentTab, updateFormState, saveTechPack, exportToPDF, resetFormState } = context ?? {};
   const { currentTab = 0, techpack, isSaving = false, lastSaved, hasUnsavedChanges = false } = state ?? {};
@@ -50,6 +51,76 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
   const constructionTabRef = useRef<ConstructionTabRef>(null);
 
   const [showSaveNotification, setShowSaveNotification] = useState(false);
+  const [hasCalledOnCreated, setHasCalledOnCreated] = useState(false);
+  const [previousTechPackId, setPreviousTechPackId] = useState<string | undefined>(undefined);
+  const [previousLastSaved, setPreviousLastSaved] = useState<string | undefined>(undefined);
+
+  // Reset state when entering create mode
+  useEffect(() => {
+    if (mode === 'create') {
+      setHasCalledOnCreated(false);
+      setPreviousTechPackId(undefined);
+      setPreviousLastSaved(undefined);
+      
+      // If techpack already has an ID when entering create mode, reset the form
+      // This ensures we start with a clean state for creating a new techpack
+      if (techpack?.id && resetFormState) {
+        console.log('[TechPackTabs] Resetting form state for new techpack creation');
+        resetFormState();
+      }
+    }
+  }, [mode, resetFormState]);
+
+  // Watch for techpack ID being set after creation
+  // Only trigger when:
+  // 1. In create mode
+  // 2. techpack.id exists (was just created)
+  // 3. techpack.id changed from empty/undefined to a value (new creation)
+  // 4. lastSaved was just updated (save just completed)
+  // 5. Haven't called onCreated yet
+  useEffect(() => {
+    const currentTechPackId = techpack?.id;
+    const currentLastSaved = lastSaved;
+    
+    // Only call onCreated when:
+    // - In create mode
+    // - techpack.id exists and is different from previous (newly created)
+    // - lastSaved was just updated (save completed)
+    // - Haven't called onCreated yet
+    if (
+      mode === 'create' && 
+      currentTechPackId && 
+      currentTechPackId !== previousTechPackId &&
+      currentLastSaved &&
+      currentLastSaved !== previousLastSaved &&
+      !hasCalledOnCreated && 
+      onCreated
+    ) {
+      // Convert techpack to ApiTechPack format for callback
+      const createdTechPack: ApiTechPack = {
+        _id: currentTechPackId,
+        id: currentTechPackId,
+        articleCode: techpack.articleInfo?.articleCode || '',
+        articleName: techpack.articleInfo?.articleName || '',
+        productName: techpack.articleInfo?.articleName || '',
+        name: techpack.articleInfo?.articleName || '',
+        status: techpack.status || 'Draft',
+        ...techpack as any,
+      };
+      setHasCalledOnCreated(true);
+      setPreviousTechPackId(currentTechPackId);
+      setPreviousLastSaved(currentLastSaved);
+      onCreated(createdTechPack);
+    } else {
+      // Update previous values to track changes
+      if (currentTechPackId !== previousTechPackId) {
+        setPreviousTechPackId(currentTechPackId);
+      }
+      if (currentLastSaved !== previousLastSaved) {
+        setPreviousLastSaved(currentLastSaved);
+      }
+    }
+  }, [mode, techpack?.id, lastSaved, hasCalledOnCreated, onCreated, previousTechPackId, previousLastSaved]);
 
   // Permission checks based on user role AND techpack sharing role
   // Get user's techpack role for this specific techpack
@@ -649,8 +720,9 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       cancelText: 'Hủy',
       onOk: async () => {
         console.log('[TechPackTabs] Calling saveTechPack (create confirmed)...');
-    await saveTechPack();
-    console.log('[TechPackTabs] saveTechPack completed');
+        await saveTechPack();
+        console.log('[TechPackTabs] saveTechPack completed');
+        // onCreated will be called via useEffect when techpack.id is set
       }
     });
   };

@@ -178,8 +178,10 @@ export class WorkflowController {
       const limitNum = Math.min(50, Math.max(1, parseInt(limit as string)));
       const skip = (pageNum - 1) * limitNum;
 
-      // Check if TechPack exists
-      const techpack = await TechPack.findById(id);
+      // Check if TechPack exists - populate createdBy and sharedWith for permission check
+      const techpack = await TechPack.findById(id)
+        .populate('createdBy', 'firstName lastName email')
+        .populate('sharedWith.userId', 'firstName lastName email');
       if (!techpack) {
         res.status(404).json({
           success: false,
@@ -188,15 +190,43 @@ export class WorkflowController {
         return;
       }
 
-      // Check access permissions
+      // Check access permissions - use same logic as getTechPack
       const user = req.user!;
-      if (user.role === UserRole.Designer && 
-          techpack.technicalDesignerId.toString() !== user._id.toString()) {
-        res.status(403).json({
-          success: false,
-          message: 'Access denied. You can only view revisions of your own TechPacks.'
-        });
-        return;
+      
+      // Admin can view all revisions
+      if (user.role === UserRole.Admin) {
+        // Allow access
+      } else {
+        // Check if user is owner - handle both ObjectId and populated object
+        const createdById = techpack.createdBy?._id?.toString() || techpack.createdBy?.toString();
+        const userId = user._id?.toString();
+        const isOwner = createdById === userId;
+        
+        // Check if user is shared with - handle both populated object and ObjectId
+        const isSharedWith = techpack.sharedWith?.some((s: any) => {
+          const shareUserId = s.userId?._id?.toString() || s.userId?.toString();
+          return shareUserId === userId;
+        }) || false;
+        
+        // Viewer: CHỈ xem được nếu được share (KHÔNG xem ngay cả khi là owner)
+        if (user.role === UserRole.Viewer) {
+          if (!isSharedWith) {
+            res.status(403).json({
+              success: false,
+              message: 'Access denied. You can only view revisions of TechPacks shared with you.'
+            });
+            return;
+          }
+        } else {
+          // Designer, Merchandiser: xem nếu là owner hoặc được share
+          if (!isOwner && !isSharedWith) {
+            res.status(403).json({
+              success: false,
+              message: 'Access denied. You can only view revisions of your own TechPacks or TechPacks shared with you.'
+            });
+            return;
+          }
+        }
       }
 
       // Sort options

@@ -74,7 +74,17 @@ export const requireRole = (roles: UserRole[]) => {
       return sendError(res, 'Authentication required. Please log in.', 401, 'UNAUTHORIZED');
     }
 
-    if (!roles.includes(req.user.role)) {
+    // Normalize user role to lowercase string for comparison
+    const userRole = typeof req.user.role === 'string' 
+      ? req.user.role.toLowerCase() 
+      : String(req.user.role).toLowerCase();
+    
+    // Normalize required roles to lowercase strings for comparison
+    const normalizedRoles = roles.map(role => 
+      typeof role === 'string' ? role.toLowerCase() : String(role).toLowerCase()
+    );
+
+    if (!normalizedRoles.includes(userRole)) {
       return sendError(
         res,
         `Insufficient permissions. Required role: ${roles.join(' or ')}. Your role: ${req.user.role}`,

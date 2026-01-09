@@ -240,7 +240,17 @@ function AppContent() {
         );
       case 'create':
         return (
-          <TechPackTabs onBackToList={handleBackToList} />
+          <TechPackTabs 
+            onBackToList={handleBackToList}
+            onCreated={(techPack) => {
+              // After techpack is created, go back to list
+              // Refresh the list to show the newly created techpack
+              if (context?.loadTechPacks) {
+                context.loadTechPacks({ page: 1, limit: 10 });
+              }
+              handleBackToList();
+            }}
+          />
         );
       case 'edit':
         if (loadingTechPack) {

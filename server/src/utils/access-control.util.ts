@@ -98,7 +98,11 @@ export function isValidRoleForSystemRole(systemRole: UserRole | string | undefin
  */
 export function hasEditAccess(techpack: any, user: any): boolean {
   if (user.role === UserRole.Admin) return true; // System Admin has override
-  const isOwner = techpack.createdBy?.toString() === user._id.toString();
+  
+  // Check if user is owner - handle both ObjectId and populated object
+  const createdById = techpack.createdBy?._id?.toString() || techpack.createdBy?.toString();
+  const userId = user._id?.toString();
+  const isOwner = createdById === userId;
   if (isOwner) return true; // Owner has full access
   
   const sharedAccess = techpack.sharedWith?.find((s: any) => {
@@ -141,7 +145,11 @@ export function hasEditAccess(techpack: any, user: any): boolean {
  */
 export function hasViewAccess(techpack: any, user: any): boolean {
   if (user.role === UserRole.Admin) return true; // System Admin has override
-  const isOwner = techpack.createdBy?.toString() === user._id.toString();
+  
+  // Check if user is owner - handle both ObjectId and populated object
+  const createdById = techpack.createdBy?._id?.toString() || techpack.createdBy?.toString();
+  const userId = user._id?.toString();
+  const isOwner = createdById === userId;
   if (isOwner) return true; // Owner has full access
   
   const sharedAccess = techpack.sharedWith?.find((s: any) => s.userId?.toString() === user._id.toString());

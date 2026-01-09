@@ -461,11 +461,14 @@ export class TechPackController {
 
       if (cachedTechpack) {
         // Kiểm tra quyền truy cập từ cached data (technicalDesignerId is no longer used for access control)
-        const isOwner = cachedTechpack.createdBy?._id?.toString() === requestUser._id.toString();
+        // Check if user is owner - handle both ObjectId and populated object
+        const cachedCreatedById = cachedTechpack.createdBy?._id?.toString() || cachedTechpack.createdBy?.toString();
+        const requestUserId = requestUser._id?.toString();
+        const isOwner = cachedCreatedById === requestUserId;
         // Check if user is shared with - handle both populated object and ObjectId
         const sharedAccess = cachedTechpack.sharedWith?.find((s: any) => {
           const shareUserId = s.userId?._id?.toString() || s.userId?.toString();
-          return shareUserId === requestUser._id.toString();
+          return shareUserId === requestUserId;
         });
         
         // Access control tương tự như logic chính:
@@ -565,11 +568,14 @@ export class TechPackController {
       }
 
       const currentUser = req.user!;
-      const isOwner = techpack.createdBy?.toString() === currentUser._id.toString();
+      // Check if user is owner - handle both ObjectId and populated object
+      const createdById = techpack.createdBy?._id?.toString() || techpack.createdBy?.toString();
+      const userId = currentUser._id?.toString();
+      const isOwner = createdById === userId;
       // Check if user is shared with - handle both populated object and ObjectId
       const isSharedWith = techpack.sharedWith?.some((s: any) => {
         const shareUserId = s.userId?._id?.toString() || s.userId?.toString();
-        return shareUserId === currentUser._id.toString();
+        return shareUserId === userId;
       }) || false;
 
       // Access control:
@@ -957,11 +963,14 @@ export class TechPackController {
 
       // Check access permissions using centralized helper
       // Debug logging to help diagnose permission issues
+      const createdById = techpack.createdBy?._id?.toString() || techpack.createdBy?.toString();
+      const userId = user._id?.toString();
       console.log('[updateTechPack] Permission check:', {
-        userId: user._id.toString(),
+        userId,
         userRole: user.role,
         techpackId: techpack._id,
-        createdBy: techpack.createdBy?.toString(),
+        createdById,
+        isOwner: createdById === userId,
         sharedWithCount: techpack.sharedWith?.length || 0,
         sharedWith: techpack.sharedWith?.map((s: any) => ({
           userId: s.userId?._id?.toString() || s.userId?.toString(),
@@ -970,7 +979,7 @@ export class TechPackController {
       });
       
       if (!hasEditAccess(techpack, user)) {
-        console.log('[updateTechPack] Access denied for user:', user._id.toString(), 'role:', user.role);
+        console.log('[updateTechPack] Access denied for user:', userId, 'role:', user.role, 'createdById:', createdById);
         return sendError(res, 'Access denied. You do not have permission to edit this tech pack.', 403, 'FORBIDDEN');
       }
       
@@ -1638,14 +1647,24 @@ export class TechPackController {
       const { id, userId } = req.params;
       const revoker = req.user!;
 
-      const techpack = await TechPack.findById(id);
+      // Populate sharedWith.userId to ensure proper comparison
+      const techpack = await TechPack.findById(id)
+        .populate('sharedWith.userId', 'firstName lastName email');
       if (!techpack) {
         return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
       }
 
       // Check if revoker has permission to revoke access
-      const isOwner = techpack.createdBy?.toString() === revoker._id.toString();
-      const revokerAccess = techpack.sharedWith?.find(s => s.userId.toString() === revoker._id.toString());
+      // Handle both ObjectId and populated object for createdBy
+      const createdById = techpack.createdBy?._id?.toString() || techpack.createdBy?.toString();
+      const revokerId = revoker._id?.toString();
+      const isOwner = createdById === revokerId;
+      
+      // Handle both ObjectId and populated object for sharedWith
+      const revokerAccess = techpack.sharedWith?.find(s => {
+        const shareUserId = s.userId?._id?.toString() || s.userId?.toString();
+        return shareUserId === revokerId;
+      });
       const canRevoke = revoker.role === UserRole.Admin || isOwner ||
                        (revokerAccess && ['admin'].includes(revokerAccess.role));
 
@@ -1653,7 +1672,11 @@ export class TechPackController {
         return sendError(res, 'Access denied. Only Owner or Admin can revoke access.', 403, 'FORBIDDEN');
       }
 
-      const shareIndex = techpack.sharedWith?.findIndex(s => s.userId.toString() === userId) || -1;
+      // Find share entry - handle both ObjectId and populated object
+      const shareIndex = techpack.sharedWith?.findIndex(s => {
+        const shareUserId = s.userId?._id?.toString() || s.userId?.toString();
+        return shareUserId === userId;
+      }) || -1;
       if (shareIndex === -1) {
         return sendError(res, 'User does not have access to this TechPack.', 404, 'NOT_FOUND');
       }
@@ -1901,14 +1924,24 @@ export class TechPackController {
         return sendError(res, 'Cannot update to Owner role. Use transfer ownership instead.', 400, 'VALIDATION_ERROR');
       }
 
-      const techpack = await TechPack.findById(id);
+      // Populate sharedWith.userId to ensure proper comparison
+      const techpack = await TechPack.findById(id)
+        .populate('sharedWith.userId', 'firstName lastName email');
       if (!techpack) {
         return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
       }
 
       // Check if updater has permission to update roles
-      const isOwner = techpack.createdBy?.toString() === updater._id.toString();
-      const updaterAccess = techpack.sharedWith?.find(s => s.userId.toString() === updater._id.toString());
+      // Handle both ObjectId and populated object for createdBy
+      const createdById = techpack.createdBy?._id?.toString() || techpack.createdBy?.toString();
+      const updaterId = updater._id?.toString();
+      const isOwner = createdById === updaterId;
+      
+      // Handle both ObjectId and populated object for sharedWith
+      const updaterAccess = techpack.sharedWith?.find(s => {
+        const shareUserId = s.userId?._id?.toString() || s.userId?.toString();
+        return shareUserId === updaterId;
+      });
       const canUpdate = updater.role === UserRole.Admin || isOwner ||
                        (updaterAccess && ['admin'].includes(updaterAccess.role));
 
@@ -1916,7 +1949,11 @@ export class TechPackController {
         return sendError(res, 'Access denied. Only Owner or Admin can update roles.', 403, 'FORBIDDEN');
       }
 
-      const shareIndex = techpack.sharedWith?.findIndex(s => s.userId.toString() === userId) || -1;
+      // Find share entry - handle both ObjectId and populated object
+      const shareIndex = techpack.sharedWith?.findIndex(s => {
+        const shareUserId = s.userId?._id?.toString() || s.userId?.toString();
+        return shareUserId === userId;
+      }) || -1;
       if (shareIndex === -1) {
         return sendError(res, 'User does not have access to this TechPack.', 404, 'NOT_FOUND');
       }
