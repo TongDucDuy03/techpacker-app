@@ -185,9 +185,10 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
     { value: 'Concept', label: t('option.lifecycle.concept') },
     { value: 'Design', label: t('option.lifecycle.design') },
     { value: 'Development', label: t('option.lifecycle.development') },
+    { value: 'Sales', label: t('option.lifecycle.sales') },
     { value: 'Pre-production', label: t('option.lifecycle.preProduction') },
     { value: 'Production', label: t('option.lifecycle.production') },
-    { value: 'Shipped', label: t('option.lifecycle.shipped') }
+
   ];
 
   // Product class options
@@ -195,7 +196,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
 
   // Price point options
   const pricePointOptions = [
-    { value: 'Value', label: t('option.pricePoint.value') },
+    { value: 'Mass', label: t('option.pricePoint.mass') },
     { value: 'Mid-range', label: t('option.pricePoint.midRange') },
     { value: 'Premium', label: t('option.pricePoint.premium') },
     { value: 'Luxury', label: t('option.pricePoint.luxury') }
@@ -204,7 +205,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
   // Status options (matching backend enum)
   const statusOptions: Array<{ value: TechPackStatus; label: string }> = [
     { value: 'Draft', label: t('option.status.draft') },
-    { value: 'In Review', label: t('option.status.inReview') },
+    { value: 'Process', label: t('option.status.process') },
     { value: 'Approved', label: t('option.status.approved') },
     { value: 'Rejected', label: t('option.status.rejected') },
     { value: 'Archived', label: t('option.status.archived') }
