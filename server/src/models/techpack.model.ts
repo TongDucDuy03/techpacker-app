@@ -183,14 +183,14 @@ export interface ITechPack extends Document {
   designSketchUrl?: string;
   companyLogoUrl?: string;
   status: TechPackStatus;
-  lifecycleStage?: 'Concept' | 'Design' | 'Development' | 'Pre-production' | 'Production' | 'Shipped';
+  lifecycleStage?: 'Concept' | 'Design' | 'Development' | 'Pre-production' | 'Production' | 'Sales';
   category?: string;
   gender?: 'Men' | 'Women' | 'Unisex' | 'Kids';
   fitType?: 'Regular' | 'Slim' | 'Loose' | 'Relaxed' | 'Oversized';
   brand?: string;
   collectionName?: string;
   targetMarket?: string;
-  pricePoint?: 'Value' | 'Mid-range' | 'Premium' | 'Luxury';
+  pricePoint?: 'Mass' | 'Mid-range' | 'Premium' | 'Luxury';
   retailPrice?: number;
   currency?: string;
   description?: string;
@@ -423,14 +423,14 @@ const TechPackSchema = new Schema<ITechPack>(
       enum: Object.values(TechPackStatus),
       default: TechPackStatus.Draft
     },
-    lifecycleStage: { type: String, enum: ['Concept', 'Design', 'Development', 'Pre-production', 'Production', 'Shipped'] },
+    lifecycleStage: { type: String, enum: ['Concept', 'Design', 'Development', 'Pre-production', 'Production', 'Sales'] },
     category: { type: String, trim: true },
     gender: { type: String, enum: ['Men', 'Women', 'Unisex', 'Kids'] },
     fitType: { type: String, enum: ['Regular', 'Slim', 'Loose', 'Relaxed', 'Oversized'], trim: true },
     brand: { type: String, trim: true },
     collectionName: { type: String, trim: true },
     targetMarket: { type: String, trim: true },
-    pricePoint: { type: String, enum: ['Value', 'Mid-range', 'Premium', 'Luxury'] },
+    pricePoint: { type: String, enum: ['Mass', 'Mid-range', 'Premium', 'Luxury'] },
     retailPrice: { type: Number, min: 0 },
     currency: { type: String, default: 'USD' },
     description: { type: String, trim: true },

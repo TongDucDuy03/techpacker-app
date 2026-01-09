@@ -1128,7 +1128,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   {t('form.articleInfo.companyLogo')}
-                  <span className="text-gray-400 text-xs ml-2">({t('common.optional')} • {t('form.companyLogoHint')})</span>
+                  {/* <span className="text-gray-400 text-xs ml-2">({t('common.optional')} • {t('form.companyLogoHint')})</span> */}
                 </label>
 
                 {mode !== 'view' && (

@@ -1391,7 +1391,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             </div>
 
             {/* Filter */}
-            <div className="relative">
+            {/* <div className="relative">
               <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <select
                 value={filterByPart}
@@ -1403,7 +1403,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                   <option key={part} value={part}>{part}</option>
                 ))}
               </select>
-            </div>
+            </div> */}
           </div>
 
           <div className="flex items-center space-x-3">
@@ -1476,50 +1476,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
           </div>
         </div>
 
-        {colorways.length > 0 && (
-          <div className="mt-6 border-t border-gray-100 pt-4">
-            <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
-              <div>
-                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{t('form.bom.colorwayColumns')}</p>
-                <p className="text-xs text-gray-500">{t('form.bom.colorwayColumnsDescription')}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setVisibleColorwayIds(colorways.map(cw => cw.id).filter((id): id is string => Boolean(id)))
-                  }
-                  className="px-3 py-1 text-xs border border-gray-300 rounded-full text-gray-600 hover:bg-gray-50"
-                >
-                  {t('form.bom.showAll')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setVisibleColorwayIds([])}
-                  className="px-3 py-1 text-xs border border-gray-300 rounded-full text-gray-600 hover:bg-gray-50"
-                >
-                  {t('form.bom.hideAll')}
-                </button>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {colorways.map(colorway => (
-                <button
-                  key={colorway.id}
-                  type="button"
-                  onClick={() => toggleColorwayVisibility(colorway.id)}
-                  className={`px-3 py-1 rounded-full text-xs transition border ${
-                    visibleColorwayIds.includes(colorway.id)
-                      ? 'bg-blue-50 border-blue-300 text-blue-700'
-                      : 'bg-white border-gray-300 text-gray-500'
-                  }`}
-                >
-                  {colorway.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+       
       </div>
 
       {/* Add/Edit Modal */}

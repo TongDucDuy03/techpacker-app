@@ -1164,7 +1164,7 @@ export class TechPackController {
             updateData.status = TechPackStatus.InReview;
             break;
           case 'Production':
-          case 'Shipped':
+          case 'Sales':
             updateData.status = TechPackStatus.Approved;
             break;
         }

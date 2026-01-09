@@ -45,7 +45,7 @@ export const articleInfoValidationSchema: FormValidationConfig = {
   lifecycleStage: {
     required: true,
     custom: (value: string) => {
-      const validStages = ['Concept', 'Design', 'Development', 'Pre-production', 'Production', 'Shipped'];
+      const validStages = ['Concept', 'Design', 'Development', 'Pre-production', 'Production', 'Sales'];
       if (!validStages.includes(value)) return 'Please select a valid lifecycle stage';
       return null;
     }
