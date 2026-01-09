@@ -1087,12 +1087,16 @@ type RoundModalFormState = {
   React.useEffect(() => {
     if (selectedSizes.length === 0) return;
     if (!formData.baseSize || !selectedSizes.includes(formData.baseSize)) {
+      // Use measurementBaseSize (global base size) if available, otherwise fallback to first size
+      const defaultBaseSize = (measurementBaseSize && selectedSizes.includes(measurementBaseSize))
+        ? measurementBaseSize
+        : selectedSizes[0];
       setFormData(prev => ({
         ...prev,
-        baseSize: selectedSizes[0],
+        baseSize: defaultBaseSize,
       }));
     }
-  }, [formData.baseSize, selectedSizes]);
+  }, [formData.baseSize, selectedSizes, measurementBaseSize]);
 
   React.useEffect(() => {
     if (!formData.baseSize) {
@@ -1381,13 +1385,18 @@ type RoundModalFormState = {
   };
 
   const resetForm = () => {
+    // Use measurementBaseSize (global base size) if available, otherwise fallback to first size
+    const defaultBaseSize = (measurementBaseSize && selectedSizes.includes(measurementBaseSize))
+      ? measurementBaseSize
+      : selectedSizes[0];
+    
     setFormData({
       pomCode: '',
       pomName: '',
       minusTolerance: 1.0,
       plusTolerance: 1.0,
       sizes: {},
-      baseSize: selectedSizes[0],
+      baseSize: defaultBaseSize,
       notes: '',
       measurementMethod: '',
       isActive: true,
