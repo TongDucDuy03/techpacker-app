@@ -298,6 +298,11 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
             const parsed = parseInt(digits, 10);
             return Number.isNaN(parsed) ? 1 : parsed;
           })(),
+          // Map sampleType from API (new field) or fallback to version (backward compatibility)
+          // Check both top-level and articleInfo.sampleType, then fallback to version
+          sampleType: (initialTechPack as any).sampleType || 
+                      (initialTechPack as any).articleInfo?.sampleType || 
+                      String((initialTechPack as any).version || (initialTechPack as any).articleInfo?.version || '1'),
           gender: resolvedGender,
           productClass: resolvedProductClass,
           fitType: ((initialTechPack as any).fitType || (initialTechPack as any).articleInfo?.fitType || 'Regular') as 'Regular' | 'Slim' | 'Loose' | 'Relaxed' | 'Oversized',

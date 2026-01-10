@@ -1368,8 +1368,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                   {safeArticleInfo.articleCode || t('form.articleInfo.articleCode')}
                 </p>
                 <div className="flex items-center text-xs text-gray-500 space-x-2">
-                  <span>{safeArticleInfo.sampleType || t('common.n/a')}</span>
-                  <span>•</span>
                   <span>{safeArticleInfo.gender}</span>
                   <span>•</span>
                   <span>{safeArticleInfo.season}</span>
@@ -1378,20 +1376,16 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
 
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">{t('form.preview.class')}:</span>
+                  <span className="text-gray-600">{t('form.preview.productType')}:</span>
                   <span className="font-medium">{safeArticleInfo.productClass || '-'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">{t('form.preview.fit')}:</span>
+                  <span className="text-gray-600">{t('form.preview.productFit')}:</span>
                   <span className="font-medium">{safeArticleInfo.fitType}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">{t('form.preview.stage')}:</span>
+                  <span className="text-gray-600">{t('form.preview.productProcess')}:</span>
                   <span className="font-medium">{safeArticleInfo.lifecycleStage}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">{t('form.preview.supplier')}:</span>
-                  <span className="font-medium">{safeArticleInfo.supplier || '-'}</span>
                 </div>
               </div>
 

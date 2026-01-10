@@ -3,9 +3,10 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import PrivateRoute from './PrivateRoute';
 import { useI18n } from '../lib/i18n';
+import LoginPage from '../pages/LoginPage';
 
 // Lazy load components for better performance
-const LoginPage = lazy(() => import('../pages/LoginPage'));
+// LoginPage should not be lazy loaded as it's the first page users see and uses i18n
 // Registration page removed (registration disabled). If you need to re-enable, restore this import.
 const ProfilePage = lazy(() => import('../pages/ProfilePage'));
 const AdminPage = lazy(() => import('../pages/Admin/AdminPage'));
