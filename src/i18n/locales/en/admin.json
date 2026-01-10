@@ -1,0 +1,37 @@
+{
+  "users": {
+    "title": "User Management",
+    "stats": {
+      "totalUsers": "Total Users",
+      "roleDistribution": "Role Distribution",
+      "recentUsers": "Recent Users"
+    },
+    "table": {
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "createdAt": "Created At",
+      "lastLogin": "Last Login",
+      "actions": "Actions"
+    },
+    "search": {
+      "placeholder": "Search users..."
+    },
+    "filter": {
+      "role": {
+        "all": "All Roles",
+        "admin": "Admin",
+        "designer": "Designer",
+        "merchandiser": "Merchandiser",
+        "viewer": "Viewer"
+      }
+    }
+  }
+}
+
+
+
+
+
+
+

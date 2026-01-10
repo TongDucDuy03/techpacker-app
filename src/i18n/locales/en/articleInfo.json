@@ -1,0 +1,53 @@
+{
+  "title": "Article Information",
+  "fields": {
+    "articleCode": "Article Code",
+    "articleName": "Article Name",
+    "sampleType": "Sample Type",
+    "gender": "Gender",
+    "productClass": "Product Class",
+    "fitType": "Fit Type",
+    "supplier": "Supplier",
+    "technicalDesigner": "Technical Designer",
+    "fabricDescription": "Fabric Description",
+    "productDescription": "Product Description",
+    "season": "Season",
+    "lifecycleStage": "Lifecycle Stage",
+    "status": "Status",
+    "brand": "Brand",
+    "collection": "Collection",
+    "targetMarket": "Target Market",
+    "pricePoint": "Price Point",
+    "notes": "Notes"
+  },
+  "placeholders": {
+    "articleCode": "Enter article code (e.g., ABC123)",
+    "articleName": "Enter product name",
+    "sampleType": "Enter sample type",
+    "season": "e.g., SS25, FW25",
+    "fabricDescription": "Enter fabric description",
+    "productDescription": "Enter product description",
+    "notes": "Enter additional notes"
+  },
+  "labels": {
+    "designSketch": "Design Sketch",
+    "companyLogo": "Company Logo",
+    "uploadImage": "Upload Image",
+    "removeImage": "Remove Image",
+    "duplicateCode": "This article code already exists",
+    "checkingDuplicate": "Checking for duplicates...",
+    "codeAvailable": "Article code is available"
+  },
+  "buttons": {
+    "save": "Save Article Info",
+    "cancel": "Cancel",
+    "next": "Next: BOM"
+  }
+}
+
+
+
+
+
+
+

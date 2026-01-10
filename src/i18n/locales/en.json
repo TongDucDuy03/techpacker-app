@@ -1,0 +1,268 @@
+{
+  "": {
+    "": {
+      "/App": "",
+      "/pages/Admin/AdminPage": "",
+      "/pages/LoginPage": "",
+      "/pages/ProfilePage": ""
+    },
+    "/tabs/ArticleInfoTab": "",
+    "/tabs/BomTab": "",
+    "/tabs/ColorwayTab": "",
+    "/tabs/HowToMeasureTab": "",
+    "/tabs/MeasurementTab": "",
+    "/tabs/RevisionTab": "",
+    "/tabs/SharingTab": ""
+  },
+  " ": "",
+  ",": "",
+  "/": "",
+  ";": "",
+  "Please fill in POM Code and Description": "",
+  "T": "",
+  "Vui lòng lưu sample round hiện tại trước khi tạo round mới": {
+    "": ""
+  },
+  "\\n": "",
+  "a": "",
+  "actions": {
+    "add": "Add",
+    "apply": "Apply",
+    "remove": "Remove",
+    "removeColorway": "Remove Colorway"
+  },
+  "admin": {
+    "users": {
+      "filter": {
+        "role": {
+          "admin": "Admin",
+          "all": "All Roles",
+          "designer": "Designer",
+          "merchandiser": "Merchandiser",
+          "viewer": "Viewer"
+        }
+      },
+      "search": {
+        "placeholder": "Search users..."
+      },
+      "stats": {
+        "recentUsers": "Recent Users",
+        "roleDistribution": "Role Distribution",
+        "totalUsers": "Total Users"
+      },
+      "table": {
+        "actions": "Actions",
+        "createdAt": "Created At",
+        "email": "Email",
+        "lastLogin": "Last Login",
+        "name": "Name",
+        "role": "Role"
+      },
+      "title": "User Management"
+    }
+  },
+  "colormgmt": {
+    "btn": {
+      "addColor": "",
+      "create": "",
+      "update": ""
+    },
+    "colorsCount": "",
+    "empty": "",
+    "form": {
+      "color": "",
+      "name": "",
+      "pantone": "",
+      "part": ""
+    },
+    "hint": "",
+    "title": ""
+  },
+  "colorways": {
+    "add": "Add Colorway",
+    "placeholder": {
+      "color": "Color",
+      "name": "Colorway Name",
+      "pantone": "Pantone (optional)",
+      "part": "Part"
+    }
+  },
+  "common": {
+    "add": "Add",
+    "apply": "Apply",
+    "cancel": "Cancel",
+    "close": "Close",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "error": "Error",
+    "language": {
+      "english": "",
+      "vietnamese": ""
+    },
+    "loading": "Loading...",
+    "remove": "Remove",
+    "save": "Save",
+    "search": "Search",
+    "success": "Success",
+    "view": "View"
+  },
+  "createdAt": "",
+  "email": "",
+  "firstName": "",
+  "form": {
+    "articleCode": "",
+    "basicInfo": "Basic Info",
+    "brand": "Brand",
+    "cancel": "Cancel",
+    "category": "Category",
+    "colorways": "Colorways",
+    "construction": "Construction",
+    "createNewTechPackTitle": "Create New Tech Pack",
+    "createTechPack": "Create Tech Pack",
+    "designer": "Designer",
+    "editTechPackTitle": "Edit Tech Pack",
+    "materials": "Materials",
+    "measurements": "Measurements",
+    "productName": "Product Name",
+    "saveColorwaysToLibrary": {
+      "footer": ""
+    },
+    "saveMaterialsToLibrary": {
+      "footer": ""
+    },
+    "saveMeasurementsToLibrary": {
+      "footer": ""
+    },
+    "season": {
+      "placeholder": ""
+    },
+    "seasonPlaceholder": "e.g., Spring 2024",
+    "status": "Status",
+    "updateTechPack": "Update Tech Pack"
+  },
+  "header": {
+    "adminPanel": "Admin Panel",
+    "createNew": "Create New",
+    "logout": "Logout",
+    "techPacks": "Tech Packs",
+    "title": "TechPacker Pro"
+  },
+  "lastLogin": "",
+  "lastName": "",
+  "materials": {
+    "addFromLibrary": "Add from library…",
+    "addRow": "Add Row",
+    "addSubMaterial": "Add sub-material",
+    "applyTemplate": "Apply template…",
+    "bom": "Bill of Materials",
+    "header": {
+      "notes": "Technical notes",
+      "position": "Position",
+      "quantity": "Quantity",
+      "specifications": "Specifications",
+      "stt": "No.",
+      "submaterials": "Sub-materials",
+      "unit": "Unit"
+    },
+    "placeholder": {
+      "color": "Color",
+      "composition": "Composition",
+      "consumption": "Consumption",
+      "name": "Material Name",
+      "notes": "Technical notes",
+      "position": "Position",
+      "qty": "Qty",
+      "specifications": "Specifications",
+      "supplier": "Supplier",
+      "unit": "Unit"
+    }
+  },
+  "matlib": {
+    "btn": {
+      "add": "",
+      "delete": "",
+      "edit": "",
+      "update": ""
+    },
+    "empty": "",
+    "form": {
+      "color": "",
+      "composition": "",
+      "consumption": "",
+      "name": "",
+      "supplier": ""
+    },
+    "hint": "",
+    "title": ""
+  },
+  "measmgmt": {
+    "btn": {
+      "addPoint": "",
+      "create": "",
+      "update": ""
+    },
+    "empty": "",
+    "form": {
+      "point": "",
+      "templateName": "",
+      "tolerance": ""
+    },
+    "hint": "",
+    "pointsCount": "",
+    "title": ""
+  },
+  "measurements": {
+    "add": "Add Measurement",
+    "header": {
+      "point": "Measurement Point",
+      "tolerance": "Tolerance (e.g., ±0.5cm)"
+    },
+    "placeholder": {
+      "size": "Size"
+    }
+  },
+  "nav": {
+    "analytics": "Analytics",
+    "colorways": "Colorways",
+    "dashboard": "Dashboard",
+    "materials": "Materials",
+    "measurements": "Measurements",
+    "settings": "Settings",
+    "team": "Team",
+    "techpacks": "Tech Packs"
+  },
+  "role": "",
+  "sizes": "",
+  "tpl": {
+    "card": {
+      "view": "View"
+    },
+    "empty": {
+      "cta": "Create Your First Tech Pack",
+      "subtitle": "Try adjusting your search or filter criteria",
+      "title": "No tech packs found"
+    },
+    "filter": {
+      "category": {
+        "all": "All Categories"
+      },
+      "more": "More Filters",
+      "status": {
+        "all": "All Status",
+        "approved": "Approved",
+        "draft": "Draft",
+        "production": "Production",
+        "review": "Under Review"
+      }
+    },
+    "header": {
+      "subtitle": "Manage your fashion technical packages",
+      "title": "Tech Pack Management"
+    },
+    "new": "New Tech Pack",
+    "search": {
+      "placeholder": "Search tech packs..."
+    }
+  }
+}

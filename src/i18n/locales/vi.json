@@ -1,0 +1,170 @@
+{
+  "common": {
+    "language": "Ngôn ngữ",
+    "search": "Tìm kiếm",
+    "close": "Đóng",
+    "cancel": "Hủy",
+    "confirm": "Xác nhận",
+    "save": "Lưu",
+    "edit": "Sửa",
+    "delete": "Xóa",
+    "remove": "Xóa",
+    "add": "Thêm",
+    "apply": "Áp dụng",
+    "loading": "Đang tải...",
+    "error": "Lỗi",
+    "success": "Thành công",
+    "view": "Xem"
+  },
+  "nav": {
+    "dashboard": "Bảng điều khiển",
+    "techpacks": "Tech Packs",
+    "measurements": "Kích thước",
+    "materials": "Nguyên phụ liệu",
+    "colorways": "Phối màu",
+    "analytics": "Phân tích",
+    "team": "Nhóm",
+    "settings": "Cài đặt"
+  },
+  "header": {
+    "title": "TechPacker Pro",
+    "logout": "Đăng xuất",
+    "adminPanel": "Bảng quản trị",
+    "createNew": "Tạo mới",
+    "techPacks": "Tech Packs"
+  },
+  "form": {
+    "basicInfo": "Thông tin cơ bản",
+    "materials": "Nguyên phụ liệu",
+    "measurements": "Kích thước",
+    "colorways": "Phối màu",
+    "construction": "Cấu trúc",
+    "productName": "Tên sản phẩm",
+    "category": "Danh mục",
+    "brand": "Thương hiệu",
+    "designer": "Nhà thiết kế",
+    "season": "Mùa",
+    "status": "Trạng thái",
+    "seasonPlaceholder": "ví dụ: Xuân 2024",
+    "createTechPack": "Tạo Tech Pack",
+    "updateTechPack": "Cập nhật Tech Pack",
+    "createNewTechPackTitle": "Tạo mới Tech Pack",
+    "editTechPackTitle": "Chỉnh sửa Tech Pack",
+    "cancel": "Hủy"
+  },
+  "materials": {
+    "bom": "Định mức nguyên phụ liệu",
+    "addRow": "Thêm dòng",
+    "addFromLibrary": "Thêm từ thư viện…",
+    "applyTemplate": "Áp dụng mẫu…",
+    "header": {
+      "stt": "STT",
+      "specifications": "Thông số kỹ thuật",
+      "position": "Vị trí",
+      "quantity": "Số lượng",
+      "unit": "Đơn vị",
+      "notes": "Ghi chú kỹ thuật",
+      "submaterials": "Phụ liệu"
+    },
+    "placeholder": {
+      "specifications": "Thông số kỹ thuật",
+      "name": "Tên NPL",
+      "composition": "Thành phần vải",
+      "supplier": "Nhà cung cấp",
+      "color": "Màu",
+      "consumption": "Định mức tiêu hao",
+      "position": "Vị trí",
+      "qty": "SL",
+      "unit": "Đơn vị",
+      "notes": "Ghi chú kỹ thuật"
+    },
+    "addSubMaterial": "Thêm phụ liệu"
+  },
+  "measurements": {
+    "add": "Thêm điểm đo",
+    "header": {
+      "point": "Điểm đo",
+      "tolerance": "Dung sai (ví dụ: ±0,5cm)"
+    },
+    "placeholder": {
+      "size": "Giá trị"
+    }
+  },
+  "colorways": {
+    "add": "Thêm phối màu",
+    "placeholder": {
+      "name": "Tên phối màu",
+      "part": "Bộ phận",
+      "color": "Màu",
+      "pantone": "Pantone (tuỳ chọn)"
+    }
+  },
+  "actions": {
+    "add": "Thêm",
+    "remove": "Xóa",
+    "removeColorway": "Xóa phối màu",
+    "apply": "Áp dụng"
+  },
+  "tpl": {
+    "header": {
+      "title": "Quản lý Tech Pack",
+      "subtitle": "Quản lý bộ hồ sơ kỹ thuật thời trang"
+    },
+    "new": "Tạo Tech Pack",
+    "search": {
+      "placeholder": "Tìm kiếm Tech Pack..."
+    },
+    "filter": {
+      "status": {
+        "all": "Tất cả trạng thái",
+        "draft": "Nháp",
+        "review": "Đang duyệt",
+        "approved": "Đã duyệt",
+        "production": "Sản xuất"
+      },
+      "category": {
+        "all": "Tất cả danh mục"
+      },
+      "more": "Thêm bộ lọc"
+    },
+    "card": {
+      "view": "Xem"
+    },
+    "empty": {
+      "title": "Không tìm thấy Tech Pack nào",
+      "subtitle": "Hãy thử điều chỉnh từ khóa hoặc bộ lọc",
+      "cta": "Tạo Tech Pack đầu tiên"
+    }
+  },
+  "admin": {
+    "users": {
+      "title": "Quản lý người dùng",
+      "stats": {
+        "totalUsers": "Tổng số người dùng",
+        "roleDistribution": "Phân bổ vai trò",
+        "recentUsers": "Người dùng gần đây"
+      },
+      "table": {
+        "name": "Tên",
+        "email": "Email",
+        "role": "Vai trò",
+        "createdAt": "Ngày tạo",
+        "lastLogin": "Lần đăng nhập cuối",
+        "actions": "Thao tác"
+      },
+      "search": {
+        "placeholder": "Tìm kiếm người dùng..."
+      },
+      "filter": {
+        "role": {
+          "all": "Tất cả vai trò",
+          "admin": "Quản trị viên",
+          "designer": "Nhà thiết kế",
+          "merchandiser": "Merchandiser",
+          "viewer": "Người xem"
+        }
+      }
+    }
+  }
+}
+

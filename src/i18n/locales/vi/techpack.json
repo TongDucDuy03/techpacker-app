@@ -1,0 +1,70 @@
+{
+  "list": {
+    "title": "Danh sách Tech Pack",
+    "subtitle": "Quản lý và theo dõi tất cả Tech Pack",
+    "searchPlaceholder": "Tìm kiếm Tech Pack...",
+    "filter": {
+      "status": {
+        "all": "Tất cả trạng thái"
+      },
+      "category": {
+        "all": "Tất cả danh mục"
+      }
+    },
+    "table": {
+      "articleName": "Tên mẫu",
+      "articleCode": "Mã bài",
+      "status": "Trạng thái",
+      "season": "Mùa",
+      "actions": "Thao tác"
+    },
+    "create": "Tạo Tech Pack"
+  },
+  "articleInfo": {
+    "fields": {
+      "season": "Mùa"
+    },
+    "status": {
+      "draft": "Nháp",
+      "inReview": "Đang duyệt",
+      "approved": "Đã duyệt",
+      "pending_approval": "Đang duyệt"
+    }
+  },
+  "enums": {
+    "status": {
+      "draft": "Nháp",
+      "in_review": "Đang duyệt",
+      "approved": "Đã duyệt",
+      "rejected": "Từ chối",
+      "archived": "Lưu trữ"
+    },
+    "fitType": {
+      "regular": "Thường",
+      "slim": "Slim",
+      "loose": "Rộng",
+      "relaxed": "Thoải mái",
+      "oversized": "Oversized"
+    },
+    "lifecycleStage": {
+      "concept": "Khái niệm",
+      "design": "Thiết kế",
+      "development": "Phát triển",
+      "pre_production": "Tiền sản xuất",
+      "production": "Sản xuất",
+      "shipped": "Đã giao hàng"
+    },
+    "gender": {
+      "unisex": "Unisex",
+      "male": "Nam",
+      "female": "Nữ",
+      "kids": "Trẻ em"
+    },
+    "pricePoint": {
+      "value": "Giá trị",
+      "mid_range": "Tầm trung",
+      "premium": "Cao cấp",
+      "luxury": "Xa xỉ"
+    }
+  }
+}

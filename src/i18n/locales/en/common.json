@@ -1,0 +1,51 @@
+{
+  "language": "Language",
+  "search": "Search",
+  "close": "Close",
+  "cancel": "Cancel",
+  "confirm": "Confirm",
+  "save": "Save",
+  "edit": "Edit",
+  "delete": "Delete",
+  "remove": "Remove",
+  "add": "Add",
+  "apply": "Apply",
+  "loading": "Loading...",
+  "error": "Error",
+  "success": "Success",
+  "view": "View",
+  "create": "Create",
+  "update": "Update",
+  "submit": "Submit",
+  "back": "Back",
+  "next": "Next",
+  "previous": "Previous",
+  "yes": "Yes",
+  "no": "No",
+  "ok": "OK",
+  "name": "Name",
+  "email": "Email",
+  "actions": "Actions",
+  "status": "Status",
+  "date": "Date",
+  "time": "Time",
+  "description": "Description",
+  "notes": "Notes",
+  "required": "Required",
+  "optional": "Optional",
+  "all": "All",
+  "none": "None",
+  "select": "Select",
+  "selectOption": "Select an option...",
+  "noData": "No data available",
+  "noResults": "No results found",
+  "tryAgain": "Try again",
+  "refresh": "Refresh"
+}
+
+
+
+
+
+
+

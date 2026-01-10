@@ -1578,7 +1578,12 @@ export class TechPackController {
 
       // Prevent sharing with system admin removed; technicalDesignerId is now free text and not linked to users
 
-      const existingShareIndex = techpack.sharedWith?.findIndex(s => s.userId.toString() === userId) || -1;
+      // Normalize userId for comparison (handle both ObjectId and string)
+      const normalizedUserIdForCompare = userId.toString().trim();
+      const existingShareIndex = techpack.sharedWith?.findIndex(s => {
+        const shareUserId = s.userId?.toString() || '';
+        return shareUserId.trim() === normalizedUserIdForCompare;
+      }) || -1;
       let action: 'share_granted' | 'role_changed' = 'share_granted';
 
       if (existingShareIndex > -1) {
@@ -1590,8 +1595,12 @@ export class TechPackController {
         if (!techpack.sharedWith) {
           techpack.sharedWith = [];
         }
+        // Ensure userId is converted to ObjectId for consistent storage
+        const normalizedUserId = Types.ObjectId.isValid(userId) 
+          ? new Types.ObjectId(userId) 
+          : userId;
         techpack.sharedWith.push({
-          userId,
+          userId: normalizedUserId,
           role,
           sharedAt: new Date(),
           sharedBy: sharer._id,
@@ -1673,10 +1682,31 @@ export class TechPackController {
       }
 
       // Find share entry - handle both ObjectId and populated object
+      // Normalize userId from params to string for comparison
+      // Validate ObjectId ngay từ đầu
+      if (!Types.ObjectId.isValid(userId)) {
+        return sendError(res, 'Invalid user ID', 400, 'VALIDATION_ERROR');
+      }
+
+      // Chuẩn hóa thành ObjectId string
+      const normalizedUserId = new Types.ObjectId(userId).toString();
+
       const shareIndex = techpack.sharedWith?.findIndex(s => {
-        const shareUserId = s.userId?._id?.toString() || s.userId?.toString();
-        return shareUserId === userId;
-      }) || -1;
+        if (!s.userId) return false;
+        
+        let shareUserId: string;
+        const userIdValue = s.userId as any;
+        
+        if (typeof userIdValue === 'object' && userIdValue._id) {
+          shareUserId = userIdValue._id.toString();
+        } else if (userIdValue instanceof Types.ObjectId) {
+          shareUserId = userIdValue.toString();
+        } else {
+          shareUserId = userIdValue.toString();
+        }
+        
+        return shareUserId === normalizedUserId;
+      }) ?? -1;
       if (shareIndex === -1) {
         return sendError(res, 'User does not have access to this TechPack.', 404, 'NOT_FOUND');
       }
@@ -1950,10 +1980,31 @@ export class TechPackController {
       }
 
       // Find share entry - handle both ObjectId and populated object
-      const shareIndex = techpack.sharedWith?.findIndex(s => {
-        const shareUserId = s.userId?._id?.toString() || s.userId?.toString();
-        return shareUserId === userId;
-      }) || -1;
+      // Normalize userId from params to string for comparison
+      // Validate ObjectId ngay từ đầu
+    if (!Types.ObjectId.isValid(userId)) {
+      return sendError(res, 'Invalid user ID', 400, 'VALIDATION_ERROR');
+    }
+
+    // Chuẩn hóa thành ObjectId string
+    const normalizedUserId = new Types.ObjectId(userId).toString();
+
+    const shareIndex = techpack.sharedWith?.findIndex(s => {
+      if (!s.userId) return false;
+      
+      let shareUserId: string;
+      const userIdValue = s.userId as any;
+      
+      if (typeof userIdValue === 'object' && userIdValue._id) {
+        shareUserId = userIdValue._id.toString();
+      } else if (userIdValue instanceof Types.ObjectId) {
+        shareUserId = userIdValue.toString();
+      } else {
+        shareUserId = userIdValue.toString();
+      }
+      
+      return shareUserId === normalizedUserId;
+    }) ?? -1;
       if (shareIndex === -1) {
         return sendError(res, 'User does not have access to this TechPack.', 404, 'NOT_FOUND');
       }

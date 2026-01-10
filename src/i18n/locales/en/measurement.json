@@ -1,0 +1,50 @@
+{
+  "title": "Measurement",
+  "add": "Add Measurement",
+  "table": {
+    "point": "Measurement Point",
+    "tolerance": "Tolerance",
+    "size": "Size"
+  },
+  "header": {
+    "point": "Measurement Point",
+    "tolerance": "Tolerance (e.g., ±0.5cm)"
+  },
+  "placeholder": {
+    "size": "Size",
+    "point": "Measurement Point",
+    "minusTolerance": "Minus Tolerance",
+    "plusTolerance": "Plus Tolerance"
+  },
+  "tolerance": {
+    "minus": "Minus",
+    "plus": "Plus",
+    "example": "e.g., ±0.5cm"
+  },
+  "sampleRound": {
+    "title": "Sample Round",
+    "saveBeforeNew": "Please save the current sample round before creating a new round",
+    "requestedSource": "Requested Source",
+    "originalSpec": "Original Spec",
+    "fromPrevious": "From Previous Round",
+    "round": "Round",
+    "date": "Date",
+    "reviewer": "Reviewer",
+    "requested": "Requested",
+    "measured": "Measured",
+    "diff": "Diff",
+    "revised": "Revised",
+    "comments": "Comments"
+  },
+  "sizeRange": {
+    "title": "Size Range Configuration",
+    "unit": "Unit"
+  }
+}
+
+
+
+
+
+
+

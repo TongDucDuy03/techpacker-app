@@ -1,0 +1,41 @@
+{
+  "title": "Định mức nguyên phụ liệu",
+  "addRow": "Thêm dòng",
+  "addFromLibrary": "Thêm từ thư viện…",
+  "applyTemplate": "Áp dụng mẫu…",
+  "table": {
+    "stt": "STT",
+    "specifications": "Thông số kỹ thuật",
+    "position": "Vị trí",
+    "quantity": "Số lượng",
+    "unit": "Đơn vị",
+    "notes": "Ghi chú kỹ thuật",
+    "submaterials": "Phụ liệu"
+  },
+  "placeholder": {
+    "specifications": "Thông số kỹ thuật",
+    "name": "Tên NPL",
+    "composition": "Thành phần vải",
+    "supplier": "Nhà cung cấp",
+    "color": "Màu",
+    "consumption": "Định mức tiêu hao",
+    "position": "Vị trí",
+    "qty": "SL",
+    "unit": "Đơn vị",
+    "notes": "Ghi chú kỹ thuật"
+  },
+  "addSubMaterial": "Thêm phụ liệu",
+  "pom": {
+    "code": "Mã POM",
+    "name": "Tên POM",
+    "description": "Mô tả",
+    "required": "Vui lòng điền Mã POM và Mô tả"
+  }
+}
+
+
+
+
+
+
+

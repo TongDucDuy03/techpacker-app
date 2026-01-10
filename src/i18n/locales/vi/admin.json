@@ -1,0 +1,37 @@
+{
+  "users": {
+    "title": "Quản lý người dùng",
+    "stats": {
+      "totalUsers": "Tổng số người dùng",
+      "roleDistribution": "Phân bổ vai trò",
+      "recentUsers": "Người dùng gần đây"
+    },
+    "table": {
+      "name": "Tên",
+      "email": "Email",
+      "role": "Vai trò",
+      "createdAt": "Ngày tạo",
+      "lastLogin": "Lần đăng nhập cuối",
+      "actions": "Thao tác"
+    },
+    "search": {
+      "placeholder": "Tìm kiếm người dùng..."
+    },
+    "filter": {
+      "role": {
+        "all": "Tất cả vai trò",
+        "admin": "Quản trị viên",
+        "designer": "Nhà thiết kế",
+        "merchandiser": "Merchandiser",
+        "viewer": "Người xem"
+      }
+    }
+  }
+}
+
+
+
+
+
+
+
