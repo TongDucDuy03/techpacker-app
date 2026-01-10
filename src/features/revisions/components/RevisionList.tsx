@@ -76,8 +76,8 @@ export const RevisionList: React.FC<RevisionListProps> = ({
       return t('form.revision.description.minorUpdates');
     }
     
-    // Pattern: "Article Info: X modified" or similar
-    const articleInfoMatch = description.match(/^Article Info:\s*(\d+)\s*modified$/i);
+    // Pattern: "Article Info: X modified" or "Product Info: X modified" or similar
+    const articleInfoMatch = description.match(/^(?:Article Info|Product Info):\s*(\d+)\s*modified$/i);
     if (articleInfoMatch) {
       return t('form.revision.description.articleInfoModified', { count: articleInfoMatch[1] });
     }

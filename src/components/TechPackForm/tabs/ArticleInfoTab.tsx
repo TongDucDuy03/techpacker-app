@@ -39,6 +39,30 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
   const validation = useFormValidation(articleInfoValidationSchema);
   const { articleInfo } = techPack ?? {};
   const { t } = useI18n();
+  
+  // Helper function to translate product class values
+  const translateProductClass = (value: string | undefined): string => {
+    if (!value) return '-';
+    const key = `option.productClass.${value.toLowerCase().replace(/\s+/g, '').replace(/-/g, '')}`;
+    const translated = t(key as any);
+    return translated !== key ? translated : value;
+  };
+  
+  // Helper function to translate fit type values
+  const translateFitType = (value: string | undefined): string => {
+    if (!value) return '-';
+    const key = `option.fitType.${value.toLowerCase()}`;
+    const translated = t(key as any);
+    return translated !== key ? translated : value;
+  };
+  
+  // Helper function to translate lifecycle stage values
+  const translateLifecycleStage = (value: string | undefined): string => {
+    if (!value) return '-';
+    const key = `option.lifecycle.${value.toLowerCase().replace('-', '')}`;
+    const translated = t(key as any);
+    return translated !== key ? translated : value;
+  };
   const { user } = useAuth();
   
   // Check if user can view Additional Information section (Admin or Merchandiser only)
@@ -192,7 +216,20 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
   ];
 
   // Product class options
-  const productClassOptions = PRODUCT_CLASSES.map(cls => ({ value: cls, label: cls }));
+  // Helper function to get translation key for product class
+  // Converts "T-Shirts" -> "tShirts", "Polo Shirts" -> "poloShirts", etc.
+  const getProductClassKey = (cls: string): string => {
+    // Remove dashes and spaces, then convert to camelCase
+    const cleaned = cls.replace(/-/g, '').replace(/\s+/g, '');
+    // Convert first letter to lowercase, rest keep as is
+    const camelCase = cleaned.charAt(0).toLowerCase() + cleaned.slice(1);
+    return `option.productClass.${camelCase}`;
+  };
+  
+  const productClassOptions = PRODUCT_CLASSES.map(cls => ({ 
+    value: cls, 
+    label: t(getProductClassKey(cls) as any) || cls 
+  }));
 
   // Price point options
   const pricePointOptions = [
@@ -1377,15 +1414,15 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">{t('form.preview.productType')}:</span>
-                  <span className="font-medium">{safeArticleInfo.productClass || '-'}</span>
+                  <span className="font-medium">{translateProductClass(safeArticleInfo.productClass)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">{t('form.preview.productFit')}:</span>
-                  <span className="font-medium">{safeArticleInfo.fitType}</span>
+                  <span className="font-medium">{translateFitType(safeArticleInfo.fitType)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">{t('form.preview.productProcess')}:</span>
-                  <span className="font-medium">{safeArticleInfo.lifecycleStage}</span>
+                  <span className="font-medium">{translateLifecycleStage(safeArticleInfo.lifecycleStage)}</span>
                 </div>
               </div>
 

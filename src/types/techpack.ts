@@ -2,7 +2,7 @@
 // Tech Pack Management System - TypeScript Interfaces
 // =====================================================
 
-export type TechPackStatus = 'Draft' | 'In Review' | 'Approved' | 'Rejected' | 'Archived';
+export type TechPackStatus = 'Draft' | 'Process' | 'Approved' | 'Rejected' | 'Archived';
 
 export interface ArticleInfo {
   id?: string;
@@ -218,7 +218,7 @@ export interface Revision {
   changeSummary: string;
   changes?: string;
   description?: string;
-  status: 'Draft' | 'In Review' | 'Approved' | 'Rejected' | 'Archived';
+  status: 'Draft' | 'Process' | 'Approved' | 'Rejected' | 'Archived';
   createdBy: string;
   createdByName?: string;
   changedBy?: string;

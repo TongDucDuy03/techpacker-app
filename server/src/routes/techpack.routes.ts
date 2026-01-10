@@ -355,7 +355,7 @@ const queryValidation = [
   
   query('status')
     .optional()
-    .isIn(['Draft', 'In Review', 'Approved', 'Rejected', 'Archived'])
+    .isIn(['Draft', 'Process', 'Approved', 'Rejected', 'Archived'])
     .withMessage('Invalid status'),
   
   query('sortBy')
@@ -535,7 +535,7 @@ router.patch(
       .withMessage('Action must be either delete or setStatus'),
     body('payload.status')
       .if(body('action').equals('setStatus'))
-      .isIn(['Draft', 'In Review', 'Approved', 'Rejected', 'Archived'])
+      .isIn(['Draft', 'Process', 'Approved', 'Rejected', 'Archived'])
       .withMessage('Status must be valid when action is setStatus')
   ],
   techpackController.bulkOperations

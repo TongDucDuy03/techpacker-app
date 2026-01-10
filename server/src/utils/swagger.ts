@@ -71,7 +71,7 @@ const options = {
             fabricDescription: { type: 'string', maxLength: 500 },
             status: {
               type: 'string',
-              enum: ['Draft', 'In Review', 'Approved', 'Rejected', 'Archived'],
+              enum: ['Draft', 'Process', 'Approved', 'Rejected', 'Archived'],
               default: 'Draft'
             },
             category: { type: 'string', maxLength: 50 },

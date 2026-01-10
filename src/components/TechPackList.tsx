@@ -180,11 +180,29 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'approved': return 'success';
-      case 'in review': case 'pending_approval': return 'warning';
+      case 'process': case 'in review': case 'pending_approval': return 'warning';
       case 'draft': return 'processing';
       case 'rejected': return 'error';
       case 'archived': return 'default';
       default: return 'default';
+    }
+  };
+
+  const getStatusLabel = (status: string): string => {
+    const statusLower = status?.toLowerCase();
+    switch (statusLower) {
+      case 'draft':
+        return t('option.status.draft');
+      case 'process':
+        return t('option.status.process');
+      case 'approved':
+        return t('option.status.approved');
+      case 'rejected':
+        return t('option.status.rejected');
+      case 'archived':
+        return t('option.status.archived');
+      default:
+        return status || '';
     }
   };
 
@@ -277,9 +295,9 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
     {
       title: t('techpack.list.status'),
       dataIndex: 'status',
-      filters: [...new Set(safeTechPacks.map(tp => tp.status))].map((s) => ({ text: s, value: s })),
+      filters: [...new Set(safeTechPacks.map(tp => tp.status))].map((s) => ({ text: getStatusLabel(s), value: s })),
       onFilter: (value: any, record: any) => record.status.indexOf(value) === 0,
-      render: (status: string) => <Tag color={getStatusColor(status)} className="status-tag">{status.toUpperCase()}</Tag>
+      render: (status: string) => <Tag color={getStatusColor(status)} className="status-tag">{getStatusLabel(status)}</Tag>
     },
     { 
       title: t('techpack.list.season'), 
@@ -348,7 +366,10 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
           <Card>
             <Statistic 
               title={t('status.inReview')} 
-              value={stats?.inReview ?? safeTechPacks.filter(tp => (tp.status || '').toLowerCase() === 'pending_approval' || (tp.status || '').toLowerCase() === 'in review').length} 
+              value={stats?.inReview ?? safeTechPacks.filter(tp => {
+                const statusLower = (tp.status || '').toLowerCase();
+                return statusLower === 'process' || statusLower === 'pending_approval' || statusLower === 'in review';
+              }).length} 
               prefix={<ClockCircleOutlined />}
             />
           </Card>
@@ -402,7 +423,7 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
                   style={{ width: 150 }} 
                   allowClear
                 >
-                  {[...new Set(safeTechPacks.map(tp => tp.status))].map((s) => <Option key={s} value={s}>{s}</Option>)}
+                  {[...new Set(safeTechPacks.map(tp => tp.status))].map((s) => <Option key={s} value={s}>{getStatusLabel(s)}</Option>)}
                 </Select>
                 <Select 
                   placeholder={`${t('common.filter')} ${t('form.category').toLowerCase()}`} 

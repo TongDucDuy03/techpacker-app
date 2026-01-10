@@ -2,7 +2,7 @@ import { Schema, model, Document, Types } from 'mongoose';
 
 export enum TechPackStatus {
   Draft = 'Draft',
-  InReview = 'In Review',
+  InReview = 'Process',
   Approved = 'Approved',
   Rejected = 'Rejected',
   Archived = 'Archived'

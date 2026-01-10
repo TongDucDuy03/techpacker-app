@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, Button, Space, Divider, Table } from 'antd';
 import { Undo2, GitCompare } from 'lucide-react';
 import { Revision, RevertResponse } from '../types';
@@ -8,6 +8,7 @@ import { useRevert } from '../hooks/useRevert';
 import { useI18n } from '../../../lib/i18n';
 import { useRevision } from '../hooks/useRevision';
 import ZoomableImage from '../../../components/common/ZoomableImage';
+import { getFieldMetadata, getFieldLabel, getSectionLabel, resolveFieldValue, FieldMetadataConfig } from '../../../utils/fieldMetadata';
 
 interface RevisionDetailProps {
   revision: Revision | null;
@@ -33,6 +34,9 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
   const { t } = useI18n();
   const activeRevision = detailedRevision || revision;
   const [showRevertModal, setShowRevertModal] = useState(false);
+  
+  // Get field metadata configuration (Single Source of Truth - shared with Form)
+  const fieldMetadata = useMemo(() => getFieldMetadata(t), [t]);
 
   if (!activeRevision) {
     return (
@@ -77,22 +81,49 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
   };
 
   const formatFieldName = (fieldPath: string): string => {
-    // Extract section and field name from path like "bom[id:xxx].supplierCode"
+    // Extract section and field name from path like "bom[id:xxx].supplierCode" or "articleInfo.fitType" or "fitType"
     const match = fieldPath.match(/^(\w+)(\[.*?\])?\.?(.+)?$/);
-    if (!match) return fieldPath;
+    if (!match) {
+      // Fallback: try to get field label directly
+      const label = getFieldLabel(fieldPath, fieldMetadata);
+      if (label !== fieldPath) return label;
+      console.warn(`[RevisionDetail] Unknown field: ${fieldPath}`);
+      return t('form.revision.unknownField') || 'Unknown Field';
+    }
     
-    const [, section, idPart, field] = match;
+    const [, sectionPart, idPart, fieldPart] = match;
+    let section = sectionPart;
+    let field = fieldPart;
+    
+    // Handle case where field path is just a field name (e.g., "fitType")
+    if (!field && sectionPart && !idPart) {
+      // Check if it's a known field in articleInfo
+      if (fieldMetadata[sectionPart]) {
+        field = sectionPart;
+        section = 'articleInfo';
+      } else {
+        // Unknown field
+        console.warn(`[RevisionDetail] Unknown field: ${sectionPart}`);
+        return t('form.revision.unknownField') || 'Unknown Field';
+      }
+    }
+    
     let result = '';
     
-    // Format section name
-    const sectionNames: Record<string, string> = {
-      bom: t('form.revision.section.bom'),
-      measurements: t('form.revision.section.measurements'),
-      colorways: t('form.revision.section.colorways'),
-      howToMeasure: t('form.revision.section.howToMeasure'),
-      articleInfo: t('form.revision.section.articleInfo')
-    };
-    result = sectionNames[section] || section;
+    // Format section name using metadata
+    if (field && fieldMetadata[field]?.sectionLabel) {
+      result = fieldMetadata[field].sectionLabel;
+    } else {
+      // Fallback to section names
+      const sectionNames: Record<string, string> = {
+        bom: t('form.revision.section.bom'),
+        measurements: t('form.revision.section.measurements'),
+        colorways: t('form.revision.section.colorways'),
+        howToMeasure: t('form.revision.section.howToMeasure'),
+        articleInfo: t('form.revision.section.articleInfo')
+      };
+      result = sectionNames[section] || section;
+    }
     
     // Add item identifier if present
     if (idPart) {
@@ -109,32 +140,16 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
       }
     }
     
-    // Add field name
+    // Add field name using metadata (Single Source of Truth)
     if (field) {
-      const fieldNames: Record<string, string> = {
-        supplierCode: 'Supplier Code',
-        materialName: 'Material Name',
-        part: 'Part',
-        quantity: 'Quantity',
-        uom: 'Unit of Measure',
-        pomCode: 'POM Code',
-        pomName: 'POM Name',
-        name: 'Name',
-        code: 'Code',
-        placement: 'Placement',
-        materialType: 'Material Type',
-        hexColor: 'Hex Color',
-        pantoneCode: 'Pantone Code',
-        stepNumber: 'Step Number',
-        description: 'Description'
-      };
-      result += ` > ${fieldNames[field] || field.replace(/([A-Z])/g, ' $1').trim()}`;
+      const fieldLabel = getFieldLabel(field, fieldMetadata);
+      result += ` > ${fieldLabel}`;
     }
     
     return result;
   };
 
-  const formatValue = (val: any, isObject = false): React.ReactNode => {
+  const formatValue = (val: any, isObject = false, fieldName?: string, section?: string): React.ReactNode => {
     if (val === null || val === undefined || val === '') return <span className="text-gray-400">—</span>;
     
     // Helper: determine if a string looks like an image URL/path
@@ -155,6 +170,28 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
       if (url.startsWith('/')) return `${base}${url}`;
       return `${base}/${url}`;
     };
+    
+    // Helper: translate field values based on field name and section
+    // Use metadata to resolve field value (Single Source of Truth)
+    const translateFieldValue = (value: any, field: string | undefined, sect: string | undefined): string => {
+      // If no field name, try to infer from section or return as-is for unknown fields
+      if (!field) {
+        // For unknown fields without field name, return '—' per fallback rule
+        if (value === null || value === undefined || value === '') {
+          return '—';
+        }
+        // Log warning for unknown fields
+        console.warn(`[RevisionDetail] Unknown field (no fieldName), value: ${value}`);
+        return '—';
+      }
+      
+      // Use resolveFieldValue from metadata with t function for proper translation
+      const resolved = resolveFieldValue(value, field, fieldMetadata, t);
+      
+      // If resolved is '—' and value is not null/undefined/empty, it means no mapping found
+      // This is correct per fallback rule - we already logged warning in resolveFieldValue
+      return resolved;
+    };
 
     if (typeof val === 'object' && !Array.isArray(val)) {
       // For objects, show as formatted key-value pairs
@@ -169,7 +206,7 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
               <div key={key} className="text-xs">
                 <span className="font-medium text-gray-600">{displayKey}:</span>{' '}
                 <span className="text-gray-800">
-                  {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                  {typeof value === 'object' ? JSON.stringify(value) : translateFieldValue(value, key, section)}
                 </span>
               </div>
             );
@@ -180,13 +217,15 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
     
     if (Array.isArray(val)) {
       if (val.length === 0) return <span className="text-gray-400">(empty)</span>;
-      return <span className="text-sm">{val.join(', ')}</span>;
+      return <span className="text-sm">{val.map(v => translateFieldValue(v, fieldName, section)).join(', ')}</span>;
     }
     
+    // Translate the value if it's a known field
+    const translatedVal = translateFieldValue(val, fieldName, section);
+    
     // String formatting: render image preview if looks like an image URL/path
-    const s = String(val);
-    if (isLikelyImageUrl(s)) {
-      const src = getImageUrl(s);
+    if (isLikelyImageUrl(translatedVal)) {
+      const src = getImageUrl(translatedVal);
       return (
         <div className="flex items-center space-x-2">
           <ZoomableImage
@@ -200,12 +239,12 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
               </div>
             }
           />
-          <span className="text-xs text-gray-600 break-all">{s}</span>
+          <span className="text-xs text-gray-600 break-all">{translatedVal}</span>
         </div>
       );
     }
 
-    return <span className="text-sm break-all">{s}</span>;
+    return <span className="text-sm break-all">{translatedVal}</span>;
   };
 
   const diffColumns = [
@@ -223,22 +262,74 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
       dataIndex: 'old',
       key: 'old',
       width: '32.5%',
-      render: (val: any, record: any) => (
-        <div className="bg-red-50 border border-red-200 px-3 py-2 rounded text-sm min-h-[40px]">
-          {formatValue(val, record._isObject)}
-        </div>
-      )
+      render: (val: any, record: any) => {
+        // Use fieldName and section from record (already parsed in processDiffData)
+        // Fallback to parsing if not available
+        let fieldName = record.fieldName;
+        let section = record.section || 'articleInfo';
+        
+        if (!fieldName) {
+          const fieldMatch = record.field?.match(/^(\w+)(\[.*?\])?\.?(.+)?$/);
+          if (fieldMatch) {
+            const [, sectionPart, , fieldPart] = fieldMatch;
+            if (fieldPart) {
+              section = sectionPart;
+              fieldName = fieldPart;
+            } else {
+              // No field part, check if it's a known section or just a field
+              if (['bom', 'measurements', 'colorways', 'howToMeasure', 'articleInfo'].includes(sectionPart)) {
+                section = sectionPart;
+              } else {
+                section = 'articleInfo';
+                fieldName = sectionPart;
+              }
+            }
+          }
+        }
+        
+        return (
+          <div className="bg-red-50 border border-red-200 px-3 py-2 rounded text-sm min-h-[40px]">
+            {formatValue(val, record._isObject, fieldName, section)}
+          </div>
+        );
+      }
     },
     {
       title: t('form.revision.newValue'),
       dataIndex: 'new',
       key: 'new',
       width: '32.5%',
-      render: (val: any, record: any) => (
-        <div className="bg-green-50 border border-green-200 px-3 py-2 rounded text-sm min-h-[40px]">
-          {formatValue(val, record._isObject)}
-        </div>
-      )
+      render: (val: any, record: any) => {
+        // Use fieldName and section from record (already parsed in processDiffData)
+        // Fallback to parsing if not available
+        let fieldName = record.fieldName;
+        let section = record.section || 'articleInfo';
+        
+        if (!fieldName) {
+          const fieldMatch = record.field?.match(/^(\w+)(\[.*?\])?\.?(.+)?$/);
+          if (fieldMatch) {
+            const [, sectionPart, , fieldPart] = fieldMatch;
+            if (fieldPart) {
+              section = sectionPart;
+              fieldName = fieldPart;
+            } else {
+              // No field part, check if it's a known section or just a field
+              if (['bom', 'measurements', 'colorways', 'howToMeasure', 'articleInfo'].includes(sectionPart)) {
+                section = sectionPart;
+              } else {
+                section = 'articleInfo';
+                fieldName = sectionPart;
+              }
+            }
+          }
+        }
+        
+        return (
+          <div className="bg-green-50 border border-green-200 px-3 py-2 rounded text-sm min-h-[40px]">
+            {formatValue(val, record._isObject, fieldName, section)}
+          </div>
+        );
+      }
     }
   ];
 
@@ -251,8 +342,28 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
     
     entries.forEach(([field, change]: [string, any]) => {
       // Extract section from field path
-      const sectionMatch = field.match(/^(\w+)(\[.*?\])?/);
-      const section = sectionMatch ? sectionMatch[1] : 'other';
+      // Handle both "articleInfo.fitType" and "fitType" formats
+      const sectionMatch = field.match(/^(\w+)(\[.*?\])?\.?(.+)?$/);
+      let section = 'other';
+      let fieldName = field;
+      
+      if (sectionMatch) {
+        const [, sectionPart, , fieldPart] = sectionMatch;
+        // If there's a field part, it's a section.field format
+        if (fieldPart) {
+          section = sectionPart;
+          fieldName = fieldPart;
+        } else {
+          // If no field part, check if it's a known section or just a field
+          if (['bom', 'measurements', 'colorways', 'howToMeasure', 'articleInfo'].includes(sectionPart)) {
+            section = sectionPart;
+          } else {
+            // It's a field without section prefix, assume articleInfo
+            section = 'articleInfo';
+            fieldName = sectionPart;
+          }
+        }
+      }
       
       if (!grouped[section]) {
         grouped[section] = [];
@@ -261,6 +372,7 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
       grouped[section].push({
         key: field,
         field,
+        fieldName, // Store extracted field name
         old: change.old,
         new: change.new,
         _isAdded: change._isAdded,
@@ -316,7 +428,7 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
         return [code, step].filter(Boolean).join(' — ') || 'Instruction';
       }
       if (section === 'articleInfo') {
-        return 'Article Info';
+        return t('form.revision.section.articleInfo');
       }
       return section;
     };
@@ -361,10 +473,29 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
       const formatVal = (val: any) => {
         if (val === null || val === undefined || val === '') return '—';
         if (typeof val === 'object') return JSON.stringify(val);
-        return String(val);
+        // Use metadata to resolve field value (Single Source of Truth)
+        // Pass t function for proper translation (including boolean values)
+        if (shortField && section === 'articleInfo') {
+          return resolveFieldValue(val, shortField, fieldMetadata, t);
+        }
+        // For non-articleInfo fields, still try to resolve if field exists in metadata
+        if (shortField) {
+          const resolved = resolveFieldValue(val, shortField, fieldMetadata, t);
+          // If resolved is not '—' or if it's a known field, use resolved value
+          if (resolved !== '—' || fieldMetadata[shortField]) {
+            return resolved;
+          }
+        }
+        // Fallback: return '—' per fallback rule (don't show raw English text)
+        console.warn(`[RevisionDetail] Unknown field in summary: ${shortField}, value: ${val}`);
+        return '—';
       };
       if (shortField) {
-        bucket.updated[itemKey].push(`${shortField}: ${formatVal(from)} → ${formatVal(to)}`);
+        // Use field label from metadata (Single Source of Truth)
+        const fieldLabel = shortField && section === 'articleInfo' 
+          ? getFieldLabel(shortField, fieldMetadata)
+          : shortField.replace(/([A-Z])/g, ' $1').trim();
+        bucket.updated[itemKey].push(`${fieldLabel}: ${formatVal(from)} → ${formatVal(to)}`);
       }
     });
 
@@ -391,24 +522,61 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
             label = getItemLabel(section, payloadNew || payloadOld || {});
           }
         } else if (section === 'articleInfo') {
-          label = 'Article Info';
+          // Use section label from metadata - try to get from field path
+          const anyKey = Object.keys(diffs).find(dk => {
+            if (dk.startsWith(`${section}.`)) {
+              const fieldMatch = dk.match(/\.([^.]+)$/);
+              return fieldMatch && fieldMatch[1];
+            }
+            return false;
+          });
+          if (anyKey) {
+            const fieldMatch = anyKey.match(/\.([^.]+)$/);
+            if (fieldMatch) {
+              label = getSectionLabel(fieldMatch[1], fieldMetadata);
+            } else {
+              label = t('form.revision.section.articleInfo');
+            }
+          } else {
+            label = t('form.revision.section.articleInfo');
+          }
         }
         const preview = changes.slice(0, 2).join('; ');
-        updatedEntries.push(label ? `“${label}” (${preview})` : `(${preview})`);
+        updatedEntries.push(label ? `"${label}" (${preview})` : `(${preview})`);
       });
       if (updatedEntries.length) {
         parts.push(`${t('form.revision.action.update')} ${updatedEntries.join(', ')}`);
       }
 
       if (parts.length) {
-        const sectionNames: Record<string, string> = {
-          bom: t('form.revision.section.bom'),
-          measurements: t('form.revision.section.measurements'),
-          colorways: t('form.revision.section.colorways'),
-          howToMeasure: t('form.revision.section.construction'),
-          articleInfo: t('form.revision.section.articleInfo')
-        };
-        summaries[section] = `${sectionNames[section] || section}: ${parts.join(', ')}`;
+        // Use section label from metadata for articleInfo
+        let sectionLabel: string;
+        if (section === 'articleInfo') {
+          // Try to get section label from any field in this section
+          const anyKey = Object.keys(diffs).find(dk => dk.startsWith(`${section}.`) || dk === section);
+          if (anyKey) {
+            const fieldMatch = anyKey.match(/\.([^.]+)$/);
+            if (fieldMatch) {
+              sectionLabel = getSectionLabel(fieldMatch[1], fieldMetadata);
+            } else if (fieldMetadata[anyKey]) {
+              sectionLabel = getSectionLabel(anyKey, fieldMetadata);
+            } else {
+              sectionLabel = t('form.revision.section.articleInfo');
+            }
+          } else {
+            sectionLabel = t('form.revision.section.articleInfo');
+          }
+        } else {
+          const sectionNames: Record<string, string> = {
+            bom: t('form.revision.section.bom'),
+            measurements: t('form.revision.section.measurements'),
+            colorways: t('form.revision.section.colorways'),
+            howToMeasure: t('form.revision.section.construction'),
+            articleInfo: t('form.revision.section.articleInfo')
+          };
+          sectionLabel = sectionNames[section] || section;
+        }
+        summaries[section] = `${sectionLabel}: ${parts.join(', ')}`;
       }
     });
 
@@ -453,7 +621,40 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
           <h4 className="text-sm font-semibold text-gray-900 mb-2">{t('form.revision.changeSummary')}</h4>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <p className="text-sm text-blue-800">
-              {activeRevision.changes?.summary || activeRevision.description || t('form.revision.noSummary')}
+              {(() => {
+                const summary = activeRevision.changes?.summary || activeRevision.description || t('form.revision.noSummary');
+                // Translate common patterns from backend
+                if (typeof summary === 'string') {
+                  // Pattern: "Article Info: X modified" or "Product Info: X modified"
+                  const articleInfoMatch = summary.match(/^(?:Article Info|Product Info):\s*(\d+)\s*modified$/i);
+                  if (articleInfoMatch) {
+                    return t('form.revision.description.articleInfoModified', { count: articleInfoMatch[1] });
+                  }
+                  // Pattern: "Initial version created by cloning from {articleCode}"
+                  const cloneMatch = summary.match(/^Initial version created by cloning from (.+)$/);
+                  if (cloneMatch) {
+                    return t('form.revision.description.clonedFrom', { articleCode: cloneMatch[1] });
+                  }
+                  // Pattern: "First version of the TechPack."
+                  if (summary === 'First version of the TechPack.') {
+                    return t('form.revision.description.firstVersion');
+                  }
+                  // Pattern: "Initial version created."
+                  if (summary === 'Initial version created.') {
+                    return t('form.revision.description.initialCreated');
+                  }
+                  // Pattern: "Minor updates."
+                  if (summary === 'Minor updates.') {
+                    return t('form.revision.description.minorUpdates');
+                  }
+                  // Pattern: "Reverted to revision {version}"
+                  const revertMatch = summary.match(/^Reverted to revision (.+)$/i);
+                  if (revertMatch) {
+                    return t('form.revision.description.revertedTo', { version: revertMatch[1] });
+                  }
+                }
+                return summary;
+              })()}
             </p>
           </div>
         </div>
@@ -513,19 +714,50 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
                 });
 
                 return Object.entries(grouped).map(([section, items]) => {
-                  const sectionNames: Record<string, string> = {
-                    bom: t('form.revision.section.bomItems'),
-                    measurements: t('form.revision.section.measurements'),
-                    colorways: t('form.revision.section.colorways'),
-                    howToMeasure: t('form.revision.section.howToMeasure'),
-                    articleInfo: t('form.revision.section.articleInformation')
-                  };
+                  // Use metadata to get section label (Single Source of Truth)
+                  let headerText: string;
+                  
+                  // For articleInfo section, if there's only one field, show field label instead of section name
+                  if (section === 'articleInfo' && items.length === 1 && items[0].fieldName) {
+                    const fieldName = items[0].fieldName;
+                    // Use field label from metadata
+                    headerText = getFieldLabel(fieldName, fieldMetadata);
+                  } else {
+                    // Use section label from metadata or fallback
+                    if (items.length > 0 && items[0].fieldName) {
+                      const firstField = items[0].fieldName;
+                      const sectionLabel = getSectionLabel(firstField, fieldMetadata);
+                      if (sectionLabel && sectionLabel !== 'Unknown Section') {
+                        headerText = sectionLabel;
+                      } else {
+                        // Fallback to section names
+                        const sectionNames: Record<string, string> = {
+                          bom: t('form.revision.section.bomItems'),
+                          measurements: t('form.revision.section.measurements'),
+                          colorways: t('form.revision.section.colorways'),
+                          howToMeasure: t('form.revision.section.howToMeasure'),
+                          articleInfo: t('form.revision.section.articleInformation')
+                        };
+                        headerText = sectionNames[section] || section;
+                      }
+                    } else {
+                      // Fallback to section names
+                      const sectionNames: Record<string, string> = {
+                        bom: t('form.revision.section.bomItems'),
+                        measurements: t('form.revision.section.measurements'),
+                        colorways: t('form.revision.section.colorways'),
+                        howToMeasure: t('form.revision.section.howToMeasure'),
+                        articleInfo: t('form.revision.section.articleInformation')
+                      };
+                      headerText = sectionNames[section] || section;
+                    }
+                  }
 
                   return (
                     <div key={section} className="border border-gray-200 rounded-lg overflow-hidden">
                       <div className="bg-gray-100 px-4 py-2 border-b border-gray-200">
-                        <h5 className="font-semibold text-gray-900 text-sm uppercase">
-                          {sectionNames[section] || section}
+                        <h5 className="font-semibold text-gray-900 text-sm">
+                          {headerText}
                         </h5>
                       </div>
                       <Table
