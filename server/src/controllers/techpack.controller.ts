@@ -1789,18 +1789,29 @@ export class TechPackController {
       }
 
       // Global Admin always has access
-      // Check if user has permission to share
+      // Check if user has permission to view shareable users
+      // Only Owner, Admin, or Editor can view (Viewer and Factory are not allowed)
       const isOwner = techpack.createdBy?.toString() === user._id.toString();
       const userAccess = techpack.sharedWith?.find(
         (s) => s?.userId && s.userId.toString() === user._id.toString()
       );
       
-      // Global Admin OR Owner OR Shared Admin can share
-      const canShare = user.role === UserRole.Admin || isOwner ||
-                      (userAccess && ['admin'].includes(userAccess.role));
+      // Use getEffectiveRole to check permissions
+      const { getEffectiveRole } = await import('../utils/access-control.util');
+      let effectiveRole: string | undefined;
+      if (isOwner) {
+        effectiveRole = 'owner';
+      } else if (user.role === UserRole.Admin) {
+        effectiveRole = 'admin';
+      } else if (userAccess) {
+        effectiveRole = getEffectiveRole(user.role, userAccess.role);
+      }
+      
+      // Only owner, admin, or editor can view shareable users
+      const canView = effectiveRole && ['owner', 'admin', 'editor'].includes(effectiveRole);
 
-      if (!canShare) {
-        return sendError(res, 'Access denied. Only Owner or Admin can view shareable users.', 403, 'FORBIDDEN');
+      if (!canView) {
+        return sendError(res, 'Access denied. Only Owner, Admin, or Editor can view shareable users. Viewer and Factory are not allowed.', 403, 'FORBIDDEN');
       }
 
       // Get all users except:
@@ -1866,15 +1877,26 @@ export class TechPackController {
 
       // Global Admin always has access
       // Check if user has permission to view access list
+      // Only Owner, Admin, or Editor can view (Viewer and Factory are not allowed)
       const isOwner = techpack.createdBy?.toString() === user._id.toString();
       const userAccess = techpack.sharedWith?.find(s => s.userId.toString() === user._id.toString());
       
-      // Global Admin OR Owner OR Shared Admin can view
-      const canView = user.role === UserRole.Admin || isOwner ||
-                     (userAccess && ['admin'].includes(userAccess.role));
+      // Use getEffectiveRole to check permissions
+      const { getEffectiveRole } = await import('../utils/access-control.util');
+      let effectiveRole: string | undefined;
+      if (isOwner) {
+        effectiveRole = 'owner';
+      } else if (user.role === UserRole.Admin) {
+        effectiveRole = 'admin';
+      } else if (userAccess) {
+        effectiveRole = getEffectiveRole(user.role, userAccess.role);
+      }
+      
+      // Only owner, admin, or editor can view access list
+      const canView = effectiveRole && ['owner', 'admin', 'editor'].includes(effectiveRole);
 
       if (!canView) {
-        return sendError(res, 'Access denied. Only Owner or Admin can view access list.', 403, 'FORBIDDEN');
+        return sendError(res, 'Access denied. Only Owner, Admin, or Editor can view access list. Viewer and Factory are not allowed.', 403, 'FORBIDDEN');
       }
 
       // Get shared users information - optimize with single query instead of N+1

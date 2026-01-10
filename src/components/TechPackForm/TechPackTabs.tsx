@@ -454,6 +454,15 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
     }
   }, [mode, initialTechPack, updateFormState, resetFormState]);
 
+  // Check if user can view Revision and Sharing tabs
+  // Only Owner, Admin, and Editor can view these tabs
+  // Viewer and Factory are not allowed
+  const canViewRevisionAndSharing = useMemo(() => {
+    if (!userTechPackRole) return false;
+    const role = userTechPackRole.toLowerCase();
+    return ['owner', 'admin', 'editor'].includes(role);
+  }, [userTechPackRole]);
+
   // Tab configuration
   const tabs = [
     {
@@ -504,6 +513,7 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       icon: Clock,
       component: (props: any) => <RevisionTab onBackToList={onBackToList} {...props} />,
       description: t('form.tab.revisionHistory.description'),
+      requiresPermission: true, // Requires owner/admin/editor
     },
     {
       id: 7,
@@ -511,8 +521,15 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
       icon: Share2,
       component: SharingTab,
       description: t('form.tab.sharing.description'),
+      requiresPermission: true, // Requires owner/admin/editor
     },
-  ];
+  ].filter(tab => {
+    // Filter out Revision and Sharing tabs for Viewer/Factory
+    if (tab.requiresPermission && !canViewRevisionAndSharing) {
+      return false;
+    }
+    return true;
+  });
 
   // Calculate tab completion status
   const getTabCompletionStatus = (tabId: number) => {
@@ -555,8 +572,20 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
   }, [lastSaved]);
 
   const handleTabChange = (tabId: number) => {
+    // Prevent accessing Revision (6) or Sharing (7) tabs if user doesn't have permission
+    if ((tabId === 6 || tabId === 7) && !canViewRevisionAndSharing) {
+      showError(t('form.accessDenied'));
+      return;
+    }
     setCurrentTab(tabId);
   };
+
+  // Redirect if current tab is Revision or Sharing and user doesn't have permission
+  useEffect(() => {
+    if ((currentTab === 6 || currentTab === 7) && !canViewRevisionAndSharing) {
+      setCurrentTab(0); // Redirect to Article Info tab
+    }
+  }, [currentTab, canViewRevisionAndSharing, setCurrentTab]);
 
   // Helper function to format validation alert message
   const formatValidationAlert = (fieldKey: string, tabName: string): string => {

@@ -614,13 +614,13 @@ router.get(
 /**
  * @route GET /api/techpacks/:id/access
  * @desc Get access list for TechPack
- * @access Private (with share access)
+ * @access Private (owner/admin/editor can view, but only owner/admin can manage)
  */
 router.get(
   '/:id/access',
   requireAuth,
   idValidation,
-  requireTechPackAccess(['share']),
+  requireTechPackAccess(['edit']), // Allow editor to view, but SharingTab will check canManage for actions
   techpackController.getAccessList
 );
 

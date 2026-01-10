@@ -23,32 +23,9 @@ const safeId = (obj: any): string => {
 };
 
 /**
- * Helper function to check if user has view access to TechPack
- * Now uses getEffectiveRole to respect system role limits
- */
-const hasViewAccess = (techpack: any, user: any): boolean => {
-  const isOwner = safeId(techpack.createdBy) === safeId(user._id);
-  const isAdmin = user.role === UserRole.Admin;
-  const isTechnicalDesigner = safeId(techpack.technicalDesignerId) === safeId(user._id);
-  
-  const sharedAccess = techpack.sharedWith?.find((s: any) => {
-    const sharedUserId = safeId(s.userId);
-    return sharedUserId === safeId(user._id);
-  });
-  
-  if (sharedAccess) {
-    // Use effective role to check permissions
-    const effectiveRole = getEffectiveRole(user.role, sharedAccess.role);
-    const hasSharedViewAccess = ['owner', 'admin', 'editor', 'viewer', 'factory'].includes(effectiveRole);
-    return isAdmin || isOwner || isTechnicalDesigner || hasSharedViewAccess;
-  }
-  
-  return isAdmin || isOwner || isTechnicalDesigner;
-};
-
-/**
  * Helper function to check if user has edit access to TechPack
  * Now uses getEffectiveRole to respect system role limits
+ * Only owner, admin, or editor can access revisions (viewer and factory are not allowed)
  */
 const hasEditAccess = (techpack: any, user: any): boolean => {
   const isOwner = safeId(techpack.createdBy) === safeId(user._id);
@@ -92,10 +69,11 @@ export class RevisionController {
         return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
       }
 
-      // Check view access permissions
-      const canView = hasViewAccess(techpack, user);
+      // Check view access permissions - only owner/admin/editor can view revisions
+      // Viewer and Factory are not allowed
+      const canView = hasEditAccess(techpack, user); // Use hasEditAccess instead of hasViewAccess
       if (!canView) {
-        return sendError(res, 'Access denied', 403, 'FORBIDDEN');
+        return sendError(res, 'Access denied. Only Owner, Admin, or Editor can view revision history.', 403, 'FORBIDDEN');
       }
 
       // Build query filters
@@ -176,10 +154,11 @@ export class RevisionController {
         return sendError(res, 'Associated TechPack not found', 404, 'NOT_FOUND');
       }
 
-      // Check view access permissions
-      const canView = hasViewAccess(techpack, user);
+      // Check view access permissions - only owner/admin/editor can view revisions
+      // Viewer and Factory are not allowed
+      const canView = hasEditAccess(techpack, user); // Use hasEditAccess instead of hasViewAccess
       if (!canView) {
-        return sendError(res, 'Access denied', 403, 'FORBIDDEN');
+        return sendError(res, 'Access denied. Only Owner, Admin, or Editor can view revision history.', 403, 'FORBIDDEN');
       }
 
       // If this revision lacks stored field-level diff, compute it on-the-fly against the previous revision
@@ -262,10 +241,11 @@ export class RevisionController {
         return sendError(res, 'TechPack not found', 404, 'NOT_FOUND');
       }
 
-      // Check view access permissions
-      const canView = hasViewAccess(techpack, user);
+      // Check view access permissions - only owner/admin/editor can view revisions
+      // Viewer and Factory are not allowed
+      const canView = hasEditAccess(techpack, user); // Use hasEditAccess instead of hasViewAccess
       if (!canView) {
-        return sendError(res, 'Access denied', 403, 'FORBIDDEN');
+        return sendError(res, 'Access denied. Only Owner, Admin, or Editor can view revision history.', 403, 'FORBIDDEN');
       }
 
       // Get both revisions
@@ -619,10 +599,11 @@ export class RevisionController {
         return sendError(res, 'Associated TechPack not found', 404, 'NOT_FOUND');
       }
 
-      // Check view access (anyone who can view can comment)
-      const canView = hasViewAccess(techpack, user);
+      // Check view access - only owner/admin/editor can comment on revisions
+      // Viewer and Factory are not allowed
+      const canView = hasEditAccess(techpack, user); // Use hasEditAccess instead of hasViewAccess
       if (!canView) {
-        return sendError(res, 'Access denied', 403, 'FORBIDDEN');
+        return sendError(res, 'Access denied. Only Owner, Admin, or Editor can comment on revisions.', 403, 'FORBIDDEN');
       }
 
       // Initialize comments array if not exists
