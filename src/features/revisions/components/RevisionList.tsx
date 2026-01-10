@@ -51,6 +51,47 @@ export const RevisionList: React.FC<RevisionListProps> = ({
     });
   };
 
+  // Translate common revision description patterns from backend
+  const translateDescription = (description: string | undefined): string => {
+    if (!description) return t('form.revision.noDescription');
+    
+    // Pattern: "Initial version created by cloning from {articleCode}"
+    const cloneMatch = description.match(/^Initial version created by cloning from (.+)$/);
+    if (cloneMatch) {
+      return t('form.revision.description.clonedFrom', { articleCode: cloneMatch[1] });
+    }
+    
+    // Pattern: "First version of the TechPack."
+    if (description === 'First version of the TechPack.') {
+      return t('form.revision.description.firstVersion');
+    }
+    
+    // Pattern: "Initial version created."
+    if (description === 'Initial version created.') {
+      return t('form.revision.description.initialCreated');
+    }
+    
+    // Pattern: "Minor updates."
+    if (description === 'Minor updates.') {
+      return t('form.revision.description.minorUpdates');
+    }
+    
+    // Pattern: "Article Info: X modified" or similar
+    const articleInfoMatch = description.match(/^Article Info:\s*(\d+)\s*modified$/i);
+    if (articleInfoMatch) {
+      return t('form.revision.description.articleInfoModified', { count: articleInfoMatch[1] });
+    }
+    
+    // Pattern: "Reverted to revision {version}"
+    const revertMatch = description.match(/^Reverted to revision (.+)$/i);
+    if (revertMatch) {
+      return t('form.revision.description.revertedTo', { version: revertMatch[1] });
+    }
+    
+    // Return original if no pattern matches
+    return description;
+  };
+
   if (error) {
     return (
       <Card>
@@ -152,7 +193,7 @@ export const RevisionList: React.FC<RevisionListProps> = ({
                   </div>
 
                   <p className="text-xs text-gray-600 line-clamp-2 mb-2">
-                    {revision.description || revision.changes?.summary || t('form.revision.noDescription')}
+                    {translateDescription(revision.description || revision.changes?.summary)}
                   </p>
 
                   <div className="flex items-center text-xs text-gray-500 gap-4">

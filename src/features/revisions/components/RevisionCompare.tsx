@@ -3,6 +3,7 @@ import { Modal, Select, Button, Table, Space, Card, Spin, Alert } from 'antd';
 import { GitCompare, X } from 'lucide-react';
 import { useCompare } from '../hooks/useCompare';
 import { Revision } from '../types';
+import { useI18n } from '../../../lib/i18n';
 
 interface RevisionCompareProps {
   open: boolean;
@@ -17,6 +18,7 @@ export const RevisionCompare: React.FC<RevisionCompareProps> = ({
   techPackId,
   onClose
 }) => {
+  const { t } = useI18n();
   const [fromId, setFromId] = useState<string>('');
   const [toId, setToId] = useState<string>('');
   const { comparison, loading, error, compare, clearComparison } = useCompare();
@@ -50,7 +52,7 @@ export const RevisionCompare: React.FC<RevisionCompareProps> = ({
 
   const diffColumns = [
     {
-      title: 'Field',
+      title: t('form.revision.field'),
       dataIndex: 'field',
       key: 'field',
       width: 200,
@@ -59,7 +61,7 @@ export const RevisionCompare: React.FC<RevisionCompareProps> = ({
       )
     },
     {
-      title: 'Old Value',
+      title: t('form.revision.oldValue'),
       dataIndex: 'old',
       key: 'old',
       render: (val: any) => (
@@ -69,7 +71,7 @@ export const RevisionCompare: React.FC<RevisionCompareProps> = ({
       )
     },
     {
-      title: 'New Value',
+      title: t('form.revision.newValue'),
       dataIndex: 'new',
       key: 'new',
       render: (val: any) => (
@@ -95,7 +97,7 @@ export const RevisionCompare: React.FC<RevisionCompareProps> = ({
       title={
         <div className="flex items-center gap-2">
           <GitCompare className="w-5 h-5" />
-          <span>Compare Revisions</span>
+          <span>{t('form.revision.compareRevisions')}</span>
         </div>
       }
       onCancel={handleClose}
@@ -109,10 +111,10 @@ export const RevisionCompare: React.FC<RevisionCompareProps> = ({
           <Space className="w-full" direction="vertical" size="middle">
             <div className="flex items-center gap-4">
               <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">From Revision</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('form.revision.fromRevision')}</label>
                 <Select
                   className="w-full"
-                  placeholder="Select revision"
+                  placeholder={t('form.revision.selectRevision')}
                   value={fromId}
                   onChange={setFromId}
                   showSearch
@@ -126,10 +128,10 @@ export const RevisionCompare: React.FC<RevisionCompareProps> = ({
                 />
               </div>
               <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">To Revision</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('form.revision.toRevision')}</label>
                 <Select
                   className="w-full"
-                  placeholder="Select revision"
+                  placeholder={t('form.revision.selectRevision')}
                   value={toId}
                   onChange={setToId}
                   showSearch
@@ -149,7 +151,7 @@ export const RevisionCompare: React.FC<RevisionCompareProps> = ({
                 disabled={!fromId || !toId || fromId === toId || loading}
                 loading={loading}
               >
-                Compare
+                {t('form.revision.compare')}
               </Button>
             </div>
           </Space>
@@ -158,7 +160,7 @@ export const RevisionCompare: React.FC<RevisionCompareProps> = ({
         {/* Error */}
         {error && (
           <Alert
-            message="Error"
+            message={t('common.error')}
             description={error}
             type="error"
             showIcon
@@ -170,7 +172,7 @@ export const RevisionCompare: React.FC<RevisionCompareProps> = ({
         {loading && (
           <div className="text-center py-8">
             <Spin size="large" />
-            <p className="text-gray-500 mt-2">Comparing revisions...</p>
+            <p className="text-gray-500 mt-2">{t('form.revision.comparing')}</p>
           </div>
         )}
 
@@ -178,20 +180,20 @@ export const RevisionCompare: React.FC<RevisionCompareProps> = ({
         {comparison && !loading && (
           <Card>
             <div className="mb-4">
-              <h4 className="font-semibold mb-2">Comparison Summary</h4>
+              <h4 className="font-semibold mb-2">{t('form.revision.comparisonSummary')}</h4>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                 <p className="text-sm text-blue-800">{comparison.comparison.summary}</p>
               </div>
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">From Revision</p>
+                  <p className="text-xs text-gray-500 mb-1">{t('form.revision.fromRevision')}</p>
                   <p className="font-medium">{comparison.fromRevision.version}</p>
                   <p className="text-xs text-gray-500">
                     {comparison.fromRevision.createdByName} • {new Date(comparison.fromRevision.createdAt).toLocaleDateString()}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">To Revision</p>
+                  <p className="text-xs text-gray-500 mb-1">{t('form.revision.toRevision')}</p>
                   <p className="font-medium">{comparison.toRevision.version}</p>
                   <p className="text-xs text-gray-500">
                     {comparison.toRevision.createdByName} • {new Date(comparison.toRevision.createdAt).toLocaleDateString()}
@@ -202,7 +204,7 @@ export const RevisionCompare: React.FC<RevisionCompareProps> = ({
 
             {diffData.length === 0 ? (
               <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed">
-                <p className="text-sm">No differences found between these revisions.</p>
+                <p className="text-sm">{t('form.revision.noDifferences')}</p>
               </div>
             ) : (
               <>
@@ -216,8 +218,8 @@ export const RevisionCompare: React.FC<RevisionCompareProps> = ({
                 {comparison.comparison.hasMore && (
                   <div className="mt-4 text-center">
                     <Alert
-                      message="Showing first 100 fields"
-                      description="There are more differences. Use the API to fetch additional fields."
+                      message={t('form.revision.showingFirst100')}
+                      description={t('form.revision.moreDifferences')}
                       type="info"
                       showIcon
                     />

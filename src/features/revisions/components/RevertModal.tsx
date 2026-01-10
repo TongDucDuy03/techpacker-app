@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal, Button, Input, Alert } from 'antd';
 import { Undo2, AlertCircle } from 'lucide-react';
 import { Revision } from '../types';
+import { useI18n } from '../../../lib/i18n';
 
 const { TextArea } = Input;
 
@@ -22,6 +23,7 @@ export const RevertModal: React.FC<RevertModalProps> = ({
   onConfirm,
   onCancel
 }) => {
+  const { t } = useI18n();
   const [reason, setReason] = useState('');
 
   const handleConfirm = () => {
@@ -42,13 +44,13 @@ export const RevertModal: React.FC<RevertModalProps> = ({
       title={
         <div className="flex items-center gap-2">
           <AlertCircle className="w-5 h-5 text-orange-600" />
-          <span>Confirm Revert</span>
+          <span>{t('form.revision.confirmRevert')}</span>
         </div>
       }
       onCancel={handleCancel}
       footer={[
         <Button key="cancel" onClick={handleCancel} disabled={loading}>
-          Cancel
+          {t('common.cancel')}
         </Button>,
         <Button
           key="confirm"
@@ -58,38 +60,38 @@ export const RevertModal: React.FC<RevertModalProps> = ({
           loading={loading}
           onClick={handleConfirm}
         >
-          Revert
+          {t('form.revision.revert')}
         </Button>
       ]}
       width={500}
     >
       <div className="space-y-4">
         <div>
-          <p className="text-sm text-gray-600 mb-2">
-            Bạn có chắc muốn revert về version <strong>{revision.version}</strong>?
-          </p>
+          <p className="text-sm text-gray-600 mb-2" dangerouslySetInnerHTML={{
+            __html: t('form.revision.revertConfirmMessage', { version: revision.version })
+          }} />
           <p className="text-sm text-gray-500">
-            Hành động này sẽ tạo revision mới và ghi lại lịch sử. Dữ liệu hiện tại sẽ được thay thế bằng dữ liệu từ revision này.
+            {t('form.revision.revertDescription')}
           </p>
         </div>
 
         {revision.description && (
           <div className="p-3 bg-gray-50 rounded-md">
             <p className="text-xs text-gray-600">
-              <strong>Original Summary:</strong> {revision.description}
+              <strong>{t('form.revision.originalSummary')}</strong> {revision.description}
             </p>
           </div>
         )}
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Lý do revert (tùy chọn)
+            {t('form.revision.revertReasonLabel')}
           </label>
           <TextArea
             rows={4}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="Nhập lý do revert (nếu có)..."
+            placeholder={t('form.revision.revertReasonPlaceholder')}
             maxLength={500}
             showCount
           />
@@ -97,7 +99,7 @@ export const RevertModal: React.FC<RevertModalProps> = ({
 
         {error && (
           <Alert
-            message="Error"
+            message={t('common.error')}
             description={error}
             type="error"
             showIcon

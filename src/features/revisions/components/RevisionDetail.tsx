@@ -57,13 +57,13 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
 
   const canRevert = canEdit && !!activeRevision.snapshot && activeRevision.changeType !== 'rollback' && !isCurrent;
   const revertDisabledReason = !activeRevision.snapshot
-    ? 'Cannot revert — snapshot data missing for this revision'
+    ? t('form.revision.cannotRevertNoSnapshot')
     : activeRevision.changeType === 'rollback'
-    ? 'Reverting to a rollback revision is not allowed'
+    ? t('form.revision.cannotRevertRollback')
     : isCurrent
-    ? 'This is the current revision'
+    ? t('form.revision.isCurrentRevision')
     : !canEdit
-    ? 'You need Editor access to revert this TechPack'
+    ? t('form.revision.needEditorAccess')
     : '';
 
   const formatDate = (date: string | Date) => {
@@ -86,11 +86,11 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
     
     // Format section name
     const sectionNames: Record<string, string> = {
-      bom: 'BOM',
-      measurements: 'Measurement',
-      colorways: 'Colorway',
-      howToMeasure: 'How to Measure',
-      articleInfo: 'Article Info'
+      bom: t('form.revision.section.bom'),
+      measurements: t('form.revision.section.measurements'),
+      colorways: t('form.revision.section.colorways'),
+      howToMeasure: t('form.revision.section.howToMeasure'),
+      articleInfo: t('form.revision.section.articleInfo')
     };
     result = sectionNames[section] || section;
     
@@ -100,11 +100,11 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
       if (idMatch) {
         const idStr = idMatch[1];
         if (idStr.startsWith('+id:')) {
-          result += ' (New Item)';
+          result += ` (${t('form.revision.item.new')})`;
         } else if (idStr.startsWith('-id:')) {
-          result += ' (Removed Item)';
+          result += ` (${t('form.revision.item.removed')})`;
         } else {
-          result += ' Item';
+          result += ` ${t('form.revision.item.item')}`;
         }
       }
     }
@@ -210,7 +210,7 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
 
   const diffColumns = [
     {
-      title: 'Field',
+      title: t('form.revision.field'),
       dataIndex: 'field',
       key: 'field',
       width: '35%',
@@ -219,7 +219,7 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
       )
     },
     {
-      title: 'Old Value',
+      title: t('form.revision.oldValue'),
       dataIndex: 'old',
       key: 'old',
       width: '32.5%',
@@ -230,7 +230,7 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
       )
     },
     {
-      title: 'New Value',
+      title: t('form.revision.newValue'),
       dataIndex: 'new',
       key: 'new',
       width: '32.5%',
@@ -372,10 +372,10 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
     Object.entries(perSection).forEach(([section, agg]) => {
       const parts: string[] = [];
       if (agg.added.length) {
-        parts.push(`Thêm ${agg.added.map(n => `“${n}”`).join(', ')}`);
+        parts.push(`${t('form.revision.action.add')} ${agg.added.map(n => `"${n}"`).join(', ')}`);
       }
       if (agg.removed.length) {
-        parts.push(`Xóa ${agg.removed.map(n => `“${n}”`).join(', ')}`);
+        parts.push(`${t('form.revision.action.remove')} ${agg.removed.map(n => `"${n}"`).join(', ')}`);
       }
       // For updated, show up to a few items with key field changes
       const updatedEntries: string[] = [];
@@ -397,16 +397,16 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
         updatedEntries.push(label ? `“${label}” (${preview})` : `(${preview})`);
       });
       if (updatedEntries.length) {
-        parts.push(`Sửa ${updatedEntries.join(', ')}`);
+        parts.push(`${t('form.revision.action.update')} ${updatedEntries.join(', ')}`);
       }
 
       if (parts.length) {
         const sectionNames: Record<string, string> = {
-          bom: 'BOM',
-          measurements: 'Measurements',
-          colorways: 'Colorways',
-          howToMeasure: 'Construction',
-          articleInfo: 'Article Info'
+          bom: t('form.revision.section.bom'),
+          measurements: t('form.revision.section.measurements'),
+          colorways: t('form.revision.section.colorways'),
+          howToMeasure: t('form.revision.section.construction'),
+          articleInfo: t('form.revision.section.articleInfo')
         };
         summaries[section] = `${sectionNames[section] || section}: ${parts.join(', ')}`;
       }
@@ -425,14 +425,14 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
         title={
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold">Revision {activeRevision.version}</h3>
+              <h3 className="text-lg font-semibold">{t('form.revision.revisionTitle', { version: activeRevision.version })}</h3>
               <p className="text-sm text-gray-600 mt-1">
-                By {activeRevision.createdByName} • {formatDate(activeRevision.createdAt)}
+                {t('form.revision.byUser', { name: activeRevision.createdByName, date: formatDate(activeRevision.createdAt) })}
               </p>
             </div>
             <Space>
               <Button icon={<GitCompare className="w-4 h-4" />} onClick={onCompare}>
-                Compare
+                {t('form.revision.compare')}
               </Button>
               <Button
                 type="primary"
@@ -442,7 +442,7 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
                 title={revertDisabledReason}
                 onClick={() => setShowRevertModal(true)}
               >
-                Revert
+                {t('form.revision.revert')}
               </Button>
             </Space>
           </div>
@@ -450,10 +450,10 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
       >
         {/* Summary */}
         <div className="mb-6">
-          <h4 className="text-sm font-semibold text-gray-900 mb-2">Change Summary</h4>
+          <h4 className="text-sm font-semibold text-gray-900 mb-2">{t('form.revision.changeSummary')}</h4>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <p className="text-sm text-blue-800">
-              {activeRevision.changes?.summary || activeRevision.description || 'No summary provided'}
+              {activeRevision.changes?.summary || activeRevision.description || t('form.revision.noSummary')}
             </p>
           </div>
         </div>
@@ -462,7 +462,7 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
 
         {/* Field Changes */}
         <div>
-          <h4 className="text-sm font-semibold text-gray-900 mb-3">Field Changes</h4>
+          <h4 className="text-sm font-semibold text-gray-900 mb-3">{t('form.revision.fieldChanges')}</h4>
           {/* High-level per-section summary */}
           {Object.keys(sectionSummaries).length > 0 && (
             <div className="mb-3">
@@ -477,13 +477,13 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
             <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed">
               {activeRevision.changes?.details && Object.keys(activeRevision.changes.details).length > 0 ? (
                 <div>
-                  <p className="text-sm mb-2">No detailed field-level diff available, but changes were detected:</p>
+                  <p className="text-sm mb-2">{t('form.revision.noDetailedDiff')}</p>
                   <div className="text-left max-w-md mx-auto">
                     {Object.entries(activeRevision.changes.details).map(([section, details]: [string, any]) => {
                       const changes: string[] = [];
-                      if (details.added) changes.push(`${details.added} added`);
-                      if (details.modified) changes.push(`${details.modified} modified`);
-                      if (details.removed) changes.push(`${details.removed} removed`);
+                      if (details.added) changes.push(`${details.added} ${t('form.revision.added')}`);
+                      if (details.modified) changes.push(`${details.modified} ${t('form.revision.modified')}`);
+                      if (details.removed) changes.push(`${details.removed} ${t('form.revision.removed')}`);
                       if (changes.length > 0) {
                         return (
                           <div key={section} className="text-sm py-1">
@@ -496,7 +496,7 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
                   </div>
                 </div>
               ) : (
-                <p className="text-sm">No field-level changes detected in this revision.</p>
+                <p className="text-sm">{t('form.revision.noFieldChanges')}</p>
               )}
             </div>
           ) : (
@@ -514,11 +514,11 @@ export const RevisionDetail: React.FC<RevisionDetailProps> = ({
 
                 return Object.entries(grouped).map(([section, items]) => {
                   const sectionNames: Record<string, string> = {
-                    bom: 'BOM Items',
-                    measurements: 'Measurements',
-                    colorways: 'Colorways',
-                    howToMeasure: 'How to Measure',
-                    articleInfo: 'Article Information'
+                    bom: t('form.revision.section.bomItems'),
+                    measurements: t('form.revision.section.measurements'),
+                    colorways: t('form.revision.section.colorways'),
+                    howToMeasure: t('form.revision.section.howToMeasure'),
+                    articleInfo: t('form.revision.section.articleInformation')
                   };
 
                   return (

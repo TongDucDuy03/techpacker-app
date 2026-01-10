@@ -4,6 +4,7 @@ import { MessageCircle, Send, User } from 'lucide-react';
 import { useComments } from '../hooks/useComments';
 import { Revision } from '../types';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useI18n } from '../../../lib/i18n';
 
 const { TextArea } = Input;
 
@@ -17,6 +18,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   canView
 }) => {
   const { user } = useAuth();
+  const { t } = useI18n();
   const { comments, adding, error, addComment, setCommentsFromRevision } = useComments(revision?._id);
   const [newComment, setNewComment] = useState('');
 
@@ -52,7 +54,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
       title={
         <div className="flex items-center gap-2">
           <MessageCircle className="w-4 h-4" />
-          <span>Comments ({comments.length})</span>
+          <span>{t('form.revision.comments')} ({comments.length})</span>
         </div>
       }
       className="mt-4"
@@ -60,7 +62,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
       {/* Comments List */}
       {comments.length === 0 ? (
         <Empty
-          description="No comments yet"
+          description={t('form.revision.noCommentsYet')}
           image={Empty.PRESENTED_IMAGE_SIMPLE}
         />
       ) : (
@@ -96,7 +98,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             rows={3}
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Add a comment..."
+            placeholder={t('form.revision.addCommentPlaceholder')}
             maxLength={1000}
             showCount
             onPressEnter={(e) => {
@@ -113,7 +115,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             disabled={!newComment.trim()}
             className="w-full"
           >
-            Send Comment
+            {t('form.revision.sendComment')}
           </Button>
         </Space.Compact>
       </div>
