@@ -742,35 +742,28 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               />
 
               {/* ===== FIXED: Sample Type Field ===== */}
-              <div className="relative">
-                <Input
-                  label={t('form.articleInfo.sampleType')}
-                  value={localSampleType}
-                  onChange={(value) => {
-                    // Mark as edited to prevent fallback
-                    setHasEditedSampleType(true);
-                    
-                    // Allow empty string
-                    const newValue = value === null || value === undefined ? '' : String(value);
-                    setLocalSampleType(newValue);
-                    
-                    // Update parent
-                    handleInputChange('sampleType')(newValue);
-                  }}
-                  onBlur={() => validation.setFieldTouched('sampleType')}
-                  type="text"
-                  placeholder={t('form.articleInfo.sampleTypePlaceholder')}
-                  maxLength={120}
-                  disabled={!canEdit}
-                  error={validation.getFieldProps('sampleType').error}
-                  helperText={validation.getFieldProps('sampleType').helperText}
-                />
-                {(mode === 'edit' || mode === 'view') && (
-                  <div className="absolute right-3 top-8 text-gray-400">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                )}
-              </div>
+              <Input
+                label={t('form.articleInfo.sampleType')}
+                value={localSampleType}
+                onChange={(value) => {
+                  // Mark as edited to prevent fallback
+                  setHasEditedSampleType(true);
+                  
+                  // Allow empty string
+                  const newValue = value === null || value === undefined ? '' : String(value);
+                  setLocalSampleType(newValue);
+                  
+                  // Update parent
+                  handleInputChange('sampleType')(newValue);
+                }}
+                onBlur={() => validation.setFieldTouched('sampleType')}
+                type="text"
+                placeholder={t('form.articleInfo.sampleTypePlaceholder')}
+                maxLength={120}
+                disabled={!canEdit}
+                error={validation.getFieldProps('sampleType').error}
+                helperText={validation.getFieldProps('sampleType').helperText}
+              />
 
               <Select
                 label={t('form.articleInfo.gender')}

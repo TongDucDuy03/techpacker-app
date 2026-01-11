@@ -1,5 +1,6 @@
 import React from 'react';
 import { Eye, Edit, Trash2 } from 'lucide-react';
+import { useI18n } from '../../../lib/i18n';
 
 interface User {
   _id: string;
@@ -23,9 +24,21 @@ interface Props {
 }
 
 const UserTable: React.FC<Props> = ({ users, loading, sortBy, sortOrder, onSort, onEdit, onView, onDelete }) => {
+  const { t } = useI18n();
+  
   const renderSortArrow = (field: string) => {
     if (sortBy !== field) return null;
     return sortOrder === 'asc' ? ' ▲' : ' ▼';
+  };
+
+  const getRoleLabel = (role: string): string => {
+    switch (role) {
+      case 'admin': return t('admin.role.admin');
+      case 'designer': return t('admin.role.designer');
+      case 'merchandiser': return t('admin.role.merchandiser');
+      case 'viewer': return t('admin.role.viewer');
+      default: return role;
+    }
   };
 
   return (
@@ -33,23 +46,23 @@ const UserTable: React.FC<Props> = ({ users, loading, sortBy, sortOrder, onSort,
       <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
         <thead>
           <tr style={{ backgroundColor: '#f8f9fa' }}>
-            <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'left', cursor: 'pointer' }} onClick={() => onSort('firstName')}>First Name{renderSortArrow('firstName')}</th>
-            <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'left', cursor: 'pointer' }} onClick={() => onSort('lastName')}>Last Name{renderSortArrow('lastName')}</th>
-            <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'left', cursor: 'pointer' }} onClick={() => onSort('email')}>Email{renderSortArrow('email')}</th>
-            <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'left', cursor: 'pointer' }} onClick={() => onSort('role')}>Role{renderSortArrow('role')}</th>
-            <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'left', cursor: 'pointer' }} onClick={() => onSort('createdAt')}>Registered{renderSortArrow('createdAt')}</th>
-            <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'left', cursor: 'pointer' }} onClick={() => onSort('lastLogin')}>Last Login{renderSortArrow('lastLogin')}</th>
-            <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'left' }}>Actions</th>
+            <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'left', cursor: 'pointer' }} onClick={() => onSort('firstName')}>{t('admin.user.firstName')}{renderSortArrow('firstName')}</th>
+            <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'left', cursor: 'pointer' }} onClick={() => onSort('lastName')}>{t('admin.user.lastName')}{renderSortArrow('lastName')}</th>
+            <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'left', cursor: 'pointer' }} onClick={() => onSort('email')}>{t('admin.user.email')}{renderSortArrow('email')}</th>
+            <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'left', cursor: 'pointer' }} onClick={() => onSort('role')}>{t('admin.user.role')}{renderSortArrow('role')}</th>
+            <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'left', cursor: 'pointer' }} onClick={() => onSort('createdAt')}>{t('admin.user.registered')}{renderSortArrow('createdAt')}</th>
+            <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'left', cursor: 'pointer' }} onClick={() => onSort('lastLogin')}>{t('admin.user.lastLogin')}{renderSortArrow('lastLogin')}</th>
+            <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'left' }}>{t('admin.user.actions')}</th>
           </tr>
         </thead>
         <tbody>
           {loading && users.length === 0 ? (
             <tr>
-              <td colSpan={7} style={{ padding: '12px', textAlign: 'center', border: '1px solid #dee2e6' }}>Loading...</td>
+              <td colSpan={7} style={{ padding: '12px', textAlign: 'center', border: '1px solid #dee2e6' }}>{t('admin.user.loading')}</td>
             </tr>
           ) : users.length === 0 ? (
             <tr>
-              <td colSpan={7} style={{ padding: '12px', textAlign: 'center', border: '1px solid #dee2e6' }}>No users found.</td>
+              <td colSpan={7} style={{ padding: '12px', textAlign: 'center', border: '1px solid #dee2e6' }}>{t('admin.user.noUsers')}</td>
             </tr>
           ) : (
             users.map(user => (
@@ -58,18 +71,15 @@ const UserTable: React.FC<Props> = ({ users, loading, sortBy, sortOrder, onSort,
                 <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>{user.lastName}</td>
                 <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>{user.email}</td>
                 <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>
-                  {user.role === 'admin' && 'Admin'}
-                  {user.role === 'designer' && 'Designer/Developer'}
-                  {user.role === 'merchandiser' && 'Merchandiser/Brand Owner'}
-                  {user.role === 'viewer' && 'Viewer/Supplier'}
+                  {getRoleLabel(user.role)}
                 </td>
                 <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>{new Date(user.createdAt).toLocaleDateString()}</td>
-                <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>{user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'Never'}</td>
+                <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>{user.lastLogin ? new Date(user.lastLogin).toLocaleString() : t('admin.user.never')}</td>
                 <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <button
                       onClick={() => onView(user)}
-                      title="View User"
+                      title={t('admin.user.view')}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -95,7 +105,7 @@ const UserTable: React.FC<Props> = ({ users, loading, sortBy, sortOrder, onSort,
                     </button>
                     <button
                       onClick={() => onEdit(user)}
-                      title="Edit User"
+                      title={t('admin.user.edit')}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -121,7 +131,7 @@ const UserTable: React.FC<Props> = ({ users, loading, sortBy, sortOrder, onSort,
                     </button>
                     <button
                       onClick={() => onDelete(user._id)}
-                      title="Delete User"
+                      title={t('admin.user.delete')}
                       style={{
                         display: 'flex',
                         alignItems: 'center',

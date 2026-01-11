@@ -51,34 +51,34 @@ const UserModal: React.FC<Props> = ({ user, mode, onClose, onSave }) => {
 
     // First name validation
     if (!formData.firstName.trim()) {
-      errors.firstName = 'First name is required';
+      errors.firstName = t('admin.user.validation.firstName.required');
     } else if (formData.firstName.trim().length < 2) {
-      errors.firstName = 'First name must be at least 2 characters';
+      errors.firstName = t('admin.user.validation.firstName.minLength');
     }
 
     // Last name validation
     if (!formData.lastName.trim()) {
-      errors.lastName = 'Last name is required';
+      errors.lastName = t('admin.user.validation.lastName.required');
     } else if (formData.lastName.trim().length < 2) {
-      errors.lastName = 'Last name must be at least 2 characters';
+      errors.lastName = t('admin.user.validation.lastName.minLength');
     }
 
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!formData.email.trim()) {
-      errors.email = 'Email is required';
+      errors.email = t('admin.user.validation.email.required');
     } else if (!emailRegex.test(formData.email)) {
-      errors.email = 'Please enter a valid email address';
+      errors.email = t('admin.user.validation.email.invalid');
     }
 
     // Password validation (only for create mode or when password is provided in edit mode)
     if (mode === 'create' || formData.password) {
       if (!formData.password) {
-        errors.password = 'Password is required';
+        errors.password = t('admin.user.validation.password.required');
       } else if (formData.password.length < 8) {
-        errors.password = 'Password must be at least 8 characters long';
+        errors.password = t('admin.user.validation.password.minLength');
       } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-        errors.password = 'Password must contain at least one uppercase letter, one lowercase letter, and one number';
+        errors.password = t('admin.user.validation.password.complexity');
       }
     }
 
@@ -127,24 +127,34 @@ const UserModal: React.FC<Props> = ({ user, mode, onClose, onSave }) => {
       }
       onSave();
     } catch (err: any) {
-      setError(err.message || 'Failed to save user');
+      setError(err.message || t('admin.user.saveError'));
     } finally {
       setLoading(false);
     }
   };
 
   if (mode === 'view' && user) {
+    const getRoleLabel = (role: string): string => {
+      switch (role) {
+        case 'admin': return t('admin.role.admin');
+        case 'designer': return t('admin.role.designer');
+        case 'merchandiser': return t('admin.role.merchandiser');
+        case 'viewer': return t('admin.role.viewer');
+        default: return role;
+      }
+    };
+
     return (
       <div style={modalStyles.overlay}>
         <div style={modalStyles.content}>
-          <h2>User Details</h2>
-          <p><strong>First Name:</strong> {user.firstName}</p>
-          <p><strong>Last Name:</strong> {user.lastName}</p>
-          <p><strong>Email:</strong> {user.email}</p>
-          <p><strong>Role:</strong> {user.role}</p>
-          <p><strong>Registered:</strong> {new Date(user.createdAt).toLocaleString()}</p>
-          <p><strong>Last Login:</strong> {user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'Never'}</p>
-          <button onClick={onClose} style={{ marginTop: '20px' }}>Close</button>
+          <h2>{t('admin.user.details')}</h2>
+          <p><strong>{t('admin.user.firstName')}:</strong> {user.firstName}</p>
+          <p><strong>{t('admin.user.lastName')}:</strong> {user.lastName}</p>
+          <p><strong>{t('admin.user.email')}:</strong> {user.email}</p>
+          <p><strong>{t('admin.user.role')}:</strong> {getRoleLabel(user.role)}</p>
+          <p><strong>{t('admin.user.registered')}:</strong> {new Date(user.createdAt).toLocaleString()}</p>
+          <p><strong>{t('admin.user.lastLogin')}:</strong> {user.lastLogin ? new Date(user.lastLogin).toLocaleString() : t('admin.user.never')}</p>
+          <button onClick={onClose} style={{ marginTop: '20px' }}>{t('admin.user.close')}</button>
         </div>
       </div>
     );
@@ -153,10 +163,10 @@ const UserModal: React.FC<Props> = ({ user, mode, onClose, onSave }) => {
   return (
     <div style={modalStyles.overlay}>
       <div style={modalStyles.content}>
-        <h2>{mode === 'create' ? 'Create New User' : 'Edit User'}</h2>
+        <h2>{mode === 'create' ? t('admin.user.createNew') : t('admin.user.edit')}</h2>
         <form onSubmit={handleSubmit}>
           <div style={formGroupStyles}>
-            <label>First Name</label>
+            <label>{t('admin.user.firstName')}</label>
             <input
               type="text"
               name="firstName"
@@ -173,7 +183,7 @@ const UserModal: React.FC<Props> = ({ user, mode, onClose, onSave }) => {
             )}
           </div>
           <div style={formGroupStyles}>
-            <label>Last Name</label>
+            <label>{t('admin.user.lastName')}</label>
             <input
               type="text"
               name="lastName"
@@ -190,7 +200,7 @@ const UserModal: React.FC<Props> = ({ user, mode, onClose, onSave }) => {
             )}
           </div>
           <div style={formGroupStyles}>
-            <label>Email</label>
+            <label>{t('admin.user.email')}</label>
             <input
               type="email"
               name="email"
@@ -207,7 +217,7 @@ const UserModal: React.FC<Props> = ({ user, mode, onClose, onSave }) => {
             )}
           </div>
           <div style={formGroupStyles}>
-            <label>Password {mode === 'edit' && '(leave blank to keep current)'}</label>
+            <label>{t('admin.user.password')} {mode === 'edit' && `(${t('admin.user.password.leaveBlank')})`}</label>
             <input
               type="password"
               name="password"
@@ -224,12 +234,12 @@ const UserModal: React.FC<Props> = ({ user, mode, onClose, onSave }) => {
             )}
           </div>
           <div style={formGroupStyles}>
-            <label>Role</label>
+            <label>{t('admin.user.role')}</label>
             <select name="role" value={formData.role} onChange={handleChange} style={inputStyles}>
-              <option value="admin">Admin (Quản trị viên)</option>
-              <option value="designer">Designer/Developer (Nhà thiết kế)</option>
-              <option value="merchandiser">Merchandiser (Chủ thương hiệu)</option>
-              <option value="viewer">Viewer/Supplier (Chỉ xem)</option>
+              <option value="admin">{t('admin.role.admin')}</option>
+              <option value="designer">{t('admin.role.designer')}</option>
+              <option value="merchandiser">{t('admin.role.merchandiser')}</option>
+              <option value="viewer">{t('admin.role.viewer')}</option>
             </select>
           </div>
           {error && <p style={{ color: 'red' }}>{error}</p>}
