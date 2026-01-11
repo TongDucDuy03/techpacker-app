@@ -76,8 +76,12 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
   const [isDuplicate, setIsDuplicate] = useState(false);
 
+  // ===== FIX: Local state management for sampleType =====
+  // This prevents the issue where deleting "1" causes it to reappear
+  const [hasEditedSampleType, setHasEditedSampleType] = useState(false);
+  const [localSampleType, setLocalSampleType] = useState('');
+
   // Fallback if no techPack is passed
-  // Support both old field names (productName, version) and new field names (articleName, sampleType) for backward compatibility
   const safeArticleInfo = articleInfo ?? {
     articleCode: '',
     articleName: '',
@@ -97,13 +101,17 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
     lastModified: new Date().toISOString(),
   };
 
+  // Sync local sampleType from props when user hasn't edited yet
+  useEffect(() => {
+    if (!hasEditedSampleType) {
+      const initialValue = safeArticleInfo.sampleType ?? (safeArticleInfo as any).version ?? '';
+      setLocalSampleType(initialValue);
+    }
+  }, [safeArticleInfo.sampleType, safeArticleInfo.version, hasEditedSampleType]);
+
   // Fetch designers on component mount (only for preview display)
-  // Note: technicalDesignerId is now a free text field, so this is optional
-  // Only fetch if user has admin role to avoid 403 errors
   useEffect(() => {
     const fetchDesigners = async () => {
-      // Skip fetching if user is not admin (to avoid 403 errors)
-      // technicalDesignerId is now free text, so designers list is only for preview
       if (user?.role !== 'admin') {
         setDesigners([]);
         setLoadingDesigners(false);
@@ -119,10 +127,8 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
         }));
         setDesigners(designerOptions);
       } catch (error: any) {
-        // Failed to fetch designers - handle silently
-        // This is expected for non-admin users since technicalDesignerId is now free text
         console.log('[ArticleInfoTab] Could not fetch designers:', error.message);
-        setDesigners([]); // Set empty array instead of leaving undefined
+        setDesigners([]);
       } finally {
         setLoadingDesigners(false);
       }
@@ -142,7 +148,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
         return;
       }
 
-      // Validate format first - must match validation schema exactly
       if (!/^[A-Z0-9-]+$/.test(debouncedArticleCode)) {
         setIsDuplicate(false);
         return;
@@ -152,7 +157,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
       setIsDuplicate(false);
 
       try {
-        // Check if articleCode exists
         const response = await api.get(`/techpacks/check-article-code/${encodeURIComponent(debouncedArticleCode.toUpperCase())}`);
         const exists = response.data?.exists || response.data?.data?.exists || false;
         setIsDuplicate(exists);
@@ -161,11 +165,9 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
           showWarning(t('validation.articleCodeExists'));
         }
       } catch (error: any) {
-        // If 404, articleCode doesn't exist (good)
         if (error.response?.status === 404) {
           setIsDuplicate(false);
         } else {
-          // Other errors - don't block user, just log
           console.error('Error checking article code:', error);
         }
       } finally {
@@ -212,16 +214,11 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
     { value: 'Sales', label: t('option.lifecycle.sales') },
     { value: 'Pre-production', label: t('option.lifecycle.preProduction') },
     { value: 'Production', label: t('option.lifecycle.production') },
-
   ];
 
   // Product class options
-  // Helper function to get translation key for product class
-  // Converts "T-Shirts" -> "tShirts", "Polo Shirts" -> "poloShirts", etc.
   const getProductClassKey = (cls: string): string => {
-    // Remove dashes and spaces, then convert to camelCase
     const cleaned = cls.replace(/-/g, '').replace(/\s+/g, '');
-    // Convert first letter to lowercase, rest keep as is
     const camelCase = cleaned.charAt(0).toLowerCase() + cleaned.slice(1);
     return `option.productClass.${camelCase}`;
   };
@@ -239,7 +236,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
     { value: 'Luxury', label: t('option.pricePoint.luxury') }
   ];
 
-  // Status options (matching backend enum)
+  // Status options
   const statusOptions: Array<{ value: TechPackStatus; label: string }> = [
     { value: 'Draft', label: t('option.status.draft') },
     { value: 'Process', label: t('option.status.process') },
@@ -259,11 +256,8 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
   ];
 
   const handleInputChange = (field: keyof ArticleInfo) => (value: string | number) => {
-    // Update the form data
     const updatedArticleInfo = { ...safeArticleInfo, [field]: value };
     onUpdate?.({ articleInfo: updatedArticleInfo });
-
-    // Validate the field in real-time
     validation.validateField(field, value);
   };
 
@@ -415,18 +409,14 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
     await uploadCompanyLogoFile(file);
   };
 
-  // Helper to get image URL - handles both relative and absolute URLs
   const getImageUrl = (url: string | undefined): string => {
     if (!url) return '';
-    // If URL is already absolute (starts with http:// or https://), return as-is
     if (url.startsWith('http://') || url.startsWith('https://')) {
       return url;
     }
-    // If URL starts with /, it's already a path, just prepend API base
     if (url.startsWith('/')) {
       return `${API_UPLOAD_BASE}${url}`;
     }
-    // Otherwise, assume it's a relative path
     return `${API_UPLOAD_BASE}/${url}`;
   };
 
@@ -435,7 +425,7 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
     if (confirmed) {
       onUpdate?.({
         articleInfo: {
-          ...safeArticleInfo, // Keep id and other fields
+          ...safeArticleInfo,
           articleCode: '',
           articleName: '',
           sampleType: '',
@@ -460,26 +450,21 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
     }
   };
 
-    const scrollToFirstError = (errors: Record<string, string>) => {
+  const scrollToFirstError = (errors: Record<string, string>) => {
     const firstErrorField = Object.keys(errors)[0];
     if (firstErrorField) {
-      // Try multiple selector strategies for better compatibility
       let element: Element | null = null;
       
-      // Strategy 1: Try by field name in id attribute
       element = document.querySelector(`[id*="${firstErrorField}"]`);
       
-      // Strategy 2: Try by name attribute
       if (!element) {
         element = document.querySelector(`[name="${firstErrorField}"]`);
       }
       
-      // Strategy 3: Try by data-field attribute (if components use it)
       if (!element) {
         element = document.querySelector(`[data-field="${firstErrorField}"]`);
       }
       
-      // Strategy 4: Try by label text (fallback)
       if (!element) {
         const labels = Array.from(document.querySelectorAll('label'));
         const matchingLabel = labels.find(label => 
@@ -495,7 +480,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
       
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        // Focus the element if it's focusable
         if (element instanceof HTMLElement && 'focus' in element) {
           (element as HTMLElement).focus();
         }
@@ -507,7 +491,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
     const current = (techPack || {}) as any;
     const currentInfo = (current.articleInfo || {}) as any;
     const nextInfo = safeArticleInfo as any;
-    // Shallow compare relevant fields of Article Info and status
     const fieldsToCompare = [
       'articleCode','articleName','sampleType','gender','productClass','fitType','supplier','technicalDesignerId',
       'fabricDescription','productDescription','designSketchUrl','companyLogoUrl','season','lifecycleStage','brand','collection',
@@ -518,7 +501,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
         return true;
       }
     }
-    // status can be on root or inside articleInfo safe
     const nextStatus = nextInfo.status || current.status || 'Draft';
     if (current.status !== nextStatus) {
       return true;
@@ -527,7 +509,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
   };
 
   const handleSave = () => {
-    // Check for duplicate articleCode before saving
     if (mode === 'create' && isDuplicate) {
       showError(t('validation.articleCodeExists'));
       return;
@@ -539,7 +520,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
       Object.keys(articleInfoValidationSchema).forEach(field => {
         validation.setFieldTouched(field, true);
       });
-      // Show user-friendly alert for the first error field
       const firstField = Object.keys(errors)[0];
       const fieldLabelMap: Record<string, string> = {
         articleCode: 'Article Code',
@@ -562,7 +542,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
       return;
     }
 
-    // Only propagate updates if actually changed to avoid toggling unsaved state
     if (isArticleInfoChanged()) {
       onUpdate?.({
         ...(techPack || {}),
@@ -572,10 +551,8 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
     }
   };
 
-  // Expose validateAndSave for parent via ref
   useImperativeHandle(ref, () => ({
     validateAndSave: () => {
-      // Check for duplicate articleCode before saving
       if (mode === 'create' && isDuplicate) {
         showError(t('validation.articleCodeExists'));
         return false;
@@ -608,7 +585,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
         return false;
       }
 
-      // Only update if changed; still return true to pass validation
       if (isArticleInfoChanged()) {
         onUpdate?.({
           ...(techPack || {}),
@@ -639,7 +615,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
     setCurrentTab?.(1);
   };
 
-  // Calculate form completion percentage
   const completionPercentage = useMemo(() => {
     const requiredFields = ['articleCode', 'articleName', 'fabricDescription', 'productDescription', 'supplier', 'season', 'technicalDesignerId', 'gender', 'productClass', 'fitType'];
     const optionalFields = ['brand', 'collection', 'targetMarket', 'pricePoint', 'notes'];
@@ -647,14 +622,12 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
     let totalRequired = requiredFields.length;
     let totalCompleted = 0;
 
-    // Count completed required fields
     requiredFields.forEach(field => {
       if (safeArticleInfo[field as keyof typeof safeArticleInfo]) {
         totalCompleted++;
       }
     });
 
-    // Handle conditionally required designSketchUrl (only for Concept/Design stages)
     const isDesignSketchRequired = ['Concept', 'Design'].includes(safeArticleInfo.lifecycleStage || '');
     if (isDesignSketchRequired) {
       totalRequired++;
@@ -663,13 +636,12 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
       }
     }
 
-    // Count completed optional fields
     const optionalCompleted = optionalFields.filter(field =>
       safeArticleInfo[field as keyof typeof safeArticleInfo]
     ).length;
 
     const totalFieldsWeight = (totalRequired * 2) + optionalFields.length;
-    if (totalFieldsWeight === 0) return 0; // Avoid division by zero
+    if (totalFieldsWeight === 0) return 0;
 
     const completedWeight = (totalCompleted * 2) + optionalCompleted;
 
@@ -719,7 +691,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                   label={t('form.articleInfo.articleCode')}
                   value={safeArticleInfo.articleCode}
                   onChange={(value) => {
-                    // Auto-uppercase articleCode
                     const upperValue = String(value).toUpperCase();
                     handleInputChange('articleCode')(upperValue);
                   }}
@@ -770,26 +741,29 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 helperText={validation.getFieldProps('articleName').helperText}
               />
 
-              {/* Sample Type - Text input */}
-              <div className="relative">
-                <Input
-                  label={t('form.articleInfo.sampleType')}
-                  value={safeArticleInfo.sampleType || (safeArticleInfo as any).version || ''}
-                  onChange={handleInputChange('sampleType')}
-                  onBlur={() => validation.setFieldTouched('sampleType')}
-                  type="text"
-                  placeholder={t('form.articleInfo.sampleTypePlaceholder')}
-                  maxLength={120}
-                  disabled={!canEdit}
-                  error={validation.getFieldProps('sampleType').error}
-                  helperText={validation.getFieldProps('sampleType').helperText}
-                />
-                {(mode === 'edit' || mode === 'view') && (
-                  <div className="absolute right-3 top-8 text-gray-400">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                )}
-              </div>
+              {/* ===== FIXED: Sample Type Field ===== */}
+              <Input
+                label={t('form.articleInfo.sampleType')}
+                value={localSampleType}
+                onChange={(value) => {
+                  // Mark as edited to prevent fallback
+                  setHasEditedSampleType(true);
+                  
+                  // Allow empty string
+                  const newValue = value === null || value === undefined ? '' : String(value);
+                  setLocalSampleType(newValue);
+                  
+                  // Update parent
+                  handleInputChange('sampleType')(newValue);
+                }}
+                onBlur={() => validation.setFieldTouched('sampleType')}
+                type="text"
+                placeholder={t('form.articleInfo.sampleTypePlaceholder')}
+                maxLength={120}
+                disabled={!canEdit}
+                error={validation.getFieldProps('sampleType').error}
+                helperText={validation.getFieldProps('sampleType').helperText}
+              />
 
               <Select
                 label={t('form.articleInfo.gender')}
@@ -888,7 +862,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                 helperText={validation.getFieldProps('lifecycleStage').helperText}
               />
 
-              {/* Status field - only editable by Admin/Merchandiser */}
               <Select
                 label={t('form.articleInfo.status')}
                 value={safeArticleInfo.status || techPack?.status || 'Draft'}
@@ -912,9 +885,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                       <span className="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
                       {t('form.additionalInformation')}
                     </h3>
-                    <div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-gray-600">
-                      {t('form.additionalInformation.restricted')}
-                    </div>
                   </div>
 
                   <Input
@@ -965,7 +935,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                     helperText={validation.getFieldProps('pricePoint').helperText}
                   />
 
-                  {/* Currency and Retail Price */}
                   <div className="grid grid-cols-2 gap-4">
                     <Select
                       label={t('form.articleInfo.currency')}
@@ -1083,7 +1052,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                           >
                             {t('form.replaceImage')}
                           </label>
-                          {/* Always-present hidden input to support Replace image */}
                           <input
                             id="design-sketch-upload"
                             name="design-sketch-upload"
@@ -1134,7 +1102,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                   </div>
                 )}
 
-                {/* Image Preview for view mode */}
                 {mode === 'view' && safeArticleInfo.designSketchUrl && (
                   <div className="mt-4 relative">
                     <ZoomableImage
@@ -1147,7 +1114,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                   </div>
                 )}
 
-                {/* Validation error display */}
                 {validation.getFieldProps('designSketchUrl').error && (
                   <p className="mt-1 text-xs text-red-600 flex items-center">
                     <AlertCircle className="w-3 h-3 mr-1" />
@@ -1165,7 +1131,6 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   {t('form.articleInfo.companyLogo')}
-                  {/* <span className="text-gray-400 text-xs ml-2">({t('common.optional')} • {t('form.companyLogoHint')})</span> */}
                 </label>
 
                 {mode !== 'view' && (
@@ -1355,21 +1320,10 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
               )}
             </div>
 
-
-
             {/* Action Buttons */}
             {mode !== 'view' && (
               <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
                 <div className="flex items-center space-x-4">
-                  {/* Hidden: Reset button */}
-                  {/* <button
-                    onClick={handleReset}
-                    className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    {t('common.reset')}
-                  </button> */}
-
                   <button
                     onClick={handleSave}
                     className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
