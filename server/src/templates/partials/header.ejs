@@ -5,7 +5,7 @@
     font-family: 'Roboto', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif;
     font-size: 10pt;
     color: #475569;
-    padding: 0 0 10px 0;
+    padding: 0 0 0px 0;
     border-bottom: 1px solid #E0E0E0;
     display: flex;
     justify-content: space-between;
@@ -48,17 +48,15 @@
 <div class="pdf-header">
   <div class="pdf-header__brand">
     <% if (meta?.companyLogo) { %>
-      <div class="pdf-header__logo">
-        <img src="<%= meta.companyLogo %>" alt="Company Logo" />
+    <div class="pdf-header__logo">
+      <img src="<%= meta.companyLogo %>" alt="Company Logo" />
+    </div>
+    <% } %>
+    <div>
+      <div class="pdf-header__title">
+        <%= meta.articleCode %> — <%= meta.productName %> — <%= meta.version %>
       </div>
-      <% } %>
-        <div>
-          <div class="pdf-header__title">
-            <%= meta.articleCode %> — <%= meta.productName %> — <%= meta.version %>
-          </div>
-        </div>
+    </div>
   </div>
-  <div class="pdf-header__meta">
-    <div>Page <span class="pageNumber"></span> / <span class="totalPages"></span> — Confidential</div>
-  </div>
+
 </div>

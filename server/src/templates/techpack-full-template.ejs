@@ -23,7 +23,7 @@
 
     body {
       font-family: Arial, sans-serif;
-      font-size: 11px;
+      font-size: 14px;
       line-height: 1.4;
       background: white;
       padding: 20px;
@@ -77,7 +77,7 @@
 
     .container {
       max-width: 1200px;
-      margin: 0 auto;
+      margin: 5 auto 0 auto;
       background: white;
     }
 
@@ -104,18 +104,20 @@
 
     .page-header td {
       border: 1px solid #000;
-      padding: 5px 8px;
-      font-size: 9px;
+      padding: 0px 8px 5px 8px;
+      font-size: 14px;
       vertical-align: top;
       word-wrap: break-word;
       overflow-wrap: break-word;
       word-break: break-word;
+      overflow: hidden;
+      max-width: 0;white-space: normal;
     }
 
     .page-title {
       text-align: center;
       font-weight: bold;
-      font-size: 14px;
+      font-size: 16px;
       padding: 0px 8px 8px 8px;
       border-bottom: 2px solid #000;
       background: #fff;
@@ -127,14 +129,24 @@
     }
 
     .label {
+      font-size: 14px;
       font-weight: bold;
       background: #e8e8e8;
-      white-space: nowrap;
+      white-space: normal;
       width: 120px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      word-break: break-word;
+      padding: 5px 6px;
     }
 
     .value {
+      font-size: 14px; 
       background: #fff;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      word-break: break-word;
+      white-space: normal;
     }
 
     .logo-cell {
@@ -217,7 +229,7 @@
       align-items: center;
       justify-content: center;
       color: #999;
-      font-size: 11px;
+      font-size: 14px;
       min-height: 200px;
     }
 
@@ -265,22 +277,23 @@
     .info-item strong {
       display: block;
       color: #666;
-      font-size: 8px;
+      font-size: 14px;
       margin-bottom: 3px;
       text-transform: uppercase;
     }
 
     .info-item span {
       display: block;
-      font-size: 10px;
+      font-size: 14px;
     }
 
     /* Table styles */
     table {
+      table-layout: fixed;
       width: 100%;
       border-collapse: collapse;
       margin-bottom: 15px;
-      font-size: 11px; /* Match body font-size for consistency */
+      font-size: 14px; /* Match body font-size for consistency */
     }
 
     th {
@@ -289,13 +302,24 @@
       text-align: left;
       border: 1px solid #999;
       font-weight: bold;
-      font-size: 8px;
+      font-size: 14px;
+      word-wrap: break-word;      /* Cắt từ dài */
+      word-break: break-word;     /* Cho phép break giữa từ nếu cần */
+      overflow-wrap: break-word;  /* Backup cho word-wrap */
+      white-space: normal;        /* Cho phép xuống dòng */
+      max-width: 0; 
     }
 
     td {
       padding: 6px;
       border: 1px solid #ccc;
       vertical-align: top;
+      font-size: 14px;
+      word-wrap: break-word;      /* Cắt từ dài */
+      word-break: break-word;     /* Cho phép break giữa từ nếu cần */
+      overflow-wrap: break-word;  /* Backup cho word-wrap */
+      white-space: normal;        /* Cho phép xuống dòng */
+      max-width: 0; 
     }
 
     .alt-row {
@@ -305,7 +329,7 @@
 
     .measurement-table td {
       text-align: center;
-      font-size: 9px;
+      font-size: 14px;
     }
 
     .measurement-table td:first-child,
@@ -328,7 +352,7 @@
       border-left: 3px solid #ffd700;
       padding: 8px 10px;
       margin: 8px 0;
-      font-size: 9px;
+      font-size: 14px;
       line-height: 1.4;
     }
 
@@ -336,7 +360,7 @@
       display: block;
       margin-bottom: 4px;
       font-weight: 600;
-      font-size: 9px;
+      font-size: 14px;
     }
 
     .size-badge {
@@ -344,14 +368,14 @@
       color: white;
       padding: 4px 10px;
       border-radius: 3px;
-      font-size: 10px;
+      font-size: 14px;
       display: inline-block;
       margin: 2px;
     }
 
     h3 {
       margin: 15px 0 10px 0;
-      font-size: 12px;
+      font-size: 14px;
       font-weight: bold;
       clear: both;
     }
@@ -391,10 +415,10 @@
                     <img src="<%= images.companyLogo %>" alt="Company Logo"
                       style="max-width: 65px; max-height: 70px; object-fit: contain;" />
                     <% } else { %>
-                      <strong style="font-size: 9px; display: block; text-align: center;">
+                      <strong style="font-size: 14px; display: block; text-align: center;">
                         <%= meta.brand || 'Company' %>
                       </strong>
-                      <small style="font-size: 7px; display: block; text-align: center; color: #666;">Logo</small>
+                      <small style="font-size: 14px; display: block; text-align: center; color: #666;">Logo</small>
                       <% } %>
               </td>
               <td class="label" style="width: 10%;">Product Code</td>
@@ -546,58 +570,8 @@
                       </span>
                     </div>
                   </div>
-                  <!-- Description section removed - already shown in header table -->
 
-                      <!-- CHÈN NỘI DUNG CARE INSTRUCTIONS Ở ĐÂY -->
-
-                      <%# 8. CARE INSTRUCTIONS %>
-                        <% if (meta.fabricDescription || articleSummary?.fabricAndComposition?.fabricDescription) { %>
-                          <div class="section">
-                            <% renderSectionHeader('Care Instructions'); %>
-                              <div class="section-content">
-                                <table style="width: 100%; border-collapse: collapse;">
-                                  <tr>
-                                    <td
-                                      style="width: 280px; vertical-align: top; border: 1px solid #ddd; padding: 15px; background: #f9fafb;">
-                                      <strong style="display: block; margin-bottom: 12px; font-size: 10px;">Care
-                                        Symbols:</strong>
-                                      <div style="font-size: 10px; line-height: 1.8;">
-                                        <div style="padding: 4px 0; border-bottom: 1px solid #e5e7eb;">⊞ Machine Wash
-                                          Warm</div>
-                                        <div style="padding: 4px 0; border-bottom: 1px solid #e5e7eb;">⊗ Do Not Bleach
-                                        </div>
-                                        <div style="padding: 4px 0; border-bottom: 1px solid #e5e7eb;">◉ Tumble Dry Low
-                                        </div>
-                                        <div style="padding: 4px 0;">▽ Cool Iron</div>
-                                      </div>
-                                    </td>
-                                    <td style="vertical-align: top; border: 1px solid #ddd; padding: 15px;">
-                                      <strong style="display: block; margin-bottom: 10px; font-size: 10px;">Fiber
-                                        Content & Instructions:</strong>
-                                      <% if (meta.fabricDescription ||
-                                        articleSummary?.fabricAndComposition?.materialInfo) { %>
-                                        <p style="margin-bottom: 10px; font-size: 11px; font-weight: bold;">
-                                          <%= meta.fabricDescription || articleSummary.fabricAndComposition.materialInfo
-                                            %>
-                                        </p>
-                                        <% } %>
-                                          <p style="margin-bottom: 6px; font-size: 9px; line-height: 1.5;">
-                                            MACHINE WASH WARM, DO NOT BLEACH, TUMBLE DRY LOW, COOL IRON.
-                                          </p>
-                                          <p style="margin-bottom: 6px; font-size: 9px; line-height: 1.5;">
-                                            LAVAR A MÁQUINA TIBIO, NO BLANQUEADOR, SECADO TEMP BAJA, PLANCHA FRIA.
-                                          </p>
-                                          <p style="font-size: 9px; line-height: 1.5;">
-                                            LAVAGE EN MACHINE CHAUD, NE PAS JAVELLISER, SÈCHE-LINGE À FAIBLE, FER
-                                            REFROIDIR.
-                                          </p>
-                                    </td>
-                                  </tr>
-                                </table>
-                              </div>
-                          </div>
-                          <% } %>
-                            <!-- KẾT THÚC NỘI DUNG CARE INSTRUCTIONS -->
+                      
                 </div>
             </div>
 
@@ -663,21 +637,21 @@
                                   <td>
                                     <%= item.comments || '-' %>
                                   </td>
-                                  <td style="font-size: 11px; line-height: 1.4; vertical-align: top;">
+                                  <td style="font-size: 14px; line-height: 1.4; vertical-align: top;">
                                     <% if (item.colorCode || item.color || item.pantone || item.hexCode) { %>
                                       <% if (item.colorCode) { %>
-                                        <span style="font-weight: 600; font-size: 11px;"><%= item.colorCode %></span>
+                                        <span style="font-weight: 600; font-size: 14px;"><%= item.colorCode %></span>
                                         <% if (item.hexCode) { %><br/><% } %>
                                       <% } else if (item.color) { %>
-                                        <span style="font-weight: 600; font-size: 11px;"><%= item.color %></span>
+                                        <span style="font-weight: 600; font-size: 14px;"><%= item.color %></span>
                                         <% if (item.pantone || item.hexCode) { %><br/><% } %>
                                         <% } %>
                                       <% if (!item.colorCode && item.pantone) { %>
-                                        <span style="font-size: 11px;"><%= item.pantone %></span><br/>
+                                        <span style="font-size: 14px;"><%= item.pantone %></span><br/>
                                         <% } %>
                                       <% if (item.hexCode) { %>
                                         <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
-                                        <span style="font-size: 11px;"><%= item.hexCode %></span>
+                                        <span style="font-size: 14px;"><%= item.hexCode %></span>
                                       <% } %>
                                     <% } else { %>
                                       -
@@ -732,21 +706,21 @@
                                       <td>
                                         <%= item.comments || '-' %>
                                       </td>
-                                      <td style="font-size: 11px; line-height: 1.4; vertical-align: top;">
+                                      <td style="font-size: 14px; line-height: 1.4; vertical-align: top;">
                                         <% if (item.colorCode || item.color || item.pantone || item.hexCode) { %>
                                           <% if (item.colorCode) { %>
-                                            <span style="font-weight: 600; font-size: 11px;"><%= item.colorCode %></span>
+                                            <span style="font-weight: 600; font-size: 14px;"><%= item.colorCode %></span>
                                             <% if (item.hexCode) { %><br/><% } %>
                                           <% } else if (item.color) { %>
-                                            <span style="font-weight: 600; font-size: 11px;"><%= item.color %></span>
+                                            <span style="font-weight: 600; font-size: 14px;"><%= item.color %></span>
                                             <% if (item.pantone || item.hexCode) { %><br/><% } %>
                                             <% } %>
                                           <% if (!item.colorCode && item.pantone) { %>
-                                            <span style="font-size: 11px;"><%= item.pantone %></span><br/>
+                                            <span style="font-size: 14px;"><%= item.pantone %></span><br/>
                                             <% } %>
                                           <% if (item.hexCode) { %>
                                             <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
-                                            <span style="font-size: 11px;"><%= item.hexCode %></span>
+                                            <span style="font-size: 14px;"><%= item.hexCode %></span>
                                           <% } %>
                                         <% } else { %>
                                           -
@@ -793,21 +767,21 @@
                                           <td>
                                             <%= item.comments || '-' %>
                                           </td>
-                                          <td style="font-size: 11px; line-height: 1.4; vertical-align: top;">
+                                          <td style="font-size: 14px; line-height: 1.4; vertical-align: top;">
                                             <% if (item.colorCode || item.color || item.pantone || item.hexCode) { %>
                                               <% if (item.colorCode) { %>
-                                                <span style="font-weight: 600; font-size: 11px;"><%= item.colorCode %></span>
+                                                <span style="font-weight: 600; font-size: 14px;"><%= item.colorCode %></span>
                                                 <% if (item.hexCode) { %><br/><% } %>
                                               <% } else if (item.color) { %>
-                                                <span style="font-weight: 600; font-size: 11px;"><%= item.color %></span>
+                                                <span style="font-weight: 600; font-size: 14px;"><%= item.color %></span>
                                                 <% if (item.pantone || item.hexCode) { %><br/><% } %>
                                                 <% } %>
                                               <% if (!item.colorCode && item.pantone) { %>
-                                                <span style="font-size: 11px;"><%= item.pantone %></span><br/>
+                                                <span style="font-size: 14px;"><%= item.pantone %></span><br/>
                                                 <% } %>
                                               <% if (item.hexCode) { %>
                                                 <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
-                                                <span style="font-size: 11px;"><%= item.hexCode %></span>
+                                                <span style="font-size: 14px;"><%= item.hexCode %></span>
                                               <% } %>
                                             <% } else { %>
                                               -
@@ -854,21 +828,21 @@
                                               <td>
                                                 <%= item.comments || '-' %>
                                               </td>
-                                              <td style="font-size: 11px; line-height: 1.4; vertical-align: top;">
+                                              <td style="font-size: 14px; line-height: 1.4; vertical-align: top;">
                                                 <% if (item.colorCode || item.color || item.pantone || item.hexCode) { %>
                                                   <% if (item.colorCode) { %>
-                                                    <span style="font-weight: 600; font-size: 11px;"><%= item.colorCode %></span>
+                                                    <span style="font-weight: 600; font-size: 14px;"><%= item.colorCode %></span>
                                                     <% if (item.hexCode) { %><br/><% } %>
                                                   <% } else if (item.color) { %>
-                                                    <span style="font-weight: 600; font-size: 11px;"><%= item.color %></span>
+                                                    <span style="font-weight: 600; font-size: 14px;"><%= item.color %></span>
                                                     <% if (item.pantone || item.hexCode) { %><br/><% } %>
                                                     <% } %>
                                                   <% if (!item.colorCode && item.pantone) { %>
-                                                    <span style="font-size: 11px;"><%= item.pantone %></span><br/>
+                                                    <span style="font-size: 14px;"><%= item.pantone %></span><br/>
                                                     <% } %>
                                                   <% if (item.hexCode) { %>
                                                     <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
-                                                    <span style="font-size: 11px;"><%= item.hexCode %></span>
+                                                    <span style="font-size: 14px;"><%= item.hexCode %></span>
                                                   <% } %>
                                                 <% } else { %>
                                                   -
@@ -989,7 +963,7 @@
 
   <% if (round.measurements && round.measurements.length> 0) { %>
     <div style="overflow-x: auto">
-      <table class="measurement-table" style="font-size: 8px">
+      <table class="measurement-table" style="font-size: 14px">
         <thead>
           <tr>
             <th style="width: 8%">POM</th>
@@ -1031,7 +1005,7 @@
               <td>
                 <%= entry.revised?.[baseSize] || '-' %>
               </td>
-              <td style="text-align: left; font-size: 7px">
+              <td style="text-align: left; font-size: 14px">
                 <%= entry.comments?.[baseSize] || '-' %>
               </td>
             </tr>
@@ -1065,10 +1039,10 @@
                             <div class="info-grid" style="margin-bottom: 20px">
                               <% colorways.forEach(color=> { %>
                                 <div class="info-item">
-                                  <div style="font-weight: 700; text-transform: uppercase; font-size: 11px; margin-bottom: 4px;">
+                                  <div style="font-weight: 700; text-transform: uppercase; font-size: 14px; margin-bottom: 4px;">
                                     <%= color.name || 'Color' %>
                                   </div>
-                                  <div style="font-size: 11px; margin-bottom: 6px;">
+                                  <div style="font-size: 14px; margin-bottom: 6px;">
                                     Code: <%= color.code || '000' %>
                                   </div>
                                   <% if (color.imageUrl && color.imageUrl !== '—' && !color.imageUrl.includes('No Image')) { %>
@@ -1092,75 +1066,59 @@
                                   <% howToMeasures.forEach((item, index)=> { %>
                                     <div
                                       style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; page-break-inside: avoid;">
-                                      <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 15px">
-                                        <div>
-                                          <h3 style="margin: 0 0 10px 0; font-size: 12px; color: #333">
-                                            <%= item.stepNumber || (index + 1) %>. <%= item.pomName || item.pomCode
-                                                || 'Measurement Point' %>
-                                          </h3>
-                                          <% if (item.pomCode) { %>
-                                            <p style="margin: 5px 0; font-size: 9px; color: #666">
-                                              <strong>Code:</strong>
-                                              <%= item.pomCode %>
-                                            </p>
-                                            <% } %>
-                                              <% if (item.description) { %>
-                                                <p style="margin: 10px 0; font-size: 10px; line-height: 1.5">
-                                                  <%= item.description %>
-                                                </p>
-                                                <% } %>
-                                                  <% if (item.steps && item.steps.length> 0) { %>
-                                                    <div style="margin-top: 10px">
-                                                      <strong style="font-size: 10px">Steps:</strong>
-                                                      <ol
-                                                        style="margin: 5px 0; padding-left: 20px; font-size: 9px; line-height: 1.5;">
-                                                        <% item.steps.forEach(step=> { %>
-                                                          <li style="margin-bottom: 5px">
-                                                            <%= step %>
-                                                          </li>
-                                                          <% }); %>
-                                                      </ol>
-                                                    </div>
-                                                    <% } %>
-                                                      <% if (item.tips && item.tips.length> 0) { %>
-                                                        <div
-                                                          style="margin-top: 10px; background: #fffbeb; padding: 8px; border-left: 3px solid #f59e0b;">
-                                                          <strong style="font-size: 9px; color: #92400e">💡
-                                                            Tips:</strong>
-                                                          <ul
-                                                            style="margin: 5px 0; padding-left: 20px; font-size: 9px; line-height: 1.4;">
-                                                            <% item.tips.forEach(tip=> { %>
-                                                              <li style="margin-bottom: 3px">
-                                                                <%= tip %>
-                                                              </li>
-                                                              <% }); %>
-                                                          </ul>
-                                                        </div>
-                                                        <% } %>
-                                                          <% if (item.commonMistakes && item.commonMistakes.length> 0) {
-                                                            %>
-                                                            <div
-                                                              style="margin-top: 10px; background: #fef2f2; padding: 8px; border-left: 3px solid #ef4444;">
-                                                              <strong style="font-size: 9px; color: #991b1b">⚠️ Common
-                                                                Mistakes:</strong>
-                                                              <ul
-                                                                style="margin: 5px 0; padding-left: 20px; font-size: 9px; line-height: 1.4;">
-                                                                <% item.commonMistakes.forEach(mistake=> { %>
-                                                                  <li style="margin-bottom: 3px">
-                                                                    <%= mistake %>
-                                                                  </li>
-                                                                  <% }); %>
-                                                              </ul>
-                                                            </div>
-                                                            <% } %>
-                                        </div>
-                                        <% if (item.imageUrl) { %>
-                                          <div style="text-align: center">
-                                            <img src="<%= item.imageUrl %>" alt="<%= item.pomName || 'Measurement' %>"
-                                              style="max-width: 320px; max-height: 220px; width: auto; height: auto; border: 1px solid #ddd; border-radius: 4px; object-fit: contain;" />
+                                      <div style="page-break-inside: avoid; page-break-after: avoid;">
+                                        <h3 style="margin: 0 0 10px 0; font-size: 13px; color: #333">
+                                          <%= item.stepNumber || (index + 1) %>. <%= item.pomName || item.pomCode || 'Measurement Point' %>
+                                        </h3>
+                                        <% if (item.pomCode) { %>
+                                          <p style="margin: 5px 0; font-size: 11px; color: #666">
+                                            <strong>Code:</strong> <%= item.pomCode %>
+                                          </p>
+                                        <% } %>
+                                        <% if (item.description) { %>
+                                          <p style="margin: 10px 0; font-size: 11px; line-height: 1.5">
+                                            <%= item.description %>
+                                          </p>
+                                        <% } %>
+                                        <% if (item.steps && item.steps.length > 0) { %>
+                                          <div style="margin-top: 10px">
+                                            <strong style="font-size: 11px">Steps:</strong>
+                                            <ol style="margin: 5px 0; padding-left: 20px; font-size: 11px; line-height: 1.5;">
+                                              <% item.steps.forEach(step => { %>
+                                                <li style="margin-bottom: 5px"><%= step %></li>
+                                              <% }); %>
+                                            </ol>
                                           </div>
-                                          <% } %>
+                                        <% } %>
+                                        <% if (item.tips && item.tips.length > 0) { %>
+                                          <div style="margin-top: 10px; background: #fffbeb; padding: 8px; border-left: 3px solid #f59e0b;">
+                                            <strong style="font-size: 11px; color: #92400e">💡 Tips:</strong>
+                                            <ul style="margin: 5px 0; padding-left: 20px; font-size: 11px; line-height: 1.4;">
+                                              <% item.tips.forEach(tip => { %>
+                                                <li style="margin-bottom: 3px"><%= tip %></li>
+                                              <% }); %>
+                                            </ul>
+                                          </div>
+                                        <% } %>
+                                        <% if (item.commonMistakes && item.commonMistakes.length > 0) { %>
+                                          <div style="margin-top: 10px; background: #fef2f2; padding: 8px; border-left: 3px solid #ef4444;">
+                                            <strong style="font-size: 11px; color: #991b1b">⚠️ Common Mistakes:</strong>
+                                            <ul style="margin: 5px 0; padding-left: 20px; font-size: 11px; line-height: 1.4;">
+                                              <% item.commonMistakes.forEach(mistake => { %>
+                                                <li style="margin-bottom: 3px"><%= mistake %></li>
+                                              <% }); %>
+                                            </ul>
+                                          </div>
+                                        <% } %>
                                       </div>
+
+                                      <% if (item.imageUrl) { %>
+                                        <div style="page-break-before: always; page-break-after: always; page-break-inside: avoid; text-align: center; padding: 20px 0;">
+                                          <img src="<%= item.imageUrl %>" 
+                                              alt="<%= item.pomName || 'Measurement' %>"
+                                              style="max-width: 90%; max-height: 85vh; width: auto; height: auto; border: 1px solid #ddd; border-radius: 4px; object-fit: contain; display: block; margin: 0 auto;" />
+                                        </div>
+                                      <% } %>
                                     </div>
                                     <% }); %>
                                 </div>
@@ -1173,99 +1131,12 @@
                                     <% renderSectionHeader('Labels - Packing'); %>
                                       <div class="section-content">
                                         <div
-                                          style="background: #f8fafc; border: 1px solid #e1e7ee; border-radius: 6px; padding: 20px; font-size: 10px; line-height: 1.6;">
+                                          style="background: #f8fafc; border: 1px solid #e1e7ee; border-radius: 6px; padding: 20px; font-size: 14px; line-height: 1.6;">
                                           <%- packingNotes %>
                                         </div>
                                       </div>
                                   </div>
                                   <% } %>
-
-                                    <!-- <%# 7. REVISION HISTORY %>
-                                  <% if (revisionHistory && revisionHistory.length> 0) { %>
-                                    <div class="section">
-                                      <% renderSectionHeader('Revision History'); %>
-                                        <div class="section-content">
-                                          <table>
-                                            <thead>
-                                              <tr>
-                                                <th style="width: 10%">Version</th>
-                                                <th style="width: 20%">Modified By</th>
-                                                <th style="width: 15%">Date</th>
-                                                <th style="width: 45%">Description</th>
-                                                <th style="width: 10%">Status</th>
-                                              </tr>
-                                            </thead>
-                                            <tbody>
-                                              <% revisionHistory.forEach((rev, idx)=> { %>
-                                                <tr class="<%= idx % 2 === 1 ? 'alt-row' : '' %>">
-                                                  <td style="text-align: center; font-weight: bold">
-                                                    <%= rev.version || '-' %>
-                                                  </td>
-                                                  <td>
-                                                    <%= rev.modifiedBy || '-' %>
-                                                  </td>
-                                                  <td>
-                                                    <%= rev.modifiedAt || '-' %>
-                                                  </td>
-                                                  <td style="font-size: 9px">
-                                                    <%= rev.description || '-' %>
-                                                  </td>
-                                                  <td style="text-align: center">
-                                                    <span
-                                                      style="padding: 3px 8px; border-radius: 3px; font-size: 8px; background: <%= rev.status === 'Approved' ? '#d1fae5' : '#fee2e2' %>; color: <%= rev.status === 'Approved' ? '#065f46' : '#991b1b' %>;">
-                                                      <%= rev.status || 'Draft' %>
-                                                    </span>
-                                                  </td>
-                                                </tr>
-                                                <% }); %>
-                                            </tbody>
-                                          </table>
-                                        </div>
-                                    </div>
-                                    <% } %> -->
-
-                                    <!-- <%# 8. CARE INSTRUCTIONS %>
-                                      <% if (meta.fabricDescription ||
-                                        articleSummary?.fabricAndComposition?.fabricDescription) { %>
-                                        <div class="section">
-                                          <% renderSectionHeader('Care Instructions'); %>
-                                            <div class="section-content">
-                                              <div
-                                                style="display: grid; grid-template-columns: auto 1fr; gap: 20px; align-items: start;">
-                                                <div>
-                                                  <strong style="display: block; margin-bottom: 8px">Care
-                                                    Symbols:</strong>
-                                                  <div style="font-size: 24px; line-height: 1.8">
-                                                    ⚿ Machine Wash Warm<br />
-                                                    ⃠ Do Not Bleach<br />
-                                                    ◎ Tumble Dry Low<br />
-                                                    ▽ Cool Iron
-                                                  </div>
-                                                </div>
-                                                <div>
-                                                  <strong style="display: block; margin-bottom: 8px">Fiber Content &
-                                                    Instructions:</strong>
-                                                  <% if (meta.fabricDescription ||
-                                                    articleSummary?.fabricAndComposition?.materialInfo) { %>
-                                                    <p style="margin-bottom: 8px">
-                                                      <strong>
-                                                        <%= meta.fabricDescription ||
-                                                          articleSummary.fabricAndComposition.materialInfo %>
-                                                      </strong>
-                                                    </p>
-                                                    <% } %>
-                                                      <p style="margin-bottom: 5px">MACHINE WASH WARM, DO NOT BLEACH,
-                                                        TUMBLE DRY LOW, COOL IRON.</p>
-                                                      <p style="margin-bottom: 5px">LAVAR A MÁQUINA TIBIO, NO
-                                                        BLANQUEADOR, SECADO TEMP BAJA, PLANCHA FRIA.</p>
-                                                      <p>LAVAGE EN MACHINE CHAUD, NE PAS JAVELLISER, SÈCHE-LINGE À
-                                                        FAIBLE, FER REFROIDIR.</p>
-                                                </div>
-                                              </div>
-                                            </div>
-                                        </div>
-                                        <% } %> -->
-
                                     <%# FOOTER %>
                                       <div
                                         style="margin-top: 30px; padding-top: 15px; border-top: 2px solid #ddd; text-align: center; font-size: 9px; color: #666;">
