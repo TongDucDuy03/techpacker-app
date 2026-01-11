@@ -5,6 +5,7 @@ import { useTechPack } from '../contexts/TechPackContext';
 import { useI18n } from '../lib/i18n';
 import { useDebounce } from '../hooks/useDebounce';
 import { api } from '../lib/api';
+import { getFieldMetadata } from '../utils/fieldMetadata';
 import CreateTechPackWorkflow from './CreateTechPackWorkflow';
 import {
   Table,
@@ -60,6 +61,10 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
   const { loadTechPacks, addTechPackToList } = useTechPack();
   const { user } = useAuth();
   const { t } = useI18n();
+  
+  // Get field metadata for translations (Single Source of Truth)
+  const fieldMetadata = useMemo(() => getFieldMetadata(t), [t]);
+  
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
   const [statusFilter, setStatusFilter] = useState('');
@@ -111,12 +116,14 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
     if (externalPagination && loadTechPacks && prevSearchRef.current !== debouncedSearchTerm) {
       prevSearchRef.current = debouncedSearchTerm;
       
-      // Reload with debounced search term
+      // Reload with debounced search term and filters
       const params: any = {
         page: 1,
         limit: pageSizeRef.current, // Use current pageSize from ref (always up-to-date)
         q: debouncedSearchTerm || undefined,
         status: statusFilter || undefined, // Include current status filter
+        category: categoryFilter || undefined, // Include category filter if supported
+        season: seasonFilter || undefined, // Include season filter if supported
       };
       
       loadTechPacks(params).catch(error => {
@@ -128,7 +135,7 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
         onPageChange(1);
       }
     }
-  }, [debouncedSearchTerm, externalPagination, loadTechPacks, onPageChange, statusFilter]);
+  }, [debouncedSearchTerm, externalPagination, loadTechPacks, onPageChange, statusFilter, categoryFilter, seasonFilter]);
 
   const canCreate = user?.role === 'admin' || user?.role === 'designer';
   
@@ -194,6 +201,7 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
       case 'draft':
         return t('option.status.draft');
       case 'process':
+      case 'in review': // Handle legacy value
         return t('option.status.process');
       case 'approved':
         return t('option.status.approved');
@@ -204,6 +212,35 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
       default:
         return status || '';
     }
+  };
+
+  // All available status options (complete list from TechPackStatus type)
+  const allStatusOptions: Array<{ value: string; label: string }> = useMemo(() => [
+    { value: 'Draft', label: t('option.status.draft') },
+    { value: 'Process', label: t('option.status.process') },
+    { value: 'Approved', label: t('option.status.approved') },
+    { value: 'Rejected', label: t('option.status.rejected') },
+    { value: 'Archived', label: t('option.status.archived') }
+  ], [t]);
+
+  // Get product class label from metadata
+  const getProductClassLabel = (productClass: string): string => {
+    if (!productClass) return '';
+    
+    // Use fieldMetadata to get translated label
+    const productClassMeta = fieldMetadata.productClass || fieldMetadata.category;
+    if (productClassMeta?.options) {
+      const option = productClassMeta.options.find(opt => 
+        opt.value === productClass || 
+        opt.value.toLowerCase() === productClass.toLowerCase()
+      );
+      if (option) {
+        return option.label;
+      }
+    }
+    
+    // Fallback to original value if not found
+    return productClass;
   };
 
   const formatDateTime = useCallback((value?: string) => {
@@ -219,12 +256,16 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
     });
   }, []);
 
-  // When server-side pagination is used, don't filter client-side
-  // Server already handles pagination and filtering
+  // When server-side pagination is used, server should handle filtering
+  // But we still apply client-side filter as a safety net in case server doesn't filter correctly
   // Only filter client-side if no server pagination (local data mode)
   const filteredTechPacks = useMemo(() => {
-    // If using server-side pagination, return data as-is (server already filtered)
-    if (externalPagination) {
+    // If using server-side pagination, still apply client-side filter as safety net
+    // This ensures filter works even if server doesn't filter correctly
+    // Note: This might cause issues if server returns all data but we filter client-side
+    // In that case, pagination counts might be off, but at least filtering will work
+    if (externalPagination && !statusFilter && !categoryFilter && !seasonFilter && !debouncedSearchTerm) {
+      // Only skip client-side filtering if no filters are active
       return safeTechPacks;
     }
     
@@ -234,14 +275,31 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
       const articleCode = tp.articleCode || '';
       const category = (tp as any).productClass || (tp as any).category || tp.metadata?.category || '';
       const season = (tp as any).season || tp.metadata?.season || '';
+      const techPackStatus = tp.status || '';
 
-      return (
-        (articleName.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) || 
-         articleCode.toLowerCase().includes(debouncedSearchTerm.toLowerCase())) &&
-        (statusFilter ? tp.status === statusFilter : true) &&
-        (categoryFilter ? category === categoryFilter : true) &&
-        (seasonFilter ? season === seasonFilter : true)
-      );
+      // Search filter
+      const matchesSearch = !debouncedSearchTerm || 
+        articleName.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) || 
+        articleCode.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+      
+      // Status filter
+      let matchesStatus = true;
+      if (statusFilter) {
+        const statusLower = techPackStatus.toLowerCase();
+        const filterLower = statusFilter.toLowerCase();
+        matchesStatus = 
+          statusLower === filterLower || 
+          // Handle legacy "In Review" value when filtering for "Process"
+          (statusFilter === 'Process' && (techPackStatus === 'In Review' || statusLower === 'in review'));
+      }
+      
+      // Category filter
+      const matchesCategory = !categoryFilter || category === categoryFilter;
+      
+      // Season filter
+      const matchesSeason = !seasonFilter || season === seasonFilter;
+      
+      return matchesSearch && matchesStatus && matchesCategory && matchesSeason;
     });
 
     return filtered.sort((a, b) => {
@@ -412,31 +470,56 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
                 <Select 
                   placeholder={`${t('common.filter')} ${t('techpack.list.status').toLowerCase()}`} 
                   onChange={(value) => {
-                    setStatusFilter(value || '');
+                    const newStatusFilter = value || '';
+                    setStatusFilter(newStatusFilter);
+                    
                     // Reload from server with status filter when using server-side pagination
                     if (externalPagination && loadTechPacks) {
-                      loadTechPacks({ page: 1, limit: pageSizeRef.current, status: value || undefined }).catch(console.error);
-                      if (onPageChange) onPageChange(1);
+                      const params: any = {
+                        page: 1,
+                        limit: pageSizeRef.current,
+                        q: debouncedSearchTerm || undefined,
+                      };
+                      
+                      // Only add status if it's not empty
+                      if (newStatusFilter) {
+                        params.status = newStatusFilter;
+                      }
+                      
+                      console.log('🔍 Filtering by status:', newStatusFilter, 'with params:', params);
+                      loadTechPacks(params).catch(error => {
+                        console.error('Failed to load techpacks with status filter:', error);
+                      });
+                      
+                      if (onPageChange) {
+                        onPageChange(1);
+                      }
                     }
+                    // Note: For client-side filtering, the useMemo will automatically re-filter
+                    // when statusFilter changes because it's in the dependency array
                   }}
                   value={statusFilter || undefined}
                   style={{ width: 150 }} 
                   allowClear
                 >
-                  {[...new Set(safeTechPacks.map(tp => tp.status))].map((s) => <Option key={s} value={s}>{getStatusLabel(s)}</Option>)}
+                  {allStatusOptions.map((opt) => (
+                    <Option key={opt.value} value={opt.value}>{opt.label}</Option>
+                  ))}
                 </Select>
                 <Select 
-                  placeholder={`${t('common.filter')} ${t('form.category').toLowerCase()}`} 
+                  placeholder={`${t('common.filter')} ${t('form.articleInfo.category').toLowerCase()}`} 
                   onChange={(value) => {
                     setCategoryFilter(value || '');
                     // Note: Category filter may need backend support
                     // For now, keep client-side filtering for category
                   }}
                   value={categoryFilter || undefined}
-                  style={{ width: 150 }} 
+                  style={{ width: 200 }} 
                   allowClear
                 >
-                  {[...new Set(safeTechPacks.map(tp => (tp as any).productClass || (tp as any).category || tp.metadata?.category))].filter(Boolean).map((c) => <Option key={c} value={c}>{c}</Option>)}
+                  {[...new Set(safeTechPacks.map(tp => (tp as any).productClass || (tp as any).category || tp.metadata?.category))].filter(Boolean).map((c) => (
+                    <Option key={c} value={c}>{getProductClassLabel(c)}</Option>
+                  ))}
                 </Select>
                 <Select 
                   placeholder={`${t('common.filter')} ${t('techpack.list.season').toLowerCase()}`} 

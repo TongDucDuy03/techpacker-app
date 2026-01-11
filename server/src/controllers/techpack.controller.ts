@@ -148,8 +148,8 @@ export class TechPackController {
         query = { 'sharedWith.userId': userId };
       }
       
-      // Exclude archived by default
-      query.status = { $ne: 'Archived' };
+      // Include all statuses including Archived in stats
+      // Don't exclude archived by default
       
       // Get counts by status using aggregation
       const stats = await TechPack.aggregate([
@@ -289,12 +289,22 @@ export class TechPackController {
       // Build filter conditions separately to combine properly
       const filterConditions: any = {};
       
-      // Status filter - exclude archived by default unless explicitly requested
+      // Status filter - show all statuses including Archived by default
+      // Only filter by status if explicitly requested
       if (status) {
-        filterConditions.status = status;
-      } else {
-        filterConditions.status = { $ne: 'Archived' };
+        // User explicitly requested a status filter
+        // Handle both "Archived" and "Process" (legacy "In Review") values
+        if (status === 'Archived') {
+          filterConditions.status = 'Archived';
+        } else if (status === 'Process') {
+          // Support legacy "In Review" value
+          filterConditions.status = { $in: ['Process', 'In Review'] };
+        } else {
+          filterConditions.status = status;
+        }
       }
+      // If no status filter, don't add any status filter condition
+      // This allows all statuses (including Archived) to be shown
 
       if (season) filterConditions.season = season;
       if (brand) filterConditions.brand = brand;
@@ -810,7 +820,26 @@ export class TechPackController {
         // Support both old field names (productName, version) and new field names (articleName, sampleType) for backward compatibility
         const articleName = articleInfo?.articleName || req.body.articleName || articleInfo?.productName || req.body.productName;
         const articleCode = articleInfo?.articleCode || req.body.articleCode;
-        const sampleType = articleInfo?.sampleType || req.body.sampleType || articleInfo?.version || req.body.version || '';
+        // Handle sampleType: Only set default when creating new techpack and field is not provided
+        // If sampleType is explicitly provided (including empty string ''), use it
+        // Don't normalize empty string to default value
+        let sampleType: string;
+        if (articleInfo?.sampleType !== undefined) {
+          // sampleType explicitly provided in articleInfo (including empty string)
+          sampleType = articleInfo.sampleType;
+        } else if (req.body.sampleType !== undefined) {
+          // sampleType explicitly provided in body (including empty string)
+          sampleType = req.body.sampleType;
+        } else if (articleInfo?.version !== undefined) {
+          // Fallback to version from articleInfo (backward compatibility)
+          sampleType = articleInfo.version;
+        } else if (req.body.version !== undefined) {
+          // Fallback to version from body (backward compatibility)
+          sampleType = req.body.version;
+        } else {
+          // Only set default empty string when field is not provided at all (create new)
+          sampleType = '';
+        }
         if (!articleName || !articleCode) {
           return sendError(res, 'Article Name and Article Code are required.', 400, 'VALIDATION_ERROR');
         }
@@ -1013,7 +1042,12 @@ export class TechPackController {
         if (articleInfo.articleCode !== undefined) {
           updateData.articleCode = articleInfo.articleCode;
         }
+        // Handle sampleType update:
+        // - If sampleType is explicitly provided (including empty string ''), use it
+        // - Don't set default value when updating - respect user's intention to clear the field
+        // - Only update if the field exists in articleInfo (user has interacted with it)
         if (articleInfo.sampleType !== undefined) {
+          // Allow empty string to clear the field - don't normalize to default
           updateData.sampleType = articleInfo.sampleType;
         }
         if (articleInfo.supplier !== undefined) {
