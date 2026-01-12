@@ -20,11 +20,11 @@
   }
 
   .pdf-header__title {
-    font-weight: 700;
-    color: #0f172a;
+    font-weight: 500;
+    color: #7b7c7e;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    font-size: 14pt;
+    font-size: 10pt;
   }
 
   .pdf-header__subtitle {
@@ -47,14 +47,14 @@
 </style>
 <div class="pdf-header">
   <div class="pdf-header__brand">
-    <% if (meta?.companyLogo) { %>
+    <!-- <% if (meta?.companyLogo) { %>
     <div class="pdf-header__logo">
       <img src="<%= meta.companyLogo %>" alt="Company Logo" />
     </div>
-    <% } %>
+    <% } %> -->
     <div>
       <div class="pdf-header__title">
-        <%= meta.articleCode %> — <%= meta.productName %> — <%= meta.version %>
+        <%= meta.articleCode %> — <%= meta.productName %>
       </div>
     </div>
   </div>

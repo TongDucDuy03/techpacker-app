@@ -26,7 +26,7 @@
       font-size: 14px;
       line-height: 1.4;
       background: white;
-      padding: 20px;
+      /* padding: 20px; */
       /* Ensure colors print correctly in PDF */
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -77,7 +77,7 @@
 
     .container {
       max-width: 1200px;
-      margin: 5 auto 0 auto;
+      margin: 0;
       background: white;
     }
 
@@ -237,7 +237,8 @@
     .section {
       page-break-before: always;
       margin-bottom: 0;
-      padding-top: 0;
+      padding-top: 0 !important;
+	  margin-top: 0 !important;
     }
 
     .section:first-child {
@@ -258,7 +259,7 @@
 
     .section-content {
       padding: 0;
-      margin-top: 10px;
+      margin-top: 0px;
       clear: both;
     }
 
@@ -392,10 +393,10 @@
     <%# Function để tạo header cho mỗi section %>
       <% function renderSectionHeader(sectionTitle) { %>
         <div class="page-header">
-          <div class="page-title">
+           <div class="page-title">
             <%= sectionTitle %>
-              <span class="version-text">Version <%= meta.version || '1' %></span>
-          </div>
+            <!--  <span class="version-text">Version <%= meta.version || '1' %></span>-->
+          </div> 
           <table>
             <colgroup>
               <col style="width: 8%;" />
@@ -413,7 +414,7 @@
                   !images.companyLogo.includes('No Image'); %>
                   <% if (hasLogo) { %>
                     <img src="<%= images.companyLogo %>" alt="Company Logo"
-                      style="max-width: 65px; max-height: 70px; object-fit: contain;" />
+                      style="max-width: 65px; max-height: 70px; object-fit: contain;display: block; margin: auto;" />
                     <% } else { %>
                       <strong style="font-size: 14px; display: block; text-align: center;">
                         <%= meta.brand || 'Company' %>
@@ -438,7 +439,7 @@
                   <% const hasDesignSketch = images && images.coverImage && images.coverImage !== '—' &&
                     !images.coverImage.includes('No Image'); %>
                     <% if (hasDesignSketch) { %>
-                      <img src="<%= images.coverImage %>" alt="Product" />
+                      <img src="<%= images.coverImage %>" alt="Product" style="display: block; margin: auto;" />
                       <% } else { %>
                       <div style="width:100%; height:100%; border:1px solid #ccc; background:#f9f9f9;"></div>
                         <% } %>
@@ -596,14 +597,14 @@
                             <thead>
                               <tr>
                                 <th style="width: 10%">Part</th>
-                                <th style="width: 25%">Material</th>
+                                <th style="width: 25%">Material Name</th>
                                 <th style="width: 15%">Placement</th>
-                                <th style="width: 8%">Size</th>
+                                <th style="width: 10%">Size/ Width/ Usage</th>
                                 <th style="width: 8%">Qty</th>
                                 <th style="width: 8%">UOM</th>
                                 <th style="width: 12%">Supplier</th>
-                                <th style="width: 14%">Comments</th>
-                                <th style="width: 12%">Color Code</th>
+                                <th style="width: 16%">Comments</th>
+                                <th style="width: 10%">Color Code</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -669,14 +670,14 @@
                                 <thead>
                                   <tr>
                                     <th style="width: 10%">Part</th>
-                                    <th style="width: 25%">Material</th>
+                                    <th style="width: 25%">Material Name</th>
                                     <th style="width: 15%">Placement</th>
-                                    <th style="width: 10%">Size</th>
+                                    <th style="width: 10%">Size/ Width/ Usage</th>
                                     <th style="width: 8%">Qty</th>
                                     <th style="width: 8%">UOM</th>
-                                    <th style="width: 10%">Supplier</th>
-                                    <th style="width: 12%">Comments</th>
-                                    <th style="width: 12%">Color Code</th>
+                                    <th style="width: 12%">Supplier</th>
+                                    <th style="width: 16%">Comments</th>
+                                    <th style="width: 10%">Color Code</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -953,12 +954,7 @@
                                   <%= round.reviewer || '-' %>
                                 </span>
                               </div>
-                              <div class="info-item">
-                                <strong>Requested Source</strong>
-                                <span style="text-transform: capitalize">
-                                  <%= round.requestedSource || 'original' %>
-                                </span>
-                              </div>
+
   </div>
 
   <% if (round.measurements && round.measurements.length> 0) { %>
@@ -970,11 +966,11 @@
             <th style="width: 12%">Point</th>
             <th style="width: 5%">-Tol</th>
             <th style="width: 5%">+Tol</th>
-            <th style="width: 8%">Requested</th>
+            <th style="width: 10%">Requested</th>
             <th style="width: 8%">Measured</th>
             <th style="width: 7%">Diff</th>
             <th style="width: 8%">Revised</th>
-            <th style="width: 39%">Comments</th>
+            <th style="width: 37%">Comments</th>
           </tr>
         </thead>
         <tbody>
@@ -1138,11 +1134,7 @@
                                   </div>
                                   <% } %>
                                     <%# FOOTER %>
-                                      <div
-                                        style="margin-top: 30px; padding-top: 15px; border-top: 2px solid #ddd; text-align: center; font-size: 9px; color: #666;">
-                                        <strong>Powered by WFX</strong> | All rights reserved<br />
-                                        Printed on <%= generatedAt %> by <%= printedBy %>
-                                      </div>
+                                      
                                       </div>
 </body>
 
