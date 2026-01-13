@@ -272,6 +272,171 @@
       padding: 0;
       margin: 0;
       clear: both;
+      page-break-inside: avoid;
+      page-break-after: avoid;
+    }
+
+    /* Construction Item Styles - Mỗi construction là 1 trang */
+    .construction-item {
+      min-height: calc(100vh - 100px);
+      display: flex;
+      flex-direction: column;
+      page-break-inside: avoid;
+      page-break-after: avoid;
+      page-break-before: avoid;
+      overflow: hidden;
+    }
+
+    .construction-header {
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #333;
+    }
+
+    .construction-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #333;
+      margin: 0;
+      text-align: center;
+    }
+
+    .construction-content {
+      display: flex;
+      flex-direction: row;
+      flex: 1;
+      gap: 20px;
+      page-break-inside: avoid !important;
+      page-break-after: avoid !important;
+      page-break-before: avoid !important;
+      min-height: calc(100vh - 200px);
+      max-height: calc(100vh - 200px);
+      overflow: hidden;
+    }
+
+    .construction-image-wrapper {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      page-break-inside: avoid !important;
+      page-break-after: avoid !important;
+      page-break-before: avoid !important;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .construction-image {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      padding: 10px;
+      background: #f9f9f9;
+      object-fit: contain;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      page-break-inside: avoid !important;
+    }
+
+    .construction-text {
+      flex: 1;
+      padding: 15px;
+      background: #fff;
+      page-break-inside: avoid !important;
+      page-break-after: avoid !important;
+      page-break-before: avoid !important;
+      overflow-y: auto;
+      min-width: 0;
+      max-height: 100%;
+    }
+
+    .construction-item-title {
+      font-size: 16px;
+      font-weight: bold;
+      color: #333;
+      margin: 0 0 10px 0;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .construction-code {
+      font-size: 12px;
+      color: #666;
+      margin: 5px 0;
+    }
+
+    .construction-description {
+      font-size: 13px;
+      line-height: 1.6;
+      color: #333;
+      margin: 10px 0;
+      padding: 10px;
+      background: #f8f9fa;
+      border-left: 3px solid #007bff;
+      border-radius: 4px;
+    }
+
+    .construction-section {
+      margin: 15px 0;
+    }
+
+    .construction-label {
+      font-size: 13px;
+      color: #333;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .construction-list {
+      margin: 8px 0;
+      padding-left: 25px;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #555;
+    }
+
+    .construction-list li {
+      margin-bottom: 5px;
+    }
+
+    .construction-tips {
+      margin: 15px 0;
+      padding: 12px;
+      background: #fffbeb;
+      border-left: 4px solid #f59e0b;
+      border-radius: 4px;
+    }
+
+    .construction-tips strong {
+      font-size: 13px;
+      color: #92400e;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .construction-tips .construction-list {
+      color: #78350f;
+    }
+
+    .construction-mistakes {
+      margin: 15px 0;
+      padding: 12px;
+      background: #fef2f2;
+      border-left: 4px solid #ef4444;
+      border-radius: 4px;
+    }
+
+    .construction-mistakes strong {
+      font-size: 13px;
+      color: #991b1b;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .construction-mistakes .construction-list {
+      color: #7f1d1d;
     }
 
     .info-grid {
@@ -280,12 +445,15 @@
       gap: 8px;
       margin: 0;
       margin-bottom: 8px;
+      page-break-inside: avoid;
+      page-break-after: avoid;
     }
 
     .info-item {
       border: 1px solid #ddd;
       padding: 8px;
       margin: 0;
+      page-break-inside: avoid;
     }
 
     .info-item strong {
@@ -1042,12 +1210,12 @@
 
                   <%# 4. COLORWAYS %>
                     <% if (colorways && colorways.length> 0) { %>
-                      <div class="section">
+                      <div class="section" style="page-break-inside: avoid !important; page-break-after: avoid !important;">
                         <% renderSectionHeader('Colorways'); %>
-                          <div class="section-content">
-                            <div class="info-grid" style="margin-bottom: 5px">
+                          <div class="section-content" style="page-break-inside: avoid !important; page-break-after: avoid !important;">
+                            <div class="info-grid" style="margin-bottom: 5px; page-break-inside: avoid !important; page-break-after: avoid !important;">
                               <% colorways.forEach(color=> { %>
-                                <div class="info-item">
+                                <div class="info-item" style="page-break-inside: avoid !important;">
                                   <div style="font-weight: 700; text-transform: uppercase; font-size: 14px; margin-bottom: 4px;">
                                     <%= color.name || 'Color' %>
                                   </div>
@@ -1055,9 +1223,9 @@
                                     Code: <%= color.code || '000' %>
                                   </div>
                                   <% if (color.imageUrl && color.imageUrl !== '—' && !color.imageUrl.includes('No Image')) { %>
-                                    <div style="text-align: left; margin-top: 6px;">
+                                    <div style="text-align: left; margin-top: 6px; page-break-inside: avoid !important;">
                                                 <img src="<%= color.imageUrl %>" alt="Colorway Image"
-                                        style="max-width: 80px; max-height: 80px; border: 1px solid #ccc; border-radius: 4px; object-fit: contain;" />
+                                        style="max-width: 80px; max-height: 80px; border: 1px solid #ccc; border-radius: 4px; object-fit: contain; page-break-inside: avoid !important;" />
                                     </div>
                                                 <% } %>
                                 </div>
@@ -1069,69 +1237,75 @@
 
                         <%# 5. CONSTRUCTION %>
                           <% if (howToMeasures && howToMeasures.length> 0) { %>
-                            <div class="section">
-                              <% renderSectionHeader('Construction Details'); %>
-                                <div class="section-content">
-                                  <% howToMeasures.forEach((item, index)=> { %>
-                                    <div
-                                      style="border: 1px solid #ddd; padding: 10px; margin-bottom: 5px; page-break-inside: avoid;">
-                                      <div style="page-break-inside: avoid;">
-                                        <h3 style="margin: 0 0 5px 0; font-size: 13px; color: #333">
-                                          <%= item.stepNumber || (index + 1) %>. <%= item.pomName || item.pomCode || 'Measurement Point' %>
-                                        </h3>
-                                        <% if (item.pomCode) { %>
-                                          <p style="margin: 3px 0; font-size: 11px; color: #666">
-                                            <strong>Code:</strong> <%= item.pomCode %>
-                                          </p>
-                                        <% } %>
-                                        <% if (item.description) { %>
-                                          <p style="margin: 5px 0; font-size: 11px; line-height: 1.5">
-                                            <%= item.description %>
-                                          </p>
-                                        <% } %>
-                                        <% if (item.steps && item.steps.length > 0) { %>
-                                          <div style="margin-top: 5px">
-                                            <strong style="font-size: 11px">Steps:</strong>
-                                            <ol style="margin: 3px 0; padding-left: 20px; font-size: 11px; line-height: 1.5;">
-                                              <% item.steps.forEach(step => { %>
-                                                <li style="margin-bottom: 3px"><%= step %></li>
-                                              <% }); %>
-                                            </ol>
-                                          </div>
-                                        <% } %>
-                                        <% if (item.tips && item.tips.length > 0) { %>
-                                          <div style="margin-top: 5px; background: #fffbeb; padding: 6px; border-left: 3px solid #f59e0b;">
-                                            <strong style="font-size: 11px; color: #92400e">💡 Tips:</strong>
-                                            <ul style="margin: 3px 0; padding-left: 20px; font-size: 11px; line-height: 1.4;">
-                                              <% item.tips.forEach(tip => { %>
-                                                <li style="margin-bottom: 2px"><%= tip %></li>
-                                              <% }); %>
-                                            </ul>
-                                          </div>
-                                        <% } %>
-                                        <% if (item.commonMistakes && item.commonMistakes.length > 0) { %>
-                                          <div style="margin-top: 5px; background: #fef2f2; padding: 6px; border-left: 3px solid #ef4444;">
-                                            <strong style="font-size: 11px; color: #991b1b">⚠️ Common Mistakes:</strong>
-                                            <ul style="margin: 3px 0; padding-left: 20px; font-size: 11px; line-height: 1.4;">
-                                              <% item.commonMistakes.forEach(mistake => { %>
-                                                <li style="margin-bottom: 2px"><%= mistake %></li>
-                                              <% }); %>
-                                            </ul>
-                                          </div>
-                                        <% } %>
+                            <% howToMeasures.forEach((item, index)=> { %>
+                              <div class="section construction-item" style="<%= index > 0 ? 'page-break-before: always;' : '' %> page-break-inside: avoid !important; page-break-after: avoid !important;">
+                                <%# Tất cả các trang đều có header giống nhau %>
+                                <% renderSectionHeader('Construction Details'); %>
+                                
+                                <div class="construction-content" style="page-break-inside: avoid !important; page-break-after: avoid !important; page-break-before: avoid !important;">
+                                  <!-- Text Content Section - Bên trái -->
+                                  <div class="construction-text" style="page-break-inside: avoid !important; page-break-after: avoid !important;">
+                                    <h3 class="construction-item-title">
+                                      <%= item.stepNumber || (index + 1) %>. <%= item.pomName || item.pomCode || 'Construction Point' %>
+                                    </h3>
+                                    <% if (item.pomCode) { %>
+                                      <p class="construction-code">
+                                        <strong>Code:</strong> <%= item.pomCode %>
+                                      </p>
+                                    <% } %>
+                                    <% if (item.description) { %>
+                                      <p class="construction-description">
+                                        <%= item.description %>
+                                      </p>
+                                    <% } %>
+                                    <% if (item.steps && item.steps.length > 0) { %>
+                                      <div class="construction-section">
+                                        <strong class="construction-label">Steps:</strong>
+                                        <ol class="construction-list">
+                                          <% item.steps.forEach(step => { %>
+                                            <li><%= step %></li>
+                                          <% }); %>
+                                        </ol>
                                       </div>
-
-                                      <% if (item.imageUrl) { %>
-                                        <div style="page-break-before: always; page-break-after: always; page-break-inside: avoid; text-align: center; padding: 20px 0;">
-                                          <img src="<%= item.imageUrl %>" 
-                                              alt="<%= item.pomName || 'Measurement' %>"
-                                              style="max-width: 90%; max-height: 85vh; width: auto; height: auto; border: 1px solid #ddd; border-radius: 4px; object-fit: contain; display: block; margin: 0 auto;" />
-                                        </div>
-                                      <% } %>
+                                    <% } %>
+                                    <% if (item.tips && item.tips.length > 0) { %>
+                                      <div class="construction-tips">
+                                        <strong>💡 Tips:</strong>
+                                        <ul class="construction-list">
+                                          <% item.tips.forEach(tip => { %>
+                                            <li><%= tip %></li>
+                                          <% }); %>
+                                        </ul>
+                                      </div>
+                                    <% } %>
+                                    <% if (item.commonMistakes && item.commonMistakes.length > 0) { %>
+                                      <div class="construction-mistakes">
+                                        <strong>⚠️ Common Mistakes:</strong>
+                                        <ul class="construction-list">
+                                          <% item.commonMistakes.forEach(mistake => { %>
+                                            <li><%= mistake %></li>
+                                          <% }); %>
+                                        </ul>
+                                      </div>
+                                    <% } %>
+                                  </div>
+                                  
+                                  <!-- Image Section - Bên phải -->
+                                  <% if (item.imageUrl) { %>
+                                    <div class="construction-image-wrapper" style="page-break-inside: avoid !important; page-break-after: avoid !important; page-break-before: avoid !important;">
+                                      <img src="<%= item.imageUrl %>" 
+                                          alt="<%= item.pomName || 'Construction' %>"
+                                          class="construction-image" 
+                                          style="page-break-inside: avoid !important;" />
                                     </div>
-                                    <% }); %>
+                                  <% } else { %>
+                                    <div class="construction-image-wrapper" style="background: #f9f9f9; border: 2px dashed #ddd; border-radius: 8px; display: flex; align-items: center; justify-content: center; page-break-inside: avoid !important; page-break-after: avoid !important;">
+                                      <span style="color: #999; font-size: 14px;">No Image</span>
+                                    </div>
+                                  <% } %>
                                 </div>
-                            </div>
+                              </div>
+                            <% }); %>
                             <% } %>
 
                               <%# 6. PACKING %>
