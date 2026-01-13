@@ -982,12 +982,12 @@
               <td style="text-align: left">
                 <%= entry.pomName || '-' %>
               </td>
-              <td>
-                <%= entry.toleranceMinus || '0' %>
-              </td>
-              <td>
-                <%= entry.tolerancePlus || '0' %>
-              </td>
+                                          <td>
+                                            <%= entry.toleranceMinusFormatted || entry.toleranceMinus || '0' %>
+                                          </td>
+                                          <td>
+                                            <%= entry.tolerancePlusFormatted || entry.tolerancePlus || '0' %>
+                                          </td>
               <td>
                 <% const baseSize=measurements?.baseSize || 'M' ; %>
                   <%= entry.requested?.[baseSize] || '-' %>

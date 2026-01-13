@@ -261,6 +261,116 @@ class PDFService {
   }
 
   /**
+   * Format a measurement value according to unit for PDF output.
+   * - For inch-16 / inch-32: convert decimal to fraction/mixed number string.
+   * - For other units: keep numeric value (to preserve existing layout).
+   */
+  private formatMeasurementForUnit(value: any, unit?: string): string | number {
+    if (value === undefined || value === null) return '—';
+
+    // Preserve placeholder strings like '—'
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed || trimmed === '—' || trimmed === '-') return '—';
+
+      // ⚠️ QUAN TRỌNG: với inch-16 / inch-32, nếu người dùng nhập dạng phân số/hỗn số
+      // (ví dụ "92 1/4", "+1/2", "-5 3/4") thì giữ nguyên chuỗi, không parseFloat
+      if (unit === 'inch-16' || unit === 'inch-32') {
+        if (trimmed.includes('/')) {
+          return trimmed;
+        }
+      }
+    }
+
+    const numeric = typeof value === 'number' ? value : parseFloat(String(value));
+    if (!Number.isFinite(numeric)) {
+      // Fallback: return raw string
+      return String(value);
+    }
+
+    if (unit === 'inch-16' || unit === 'inch-32') {
+      return this.formatInchFraction(Math.abs(numeric), unit);
+    }
+
+    // Other units: keep number to preserve existing behavior
+    return numeric;
+  }
+
+  /**
+   * Format tolerance value (always non-negative) for PDF, following UI style:
+   * - inch-16 / inch-32: fraction/hỗn số (1 1/4, 3/8, ...)
+   * - inch-10: đến 3 chữ số thập phân, bỏ bớt 0 thừa
+   * - mm / cm: 1 chữ số thập phân (giống formatToleranceNoUnit phía frontend)
+   */
+  private formatToleranceForUnit(value: any, unit?: string): string {
+    if (value === undefined || value === null) return '0';
+
+    const numeric = typeof value === 'number' ? value : parseFloat(String(value));
+    if (!Number.isFinite(numeric)) return '0';
+
+    const abs = Math.abs(numeric);
+
+    if (unit === 'inch-16' || unit === 'inch-32') {
+      return this.formatInchFraction(abs, unit as 'inch-16' | 'inch-32');
+    }
+
+    if (unit === 'inch-10') {
+      return abs.toFixed(3).replace(/\.?0+$/, '');
+    }
+
+    // mm / cm: 1 decimal place
+    return abs.toFixed(1).replace(/\.0$/, '');
+  }
+
+  /**
+   * Convert a decimal inch value to a fraction / mixed number string.
+   * Supports:
+   * - inch-16: sixteenths
+   * - inch-32: thirty-seconds
+   */
+  private formatInchFraction(value: number, unit: 'inch-16' | 'inch-32'): string {
+    if (!Number.isFinite(value)) return '—';
+
+    const integerPart = Math.floor(value);
+    const decimalPart = value - integerPart;
+
+    const denom = unit === 'inch-32' ? 32 : 16;
+    let numerator = Math.round(decimalPart * denom);
+
+    // If rounding pushes to next whole inch (e.g. 0.9999 * 16 ≈ 16)
+    if (numerator === denom) {
+      return String(integerPart + 1);
+    }
+
+    // No fractional part
+    if (numerator === 0) {
+      return integerPart === 0 ? '0' : String(integerPart);
+    }
+
+    // Simplify fraction
+    const gcd = (a: number, b: number): number => {
+      let x = Math.abs(a);
+      let y = Math.abs(b);
+      while (y) {
+        const temp = y;
+        y = x % y;
+        x = temp;
+      }
+      return x || 1;
+    };
+
+    const divisor = gcd(numerator, denom);
+    const simpleNum = numerator / divisor;
+    const simpleDen = denom / divisor;
+
+    const fractionText = `${simpleNum}/${simpleDen}`;
+    if (integerPart === 0) {
+      return fractionText;
+    }
+    return `${integerPart} ${fractionText}`;
+  }
+
+  /**
    * Optimized BOM data preparation with image compression
    */
   private async prepareBOMDataOptimized(
@@ -394,6 +504,7 @@ class PDFService {
     const baseSize = techpack.measurementBaseSize || sizeRange[0] || 'M';
     
     const rows = (techpack.measurements || []).map((measurement: IMeasurement) => {
+      const unit = (techpack.measurementUnit as string) || (measurement.unit as string) || 'cm';
       const row: any = {
         pomCode: measurement.pomCode || '—',
         pomName: measurement.pomName || '—',
@@ -401,14 +512,21 @@ class PDFService {
         category: measurement.category || '—',
         minusTolerance: measurement.toleranceMinus || 0,
         plusTolerance: measurement.tolerancePlus || 0,
+        minusToleranceFormatted: this.formatToleranceForUnit(measurement.toleranceMinus, unit),
+        plusToleranceFormatted: this.formatToleranceForUnit(measurement.tolerancePlus, unit),
         notes: measurement.notes || '—',
         critical: measurement.critical || false,
-        unit: measurement.unit || 'cm',
+        unit: unit || 'cm',
         sizes: {},
       };
 
       sizeRange.forEach((size: string) => {
-        row.sizes[size] = measurement.sizes?.[size] || '—';
+        const rawValue = measurement.sizes?.[size];
+        // Luôn dùng measurementUnit cấp TechPack để khớp với UI
+        row.sizes[size] = this.formatMeasurementForUnit(
+          rawValue,
+          techpack.measurementUnit as string
+        );
       });
 
       return row;
@@ -429,6 +547,7 @@ class PDFService {
   private prepareSampleRoundsOptimized(techpack: any): any[] {
     console.log('🔬 Processing sample rounds...');
     const sizeRange = techpack.measurementSizeRange || ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+    const unit = (techpack.measurementUnit as string) || 'cm';
     
     const measurementMap = new Map<string, IMeasurement>();
     (techpack.measurements || []).forEach((m: IMeasurement) => {
@@ -450,6 +569,14 @@ class PDFService {
           pomName: entry.pomName || '—',
           toleranceMinus: entry.toleranceMinus !== undefined ? entry.toleranceMinus : (correspondingMeasurement?.toleranceMinus || '—'),
           tolerancePlus: entry.tolerancePlus !== undefined ? entry.tolerancePlus : (correspondingMeasurement?.tolerancePlus || '—'),
+          toleranceMinusFormatted: this.formatToleranceForUnit(
+            entry.toleranceMinus !== undefined ? entry.toleranceMinus : correspondingMeasurement?.toleranceMinus,
+            unit
+          ),
+          tolerancePlusFormatted: this.formatToleranceForUnit(
+            entry.tolerancePlus !== undefined ? entry.tolerancePlus : correspondingMeasurement?.tolerancePlus,
+            unit
+          ),
           requested: {},
           measured: {},
           diff: {},
@@ -458,10 +585,10 @@ class PDFService {
         };
 
         sizeRange.forEach((size: string) => {
-          entryRow.requested[size] = entry.requested?.[size] || '—';
-          entryRow.measured[size] = entry.measured?.[size] || '—';
-          entryRow.diff[size] = entry.diff?.[size] || '—';
-          entryRow.revised[size] = entry.revised?.[size] || '—';
+          entryRow.requested[size] = this.formatMeasurementForUnit(entry.requested?.[size], unit);
+          entryRow.measured[size] = this.formatMeasurementForUnit(entry.measured?.[size], unit);
+          entryRow.diff[size] = this.formatMeasurementForUnit(entry.diff?.[size], unit);
+          entryRow.revised[size] = this.formatMeasurementForUnit(entry.revised?.[size], unit);
           entryRow.comments[size] = entry.comments?.[size] || '—';
         });
 
