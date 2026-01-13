@@ -9,7 +9,7 @@
   <style>
     @page {
       size: A4 landscape;
-      margin: 15mm 10mm;
+      margin: 8mm 5mm;
     }
 
     * {
@@ -26,7 +26,8 @@
       font-size: 14px;
       line-height: 1.4;
       background: white;
-      /* padding: 20px; */
+      margin: 0;
+      padding: 0;
       /* Ensure colors print correctly in PDF */
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -38,10 +39,8 @@
       height: auto;
       image-rendering: -webkit-optimize-contrast;
       image-rendering: crisp-edges;
-      /* Limit maximum dimensions to reduce PDF size */
-      max-width: 1200px;
-      max-height: 800px;
       object-fit: contain;
+      page-break-inside: avoid;
     }
 
     /* Specific constraints for different image types */
@@ -56,23 +55,29 @@
       max-height: 200px;
     }
 
-    /* BOM thumbnail images */
+    /* BOM thumbnail images - allow natural scaling */
     .bom-image img,
     .grid-item img {
-      max-width: 800px;
-      max-height: 600px;
+      max-width: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
     }
 
-    /* How to measure images */
+    /* How to measure images - allow natural scaling */
     .how-to-measure img {
-      max-width: 1000px;
-      max-height: 700px;
+      max-width: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
     }
 
-    /* Colorway images */
+    /* Colorway images - allow natural scaling */
     .colorway-image img {
-      max-width: 1000px;
-      max-height: 700px;
+      max-width: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
     }
 
     .container {
@@ -88,12 +93,13 @@
       border: none;
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 5px;
+      margin: 0;
+      margin-bottom: 3px;
+      padding: 0;
       position: relative;
       z-index: 10;
       page-break-inside: avoid;
       page-break-after: avoid;
-      page-break-before: avoid;
     }
 
     .page-header table {
@@ -192,36 +198,42 @@
       padding: 4px;
       text-align: center;
       vertical-align: middle;
-      margin-top: 10px;
+      margin: 0;
+      margin-top: 5px;
+      margin-bottom: 10px;
       /* Không set height cố định, để ảnh tự fit */
       display: inline-block;
       width: 100%;
       box-sizing: border-box;
+      overflow: visible;
     }
 
     .image-box img {
       display: block;
       margin: 0 auto;
       max-width: 100%;
-      max-height: 400px;
       width: auto;
       height: auto;
       object-fit: contain;
       /* Đảm bảo ảnh không tràn ra ngoài container */
       box-sizing: border-box;
+      page-break-inside: avoid;
     }
 
-    /* Giới hạn kích thước ảnh Design Sketch để không nhảy xuống trang 2 */
+    /* Giới hạn kích thước ảnh Design Sketch để không bị lẹm */
     .image-box--sketch {
-      max-height: 350px;
-      overflow: hidden;
       page-break-inside: avoid;
-      page-break-before: avoid;
-      page-break-after: avoid;
+      overflow: visible;
+      max-height: 400px;
+      margin-bottom: 10px;
     }
 
     .image-box--sketch img {
-      max-height: 330px;
+      max-height: 380px;
+      max-width: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
     }
 
     .image-box--empty {
@@ -236,43 +248,44 @@
     /* Section styles */
     .section {
       page-break-before: always;
-      margin-bottom: 0;
-      padding-top: 0 !important;
-	  margin-top: 0 !important;
+      margin: 0;
+      padding: 0;
+      min-height: 0;
     }
 
     .section:first-child {
       page-break-before: auto;
+      margin-top: 0;
+      padding-top: 0;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
     }
 
     /* Article Information section - keep header and design sketch together on page 1 */
-    .section:first-child {
-      page-break-inside: avoid;
-    }
-
     .section:first-child .page-header,
-    .section:first-child .image-box--sketch {
+    .section:first-child .section-content,
+    .section:first-child .info-grid {
       page-break-inside: avoid;
-      page-break-after: avoid;
-      page-break-before: avoid;
     }
 
     .section-content {
       padding: 0;
-      margin-top: 0px;
+      margin: 0;
       clear: both;
     }
 
     .info-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 15px;
-      margin-bottom: 15px;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 8px;
+      margin: 0;
+      margin-bottom: 8px;
     }
 
     .info-item {
       border: 1px solid #ddd;
-      padding: 10px;
+      padding: 8px;
+      margin: 0;
     }
 
     .info-item strong {
@@ -293,7 +306,8 @@
       table-layout: fixed;
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 15px;
+      margin: 0;
+      margin-bottom: 5px;
       font-size: 14px; /* Match body font-size for consistency */
     }
 
@@ -490,37 +504,10 @@
         <% } %>
 
           <%# 1. ARTICLE INFORMATION %>
-            <div class="section" style="page-break-inside: avoid; page-break-after: avoid;">
+            <div class="section" style="page-break-inside: avoid; page-break-after: avoid; page-break-before: avoid; max-height: 100vh; overflow: hidden;">
                <% renderSectionHeader('Product Info'); %>
-               <!-- Design Sketch Section - placed after header table -->
-                  <div style="margin-top: 10px; page-break-inside: avoid; page-break-before: avoid; margin-bottom: 5px; width: 100%; overflow: hidden;">
-                    <!-- <div style="font-weight: 700; font-size: 12px; text-transform: uppercase; border-bottom: 2px solid #333; padding-bottom: 5px;">
-                      DESIGN SKETCH
-                    </div> -->
-                    <% 
-                      const designSketchImg = images && images.designSketch ? images.designSketch : (meta.designSketchUrl || '');
-                     
-                      const hasDesignSketch = designSketchImg && 
-                        designSketchImg !== '—' && 
-                        !designSketchImg.includes('No Image') &&
-                        !designSketchImg.toLowerCase().includes('data:image/svg+xml') &&
-                        designSketchImg.trim() !== '' &&
-                        (designSketchImg.startsWith('data:image/jpeg') || 
-                         designSketchImg.startsWith('data:image/png') ||
-                         designSketchImg.startsWith('data:image/gif') ||
-                         designSketchImg.startsWith('http'));
-                    %>
-                    <% if (hasDesignSketch) { %>
-                      <div class="image-box image-box--sketch">
-                        <img src="<%= designSketchImg %>" alt="Design Sketch" />
-                      </div>
-                    <% } else { %>
-                      <div class="image-box image-box--sketch image-box--empty">
-                        No design sketch
-                      </div>
-                    <% } %>
-                  </div>
-                <div class="section-content" style ="page-break-inside: avoid;">
+               <!-- Info Grid Section - placed before Design Sketch -->
+                <div class="section-content" style="margin-top: 5px; margin-bottom: 8px;">
                   <div class="info-grid">
                     <div class="info-item">
                       <strong>Gender</strong>
@@ -571,9 +558,35 @@
                       </span>
                     </div>
                   </div>
-
-                      
                 </div>
+               <!-- Design Sketch Section - placed after info grid -->
+                  <div style="margin-top: 5px; margin-bottom: 10px; width: 100%; overflow: visible;">
+                    <!-- <div style="font-weight: 700; font-size: 12px; text-transform: uppercase; border-bottom: 2px solid #333; padding-bottom: 5px;">
+                      DESIGN SKETCH
+                    </div> -->
+                    <% 
+                      const designSketchImg = images && images.designSketch ? images.designSketch : (meta.designSketchUrl || '');
+                     
+                      const hasDesignSketch = designSketchImg && 
+                        designSketchImg !== '—' && 
+                        !designSketchImg.includes('No Image') &&
+                        !designSketchImg.toLowerCase().includes('data:image/svg+xml') &&
+                        designSketchImg.trim() !== '' &&
+                        (designSketchImg.startsWith('data:image/jpeg') || 
+                         designSketchImg.startsWith('data:image/png') ||
+                         designSketchImg.startsWith('data:image/gif') ||
+                         designSketchImg.startsWith('http'));
+                    %>
+                    <% if (hasDesignSketch) { %>
+                      <div class="image-box image-box--sketch" style="page-break-inside: avoid; page-break-after: avoid;">
+                        <img src="<%= designSketchImg %>" alt="Design Sketch" />
+                      </div>
+                    <% } else { %>
+                      <div class="image-box image-box--sketch image-box--empty" style="page-break-inside: avoid; page-break-after: avoid;">
+                        No design sketch
+                      </div>
+                    <% } %>
+                  </div>
             </div>
 
             <%# 2. BILL OF MATERIALS %>
@@ -864,12 +877,12 @@
                         <% renderSectionHeader('Measurements - Comments'); %>
                           <div class="section-content">
                             <% if (measurements.sizeRange && measurements.sizeRange.length> 0) { %>
-                              <div style="margin-bottom: 15px">
+                              <div style="margin-bottom: 5px">
                                 <strong>SIZE RANGE:</strong>
                                 <% if (measurements.unit) { %>
                                   <span style="margin-left: 10px; color: #666; font-weight: normal;">(Unit: <%= measurements.unit %>)</span>
                                 <% } %>
-                                <div style="margin-top: 8px">
+                                <div style="margin-top: 3px">
                                   <% const baseSize = measurements.baseSize; %>
                                   <% measurements.sizeRange.forEach(size=> { %>
                                     <span class="size-badge" style="<%= size === baseSize ? 'background: #79e5a5; color: #000;' : '' %>">
@@ -943,7 +956,7 @@
                               <div class="section">
                                 <% renderSectionHeader('Sample Measurements - ' + round.name); %>
           <div class="section-content">
-            <div class="info-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 15px">
+            <div class="info-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 5px">
               <div class="info-item">
                 <strong>Measurement Date</strong>
                 <span><%= round.measurementDate || ' -' %></span>
@@ -1011,13 +1024,13 @@
     </div>
     <% } %>
       <% if (round.overallComments && round.overallComments !=='—' ) { %>
-        <div class="notes" style="margin-top: 10px">
+        <div class="notes" style="margin-top: 5px">
           <strong>OVERALL COMMENTS:</strong>
           <%- round.overallComments %>
         </div>
         <% } %>
           <% if (round.editorContent && round.editorContent.trim() !=='' ) { %>
-            <div class="notes" style="margin-top: 10px">
+            <div class="notes" style="margin-top: 5px">
               <strong>DETAILS:</strong>
               <%- round.editorContent %>
             </div>
@@ -1032,7 +1045,7 @@
                       <div class="section">
                         <% renderSectionHeader('Colorways'); %>
                           <div class="section-content">
-                            <div class="info-grid" style="margin-bottom: 20px">
+                            <div class="info-grid" style="margin-bottom: 5px">
                               <% colorways.forEach(color=> { %>
                                 <div class="info-item">
                                   <div style="font-weight: 700; text-transform: uppercase; font-size: 14px; margin-bottom: 4px;">
@@ -1061,47 +1074,47 @@
                                 <div class="section-content">
                                   <% howToMeasures.forEach((item, index)=> { %>
                                     <div
-                                      style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; page-break-inside: avoid;">
-                                      <div style="page-break-inside: avoid; page-break-after: avoid;">
-                                        <h3 style="margin: 0 0 10px 0; font-size: 13px; color: #333">
+                                      style="border: 1px solid #ddd; padding: 10px; margin-bottom: 5px; page-break-inside: avoid;">
+                                      <div style="page-break-inside: avoid;">
+                                        <h3 style="margin: 0 0 5px 0; font-size: 13px; color: #333">
                                           <%= item.stepNumber || (index + 1) %>. <%= item.pomName || item.pomCode || 'Measurement Point' %>
                                         </h3>
                                         <% if (item.pomCode) { %>
-                                          <p style="margin: 5px 0; font-size: 11px; color: #666">
+                                          <p style="margin: 3px 0; font-size: 11px; color: #666">
                                             <strong>Code:</strong> <%= item.pomCode %>
                                           </p>
                                         <% } %>
                                         <% if (item.description) { %>
-                                          <p style="margin: 10px 0; font-size: 11px; line-height: 1.5">
+                                          <p style="margin: 5px 0; font-size: 11px; line-height: 1.5">
                                             <%= item.description %>
                                           </p>
                                         <% } %>
                                         <% if (item.steps && item.steps.length > 0) { %>
-                                          <div style="margin-top: 10px">
+                                          <div style="margin-top: 5px">
                                             <strong style="font-size: 11px">Steps:</strong>
-                                            <ol style="margin: 5px 0; padding-left: 20px; font-size: 11px; line-height: 1.5;">
+                                            <ol style="margin: 3px 0; padding-left: 20px; font-size: 11px; line-height: 1.5;">
                                               <% item.steps.forEach(step => { %>
-                                                <li style="margin-bottom: 5px"><%= step %></li>
+                                                <li style="margin-bottom: 3px"><%= step %></li>
                                               <% }); %>
                                             </ol>
                                           </div>
                                         <% } %>
                                         <% if (item.tips && item.tips.length > 0) { %>
-                                          <div style="margin-top: 10px; background: #fffbeb; padding: 8px; border-left: 3px solid #f59e0b;">
+                                          <div style="margin-top: 5px; background: #fffbeb; padding: 6px; border-left: 3px solid #f59e0b;">
                                             <strong style="font-size: 11px; color: #92400e">💡 Tips:</strong>
-                                            <ul style="margin: 5px 0; padding-left: 20px; font-size: 11px; line-height: 1.4;">
+                                            <ul style="margin: 3px 0; padding-left: 20px; font-size: 11px; line-height: 1.4;">
                                               <% item.tips.forEach(tip => { %>
-                                                <li style="margin-bottom: 3px"><%= tip %></li>
+                                                <li style="margin-bottom: 2px"><%= tip %></li>
                                               <% }); %>
                                             </ul>
                                           </div>
                                         <% } %>
                                         <% if (item.commonMistakes && item.commonMistakes.length > 0) { %>
-                                          <div style="margin-top: 10px; background: #fef2f2; padding: 8px; border-left: 3px solid #ef4444;">
+                                          <div style="margin-top: 5px; background: #fef2f2; padding: 6px; border-left: 3px solid #ef4444;">
                                             <strong style="font-size: 11px; color: #991b1b">⚠️ Common Mistakes:</strong>
-                                            <ul style="margin: 5px 0; padding-left: 20px; font-size: 11px; line-height: 1.4;">
+                                            <ul style="margin: 3px 0; padding-left: 20px; font-size: 11px; line-height: 1.4;">
                                               <% item.commonMistakes.forEach(mistake => { %>
-                                                <li style="margin-bottom: 3px"><%= mistake %></li>
+                                                <li style="margin-bottom: 2px"><%= mistake %></li>
                                               <% }); %>
                                             </ul>
                                           </div>
