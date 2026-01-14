@@ -2216,7 +2216,7 @@ export class TechPackController {
         imageMaxHeight: 800, // Max height in pixels
         margin: {
           top: '10mm',
-          bottom: '10mm',
+          bottom: '15mm', // Tăng lên 15mm để đảm bảo footer có đủ không gian hiển thị số trang
           left: '10mm',
           right: '10mm',
         },

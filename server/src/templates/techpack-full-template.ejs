@@ -9,7 +9,12 @@
   <style>
     @page {
       size: A4 landscape;
-      margin: 4mm 5mm;
+      margin: 4mm 5mm 15mm 5mm; /* Margin bottom 15mm để có chỗ cho footer, không quá lớn */
+      counter-increment: page;
+    }
+
+    @page:first {
+      counter-reset: page 1;
     }
 
     * {
@@ -28,8 +33,7 @@
       background: white;
       margin: 0;
       padding: 0;
-      margin-bottom: 8mm;
-      /* Tạo khoảng trống cho footer (tối ưu) */
+      margin-bottom: 0; /* Không cần margin-bottom vì @page đã có margin */
       /* Ensure colors print correctly in PDF */
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -236,16 +240,16 @@
       page-break-inside: avoid;
     }
 
-    /* Giới hạn kích thước ảnh Design Sketch để không bị lẹm */
+    /* Giới hạn kích thước ảnh Design Sketch để không bị lẹm và vừa với trang 1 */
     .image-box--sketch {
       page-break-inside: avoid;
-      overflow: visible;
-      max-height: 400px;
-      margin-bottom: 4px;
+      overflow: hidden;
+      max-height: calc(100vh - 400px); /* Tự động điều chỉnh theo chiều cao trang */
+      margin-bottom: 2px;
     }
 
     .image-box--sketch img {
-      max-height: 380px;
+      max-height: calc(100vh - 420px); /* Đảm bảo ảnh không tràn */
       max-width: 100%;
       width: auto;
       height: auto;
@@ -269,19 +273,32 @@
       min-height: 0;
     }
 
+    /* Article Information section - keep header and design sketch together on page 1 */
     .section:first-child {
       page-break-before: auto;
+      page-break-inside: avoid !important;
+      page-break-after: avoid !important;
       margin-top: 0;
       padding-top: 0;
-      margin-bottom: 15px;
-      padding-bottom: 10px;
+      margin-bottom: 0; /* Giảm margin để tiết kiệm không gian */
+      padding-bottom: 0; /* Giảm padding để tiết kiệm không gian */
+      max-height: calc(100vh - 20mm); /* Đảm bảo không vượt quá chiều cao trang trừ margin */
+      overflow: hidden; /* Ẩn phần tràn nếu quá dài */
     }
-
-    /* Article Information section - keep header and design sketch together on page 1 */
+    
     .section:first-child .page-header,
     .section:first-child .section-content,
     .section:first-child .info-grid {
-      page-break-inside: avoid;
+      page-break-inside: avoid !important;
+    }
+
+    /* Colorways section - LUÔN bắt đầu ở trang mới, không được chia cắt */
+    .section--colorways {
+      page-break-before: always !important; /* Bắt buộc bắt đầu ở trang mới */
+      page-break-inside: avoid !important; /* Không được chia cắt */
+      page-break-after: auto; /* Cho phép section sau bắt đầu ở trang mới nếu cần */
+      margin: 0;
+      padding: 0;
     }
 
     .section-content {
@@ -296,12 +313,18 @@
     .construction-item {
       display: flex;
       flex-direction: column;
-      page-break-inside: avoid;
-      page-break-after: avoid;
-      page-break-before: avoid;
-      overflow: visible;
-      min-height: 0;
-      height: auto;
+      page-break-inside: avoid !important;
+      page-break-after: always !important; /* Luôn kết thúc trang sau mỗi item */
+      page-break-before: always !important; /* Luôn bắt đầu ở trang mới (trừ item đầu tiên sẽ override) */
+      overflow: hidden; /* Ẩn phần tràn để tránh trang trống */
+      min-height: calc(100vh - 20mm); /* Đảm bảo chiếm hết chiều cao trang trừ margin */
+      height: calc(100vh - 20mm); /* Cố định chiều cao để vừa 1 trang */
+      box-sizing: border-box;
+    }
+
+    /* Construction item đầu tiên không cần break-before */
+    .construction-item:first-of-type {
+      page-break-before: auto !important;
     }
 
     .construction-header {
@@ -327,8 +350,10 @@
       page-break-after: avoid !important;
       page-break-before: avoid !important;
       min-height: 0;
-      max-height: none;
-      overflow: visible;
+      max-height: calc(100vh - 180px); /* Trừ header (~80px) và footer (~20mm) */
+      height: calc(100vh - 180px); /* Cố định chiều cao để vừa trong 1 trang */
+      overflow: hidden; /* Ẩn phần tràn để tránh trang trống */
+      box-sizing: border-box;
     }
 
     .construction-image-wrapper {
@@ -340,9 +365,10 @@
       page-break-after: avoid !important;
       page-break-before: avoid !important;
       min-width: 0;
-      /* Giới hạn chiều cao khối ảnh để không tràn sang trang sau */
-      max-height: 520px;
-      overflow: hidden;
+      max-height: 100%; /* Sử dụng 100% của construction-content */
+      height: 100%; /* Chiếm hết chiều cao của construction-content */
+      overflow: hidden; /* Ẩn phần tràn */
+      box-sizing: border-box;
     }
 
     .construction-image {
@@ -354,9 +380,11 @@
       border-radius: 8px;
       padding: 10px;
       background: #f9f9f9;
-      object-fit: contain;
+      object-fit: contain; /* Giữ đúng tỷ lệ, không crop */
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       page-break-inside: avoid !important;
+      display: block;
+      margin: 0 auto;
     }
 
     .construction-text {
@@ -366,9 +394,12 @@
       page-break-inside: avoid !important;
       page-break-after: avoid !important;
       page-break-before: avoid !important;
-      overflow: visible;
+      overflow: hidden; /* Ẩn phần tràn để tránh trang trống */
       min-width: 0;
-      max-height: none;
+      max-height: 100%; /* Giới hạn theo chiều cao của construction-content */
+      height: 100%; /* Chiếm hết chiều cao của construction-content */
+      box-sizing: border-box;
+      overflow-y: auto; /* Cho phép scroll nếu nội dung quá dài */
     }
 
     .construction-item-title {
@@ -475,13 +506,15 @@
       page-break-inside: avoid;
     }
 
-    /* Colorways layout: 3 “cards” đều, có khoảng cách rõ ràng */
+    /* Colorways layout: 3 "cards" đều, có khoảng cách rõ ràng */
     .colorways-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 12px;
       margin: 0;
       margin-bottom: 8px;
+      page-break-inside: avoid !important; /* Không được chia cắt grid */
+      page-break-after: avoid !important;
     }
 
     .colorway-card {
@@ -494,6 +527,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 12px;
+      page-break-inside: avoid !important; /* Không được chia cắt card */
     }
 
     .colorway-card-text {
@@ -663,34 +697,58 @@
         break-before: auto;
       }
 
-      /* Colorways luôn kết thúc trang => Construction không dính lên */
+      /* Colorways LUÔN bắt đầu ở trang mới, không được chia cắt */
       .section--colorways {
-        break-after: page;
+        break-before: page !important; /* Bắt buộc bắt đầu ở trang mới */
+        break-inside: avoid !important; /* Không được chia cắt */
+        break-after: auto; /* Cho phép section sau bắt đầu ở trang mới nếu cần */
       }
 
-      /* Construction item: đúng 1 break trước mỗi item, không double break */
+      .colorways-grid {
+        break-inside: avoid !important; /* Không được chia cắt grid */
+      }
+
+      .colorway-card {
+        break-inside: avoid !important; /* Không được chia cắt card */
+      }
+
+      /* Construction item: mỗi item = 1 trang, không trang trống */
       .construction-item {
-        break-before: page !important;
-        break-after: auto !important;
         break-inside: avoid !important;
-
-        /* Bỏ toàn bộ vh/height cố định */
-        min-height: 0 !important;
-        height: auto !important;
-        overflow: visible !important;
-
-        /* Giữ flex để layout đúng, nhưng đảm bảo break hoạt động */
+        break-after: page !important; /* Luôn kết thúc trang sau mỗi item */
+        break-before: page !important; /* Luôn bắt đầu ở trang mới (trừ item đầu tiên) */
+        min-height: calc(100vh - 20mm) !important; /* Chiếm hết chiều cao trang */
+        height: calc(100vh - 20mm) !important; /* Cố định chiều cao */
+        overflow: hidden !important; /* Ẩn phần tràn để tránh trang trống */
         display: flex !important;
         flex-direction: column !important;
+        box-sizing: border-box !important;
+      }
+
+      /* Construction item đầu tiên không cần break-before */
+      .construction-item:first-of-type {
+        break-before: auto !important;
       }
 
       .construction-content {
-        /* Bỏ vh gây lỗi print */
         min-height: 0 !important;
-        max-height: none !important;
-        overflow: visible !important;
-
+        max-height: calc(100vh - 180px) !important; /* Trừ header và footer */
+        height: calc(100vh - 180px) !important; /* Cố định chiều cao */
+        overflow: hidden !important; /* Ẩn phần tràn */
         break-inside: avoid !important;
+        box-sizing: border-box !important;
+      }
+
+      .construction-image-wrapper {
+        max-height: 100% !important;
+        height: 100% !important;
+        overflow: hidden !important;
+      }
+
+      .construction-text {
+        max-height: 100% !important;
+        height: 100% !important;
+        overflow-y: auto !important; /* Cho phép scroll nếu cần */
       }
 
       .construction-text {
@@ -797,7 +855,7 @@
       left: 0;
       right: 0;
       width: 100%;
-      font-family: Arial, sans-serif;
+      font-family: Arial, Helvetica, sans-serif;
       font-size: 8pt;
       color: #1e293b;
       padding: 2px 6mm;
@@ -810,6 +868,8 @@
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
       box-shadow: none;
+      height: 20px;
+      box-sizing: border-box;
     }
 
     .pdf-footer__left,
@@ -838,6 +898,15 @@
     .pdf-footer strong {
       font-weight: 600;
       color: #334155;
+    }
+
+    /* Page number counter - sử dụng CSS counter */
+    .page-number::before {
+      content: counter(page);
+    }
+
+    .total-pages::before {
+      content: counter(pages);
     }
   </style>
 </head>
@@ -946,7 +1015,7 @@
     <div class="section" style="page-break-inside: avoid; page-break-after: avoid; page-break-before: avoid;">
       <% renderSectionHeader('Product Info'); %>
       <!-- Info Grid Section - placed before Design Sketch -->
-      <div class="section-content" style="margin-top: 5px; margin-bottom: 8px;">
+      <div class="section-content" style="margin-top: 2px; margin-bottom: 4px;">
         <div class="info-grid">
           <div class="info-item">
             <strong>Gender</strong>
@@ -999,7 +1068,7 @@
         </div>
       </div>
       <!-- Design Sketch Section - placed after info grid -->
-      <div style="margin-top: 5px; margin-bottom: 10px; width: 100%; overflow: visible;">
+      <div style="margin-top: 2px; margin-bottom: 4px; width: 100%; overflow: hidden; max-height: calc(100vh - 350px);">
         <!-- <div style="font-weight: 700; font-size: 12px; text-transform: uppercase; border-bottom: 2px solid #333; padding-bottom: 5px;">
                       DESIGN SKETCH
                     </div> -->
@@ -1483,9 +1552,9 @@
     <% }); %>
     <% } %>
 
-    <%# 4. COLORWAYS %>
+    <%# 4. COLORWAYS - LUÔN bắt đầu ở trang mới, không được chia cắt %>
     <% if (colorways && colorways.length> 0) { %>
-    <div class="section section--colorways" style="page-break-inside: avoid !important; page-break-after: avoid !important;">
+    <div class="section section--colorways" style="page-break-before: always !important; page-break-inside: avoid !important; page-break-after: auto !important;">
       <% renderSectionHeader('Colorways'); %>
       <div class="section-content" style="page-break-inside: avoid !important; page-break-after: avoid !important;">
         <div class="colorways-grid" style="page-break-inside: avoid !important; page-break-after: avoid !important;">
@@ -1511,12 +1580,15 @@
     </div>
     <% } %>
 
-    <%# 5. CONSTRUCTION %>
+    <%# 5. CONSTRUCTION - Mỗi ảnh = 1 trang, header lặp lại mỗi trang %>
     <% if (howToMeasures && howToMeasures.length> 0) { %>
     <% howToMeasures.forEach((item, index)=> { %>
-    <div class="section construction-item" style="page-break-inside: avoid !important; page-break-after: auto !important;">
-      <%# Tất cả các trang đều có header giống nhau %>
-      <% renderSectionHeader('Construction Details'); %>
+    <%# Mỗi construction item bắt đầu ở trang mới (trừ item đầu tiên) %>
+    <div class="section construction-item" style="page-break-inside: avoid !important; page-break-after: always !important; <%= index > 0 ? 'page-break-before: always !important;' : 'page-break-before: auto !important;' %>">
+      <%# Header lặp lại trên MỖI TRANG - không được break với content %>
+      <div style="page-break-inside: avoid !important; page-break-after: avoid !important; margin-bottom: 5px;">
+        <% renderSectionHeader('Construction Details'); %>
+      </div>
 
       <div class="construction-content" style="page-break-inside: avoid !important; page-break-after: avoid !important; page-break-before: avoid !important;">
         <!-- Text Content Section - Bên trái -->
@@ -1592,6 +1664,21 @@
     </div>
     <% } %>
 
+  </div>
+
+  <!-- Footer - Fixed at bottom of every page -->
+  <!-- NOTE: Footer này chỉ hiển thị khi KHÔNG dùng Puppeteer footerTemplate -->
+  <!-- Khi dùng footerTemplate, footer này sẽ bị ẩn bằng CSS -->
+  <div class="pdf-footer" id="html-footer" style="display: none;">
+    <div class="pdf-footer__left">
+      Created by: <%= meta.technicalDesignerId || meta.designer || meta.technicalDesigner || 'Technical Designer' %>
+    </div>
+    <div class="pdf-footer__center">
+      By: iBC connecting
+    </div>
+    <div class="pdf-footer__right">
+      Page <span class="page-number">-</span> / <span class="total-pages">-</span>
+    </div>
   </div>
 
 </body>

@@ -1419,30 +1419,57 @@ class PDFService {
         timeout: this.PDF_GENERATION_TIMEOUT,
         margin: {
           top: options.margin?.top || '10mm',
-          bottom: options.margin?.bottom || '8mm', // Margin bottom cho footer (tối ưu)
-          left: options.margin?.left || '8mm',
-          right: options.margin?.right || '8mm',
+          bottom: options.margin?.bottom || '15mm', // Tối thiểu 15mm để footer có đủ không gian hiển thị
+          left: options.margin?.left || '10mm',
+          right: options.margin?.right || '10mm',
         },
         displayHeaderFooter: options.displayHeaderFooter !== false,
         preferCSSPageSize: true,
       };
+      
+      console.log('📋 PDF Options initialized:', {
+        displayHeaderFooter: pdfOptions.displayHeaderFooter,
+        margin: pdfOptions.margin,
+        format: pdfOptions.format,
+        landscape: pdfOptions.landscape,
+      });
 
-      // Add header/footer if needed
+      // Sử dụng footerTemplate của Puppeteer để có số trang tự động
+      // Footer trong HTML template sẽ bị ẩn khi dùng footerTemplate
       if (options.displayHeaderFooter !== false) {
         try {
           // Check page is still open before getting templates
           if (page.isClosed()) {
-            throw new Error('Page was closed before getting header/footer templates');
+            throw new Error('Page was closed before getting footer template');
           }
-          pdfOptions.headerTemplate = await this.getHeaderTemplate(templateData);
-          pdfOptions.footerTemplate = await this.getFooterTemplate(templateData);
-          console.log('✅ Footer template loaded, length:', pdfOptions.footerTemplate?.length || 0);
+          
+          // Get footer template
+          const footerTemplate = await this.getFooterTemplate(templateData);
+          
+          // Đảm bảo footer template không rỗng và có pageNumber/totalPages
+          if (!footerTemplate || footerTemplate.trim().length === 0) {
+            throw new Error('Footer template is empty');
+          }
+          
+          if (!footerTemplate.includes('pageNumber') || !footerTemplate.includes('totalPages')) {
+            console.warn('⚠️  Footer template missing pageNumber or totalPages - Puppeteer may not render page numbers');
+          }
+          
+          // Set footer template vào pdfOptions
+          pdfOptions.footerTemplate = footerTemplate;
+          pdfOptions.displayHeaderFooter = true;
+          
+          console.log('✅ Footer template loaded, length:', footerTemplate.length);
+          console.log('📋 Footer template preview (first 200 chars):', footerTemplate.substring(0, 200));
+          console.log('📋 Footer template has pageNumber:', footerTemplate.includes('pageNumber'));
+          console.log('📋 Footer template has totalPages:', footerTemplate.includes('totalPages'));
         } catch (error: any) {
-          console.error('❌ Could not load header/footer templates:', error.message || error);
-          // Continue without header/footer if there's an error
+          console.error('❌ Could not load footer template:', error.message || error);
+          // Fallback: Tắt footerTemplate nếu có lỗi
+          pdfOptions.displayHeaderFooter = false;
         }
       } else {
-        console.log('⚠️  displayHeaderFooter is disabled');
+        pdfOptions.displayHeaderFooter = false;
       }
 
       // ✅ REQUIREMENT 2: Final check before generating PDF - ensure page is still open
@@ -1467,6 +1494,16 @@ class PDFService {
         }
       }
 
+      // Log PDF options để debug footer
+      console.log('📋 PDF Options before generation:', {
+        displayHeaderFooter: pdfOptions.displayHeaderFooter,
+        hasHeaderTemplate: !!pdfOptions.headerTemplate,
+        hasFooterTemplate: !!pdfOptions.footerTemplate,
+        margin: pdfOptions.margin,
+        format: pdfOptions.format,
+        orientation: pdfOptions.orientation,
+      });
+      
       console.log(`📄 Generating PDF [${requestId}]`);
       const pdfBuffer = await page.pdf(pdfOptions);
       console.log(`✅ PDF generated in ${Date.now() - pdfStart}ms [${requestId}]`);
@@ -1544,7 +1581,9 @@ class PDFService {
 
   /**
    * Get header template for PDF
+   * NOTE: Currently not used - header/footer are embedded in HTML template
    */
+  // @ts-ignore - Kept for potential future use
   private async getHeaderTemplate(data: any): Promise<string> {
     try {
       const headerPath = path.join(this.templateDir, 'partials', 'header.ejs');
@@ -1566,17 +1605,40 @@ class PDFService {
    * Footer content is inlined here to avoid file loading issues across different machines
    */
   private async getFooterTemplate(data: any): Promise<string> {
-    // Inline footer template - no need to load from file
-    const designerName = data?.meta?.technicalDesignerId || data?.meta?.designer || data?.meta?.technicalDesigner;
-    const displayName = (designerName && String(designerName).trim() && designerName !== '—' && designerName !== '-') 
-      ? designerName 
-      : 'Technical Designer';
-    
-    return `<div style="width: 100%; font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color: #1e293b; padding: 2px 6mm; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; background: #fff;">
-      <div style="text-align: left; flex: 1; font-size: 8pt;">Created by: ${displayName}</div>
-      <div style="text-align: center; flex: 1; font-weight: 600; font-size: 8pt; color: #0f172a;">By: iBC connecting</div>
-      <div style="text-align: right; flex: 1; font-size: 8pt;">Page <span class="pageNumber"></span> / <span class="totalPages"></span></div>
-    </div>`;
+    try {
+      // Inline footer template - no need to load from file
+      // Puppeteer yêu cầu footer phải là một dòng HTML hợp lệ (không có line breaks)
+      const designerName = data?.meta?.technicalDesignerId || data?.meta?.designer || data?.meta?.technicalDesigner;
+      const displayName = (designerName && String(designerName).trim() && designerName !== '—' && designerName !== '-') 
+        ? designerName 
+        : 'Technical Designer';
+      
+      // Escape HTML để tránh XSS và đảm bảo hiển thị đúng
+      const safeDisplayName = String(displayName)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+      
+      // Tạo footer HTML - QUAN TRỌNG: Phải là một dòng duy nhất, không có line breaks
+      // Puppeteer yêu cầu footer template phải được format trên một dòng
+      const footerHTML = `<div style="width:100%;font-family:Arial,Helvetica,sans-serif;font-size:8pt;color:#1e293b;padding:2px 6mm;border-top:1px solid #333;display:flex;justify-content:space-between;align-items:center;box-sizing:border-box;background:#fff;height:20px;"><div style="text-align:left;flex:1;font-size:8pt;">Created by: ${safeDisplayName}</div><div style="text-align:center;flex:1;font-weight:600;font-size:8pt;color:#0f172a;">By: iBC connecting</div><div style="text-align:right;flex:1;font-size:8pt;">Page <span class="pageNumber"></span> / <span class="totalPages"></span></div></div>`;
+      
+      // Validate footer có chứa pageNumber và totalPages
+      if (!footerHTML.includes('pageNumber') || !footerHTML.includes('totalPages')) {
+        console.warn('⚠️  Footer template missing pageNumber or totalPages classes');
+      }
+      
+      console.log('✅ Footer template generated, length:', footerHTML.length);
+      console.log('📋 Footer template full content:', footerHTML);
+      
+      return footerHTML;
+    } catch (error: any) {
+      console.error('❌ Error generating footer template:', error.message || error);
+      // Fallback footer với inline styles - đơn giản và chắc chắn hoạt động
+      return '<div style="width:100%;font-family:Arial,sans-serif;font-size:8pt;color:#1e293b;padding:2px 6mm;border-top:1px solid #333;display:flex;justify-content:space-between;align-items:center;box-sizing:border-box;background:#fff;height:20px;"><div style="text-align:left;flex:1;">Created by: Technical Designer</div><div style="text-align:center;flex:1;font-weight:600;">By: iBC connecting</div><div style="text-align:right;flex:1;">Page <span class="pageNumber"></span> / <span class="totalPages"></span></div></div>';
+    }
   }
 
   /**
