@@ -536,6 +536,7 @@ class PDFService {
       rows,
       sizeRange,
       baseSize,
+      unit: (techpack.measurementUnit as string) || 'cm',
       baseHighlightColor: techpack.measurementBaseHighlightColor || '#dbeafe',
       rowStripeColor: techpack.measurementRowStripeColor || '#f3f4f6',
     };
@@ -557,9 +558,12 @@ class PDFService {
     return (techpack.sampleMeasurementRounds || []).map((round: ISampleMeasurementRound) => ({
       name: round.name || '—',
       measurementDate: round.measurementDate ? this.formatDate(round.measurementDate) : '—',
-      reviewer: (round.createdBy as any)?.firstName && (round.createdBy as any)?.lastName
-        ? `${(round.createdBy as any).firstName} ${(round.createdBy as any).lastName}`
-        : '—',
+      // Prefer explicit reviewer field (stored in techpack) over createdBy population (often not populated in PDF export)
+      reviewer: (round.reviewer && String(round.reviewer).trim())
+        ? String(round.reviewer).trim()
+        : ((round.createdBy as any)?.firstName && (round.createdBy as any)?.lastName
+          ? `${(round.createdBy as any).firstName} ${(round.createdBy as any).lastName}`
+          : (techpack.updatedByName || techpack.createdByName || '—')),
       requestedSource: round.requestedSource || 'original',
       overallComments: round.overallComments || '—',
       measurements: (round.measurements || []).map((entry: any) => {
@@ -636,6 +640,7 @@ class PDFService {
         tips: item.tips || [],
         commonMistakes: item.commonMistakes || [],
         relatedMeasurements: item.relatedMeasurements || [],
+        note: (item as any).note || '',
       }));
     }
     
@@ -649,6 +654,7 @@ class PDFService {
       tips: item.tips || [],
       commonMistakes: item.commonMistakes || [],
       relatedMeasurements: item.relatedMeasurements || [],
+      note: (item as any).note || '',
     }));
   }
 
@@ -965,6 +971,7 @@ class PDFService {
         currency: currency,
         description: techpack.description || techpack.productDescription || '—',
         designer: technicalDesignerName,
+        technicalDesignerId: technicalDesignerName, // Add technicalDesignerId to meta for footer template
         companyLogo: compressedLogo, // Add companyLogo to meta for header template
       },
       images: {
@@ -1365,7 +1372,7 @@ class PDFService {
         timeout: this.PDF_GENERATION_TIMEOUT,
         margin: {
           top: options.margin?.top || '10mm',
-          bottom: options.margin?.bottom || '10mm',
+          bottom: options.margin?.bottom || '8mm', // Margin bottom cho footer (tối ưu)
           left: options.margin?.left || '8mm',
           right: options.margin?.right || '8mm',
         },
@@ -1382,10 +1389,13 @@ class PDFService {
           }
           pdfOptions.headerTemplate = await this.getHeaderTemplate(templateData);
           pdfOptions.footerTemplate = await this.getFooterTemplate(templateData);
+          console.log('✅ Footer template loaded, length:', pdfOptions.footerTemplate?.length || 0);
         } catch (error: any) {
-          console.warn('Could not load header/footer templates:', error.message || error);
+          console.error('❌ Could not load header/footer templates:', error.message || error);
           // Continue without header/footer if there's an error
         }
+      } else {
+        console.log('⚠️  displayHeaderFooter is disabled');
       }
 
       // ✅ REQUIREMENT 2: Final check before generating PDF - ensure page is still open
@@ -1511,15 +1521,30 @@ class PDFService {
     try {
       const footerPath = path.join(this.templateDir, 'partials', 'footer.ejs');
       
+      let footerContent: string;
       if (this.templateCache.has(footerPath)) {
-        return ejs.render(this.templateCache.get(footerPath)!, { meta: data.meta });
+        footerContent = this.templateCache.get(footerPath)!;
+      } else {
+        footerContent = await fs.readFile(footerPath, 'utf-8');
+        this.templateCache.set(footerPath, footerContent);
       }
       
-      const footerContent = await fs.readFile(footerPath, 'utf-8');
-      this.templateCache.set(footerPath, footerContent);
-      return ejs.render(footerContent, { meta: data.meta });
-    } catch {
-      return '<div style="font-size: 9px; text-align: center; width: 100%; padding: 10px;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>';
+      const renderedFooter = ejs.render(footerContent, { meta: data.meta || {} });
+      
+      if (!renderedFooter || renderedFooter.trim().length === 0) {
+        throw new Error('Footer template rendered empty');
+      }
+      
+      return renderedFooter;
+    } catch (error: any) {
+      console.error('❌ Error loading footer template:', error.message || error);
+      // Fallback footer với đầy đủ thông tin
+      const designerName = data?.meta?.technicalDesignerId || data?.meta?.designer || data?.meta?.technicalDesigner || 'Technical Designer';
+      return `<div style="font-size: 8pt; color: #1e293b; padding: 2px 6mm; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box; background: #fff;">
+        <div style="text-align: left; flex: 1; font-size: 8pt;">Created by: ${designerName}</div>
+        <div style="text-align: center; flex: 1; font-weight: 600; font-size: 8pt; color: #0f172a;">By: iBC connecting</div>
+        <div style="text-align: right; flex: 1; font-size: 8pt;">Page <span class="pageNumber"></span> / <span class="totalPages"></span> — Confidential</div>
+      </div>`;
     }
   }
 

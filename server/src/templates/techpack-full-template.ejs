@@ -9,7 +9,7 @@
   <style>
     @page {
       size: A4 landscape;
-      margin: 8mm 5mm;
+      margin: 4mm 5mm;
     }
 
     * {
@@ -28,6 +28,7 @@
       background: white;
       margin: 0;
       padding: 0;
+      margin-bottom: 8mm; /* Tạo khoảng trống cho footer (tối ưu) */
       /* Ensure colors print correctly in PDF */
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -94,7 +95,7 @@
       width: 100%;
       border-collapse: collapse;
       margin: 0;
-      margin-bottom: 3px;
+      margin-bottom: 2px;
       padding: 0;
       position: relative;
       z-index: 10;
@@ -110,7 +111,7 @@
 
     .page-header td {
       border: 1px solid #000;
-      padding: 0px 8px 5px 8px;
+      padding: 0px 8px 3px 8px;
       font-size: 14px;
       vertical-align: top;
       word-wrap: break-word;
@@ -123,10 +124,11 @@
     .page-title {
       text-align: center;
       font-weight: bold;
-      font-size: 16px;
-      padding: 0px 8px 8px 8px;
-      border-bottom: 2px solid #000;
+      font-size: 14px;
+      padding: 0px 8px 4px 8px;
+      border-bottom: 1px solid #000;
       background: #fff;
+      line-height: 1.1;
     }
 
     .version-text {
@@ -161,7 +163,7 @@
       vertical-align: middle;
       background: #fff;
       border-left: 2px solid #000;
-      padding: 4px;
+      padding: 0;
     }
 
     .product-cell {
@@ -170,7 +172,14 @@
       vertical-align: middle;
       background: #fff;
       border-left: 2px solid #000;
-      padding: 4px;
+      padding: 0;
+    }
+
+    /* Override .page-header td (vertical-align: top) for image cells */
+    .page-header td.product-cell,
+    .page-header td.logo-cell {
+      vertical-align: middle;
+      padding: 0; /* tránh ảnh bị lệch do padding */
     }
 
     .product-images {
@@ -179,15 +188,17 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      overflow: hidden;
     }
 
     .product-images img {
-      max-width: 100%;
-      max-height: 100%;
-      width: auto;
-      height: auto;
-      object-fit: contain;
+      width: 100%;
+      height: 100%;
+      max-width: 95%;
+      max-height: 95%; /* chừa 1 chút khoảng để không đè viền bảng */
+      object-fit: contain; /* phóng to tối đa nhưng không méo */
       display: block;
+      margin: 0;
     }
 
     /* Image box - reusable container for images that fit within a frame */
@@ -199,8 +210,8 @@
       text-align: center;
       vertical-align: middle;
       margin: 0;
-      margin-top: 5px;
-      margin-bottom: 10px;
+      margin-top: 3px;
+      margin-bottom: 4px;
       /* Không set height cố định, để ảnh tự fit */
       display: inline-block;
       width: 100%;
@@ -225,7 +236,7 @@
       page-break-inside: avoid;
       overflow: visible;
       max-height: 400px;
-      margin-bottom: 10px;
+      margin-bottom: 4px;
     }
 
     .image-box--sketch img {
@@ -278,13 +289,14 @@
 
     /* Construction Item Styles - Mỗi construction là 1 trang */
     .construction-item {
-      min-height: calc(100vh - 100px);
       display: flex;
       flex-direction: column;
       page-break-inside: avoid;
       page-break-after: avoid;
       page-break-before: avoid;
-      overflow: hidden;
+      overflow: visible;
+      min-height: 0;
+      height: auto;
     }
 
     .construction-header {
@@ -309,9 +321,9 @@
       page-break-inside: avoid !important;
       page-break-after: avoid !important;
       page-break-before: avoid !important;
-      min-height: calc(100vh - 200px);
-      max-height: calc(100vh - 200px);
-      overflow: hidden;
+      min-height: 0;
+      max-height: none;
+      overflow: visible;
     }
 
     .construction-image-wrapper {
@@ -323,7 +335,7 @@
       page-break-after: avoid !important;
       page-break-before: avoid !important;
       min-width: 0;
-      overflow: hidden;
+      overflow: visible;
     }
 
     .construction-image {
@@ -347,9 +359,9 @@
       page-break-inside: avoid !important;
       page-break-after: avoid !important;
       page-break-before: avoid !important;
-      overflow-y: auto;
+      overflow: visible;
       min-width: 0;
-      max-height: 100%;
+      max-height: none;
     }
 
     .construction-item-title {
@@ -442,18 +454,70 @@
     .info-grid {
       display: grid;
       grid-template-columns: repeat(8, 1fr);
-      gap: 8px;
+      gap: 6px;
       margin: 0;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
       page-break-inside: avoid;
       page-break-after: avoid;
     }
 
     .info-item {
       border: 1px solid #ddd;
-      padding: 8px;
+      padding: 6px;
       margin: 0;
       page-break-inside: avoid;
+    }
+
+    /* Colorways layout: 3 “cards” đều, có khoảng cách rõ ràng */
+    .colorways-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin: 0;
+      margin-bottom: 8px;
+    }
+
+    .colorway-card {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 8px 10px;
+      background: #fff;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .colorway-card-text {
+      flex: 1;
+      text-align: left;
+    }
+
+    .colorway-card-title {
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .colorway-card-code {
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .colorway-card-image {
+      flex-shrink: 0;
+      text-align: right;
+    }
+
+    .colorway-card-image img {
+      max-width: 140px;
+      max-height: 110px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      object-fit: contain;
+      display: block;
     }
 
     .info-item strong {
@@ -567,6 +631,144 @@
     table:first-of-type {
       margin-top: 0;
     }
+
+    /* Print-specific CSS với break-* chuẩn mới */
+    @media print {
+      /* Chuẩn mới thay cho page-break-* */
+      .section {
+        break-before: page;
+        break-inside: auto;
+      }
+
+      .section:first-child {
+        break-before: auto;
+      }
+
+      /* Colorways luôn kết thúc trang => Construction không dính lên */
+      .section--colorways {
+        break-after: page;
+      }
+
+      /* Construction item: đúng 1 break trước mỗi item, không double break */
+      .construction-item {
+        break-before: page !important;
+        break-after: auto !important;
+        break-inside: avoid !important;
+
+        /* Bỏ toàn bộ vh/height cố định */
+        min-height: 0 !important;
+        height: auto !important;
+        overflow: visible !important;
+
+        /* Giữ flex để layout đúng, nhưng đảm bảo break hoạt động */
+        display: flex !important;
+        flex-direction: column !important;
+      }
+
+      .construction-content {
+        /* Bỏ vh gây lỗi print */
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+
+        break-inside: avoid !important;
+      }
+
+      .construction-text {
+        overflow: visible !important; /* Tránh scroll container trong PDF */
+        max-height: none !important;
+      }
+
+      .construction-image-wrapper {
+        overflow: visible !important;
+      }
+
+      /* Đảm bảo thead lặp lại trên mỗi trang khi table bị ngắt trang */
+      thead {
+        display: table-header-group !important;
+      }
+
+      tbody {
+        display: table-row-group !important;
+      }
+
+      tfoot {
+        display: table-footer-group !important;
+      }
+
+      /* Đảm bảo header không bị ngắt trang */
+      .page-header {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+      }
+
+      /* Footer styles cho print */
+      .pdf-footer {
+        position: fixed !important;
+        bottom: 0 !important;
+      }
+      
+      body {
+        margin-bottom: 8mm !important;
+      }
+      
+      /* Đảm bảo content không đè lên footer */
+      .section:last-of-type {
+        margin-bottom: 9mm;
+      }
+    }
+
+    /* ============================================
+       FOOTER STYLES
+       ============================================ */
+    .pdf-footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      width: 100%;
+      font-family: Arial, sans-serif;
+      font-size: 8pt;
+      color: #1e293b;
+      padding: 2px 6mm;
+      border-top: 1px solid #333;
+      background: #fff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 9999;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      box-shadow: none;
+    }
+
+    .pdf-footer__left,
+    .pdf-footer__center,
+    .pdf-footer__right {
+      flex: 1;
+    }
+
+    .pdf-footer__left {
+      text-align: left;
+      font-size: 8pt;
+    }
+
+    .pdf-footer__center {
+      text-align: center;
+      font-weight: 600;
+      font-size: 8pt;
+      color: #0f172a;
+    }
+
+    .pdf-footer__right {
+      text-align: right;
+      font-size: 8pt;
+    }
+
+    .pdf-footer strong {
+      font-weight: 600;
+      color: #334155;
+    }
   </style>
 </head>
 
@@ -672,7 +874,7 @@
         <% } %>
 
           <%# 1. ARTICLE INFORMATION %>
-            <div class="section" style="page-break-inside: avoid; page-break-after: avoid; page-break-before: avoid; max-height: 100vh; overflow: hidden;">
+            <div class="section" style="page-break-inside: avoid; page-break-after: avoid; page-break-before: avoid;">
                <% renderSectionHeader('Product Info'); %>
                <!-- Info Grid Section - placed before Design Sketch -->
                 <div class="section-content" style="margin-top: 5px; margin-bottom: 8px;">
@@ -1210,26 +1412,27 @@
 
                   <%# 4. COLORWAYS %>
                     <% if (colorways && colorways.length> 0) { %>
-                      <div class="section" style="page-break-inside: avoid !important; page-break-after: avoid !important;">
+                      <div class="section section--colorways" style="page-break-inside: avoid !important; page-break-after: avoid !important;">
                         <% renderSectionHeader('Colorways'); %>
                           <div class="section-content" style="page-break-inside: avoid !important; page-break-after: avoid !important;">
-                            <div class="info-grid" style="margin-bottom: 5px; page-break-inside: avoid !important; page-break-after: avoid !important;">
+                            <div class="colorways-grid" style="page-break-inside: avoid !important; page-break-after: avoid !important;">
                               <% colorways.forEach(color=> { %>
-                                <div class="info-item" style="page-break-inside: avoid !important;">
-                                  <div style="font-weight: 700; text-transform: uppercase; font-size: 14px; margin-bottom: 4px;">
-                                    <%= color.name || 'Color' %>
-                                  </div>
-                                  <div style="font-size: 14px; margin-bottom: 6px;">
-                                    Code: <%= color.code || '000' %>
+                                <div class="colorway-card" style="page-break-inside: avoid !important;">
+                                  <div class="colorway-card-text">
+                                    <div class="colorway-card-title">
+                                      <%= color.name || 'Color' %>
+                                    </div>
+                                    <div class="colorway-card-code">
+                                      Code: <%= color.code || '000' %>
+                                    </div>
                                   </div>
                                   <% if (color.imageUrl && color.imageUrl !== '—' && !color.imageUrl.includes('No Image')) { %>
-                                    <div style="text-align: left; margin-top: 6px; page-break-inside: avoid !important;">
-                                                <img src="<%= color.imageUrl %>" alt="Colorway Image"
-                                        style="max-width: 80px; max-height: 80px; border: 1px solid #ccc; border-radius: 4px; object-fit: contain; page-break-inside: avoid !important;" />
+                                    <div class="colorway-card-image" style="page-break-inside: avoid !important;">
+                                      <img src="<%= color.imageUrl %>" alt="Colorway Image" />
                                     </div>
-                                                <% } %>
+                                  <% } %>
                                 </div>
-                                <% }); %>
+                              <% }); %>
                             </div>
                           </div>
                       </div>
@@ -1238,7 +1441,7 @@
                         <%# 5. CONSTRUCTION %>
                           <% if (howToMeasures && howToMeasures.length> 0) { %>
                             <% howToMeasures.forEach((item, index)=> { %>
-                              <div class="section construction-item" style="<%= index > 0 ? 'page-break-before: always;' : '' %> page-break-inside: avoid !important; page-break-after: avoid !important;">
+                              <div class="section construction-item" style="page-break-inside: avoid !important; page-break-after: auto !important;">
                                 <%# Tất cả các trang đều có header giống nhau %>
                                 <% renderSectionHeader('Construction Details'); %>
                                 
@@ -1246,18 +1449,17 @@
                                   <!-- Text Content Section - Bên trái -->
                                   <div class="construction-text" style="page-break-inside: avoid !important; page-break-after: avoid !important;">
                                     <h3 class="construction-item-title">
-                                      <%= item.stepNumber || (index + 1) %>. <%= item.pomName || item.pomCode || 'Construction Point' %>
+                                      <% 
+                                        const stepNo = item.stepNumber || (index + 1);
+                                        const rawNote = item.note && String(item.note).trim() && item.note !== '—' ? String(item.note).trim() : '';
+                                        // Ưu tiên hiển thị NOTE ở vị trí tiêu đề (thay cho "Construction Point")
+                                        const titleName = rawNote
+                                          ? rawNote
+                                          : ((item.pomName && item.pomName !== '—') ? item.pomName : '');
+                                      %>
+                                      <%= stepNo %><%= titleName ? '. ' + titleName : '' %>
                                     </h3>
-                                    <% if (item.pomCode) { %>
-                                      <p class="construction-code">
-                                        <strong>Code:</strong> <%= item.pomCode %>
-                                      </p>
-                                    <% } %>
-                                    <% if (item.description) { %>
-                                      <p class="construction-description">
-                                        <%= item.description %>
-                                      </p>
-                                    <% } %>
+                                    <%# Ẩn description và block NOTES theo yêu cầu (note đã được đưa lên tiêu đề) %>
                                     <% if (item.steps && item.steps.length > 0) { %>
                                       <div class="construction-section">
                                         <strong class="construction-label">Steps:</strong>
@@ -1321,7 +1523,21 @@
                                   </div>
                                   <% } %>
                                     <%# FOOTER %>
-                                      
+                                      <div class="pdf-footer">
+                                        <div class="pdf-footer__left">
+                                          Created by: <% 
+                                            const designerName = meta?.technicalDesignerId || meta?.designer || meta?.technicalDesigner;
+                                            const displayName = (designerName && String(designerName).trim() && designerName !== '—' && designerName !== '-') ? designerName : 'Technical Designer';
+                                          %>
+                                          <%= displayName %>
+                                        </div>
+                                        <div class="pdf-footer__center">
+                                          By: iBC connecting
+                                        </div>
+                                        <div class="pdf-footer__right">
+                                          Page <span class="pageNumber"></span> / <span class="totalPages"></span> 
+                                        </div>
+                                      </div>
                                       </div>
 </body>
 

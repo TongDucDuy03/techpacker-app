@@ -1,25 +1,49 @@
 <style>
   .pdf-footer {
     width: 100%;
-    max-width: 100%;
-    font-family: 'Roboto', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif;
-    font-size: 9pt;
-    color: #475569;
-    padding: 10px 0;
-    border-top: 1px solid #E0E0E0;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 8pt;
+    color: #1e293b;
+    padding: 2px 6mm;
+    border-top: 1px solid #333;
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
     align-items: center;
     box-sizing: border-box;
+    background: #fff;
+    box-shadow: none;
   }
-
-  .pdf-footer__info {
+  .pdf-footer__left, .pdf-footer__center, .pdf-footer__right { 
+    flex: 1;
+  }
+  .pdf-footer__left { 
+    text-align: left;
+    font-size: 8pt;
+  }
+  .pdf-footer__center { 
+    text-align: center;
+    font-weight: 600;
+    font-size: 8pt;
+    color: #0f172a;
+  }
+  .pdf-footer__right { 
     text-align: right;
-    font-size: 9pt;
+    font-size: 8pt;
   }
 </style>
+
 <div class="pdf-footer">
-  <div class="pdf-footer__info">
-    Page <span class="pageNumber"></span> / <span class="totalPages"></span>
+  <div class="pdf-footer__left">
+    Created by: <% 
+      const designerName = meta?.technicalDesignerId || meta?.designer || meta?.technicalDesigner;
+      const displayName = (designerName && String(designerName).trim() && designerName !== '—' && designerName !== '-') ? designerName : 'Technical Designer';
+    %>
+    <%= displayName %>
+  </div>
+  <div class="pdf-footer__center">
+    By: iBC connecting
+  </div>
+  <div class="pdf-footer__right">
+    Page <span class="pageNumber"></span> / <span class="totalPages"></span> — Confidential
   </div>
 </div>
