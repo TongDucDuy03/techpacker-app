@@ -1533,23 +1533,7 @@
                                       </div>
                                   </div>
                                   <% } %>
-                                    <%# FOOTER %>
-                                      <div class="pdf-footer">
-                                        <div class="pdf-footer__left">
-                                          Created by: <% 
-                                            const designerName = meta?.technicalDesignerId || meta?.designer || meta?.technicalDesigner;
-                                            const displayName = (designerName && String(designerName).trim() && designerName !== '—' && designerName !== '-') ? designerName : 'Technical Designer';
-                                          %>
-                                          <%= displayName %>
-                                        </div>
-                                        <div class="pdf-footer__center">
-                                          By: iBC connecting
-                                        </div>
-                                        <div class="pdf-footer__right">
-                                          Page <span class="pageNumber"></span> / <span class="totalPages"></span> 
-                                        </div>
-                                      </div>
-                                      </div>
+                                    
 </body>
 
 </html>
