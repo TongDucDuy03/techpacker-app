@@ -83,8 +83,10 @@ class PDFService {
 
     if (!this.browser) {
       try {
+        //this.browser = await puppeteer.launch({
         const launchOptions: any = {
           headless: 'new',
+          // executablePath: process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -1561,36 +1563,20 @@ class PDFService {
 
   /**
    * Get footer template for PDF
+   * Footer content is inlined here to avoid file loading issues across different machines
    */
   private async getFooterTemplate(data: any): Promise<string> {
-    try {
-      const footerPath = path.join(this.templateDir, 'partials', 'footer.ejs');
-      
-      let footerContent: string;
-      if (this.templateCache.has(footerPath)) {
-        footerContent = this.templateCache.get(footerPath)!;
-      } else {
-        footerContent = await fs.readFile(footerPath, 'utf-8');
-        this.templateCache.set(footerPath, footerContent);
-      }
-      
-      const renderedFooter = ejs.render(footerContent, { meta: data.meta || {} });
-      
-      if (!renderedFooter || renderedFooter.trim().length === 0) {
-        throw new Error('Footer template rendered empty');
-      }
-      
-      return renderedFooter;
-    } catch (error: any) {
-      console.error('❌ Error loading footer template:', error.message || error);
-      // Fallback footer với đầy đủ thông tin
-      const designerName = data?.meta?.technicalDesignerId || data?.meta?.designer || data?.meta?.technicalDesigner || 'Technical Designer';
-      return `<div style="font-size: 8pt; color: #1e293b; padding: 2px 6mm; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box; background: #fff;">
-        <div style="text-align: left; flex: 1; font-size: 8pt;">Created by: ${designerName}</div>
-        <div style="text-align: center; flex: 1; font-weight: 600; font-size: 8pt; color: #0f172a;">By: iBC connecting</div>
-        <div style="text-align: right; flex: 1; font-size: 8pt;">Page <span class="pageNumber"></span> / <span class="totalPages"></span> — Confidential</div>
-      </div>`;
-    }
+    // Inline footer template - no need to load from file
+    const designerName = data?.meta?.technicalDesignerId || data?.meta?.designer || data?.meta?.technicalDesigner;
+    const displayName = (designerName && String(designerName).trim() && designerName !== '—' && designerName !== '-') 
+      ? designerName 
+      : 'Technical Designer';
+    
+    return `<div style="width: 100%; font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color: #1e293b; padding: 2px 6mm; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; background: #fff;">
+      <div style="text-align: left; flex: 1; font-size: 8pt;">Created by: ${displayName}</div>
+      <div style="text-align: center; flex: 1; font-weight: 600; font-size: 8pt; color: #0f172a;">By: iBC connecting</div>
+      <div style="text-align: right; flex: 1; font-size: 8pt;">Page <span class="pageNumber"></span> / <span class="totalPages"></span></div>
+    </div>`;
   }
 
   /**
