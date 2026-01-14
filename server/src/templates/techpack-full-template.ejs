@@ -653,6 +653,7 @@
       margin: 8px 0;
       font-size: 14px;
       line-height: 1.4;
+      page-break-inside: avoid;
     }
 
     .notes strong {
@@ -660,6 +661,19 @@
       margin-bottom: 4px;
       font-weight: 600;
       font-size: 14px;
+    }
+
+    /* Giới hạn kích thước ảnh trong notes và packing để tránh bị cắt trang */
+    .notes img,
+    .pp .section-content img {
+      max-width: 100%;
+      max-height: 600px;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      page-break-inside: avoid;
+      display: block;
+      margin: 10px auto;
     }
 
     .size-badge {
@@ -1536,13 +1550,13 @@
         </div>
         <% } %>
         <% if (round.overallComments && round.overallComments !=='—' ) { %>
-        <div class="notes" style="margin-top: 5px">
+        <div class="notes" style="margin-top: 5px; page-break-inside: avoid;">
           <strong>OVERALL COMMENTS:</strong>
           <%- round.overallComments %>
         </div>
         <% } %>
         <% if (round.editorContent && round.editorContent.trim() !=='' ) { %>
-        <div class="notes" style="margin-top: 5px">
+        <div class="notes" style="margin-top: 5px; page-break-inside: avoid;">
           <strong>DETAILS:</strong>
           <%- round.editorContent %>
         </div>
@@ -1654,10 +1668,10 @@
 
     <%# 6. PACKING %>
     <% if (packingNotes && packingNotes !=='—' ) { %>
-    <div class="section">
+    <div class="section pp">
       <% renderSectionHeader('Labels - Packing'); %>
-      <div class="section-content">
-        <div style="background: #f8fafc; border: 1px solid #e1e7ee; border-radius: 6px; padding: 20px; font-size: 14px; line-height: 1.6;">
+      <div class="section-content" style="page-break-inside: avoid;">
+        <div style="background: #f8fafc; border: 1px solid #e1e7ee; border-radius: 6px; padding: 20px; font-size: 14px; line-height: 1.6; page-break-inside: avoid;">
           <%- packingNotes %>
         </div>
       </div>
