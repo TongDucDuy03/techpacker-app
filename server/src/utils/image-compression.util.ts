@@ -24,6 +24,55 @@ const DEFAULT_OPTIONS: Required<ImageCompressionOptions> = {
 };
 
 /**
+ * If an absolute URL contains an uploads path, strip host and keep the uploads path only.
+ * Example: https://cdn.example.com/uploads/foo.jpg -> /uploads/foo.jpg
+ */
+function stripToUploadsPathIfPossible(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const pathname = parsed.pathname || '';
+
+    const uploadsIdx = pathname.indexOf('/uploads/');
+    if (uploadsIdx >= 0) {
+      return pathname.substring(uploadsIdx);
+    }
+
+    const apiUploadsIdx = pathname.indexOf('/api/uploads/');
+    if (apiUploadsIdx >= 0) {
+      return pathname.substring(apiUploadsIdx);
+    }
+
+    return url;
+  } catch {
+    // Not an absolute URL
+    return url;
+  }
+}
+
+/**
+ * Normalize image URL into a consistent form the downloader can understand.
+ * - Trim spaces
+ * - Convert absolute URLs pointing to /uploads/ into relative /uploads/... paths for local read
+ * - Normalize /api/uploads/... -> /uploads/...
+ * - Normalize 'uploads/...' -> '/uploads/...'
+ */
+function normalizeImageUrl(url: string): string {
+  let normalized = url.trim();
+  if (!normalized) return normalized;
+
+  // If absolute URL that contains uploads path, strip to path for local read
+  normalized = stripToUploadsPathIfPossible(normalized);
+
+  if (normalized.startsWith('/api/uploads/')) {
+    normalized = normalized.replace('/api/uploads/', '/uploads/');
+  } else if (normalized.startsWith('uploads/')) {
+    normalized = '/uploads/' + normalized.substring('uploads/'.length);
+  }
+
+  return normalized;
+}
+
+/**
  * Download image from URL and return buffer
  * Priority: local filesystem > HTTP request (for /uploads/ paths)
  */
@@ -34,6 +83,9 @@ async function downloadImage(url: string): Promise<Buffer> {
       const base64Data = url.split(',')[1];
       return Buffer.from(base64Data, 'base64');
     }
+
+    // Normalize and clean up URL for further handling
+    url = normalizeImageUrl(url);
 
     // Handle absolute URLs (http/https) - always use HTTP
     if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -51,15 +103,12 @@ async function downloadImage(url: string): Promise<Buffer> {
       }
     }
 
-    // Handle /uploads/ and /api/uploads/ paths
+    // Handle /uploads/ paths (already normalized from /api/uploads/ or absolute URLs)
     // Priority 1: Try to read from local filesystem (for production stability)
     // Priority 2: Fallback to HTTP request (for cases where file might be on different server)
-    if (url.startsWith('/uploads/') || url.startsWith('/api/uploads/')) {
-      // Normalize path: remove /api prefix if present
-      const normalizedPath = url.startsWith('/api/uploads/') 
-        ? url.replace('/api/uploads/', '/uploads/') 
-        : url;
-      
+    if (url.startsWith('/uploads/')) {
+      const normalizedPath = url;
+
       // Determine upload directory
       const uploadPath = config.uploadPath || './uploads';
       const uploadDir = path.isAbsolute(uploadPath) 
@@ -83,7 +132,10 @@ async function downloadImage(url: string): Promise<Buffer> {
         
         // Fallback to HTTP request
         try {
-          const serverUrl = process.env.SERVER_URL || `http://localhost:${process.env.PORT || 4001}`;
+          const serverUrl =
+            process.env.INTERNAL_SERVER_URL ||
+            process.env.SERVER_URL ||
+            `http://localhost:${process.env.PORT || 4001}`;
           const fullUrl = `${serverUrl}${normalizedPath}`;
           console.log(`[downloadImage] Attempting HTTP fallback: ${fullUrl}`);
           const response = await axios.get(fullUrl, {

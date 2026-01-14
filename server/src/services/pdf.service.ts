@@ -866,6 +866,10 @@ class PDFService {
 
     // Compress main images (logo and cover) first with timeout protection
     console.log('🖼️  Compressing main images (logo, cover, design sketch)...');
+    console.log('   - companyLogoUrl:', (techpack as any).companyLogoUrl);
+    console.log('   - designSketchUrl:', (techpack as any).designSketchUrl);
+    console.log('   - coverImageUrl (raw):', (techpack as any).coverImageUrl);
+
     // ✅ FIX: compressedCover và compressedDesignSketch đều dùng designSketchUrl (cover = design sketch trong model này)
     // Nếu có coverImageUrl riêng thì dùng, không thì dùng designSketchUrl cho cả 2
     const coverImageUrl = (techpack as any).coverImageUrl || techpack.designSketchUrl;

@@ -335,7 +335,9 @@
       page-break-after: avoid !important;
       page-break-before: avoid !important;
       min-width: 0;
-      overflow: visible;
+      /* Giới hạn chiều cao khối ảnh để không tràn sang trang sau */
+      max-height: 520px;
+      overflow: hidden;
     }
 
     .construction-image {
@@ -680,7 +682,9 @@
       }
 
       .construction-image-wrapper {
-        overflow: visible !important;
+        /* Vẫn cho phép hiển thị đầy đủ trong trang, nhưng giới hạn chiều cao cho bản in */
+        max-height: 520px !important;
+        overflow: hidden !important;
       }
 
       /* Đảm bảo thead lặp lại trên mỗi trang khi table bị ngắt trang */
