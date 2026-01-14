@@ -1382,8 +1382,15 @@
               <td>
                 <%= entry.measured?.[baseSize] || '-' %>
               </td>
-              <td style="<%= parseFloat(entry.diff?.[baseSize] || 0) > 0 ? 'color: red; font-weight: bold;' : '' %>">
-                <%= entry.diff?.[baseSize] || '-' %>
+              <td
+                style="
+                  white-space: nowrap;
+                  word-break: normal;
+                  overflow-wrap: normal;
+                  <%= parseFloat(entry.diffDisplay?.[baseSize] || 0) > 0 ? 'color: red; font-weight: bold;' : '' %>
+                "
+              >
+                <%= entry.diffDisplay?.[baseSize] || '-' %>
               </td>
               <td>
                 <%= entry.revised?.[baseSize] || '-' %>

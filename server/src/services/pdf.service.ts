@@ -4,6 +4,7 @@ import ejs from 'ejs';
 import { ITechPack, IBOMItem, IMeasurement, ISampleMeasurementRound, IHowToMeasure, IColorway, IColorwayPart } from '../models/techpack.model';
 import fs from 'fs/promises';
 import { compressImageToDataURI, compressImagesBatch } from '../utils/image-compression.util';
+import { MeasurementUnit, parseMeasurementValue, formatMeasurementValueAsFraction, formatMeasurementValueNoRound } from '../utils/measurement-format.util';
 
 type TechPackForPDF = ITechPack | any;
 
@@ -543,6 +544,39 @@ class PDFService {
   }
 
   /**
+   * Format sample round diff value exactly like UI.
+   * Reuses the same logic as SampleMeasurementsTable (fraction units vs decimal units).
+   */
+  private formatDiffDisplay(rawValue: any, unit: MeasurementUnit): string {
+    if (rawValue === undefined || rawValue === null || rawValue === '') {
+      return '—';
+    }
+
+    const valueStr = String(rawValue);
+    const numValue = parseMeasurementValue(valueStr);
+    if (numValue === undefined || Number.isNaN(numValue)) {
+      // Fallback: return raw string if it cannot be parsed
+      return valueStr;
+    }
+
+    const isFractionUnit = unit === 'inch-16' || unit === 'inch-32';
+
+    if (isFractionUnit) {
+      // Format as fraction with explicit sign (same as UI)
+      let display = formatMeasurementValueAsFraction(Math.abs(numValue), unit);
+      if (numValue < 0) {
+        display = `-${display}`;
+      } else if (numValue > 0) {
+        display = `+${display}`;
+      }
+      return display;
+    }
+
+    // For cm/mm/inch-10: use the same no-rounding formatter as UI
+    return formatMeasurementValueNoRound(numValue, unit);
+  }
+
+  /**
    * Optimized sample rounds preparation
    */
   private prepareSampleRoundsOptimized(techpack: any): any[] {
@@ -584,6 +618,7 @@ class PDFService {
           requested: {},
           measured: {},
           diff: {},
+          diffDisplay: {},
           revised: {},
           comments: {},
         };
@@ -591,7 +626,13 @@ class PDFService {
         sizeRange.forEach((size: string) => {
           entryRow.requested[size] = this.formatMeasurementForUnit(entry.requested?.[size], unit);
           entryRow.measured[size] = this.formatMeasurementForUnit(entry.measured?.[size], unit);
-          entryRow.diff[size] = this.formatMeasurementForUnit(entry.diff?.[size], unit);
+          // Keep raw diff value (for potential numeric uses)
+          entryRow.diff[size] =
+            entry.diff?.[size] !== undefined && entry.diff?.[size] !== null
+              ? String(entry.diff?.[size])
+              : undefined;
+          // And pre-format a display string that matches UI exactly
+          entryRow.diffDisplay[size] = this.formatDiffDisplay(entry.diff?.[size], unit as MeasurementUnit);
           entryRow.revised[size] = this.formatMeasurementForUnit(entry.revised?.[size], unit);
           entryRow.comments[size] = entry.comments?.[size] || '—';
         });
