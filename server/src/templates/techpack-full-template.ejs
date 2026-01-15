@@ -666,7 +666,65 @@
       font-size: 14px;
     }
 
-    /* Ảnh content cần xử lý anti-waste (packing, construction, notes) */
+    /* PACKING layout - bắt chước Construction: 1 ảnh + 1 ghi chú cạnh nhau */
+    .packing-layout {
+      display: flex;
+      flex-direction: row;
+      gap: 20px;
+      align-items: stretch;
+      margin-bottom: 16px;
+      page-break-inside: avoid;
+    }
+
+    .packing-layout__image {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      max-width: 50%;
+      max-height: 100%;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+
+    .packing-layout__image img {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      padding: 8px;
+      background: #f9f9f9;
+      page-break-inside: avoid;
+      display: block;
+      margin: 0 auto;
+      box-sizing: border-box;
+    }
+
+    .packing-layout__note {
+      flex: 1;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #111827;
+      background: #ffffff;
+      border-radius: 6px;
+      padding: 12px 14px;
+      box-sizing: border-box;
+      max-height: 100%;
+      overflow: hidden;
+      border-left: 3px solid #2563eb; /* giống style note construction */
+    }
+
+    @media print {
+      .pp .packing-layout {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+    }
+
+    /* Ảnh content cần xử lý anti-waste (construction, notes) */
     .content-image {
       max-width: 100%;
       width: auto;
@@ -678,10 +736,10 @@
       /* Sẽ được scale động bởi JavaScript dựa trên remainingHeight */
     }
 
-    /* Giới hạn kích thước ảnh trong notes và packing để tránh bị cắt trang */
-    /* Sử dụng calc() để tính toán remainingHeight động */
-    .notes img,
-    .pp .section-content img {
+    /* Giới hạn kích thước ảnh trong notes để tránh bị cắt trang */
+    /* LƯU Ý: KHÔNG áp dụng rule này cho PACKING (.pp) nữa,
+       để phần Packing export đúng y như nội dung nhập (WYSIWYG) */
+    .notes img {
       max-width: 100%;
       /* Tính toán max-height dựa trên viewport height trừ header/footer/margins */
       /* A4 landscape: height=210mm ≈ 794px, margin=4mm+15mm=19mm ≈ 72px, header≈80px, footer≈20mm≈76px */
@@ -699,8 +757,7 @@
     
     /* Khi trang còn nhiều khoảng trống (>40%), scale ảnh để vừa */
     @media print {
-      .notes img,
-      .pp .section-content img {
+      .notes img {
         /* Trong print mode, sử dụng max-height động hơn */
         max-height: calc(100vh - 180px) !important;
         page-break-before: avoid !important;
@@ -1945,15 +2002,9 @@
        * Xử lý tất cả ảnh content
        */
       function processContentImages() {
-        // Tìm tất cả ảnh trong packing notes, construction, notes
-        // Bao gồm cả ảnh trong các div, p, figure chứa ảnh
-        // Sử dụng selector tổng quát để bắt tất cả ảnh trong section pp (packing)
+        // Tìm tất cả ảnh trong construction, notes, nhưng BỎ QUA phần Packing (.pp)
+        // vì Packing cần export đúng y như nội dung người dùng nhập (không auto-scale).
         const contentImages = document.querySelectorAll(
-          '.pp img, ' +
-          '.pp .section-content img, ' +
-          '.pp div img, ' +
-          '.pp p img, ' +
-          '.pp figure img, ' +
           '.notes img, ' +
           '.construction-image, ' +
           '.construction-image-wrapper img, ' +
@@ -2094,7 +2145,7 @@
       // Retry logic: nếu vẫn còn ảnh chưa được xử lý, retry
       setTimeout(function() {
         const unprocessedImages = document.querySelectorAll(
-          '.pp img, .notes img, .construction-image, .construction-image-wrapper img'
+          '.notes img, .construction-image, .construction-image-wrapper img'
         );
         let unprocessedCount = 0;
         unprocessedImages.forEach(function(img) {
