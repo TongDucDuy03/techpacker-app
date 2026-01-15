@@ -292,11 +292,11 @@
       page-break-inside: avoid !important;
     }
 
-    /* Colorways section - LUÔN bắt đầu ở trang mới, không được chia cắt */
+    /* Colorways section - LUÔN bắt đầu ở trang mới, không được chia cắt, và LUÔN kết thúc bằng ngắt trang */
     .section--colorways {
       page-break-before: always !important; /* Bắt buộc bắt đầu ở trang mới */
       page-break-inside: avoid !important; /* Không được chia cắt */
-      page-break-after: auto; /* Cho phép section sau bắt đầu ở trang mới nếu cần */
+      page-break-after: always !important; /* LUÔN kết thúc bằng ngắt trang để Construction bắt đầu ở trang mới */
       margin: 0;
       padding: 0;
     }
@@ -315,16 +315,11 @@
       flex-direction: column;
       page-break-inside: avoid !important;
       page-break-after: always !important; /* Luôn kết thúc trang sau mỗi item */
-      page-break-before: always !important; /* Luôn bắt đầu ở trang mới (trừ item đầu tiên sẽ override) */
+      page-break-before: always !important; /* LUÔN bắt đầu ở trang mới (kể cả item đầu tiên) */
       overflow: hidden; /* Ẩn phần tràn để tránh trang trống */
       min-height: calc(100vh - 20mm); /* Đảm bảo chiếm hết chiều cao trang trừ margin */
       height: calc(100vh - 20mm); /* Cố định chiều cao để vừa 1 trang */
       box-sizing: border-box;
-    }
-
-    /* Construction item đầu tiên không cần break-before */
-    .construction-item:first-of-type {
-      page-break-before: auto !important;
     }
 
     .construction-header {
@@ -367,20 +362,20 @@
       min-width: 0;
       max-height: 100%; /* Sử dụng 100% của construction-content */
       height: 100%; /* Chiếm hết chiều cao của construction-content */
-      overflow: hidden; /* Ẩn phần tràn */
+      overflow: hidden; /* Ẩn phần tràn - QUAN TRỌNG để ảnh không tràn sang trang khác */
       box-sizing: border-box;
     }
 
     .construction-image {
       max-width: 100%;
-      max-height: 100%;
+      max-height: 100%; /* Giới hạn chiều cao = 100% của wrapper */
       width: auto;
       height: auto;
       border: 2px solid #ddd;
       border-radius: 8px;
       padding: 10px;
       background: #f9f9f9;
-      object-fit: contain; /* Giữ đúng tỷ lệ, không crop */
+      object-fit: contain; /* Giữ đúng tỷ lệ, không crop - QUAN TRỌNG để ảnh không bị méo */
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       page-break-inside: avoid !important;
       display: block;
@@ -520,41 +515,48 @@
     .colorway-card {
       border: 1px solid #ddd;
       border-radius: 4px;
-      padding: 8px 10px;
+      padding: 12px 14px; /* Tăng padding để có thêm không gian */
       background: #fff;
       box-sizing: border-box;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 16px; /* Tăng gap giữa text và ảnh */
+      min-height: 200px; /* Đặt chiều cao tối thiểu để card cao hơn */
       page-break-inside: avoid !important; /* Không được chia cắt card */
     }
 
     .colorway-card-text {
       flex: 1;
       text-align: left;
+      display: flex;
+      flex-direction: column;
+      justify-content: center; /* Căn giữa theo chiều dọc */
     }
 
     .colorway-card-title {
       font-weight: 700;
       text-transform: uppercase;
-      font-size: 14px;
-      margin-bottom: 4px;
+      font-size: 16px; /* Tăng font-size */
+      margin-bottom: 6px; /* Tăng margin */
     }
 
     .colorway-card-code {
-      font-size: 13px;
-      margin-bottom: 6px;
+      font-size: 14px; /* Tăng font-size */
+      margin-bottom: 8px; /* Tăng margin */
     }
 
     .colorway-card-image {
       flex-shrink: 0;
       text-align: right;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .colorway-card-image img {
-      max-width: 140px;
-      max-height: 110px;
+      max-width: 180px; /* Tăng max-width */
+      max-height: 165px; /* Tăng từ 110px lên 165px (gấp rưỡi) */
       border: 1px solid #ccc;
       border-radius: 4px;
       object-fit: contain;
@@ -653,7 +655,8 @@
       margin: 8px 0;
       font-size: 14px;
       line-height: 1.4;
-      page-break-inside: avoid;
+      page-break-before: avoid; /* Không tách khỏi phần trước (bảng) */
+      page-break-inside: avoid; /* Không chia cắt nội dung notes */
     }
 
     .notes strong {
@@ -711,11 +714,11 @@
         break-before: auto;
       }
 
-      /* Colorways LUÔN bắt đầu ở trang mới, không được chia cắt */
+      /* Colorways LUÔN bắt đầu ở trang mới, không được chia cắt, và LUÔN kết thúc bằng ngắt trang */
       .section--colorways {
         break-before: page !important; /* Bắt buộc bắt đầu ở trang mới */
         break-inside: avoid !important; /* Không được chia cắt */
-        break-after: auto; /* Cho phép section sau bắt đầu ở trang mới nếu cần */
+        break-after: page !important; /* LUÔN kết thúc bằng ngắt trang để Construction bắt đầu ở trang mới */
       }
 
       .colorways-grid {
@@ -726,22 +729,17 @@
         break-inside: avoid !important; /* Không được chia cắt card */
       }
 
-      /* Construction item: mỗi item = 1 trang, không trang trống */
+      /* Construction item: mỗi item = 1 trang, không trang trống, LUÔN bắt đầu ở trang mới */
       .construction-item {
         break-inside: avoid !important;
         break-after: page !important; /* Luôn kết thúc trang sau mỗi item */
-        break-before: page !important; /* Luôn bắt đầu ở trang mới (trừ item đầu tiên) */
+        break-before: page !important; /* LUÔN bắt đầu ở trang mới (kể cả item đầu tiên) */
         min-height: calc(100vh - 20mm) !important; /* Chiếm hết chiều cao trang */
         height: calc(100vh - 20mm) !important; /* Cố định chiều cao */
         overflow: hidden !important; /* Ẩn phần tràn để tránh trang trống */
         display: flex !important;
         flex-direction: column !important;
         box-sizing: border-box !important;
-      }
-
-      /* Construction item đầu tiên không cần break-before */
-      .construction-item:first-of-type {
-        break-before: auto !important;
       }
 
       .construction-content {
@@ -754,27 +752,26 @@
       }
 
       .construction-image-wrapper {
-        max-height: 100% !important;
+        max-height: 100% !important; /* Giới hạn = 100% của construction-content */
         height: 100% !important;
-        overflow: hidden !important;
+        overflow: hidden !important; /* QUAN TRỌNG: Ẩn phần tràn để ảnh không nhảy sang trang khác */
+        break-inside: avoid !important;
+      }
+
+      .construction-image {
+        max-width: 100% !important;
+        max-height: 100% !important; /* Giới hạn = 100% của wrapper */
+        width: auto !important;
+        height: auto !important;
+        object-fit: contain !important; /* Giữ đúng tỷ lệ, không crop */
+        break-inside: avoid !important;
       }
 
       .construction-text {
-        max-height: 100% !important;
+        max-height: 100% !important; /* Giới hạn = 100% của construction-content */
         height: 100% !important;
-        overflow-y: auto !important; /* Cho phép scroll nếu cần */
-      }
-
-      .construction-text {
-        overflow: visible !important;
-        /* Tránh scroll container trong PDF */
-        max-height: none !important;
-      }
-
-      .construction-image-wrapper {
-        /* Vẫn cho phép hiển thị đầy đủ trong trang, nhưng giới hạn chiều cao cho bản in */
-        max-height: 520px !important;
-        overflow: hidden !important;
+        overflow-y: auto !important; /* Cho phép scroll nếu nội dung quá dài */
+        break-inside: avoid !important;
       }
 
       /* Đảm bảo thead lặp lại trên mỗi trang khi table bị ngắt trang */
@@ -792,6 +789,14 @@
 
       /* Đảm bảo header không bị ngắt trang */
       .page-header {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+      }
+
+      /* Đảm bảo notes (overallComments) không bị tách khỏi bảng */
+      .notes {
+        break-before: avoid !important;
+        page-break-before: avoid !important;
         break-inside: avoid !important;
         page-break-inside: avoid !important;
       }
@@ -1550,13 +1555,13 @@
         </div>
         <% } %>
         <% if (round.overallComments && round.overallComments !=='—' ) { %>
-        <div class="notes" style="margin-top: 5px; page-break-inside: avoid;">
+        <div class="notes" style="margin-top: 5px; page-break-before: avoid !important; page-break-inside: avoid;">
           <strong>OVERALL COMMENTS:</strong>
           <%- round.overallComments %>
         </div>
         <% } %>
         <% if (round.editorContent && round.editorContent.trim() !=='' ) { %>
-        <div class="notes" style="margin-top: 5px; page-break-inside: avoid;">
+        <div class="notes" style="margin-top: 5px; page-break-before: avoid !important; page-break-inside: avoid;">
           <strong>DETAILS:</strong>
           <%- round.editorContent %>
         </div>
@@ -1566,9 +1571,9 @@
     <% }); %>
     <% } %>
 
-    <%# 4. COLORWAYS - LUÔN bắt đầu ở trang mới, không được chia cắt %>
+    <%# 4. COLORWAYS - LUÔN bắt đầu ở trang mới, không được chia cắt, và LUÔN kết thúc bằng ngắt trang %>
     <% if (colorways && colorways.length> 0) { %>
-    <div class="section section--colorways" style="page-break-before: always !important; page-break-inside: avoid !important; page-break-after: auto !important;">
+    <div class="section section--colorways" style="page-break-before: always !important; page-break-inside: avoid !important; page-break-after: always !important;">
       <% renderSectionHeader('Colorways'); %>
       <div class="section-content" style="page-break-inside: avoid !important; page-break-after: avoid !important;">
         <div class="colorways-grid" style="page-break-inside: avoid !important; page-break-after: avoid !important;">
@@ -1594,11 +1599,11 @@
     </div>
     <% } %>
 
-    <%# 5. CONSTRUCTION - Mỗi ảnh = 1 trang, header lặp lại mỗi trang %>
+    <%# 5. CONSTRUCTION - Mỗi construction = 1 trang, header lặp lại mỗi trang, ảnh không được tràn %>
     <% if (howToMeasures && howToMeasures.length> 0) { %>
     <% howToMeasures.forEach((item, index)=> { %>
-    <%# Mỗi construction item bắt đầu ở trang mới (trừ item đầu tiên) %>
-    <div class="section construction-item" style="page-break-inside: avoid !important; page-break-after: always !important; <%= index > 0 ? 'page-break-before: always !important;' : 'page-break-before: auto !important;' %>">
+    <%# Mỗi construction item LUÔN bắt đầu ở trang mới (kể cả item đầu tiên) %>
+    <div class="section construction-item" style="page-break-before: always !important; page-break-inside: avoid !important; page-break-after: always !important;">
       <%# Header lặp lại trên MỖI TRANG - không được break với content %>
       <div style="page-break-inside: avoid !important; page-break-after: avoid !important; margin-bottom: 5px;">
         <% renderSectionHeader('Construction Details'); %>
@@ -1606,7 +1611,7 @@
 
       <div class="construction-content" style="page-break-inside: avoid !important; page-break-after: avoid !important; page-break-before: avoid !important;">
         <!-- Text Content Section - Bên trái -->
-        <div class="construction-text" style="page-break-inside: avoid !important; page-break-after: avoid !important;">
+        <div class="construction-text" style="page-break-inside: avoid !important; page-break-after: avoid !important; overflow-y: auto;">
           <h3 class="construction-item-title">
             <% 
                                         const stepNo = item.stepNumber || (index + 1);
@@ -1653,8 +1658,8 @@
 
         <!-- Image Section - Bên phải -->
         <% if (item.imageUrl) { %>
-        <div class="construction-image-wrapper" style="page-break-inside: avoid !important; page-break-after: avoid !important; page-break-before: avoid !important;">
-          <img src="<%= item.imageUrl %>" alt="<%= item.pomName || 'Construction' %>" class="construction-image" style="page-break-inside: avoid !important;" />
+        <div class="construction-image-wrapper" style="page-break-inside: avoid !important; page-break-after: avoid !important; page-break-before: avoid !important; max-height: 100%; overflow: hidden;">
+          <img src="<%= item.imageUrl %>" alt="<%= item.pomName || 'Construction' %>" class="construction-image" style="page-break-inside: avoid !important; max-height: 100%; width: auto; height: auto; object-fit: contain;" />
         </div>
         <% } else { %>
         <div class="construction-image-wrapper" style="background: #f9f9f9; border: 2px dashed #ddd; border-radius: 8px; display: flex; align-items: center; justify-content: center; page-break-inside: avoid !important; page-break-after: avoid !important;">
