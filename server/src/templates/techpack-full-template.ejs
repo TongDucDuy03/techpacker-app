@@ -666,17 +666,45 @@
       font-size: 14px;
     }
 
-    /* Giới hạn kích thước ảnh trong notes và packing để tránh bị cắt trang */
-    .notes img,
-    .pp .section-content img {
+    /* Ảnh content cần xử lý anti-waste (packing, construction, notes) */
+    .content-image {
       max-width: 100%;
-      max-height: 600px;
       width: auto;
       height: auto;
       object-fit: contain;
       page-break-inside: avoid;
       display: block;
       margin: 10px auto;
+      /* Sẽ được scale động bởi JavaScript dựa trên remainingHeight */
+    }
+
+    /* Giới hạn kích thước ảnh trong notes và packing để tránh bị cắt trang */
+    /* Sử dụng calc() để tính toán remainingHeight động */
+    .notes img,
+    .pp .section-content img {
+      max-width: 100%;
+      /* Tính toán max-height dựa trên viewport height trừ header/footer/margins */
+      /* A4 landscape: height=210mm ≈ 794px, margin=4mm+15mm=19mm ≈ 72px, header≈80px, footer≈20mm≈76px */
+      /* Usable height ≈ 794 - 72 - 80 - 76 = 566px */
+      /* Nhưng cần tính remainingHeight động, nên dùng calc(100vh - X) */
+      max-height: calc(100vh - 200px); /* Ước tính, sẽ được điều chỉnh bởi JavaScript */
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      page-break-inside: avoid;
+      page-break-before: avoid; /* Ưu tiên không tách khỏi content trước */
+      display: block;
+      margin: 10px auto;
+    }
+    
+    /* Khi trang còn nhiều khoảng trống (>40%), scale ảnh để vừa */
+    @media print {
+      .notes img,
+      .pp .section-content img {
+        /* Trong print mode, sử dụng max-height động hơn */
+        max-height: calc(100vh - 180px) !important;
+        page-break-before: avoid !important;
+      }
     }
 
     .size-badge {
@@ -1699,6 +1727,229 @@
       Page <span class="page-number">-</span> / <span class="total-pages">-</span>
     </div>
   </div>
+
+  <!-- Script để xử lý anti-waste: scale ảnh khi trang còn trống >40% -->
+  <script>
+    (function() {
+      'use strict';
+      
+      // Thông số
+      const WASTE_THRESHOLD = 0.4; // 40%
+      const MIN_SCALE = 0.25; // Tối thiểu 25% kích thước gốc
+      const HEADER_HEIGHT = 80; // ~80px cho header
+      const FOOTER_HEIGHT = 20; // ~20mm cho footer
+      const PAGE_MARGIN_TOP = 4; // 4mm
+      const PAGE_MARGIN_BOTTOM = 15; // 15mm
+      
+      // Tính chiều cao khả dụng của trang (A4 landscape: 210mm x 297mm)
+      // Landscape: width=297mm, height=210mm
+      // 1mm ≈ 3.7795px ở 96dpi
+      const PAGE_HEIGHT_MM = 210;
+      const MM_TO_PX = 3.7795;
+      const PAGE_HEIGHT_PX = PAGE_HEIGHT_MM * MM_TO_PX; // ~794px
+      const PAGE_USABLE_HEIGHT = PAGE_HEIGHT_PX - (PAGE_MARGIN_TOP + PAGE_MARGIN_BOTTOM) * MM_TO_PX - HEADER_HEIGHT - FOOTER_HEIGHT * MM_TO_PX;
+      
+      /**
+       * Tính remainingHeight tại vị trí của element
+       * Sử dụng offsetTop để tính toán chính xác hơn
+       */
+      function getRemainingHeight(element) {
+        // Tính offsetTop từ đầu document
+        let offsetTop = 0;
+        let currentElement = element;
+        while (currentElement) {
+          offsetTop += currentElement.offsetTop;
+          currentElement = currentElement.offsetParent;
+        }
+        
+        // Tính vị trí trong trang hiện tại (giả sử mỗi trang có chiều cao PAGE_HEIGHT_PX)
+        const positionInPage = offsetTop % PAGE_HEIGHT_PX;
+        
+        // Tính phần đã sử dụng (header + margin + content trước đó)
+        const usedHeight = positionInPage - (PAGE_MARGIN_TOP * MM_TO_PX) - HEADER_HEIGHT;
+        
+        // RemainingHeight = usableHeight - usedHeight - một chút padding
+        const remainingHeight = PAGE_USABLE_HEIGHT - usedHeight - 20; // Trừ thêm 20px cho padding
+        
+        return Math.max(100, remainingHeight); // Tối thiểu 100px để tránh scale quá nhỏ
+      }
+      
+      /**
+       * Tính wasteRatio
+       */
+      function getWasteRatio(remainingHeight) {
+        return remainingHeight / PAGE_USABLE_HEIGHT;
+      }
+      
+      /**
+       * Scale ảnh để vừa remainingHeight
+       */
+      function scaleImageToFit(img, remainingHeight, minScale) {
+        if (!img.complete || !img.naturalWidth || !img.naturalHeight) {
+          // Ảnh chưa load, đợi load xong
+          img.addEventListener('load', function() {
+            scaleImageToFit(img, remainingHeight, minScale);
+          });
+          return;
+        }
+        
+        const container = img.parentElement;
+        const containerWidth = container ? container.clientWidth : img.parentElement.clientWidth || 800;
+        const maxRenderWidth = containerWidth * 0.95; // 95% của container width
+        
+        // Tính chiều cao ảnh ở maxRenderWidth
+        const aspectRatio = img.naturalWidth / img.naturalHeight;
+        const imgHeightAtMaxWidth = maxRenderWidth / aspectRatio;
+        
+        // Case 1: Ảnh fit bình thường
+        if (imgHeightAtMaxWidth <= remainingHeight) {
+          img.style.maxWidth = maxRenderWidth + 'px';
+          img.style.maxHeight = 'none';
+          img.style.width = 'auto';
+          img.style.height = 'auto';
+          return;
+        }
+        
+        // Case 2: Ảnh không fit - tính scale
+        const scaleToFit = remainingHeight / imgHeightAtMaxWidth;
+        
+        // Rule A: Anti-waste - wasteRatio > 0.4
+        const wasteRatio = getWasteRatio(remainingHeight);
+        
+        if (wasteRatio > WASTE_THRESHOLD) {
+          // BẮT BUỘC scale để vừa trang hiện tại
+          if (scaleToFit >= minScale) {
+            const renderWidth = maxRenderWidth * scaleToFit;
+            const renderHeight = remainingHeight;
+            
+            img.style.maxWidth = renderWidth + 'px';
+            img.style.maxHeight = renderHeight + 'px';
+            img.style.width = 'auto';
+            img.style.height = 'auto';
+            img.style.objectFit = 'contain';
+            img.style.pageBreakBefore = 'avoid';
+            img.style.pageBreakInside = 'avoid';
+            
+            console.log('[Anti-waste] Scaled image:', {
+              original: img.naturalWidth + 'x' + img.naturalHeight,
+              scaled: renderWidth.toFixed(0) + 'x' + renderHeight.toFixed(0),
+              scaleRatio: scaleToFit.toFixed(2),
+              wasteRatio: wasteRatio.toFixed(2)
+            });
+          } else {
+            // Scale quá nhỏ, thử giảm maxRenderWidth
+            const adjustedMaxWidth = maxRenderWidth * 0.7; // Giảm 30%
+            const adjustedHeight = adjustedMaxWidth / aspectRatio;
+            
+            if (adjustedHeight <= remainingHeight && adjustedMaxWidth / img.naturalWidth >= minScale) {
+              img.style.maxWidth = adjustedMaxWidth + 'px';
+              img.style.maxHeight = remainingHeight + 'px';
+              img.style.width = 'auto';
+              img.style.height = 'auto';
+              img.style.objectFit = 'contain';
+            } else {
+              // Vẫn không đạt, cho phép page-break nhưng scale nhẹ
+              img.style.maxWidth = maxRenderWidth * 0.8 + 'px';
+              img.style.maxHeight = 'none';
+            }
+          }
+        } else {
+          // Rule B: wasteRatio <= 0.4, cho phép page-break
+          img.style.maxWidth = maxRenderWidth + 'px';
+          img.style.maxHeight = 'none';
+          img.style.pageBreakBefore = 'auto';
+        }
+      }
+      
+      /**
+       * Xử lý tất cả ảnh content
+       */
+      function processContentImages() {
+        // Tìm tất cả ảnh trong packing notes, construction, notes
+        const contentImages = document.querySelectorAll(
+          '.pp .section-content img, ' +
+          '.notes img, ' +
+          '.construction-image, ' +
+          '.construction-image-wrapper img'
+        );
+        
+        console.log('[Anti-waste] Found', contentImages.length, 'content images to process');
+        
+        contentImages.forEach(function(img, index) {
+          // Đợi ảnh load xong
+          if (img.complete && img.naturalWidth > 0) {
+            const remainingHeight = getRemainingHeight(img);
+            const wasteRatio = getWasteRatio(remainingHeight);
+            console.log('[Anti-waste] Image', index + 1, '- remainingHeight:', remainingHeight.toFixed(0), 'px, wasteRatio:', wasteRatio.toFixed(2));
+            scaleImageToFit(img, remainingHeight, MIN_SCALE);
+          } else {
+            // Đợi ảnh load
+            const loadHandler = function() {
+              const remainingHeight = getRemainingHeight(img);
+              const wasteRatio = getWasteRatio(remainingHeight);
+              console.log('[Anti-waste] Image', index + 1, '(loaded) - remainingHeight:', remainingHeight.toFixed(0), 'px, wasteRatio:', wasteRatio.toFixed(2));
+              scaleImageToFit(img, remainingHeight, MIN_SCALE);
+              img.removeEventListener('load', loadHandler);
+            };
+            img.addEventListener('load', loadHandler);
+            
+            // Fallback: nếu ảnh không load được sau 2s, xử lý với kích thước mặc định
+            setTimeout(function() {
+              if (!img.complete) {
+                console.warn('[Anti-waste] Image', index + 1, 'not loaded after 2s, using default size');
+                img.style.maxHeight = '600px';
+              }
+            }, 2000);
+          }
+        });
+      }
+      
+      // Chạy khi DOM ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+          setTimeout(processContentImages, 100);
+        });
+      } else {
+        setTimeout(processContentImages, 100);
+      }
+      
+      // Chạy lại sau khi tất cả ảnh load xong (quan trọng cho Puppeteer)
+      window.addEventListener('load', function() {
+        setTimeout(processContentImages, 300);
+      });
+      
+      // Chạy lại sau một khoảng thời gian để đảm bảo layout đã ổn định
+      setTimeout(processContentImages, 500);
+      setTimeout(processContentImages, 1000);
+      
+      // Sử dụng MutationObserver để xử lý ảnh được thêm động
+      const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+          mutation.addedNodes.forEach(function(node) {
+            if (node.nodeType === 1) { // Element node
+              if (node.tagName === 'IMG') {
+                const remainingHeight = getRemainingHeight(node);
+                scaleImageToFit(node, remainingHeight, MIN_SCALE);
+              } else {
+                const images = node.querySelectorAll && node.querySelectorAll('img');
+                if (images) {
+                  images.forEach(function(img) {
+                    const remainingHeight = getRemainingHeight(img);
+                    scaleImageToFit(img, remainingHeight, MIN_SCALE);
+                  });
+                }
+              }
+            }
+          });
+        });
+      });
+      
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+    })();
+  </script>
 
 </body>
 
