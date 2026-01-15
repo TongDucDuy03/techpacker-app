@@ -1409,6 +1409,35 @@ class PDFService {
       
       console.log(`✅ Images processed in ${Date.now() - imageStart}ms`);
 
+      // Run anti-waste script to scale images and prevent page breaks
+      try {
+        console.log('🔧 Running anti-waste script to optimize image placement...');
+        await page.evaluate(() => {
+          const win = window as any;
+          if (typeof win.processAntiWasteImages === 'function') {
+            console.log('[Anti-waste] Called from Puppeteer');
+            win.processAntiWasteImages();
+          } else {
+            console.warn('[Anti-waste] processAntiWasteImages function not found');
+          }
+        });
+        
+        // Wait a bit for the script to process images
+        await page.waitForTimeout(500);
+        
+        // Run again to ensure all images are processed
+        await page.evaluate(() => {
+          const win = window as any;
+          if (typeof win.processAntiWasteImages === 'function') {
+            win.processAntiWasteImages();
+          }
+        });
+        
+        console.log('✅ Anti-waste script executed');
+      } catch (error: any) {
+        console.warn('Anti-waste script execution failed (continuing):', error.message || error);
+      }
+
       // Generate PDF
       console.log('📄 Generating PDF...');
       const pdfStart = Date.now();
