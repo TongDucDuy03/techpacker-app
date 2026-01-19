@@ -9,12 +9,11 @@
   <style>
     @page {
       size: A4 landscape;
-      margin: 4mm 5mm 15mm 5mm;
-      /* Margin bottom 15mm để có chỗ cho footer, không quá lớn */
+      margin: 4mm 5mm 15mm 5mm; /* Margin bottom 15mm để có chỗ cho footer, không quá lớn */
       counter-increment: page;
     }
 
-    @page: first {
+    @page:first {
       counter-reset: page 1;
     }
 
@@ -34,8 +33,7 @@
       background: white;
       margin: 0;
       padding: 0;
-      margin-bottom: 0;
-      /* Không cần margin-bottom vì @page đã có margin */
+      margin-bottom: 0; /* Không cần margin-bottom vì @page đã có margin */
       /* Ensure colors print correctly in PDF */
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -246,14 +244,12 @@
     .image-box--sketch {
       page-break-inside: avoid;
       overflow: hidden;
-      max-height: calc(100vh - 400px);
-      /* Tự động điều chỉnh theo chiều cao trang */
+      max-height: calc(100vh - 400px); /* Tự động điều chỉnh theo chiều cao trang */
       margin-bottom: 2px;
     }
 
     .image-box--sketch img {
-      max-height: calc(100vh - 420px);
-      /* Đảm bảo ảnh không tràn */
+      max-height: calc(100vh - 420px); /* Đảm bảo ảnh không tràn */
       max-width: 100%;
       width: auto;
       height: auto;
@@ -284,16 +280,12 @@
       page-break-after: avoid !important;
       margin-top: 0;
       padding-top: 0;
-      margin-bottom: 0;
-      /* Giảm margin để tiết kiệm không gian */
-      padding-bottom: 0;
-      /* Giảm padding để tiết kiệm không gian */
-      max-height: calc(100vh - 20mm);
-      /* Đảm bảo không vượt quá chiều cao trang trừ margin */
-      overflow: hidden;
-      /* Ẩn phần tràn nếu quá dài */
+      margin-bottom: 0; /* Giảm margin để tiết kiệm không gian */
+      padding-bottom: 0; /* Giảm padding để tiết kiệm không gian */
+      max-height: calc(100vh - 20mm); /* Đảm bảo không vượt quá chiều cao trang trừ margin */
+      overflow: hidden; /* Ẩn phần tràn nếu quá dài */
     }
-
+    
     .section:first-child .page-header,
     .section:first-child .section-content,
     .section:first-child .info-grid {
@@ -302,12 +294,9 @@
 
     /* Colorways section - LUÔN bắt đầu ở trang mới, không được chia cắt, và LUÔN kết thúc bằng ngắt trang */
     .section--colorways {
-      page-break-before: always !important;
-      /* Bắt buộc bắt đầu ở trang mới */
-      page-break-inside: avoid !important;
-      /* Không được chia cắt */
-      page-break-after: always !important;
-      /* LUÔN kết thúc bằng ngắt trang để Construction bắt đầu ở trang mới */
+      page-break-before: always !important; /* Bắt buộc bắt đầu ở trang mới */
+      page-break-inside: avoid !important; /* Không được chia cắt */
+      page-break-after: always !important; /* LUÔN kết thúc bằng ngắt trang để Construction bắt đầu ở trang mới */
       margin: 0;
       padding: 0;
     }
@@ -325,16 +314,11 @@
       display: flex;
       flex-direction: column;
       page-break-inside: avoid !important;
-      page-break-after: always !important;
-      /* Luôn kết thúc trang sau mỗi item */
-      page-break-before: always !important;
-      /* LUÔN bắt đầu ở trang mới (kể cả item đầu tiên) */
-      overflow: hidden;
-      /* Ẩn phần tràn để tránh trang trống */
-      min-height: calc(100vh - 20mm);
-      /* Đảm bảo chiếm hết chiều cao trang trừ margin */
-      height: calc(100vh - 20mm);
-      /* Cố định chiều cao để vừa 1 trang */
+      page-break-after: always !important; /* Luôn kết thúc trang sau mỗi item */
+      page-break-before: always !important; /* LUÔN bắt đầu ở trang mới (kể cả item đầu tiên) */
+      overflow: hidden; /* Ẩn phần tràn để tránh trang trống */
+      min-height: calc(100vh - 20mm); /* Đảm bảo chiếm hết chiều cao trang trừ margin */
+      height: calc(100vh - 20mm); /* Cố định chiều cao để vừa 1 trang */
       box-sizing: border-box;
     }
 
@@ -354,53 +338,63 @@
 
     .construction-content {
       display: flex;
-      flex-direction: column;
+      flex-direction: row;
       flex: 1;
-      gap: 15px;
+      gap: 20px;
       page-break-inside: avoid !important;
       page-break-after: avoid !important;
       page-break-before: avoid !important;
       min-height: 0;
+      max-height: calc(100vh - 180px); /* Trừ header (~80px) và footer (~20mm) */
+      height: calc(100vh - 180px); /* Cố định chiều cao để vừa trong 1 trang */
+      overflow: hidden; /* Ẩn phần tràn để tránh trang trống */
       box-sizing: border-box;
     }
 
     .construction-image-wrapper {
+      flex: 1;
       display: flex;
       align-items: center;
       justify-content: center;
       page-break-inside: avoid !important;
       page-break-after: avoid !important;
       page-break-before: avoid !important;
-      width: 100%;
-      min-height: 400px;
-      max-height: 600px;
-      overflow: hidden;
+      min-width: 0;
+      max-height: 100%; /* Sử dụng 100% của construction-content */
+      height: 100%; /* Chiếm hết chiều cao của construction-content */
+      overflow: hidden; /* Ẩn phần tràn - QUAN TRỌNG để ảnh không tràn sang trang khác */
       box-sizing: border-box;
     }
 
     .construction-image {
-      max-width: 100% !important;
-      max-height: 600px !important;
-      width: auto !important;
-      height: auto !important;
+      max-width: 100%;
+      max-height: 100%; /* Giới hạn chiều cao = 100% của wrapper */
+      width: auto;
+      height: auto;
       border: 2px solid #ddd;
       border-radius: 8px;
       padding: 10px;
       background: #f9f9f9;
-      object-fit: contain !important;
+      object-fit: contain; /* Giữ đúng tỷ lệ, không crop - QUAN TRỌNG để ảnh không bị méo */
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       page-break-inside: avoid !important;
-      display: block !important;
-      margin: 0 auto !important;
+      display: block;
+      margin: 0 auto;
     }
 
     .construction-text {
+      flex: 1;
       padding: 15px;
       background: #fff;
       page-break-inside: avoid !important;
       page-break-after: avoid !important;
       page-break-before: avoid !important;
+      overflow: hidden; /* Ẩn phần tràn để tránh trang trống */
+      min-width: 0;
+      max-height: 100%; /* Giới hạn theo chiều cao của construction-content */
+      height: 100%; /* Chiếm hết chiều cao của construction-content */
       box-sizing: border-box;
+      overflow-y: auto; /* Cho phép scroll nếu nội dung quá dài */
     }
 
     .construction-item-title {
@@ -514,27 +508,22 @@
       gap: 12px;
       margin: 0;
       margin-bottom: 8px;
-      page-break-inside: avoid !important;
-      /* Không được chia cắt grid */
+      page-break-inside: avoid !important; /* Không được chia cắt grid */
       page-break-after: avoid !important;
     }
 
     .colorway-card {
       border: 1px solid #ddd;
       border-radius: 4px;
-      padding: 12px 14px;
-      /* Tăng padding để có thêm không gian */
+      padding: 12px 14px; /* Tăng padding để có thêm không gian */
       background: #fff;
       box-sizing: border-box;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
-      /* Tăng gap giữa text và ảnh */
-      min-height: 200px;
-      /* Đặt chiều cao tối thiểu để card cao hơn */
-      page-break-inside: avoid !important;
-      /* Không được chia cắt card */
+      gap: 16px; /* Tăng gap giữa text và ảnh */
+      min-height: 200px; /* Đặt chiều cao tối thiểu để card cao hơn */
+      page-break-inside: avoid !important; /* Không được chia cắt card */
     }
 
     .colorway-card-text {
@@ -542,24 +531,19 @@
       text-align: left;
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      /* Căn giữa theo chiều dọc */
+      justify-content: center; /* Căn giữa theo chiều dọc */
     }
 
     .colorway-card-title {
       font-weight: 700;
       text-transform: uppercase;
-      font-size: 16px;
-      /* Tăng font-size */
-      margin-bottom: 6px;
-      /* Tăng margin */
+      font-size: 16px; /* Tăng font-size */
+      margin-bottom: 6px; /* Tăng margin */
     }
 
     .colorway-card-code {
-      font-size: 14px;
-      /* Tăng font-size */
-      margin-bottom: 8px;
-      /* Tăng margin */
+      font-size: 14px; /* Tăng font-size */
+      margin-bottom: 8px; /* Tăng margin */
     }
 
     .colorway-card-image {
@@ -571,10 +555,8 @@
     }
 
     .colorway-card-image img {
-      max-width: 180px;
-      /* Tăng max-width */
-      max-height: 165px;
-      /* Tăng từ 110px lên 165px (gấp rưỡi) */
+      max-width: 180px; /* Tăng max-width */
+      max-height: 165px; /* Tăng từ 110px lên 165px (gấp rưỡi) */
       border: 1px solid #ccc;
       border-radius: 4px;
       object-fit: contain;
@@ -673,10 +655,8 @@
       margin: 8px 0;
       font-size: 14px;
       line-height: 1.4;
-      page-break-before: avoid;
-      /* Không tách khỏi phần trước (bảng) */
-      page-break-inside: avoid;
-      /* Không chia cắt nội dung notes */
+      page-break-before: avoid; /* Không tách khỏi phần trước (bảng) */
+      page-break-inside: avoid; /* Không chia cắt nội dung notes */
     }
 
     .notes strong {
@@ -723,38 +703,6 @@
       box-sizing: border-box;
     }
 
-    /* CSS đặc biệt cho ảnh trong phần Packing - đảm bảo luôn fit trong 1 trang A4 */
-    .pp .section-content img {
-      max-width: 100% !important;
-      max-height: 700px !important;
-      /* A4 landscape usable height ~ 700-750px */
-      width: auto !important;
-      height: auto !important;
-      object-fit: contain !important;
-      display: block !important;
-      margin: 0 auto 15px auto !important;
-      page-break-before: auto;
-      page-break-after: auto;
-      page-break-inside: avoid !important;
-      order: -1; /* Đưa ảnh lên trước text */
-    }
-
-    /* Nếu ảnh nằm trong container có background/border */
-    .pp .section-content>div {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .pp .section-content>div img {
-      max-width: 100% !important;
-      max-height: 700px !important;
-      width: auto !important;
-      height: auto !important;
-      object-fit: contain !important;
-      order: -1; /* Đưa ảnh lên trước text */
-      margin-bottom: 15px !important;
-    }
-
     .packing-layout__note {
       flex: 1;
       font-size: 14px;
@@ -766,8 +714,7 @@
       box-sizing: border-box;
       max-height: 100%;
       overflow: hidden;
-      border-left: 3px solid #2563eb;
-      /* giống style note construction */
+      border-left: 3px solid #2563eb; /* giống style note construction */
     }
 
     @media print {
@@ -798,18 +745,16 @@
       /* A4 landscape: height=210mm ≈ 794px, margin=4mm+15mm=19mm ≈ 72px, header≈80px, footer≈20mm≈76px */
       /* Usable height ≈ 794 - 72 - 80 - 76 = 566px */
       /* Nhưng cần tính remainingHeight động, nên dùng calc(100vh - X) */
-      max-height: calc(100vh - 200px);
-      /* Ước tính, sẽ được điều chỉnh bởi JavaScript */
+      max-height: calc(100vh - 200px); /* Ước tính, sẽ được điều chỉnh bởi JavaScript */
       width: auto;
       height: auto;
       object-fit: contain;
       page-break-inside: avoid;
-      page-break-before: avoid;
-      /* Ưu tiên không tách khỏi content trước */
+      page-break-before: avoid; /* Ưu tiên không tách khỏi content trước */
       display: block;
       margin: 10px auto;
     }
-
+    
     /* Khi trang còn nhiều khoảng trống (>40%), scale ảnh để vừa */
     @media print {
       .notes img {
@@ -856,68 +801,61 @@
 
       /* Colorways LUÔN bắt đầu ở trang mới, không được chia cắt, và LUÔN kết thúc bằng ngắt trang */
       .section--colorways {
-        break-before: page !important;
-        /* Bắt buộc bắt đầu ở trang mới */
-        break-inside: avoid !important;
-        /* Không được chia cắt */
-        break-after: page !important;
-        /* LUÔN kết thúc bằng ngắt trang để Construction bắt đầu ở trang mới */
+        break-before: page !important; /* Bắt buộc bắt đầu ở trang mới */
+        break-inside: avoid !important; /* Không được chia cắt */
+        break-after: page !important; /* LUÔN kết thúc bằng ngắt trang để Construction bắt đầu ở trang mới */
       }
 
       .colorways-grid {
-        break-inside: avoid !important;
-        /* Không được chia cắt grid */
+        break-inside: avoid !important; /* Không được chia cắt grid */
       }
 
       .colorway-card {
-        break-inside: avoid !important;
-        /* Không được chia cắt card */
+        break-inside: avoid !important; /* Không được chia cắt card */
       }
 
       /* Construction item: mỗi item = 1 trang, không trang trống, LUÔN bắt đầu ở trang mới */
       .construction-item {
         break-inside: avoid !important;
-        break-after: page !important;
-        /* Luôn kết thúc trang sau mỗi item */
-        break-before: page !important;
-        /* LUÔN bắt đầu ở trang mới (kể cả item đầu tiên) */
-        min-height: calc(100vh - 20mm) !important;
-        /* Chiếm hết chiều cao trang */
-        height: calc(100vh - 20mm) !important;
-        /* Cố định chiều cao */
-        overflow: hidden !important;
-        /* Ẩn phần tràn để tránh trang trống */
+        break-after: page !important; /* Luôn kết thúc trang sau mỗi item */
+        break-before: page !important; /* LUÔN bắt đầu ở trang mới (kể cả item đầu tiên) */
+        min-height: calc(100vh - 20mm) !important; /* Chiếm hết chiều cao trang */
+        height: calc(100vh - 20mm) !important; /* Cố định chiều cao */
+        overflow: hidden !important; /* Ẩn phần tràn để tránh trang trống */
         display: flex !important;
         flex-direction: column !important;
         box-sizing: border-box !important;
       }
 
       .construction-content {
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 15px !important;
+        min-height: 0 !important;
+        max-height: calc(100vh - 180px) !important; /* Trừ header và footer */
+        height: calc(100vh - 180px) !important; /* Cố định chiều cao */
+        overflow: hidden !important; /* Ẩn phần tràn */
         break-inside: avoid !important;
         box-sizing: border-box !important;
       }
 
       .construction-image-wrapper {
-        width: 100% !important;
-        min-height: 400px !important;
-        max-height: 600px !important;
-        overflow: hidden !important;
+        max-height: 100% !important; /* Giới hạn = 100% của construction-content */
+        height: 100% !important;
+        overflow: hidden !important; /* QUAN TRỌNG: Ẩn phần tràn để ảnh không nhảy sang trang khác */
         break-inside: avoid !important;
       }
 
       .construction-image {
         max-width: 100% !important;
-        max-height: 600px !important;
+        max-height: 100% !important; /* Giới hạn = 100% của wrapper */
         width: auto !important;
         height: auto !important;
-        object-fit: contain !important;
+        object-fit: contain !important; /* Giữ đúng tỷ lệ, không crop */
         break-inside: avoid !important;
       }
 
       .construction-text {
+        max-height: 100% !important; /* Giới hạn = 100% của construction-content */
+        height: 100% !important;
+        overflow-y: auto !important; /* Cho phép scroll nếu nội dung quá dài */
         break-inside: avoid !important;
       }
 
@@ -1757,18 +1695,7 @@
       </div>
 
       <div class="construction-content" style="page-break-inside: avoid !important; page-break-after: avoid !important; page-break-before: avoid !important;">
-        <!-- Image Section - Hiển thị trước -->
-        <% if (item.imageUrl) { %>
-        <div class="construction-image-wrapper" style="page-break-inside: avoid !important; page-break-after: avoid !important; page-break-before: avoid !important; max-height: 100%; overflow: hidden;">
-          <img src="<%= item.imageUrl %>" alt="<%= item.pomName || 'Construction' %>" class="construction-image" style="page-break-inside: avoid !important; max-height: 100%; width: auto; height: auto; object-fit: contain;" />
-        </div>
-        <% } else { %>
-        <div class="construction-image-wrapper" style="background: #f9f9f9; border: 2px dashed #ddd; border-radius: 8px; display: flex; align-items: center; justify-content: center; page-break-inside: avoid !important; page-break-after: avoid !important;">
-          <span style="color: #999; font-size: 14px;">No Image</span>
-        </div>
-        <% } %>
-
-        <!-- Text Content Section - Hiển thị sau -->
+        <!-- Text Content Section - Bên trái -->
         <div class="construction-text" style="page-break-inside: avoid !important; page-break-after: avoid !important; overflow-y: auto;">
           <h3 class="construction-item-title">
             <% 
@@ -1813,6 +1740,17 @@
           </div>
           <% } %>
         </div>
+
+        <!-- Image Section - Bên phải -->
+        <% if (item.imageUrl) { %>
+        <div class="construction-image-wrapper" style="page-break-inside: avoid !important; page-break-after: avoid !important; page-break-before: avoid !important; max-height: 100%; overflow: hidden;">
+          <img src="<%= item.imageUrl %>" alt="<%= item.pomName || 'Construction' %>" class="construction-image" style="page-break-inside: avoid !important; max-height: 100%; width: auto; height: auto; object-fit: contain;" />
+        </div>
+        <% } else { %>
+        <div class="construction-image-wrapper" style="background: #f9f9f9; border: 2px dashed #ddd; border-radius: 8px; display: flex; align-items: center; justify-content: center; page-break-inside: avoid !important; page-break-after: avoid !important;">
+          <span style="color: #999; font-size: 14px;">No Image</span>
+        </div>
+        <% } %>
       </div>
     </div>
     <% }); %>
@@ -1820,7 +1758,7 @@
 
     <%# 6. PACKING %>
     <% if (packingNotes && packingNotes !=='—' ) { %>
-    <div class="section pp" style="page-break-before: always;">
+    <div class="section pp">
       <% renderSectionHeader('Labels - Packing'); %>
       <div class="section-content" style="page-break-inside: avoid;">
         <div style="background: #f8fafc; border: 1px solid #e1e7ee; border-radius: 6px; padding: 20px; font-size: 14px; line-height: 1.6; page-break-inside: avoid;">
@@ -1851,34 +1789,34 @@
   <script>
     (function() {
       'use strict';
-
+      
       // Thông số
       // WASTE_THRESHOLD = 40% của phần CONTENT KHẢ DỤNG (đã trừ header, footer, margins)
       // KHÔNG phải 40% của toàn bộ trang
       const WASTE_THRESHOLD = 0.4; // 40% của USABLE_CONTENT_HEIGHT
       const MIN_SCALE = 0.25; // Tối thiểu 25% kích thước gốc
-
+      
       // Định nghĩa rõ USABLE CONTENT HEIGHT
       // A4 portrait: width=210mm, height=297mm
       // 1mm ≈ 3.7795px ở 96dpi
       const PAGE_HEIGHT_MM = 297; // A4 portrait height
       const MM_TO_PX = 3.7795;
       const PAGE_HEIGHT_PX = PAGE_HEIGHT_MM * MM_TO_PX; // ~1123px
-
+      
       // Header, Footer, Margins
       const HEADER_HEIGHT = 120; // 120px cho header
       const FOOTER_HEIGHT = 76; // 76px cho footer (≈20mm)
       const PAGE_MARGIN_TOP = 4; // 4mm
       const PAGE_MARGIN_BOTTOM = 15; // 15mm
       const MARGINS_TOTAL = (PAGE_MARGIN_TOP + PAGE_MARGIN_BOTTOM) * MM_TO_PX; // ~72px
-
+      
       // USABLE CONTENT HEIGHT = Tổng chiều cao trang - Header - Footer - Margins
       // ≈ 1123px - 120px - 76px - 72px ≈ 855px (100%)
       // Nhưng với A4 landscape (210mm height), ta dùng:
       const PAGE_HEIGHT_MM_LANDSCAPE = 210; // A4 landscape height
       const PAGE_HEIGHT_PX_LANDSCAPE = PAGE_HEIGHT_MM_LANDSCAPE * MM_TO_PX; // ~794px
       const USABLE_CONTENT_HEIGHT = PAGE_HEIGHT_PX_LANDSCAPE - HEADER_HEIGHT - FOOTER_HEIGHT - MARGINS_TOTAL; // ~526px
-
+      
       // Log thông tin tính toán
       console.log('[Anti-waste] Page calculations:', {
         pageHeightPx: PAGE_HEIGHT_PX_LANDSCAPE.toFixed(0) + 'px',
@@ -1888,31 +1826,25 @@
         usableContentHeight: USABLE_CONTENT_HEIGHT.toFixed(0) + 'px (100%)',
         wasteThreshold40pct: (USABLE_CONTENT_HEIGHT * WASTE_THRESHOLD).toFixed(0) + 'px (40%)'
       });
-
+      
       // Giữ PAGE_USABLE_HEIGHT cho backward compatibility
       const PAGE_USABLE_HEIGHT = USABLE_CONTENT_HEIGHT;
-
+      
       /**
        * Tính metrics của trang tại vị trí docY
        */
       function getPageMetricsForY(docY) {
         const pageIndex = Math.floor(docY / PAGE_HEIGHT_PX_LANDSCAPE);
         const pageTop = pageIndex * PAGE_HEIGHT_PX_LANDSCAPE;
-
+        
         const usableTop = pageTop + (PAGE_MARGIN_TOP * MM_TO_PX) + HEADER_HEIGHT;
         const usableBottom = pageTop + PAGE_HEIGHT_PX_LANDSCAPE - (PAGE_MARGIN_BOTTOM * MM_TO_PX) - FOOTER_HEIGHT;
-
+        
         // Sử dụng USABLE_CONTENT_HEIGHT thay vì tính lại
         const pageUsableHeight = USABLE_CONTENT_HEIGHT;
-        return {
-          pageIndex,
-          pageTop,
-          usableTop,
-          usableBottom,
-          pageUsableHeight
-        };
+        return { pageIndex, pageTop, usableTop, usableBottom, pageUsableHeight };
       }
-
+      
       /**
        * Tính docY từ rect.top
        */
@@ -1920,7 +1852,7 @@
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
         return rectTop + scrollTop;
       }
-
+      
       /**
        * Tính fillableNow đúng nghĩa (và xử lý case ảnh bị đẩy sang trang mới)
        */
@@ -1928,17 +1860,17 @@
         const imgRect = img.getBoundingClientRect();
         const imgTopDocY = getDocYFromRectTop(imgRect.top);
         const imgMetrics = getPageMetricsForY(imgTopDocY);
-
+        
         // Ảnh đang ở "đầu trang" => có khả năng bị page-break từ trang trước
         const imgTopInPage = imgTopDocY - imgMetrics.pageTop;
         const isNearTopOfPage = imgTopInPage < (PAGE_MARGIN_TOP * MM_TO_PX + HEADER_HEIGHT + 80); // 80px tolerance
-
+        
         if (!isNearTopOfPage) {
           // Bình thường: fillable của chính trang ảnh đang đứng
           const cursorY = Math.max(imgTopDocY, imgMetrics.usableTop);
           const fillableNow = Math.max(0, imgMetrics.usableBottom - cursorY);
           const wasteRatio = fillableNow / USABLE_CONTENT_HEIGHT;
-
+          
           console.log('[Anti-waste] getRemainingHeight:', {
             remainingHeight: fillableNow.toFixed(0) + 'px',
             usableContentHeight: USABLE_CONTENT_HEIGHT.toFixed(0) + 'px',
@@ -1946,37 +1878,29 @@
             threshold: (WASTE_THRESHOLD * 100) + '%',
             action: wasteRatio > WASTE_THRESHOLD ? '✅ WILL SCALE (waste > threshold)' : '⚠️ ALLOW PAGE BREAK (waste <= threshold)'
           });
-
-          return {
-            fillableNow: fillableNow,
-            metrics: imgMetrics,
-            fromPrevPage: false
-          };
+          
+          return { fillableNow: fillableNow, metrics: imgMetrics, fromPrevPage: false };
         }
-
+        
         // Nếu ảnh ở gần đầu trang => tính fillable của TRANG TRƯỚC theo phần tử ngay trước ảnh
         const prev = img.previousElementSibling || img.parentElement?.previousElementSibling;
         if (!prev) {
           // Fallback: vẫn dùng trang hiện tại
           const cursorY = Math.max(imgTopDocY, imgMetrics.usableTop);
           const fillableNow = Math.max(0, imgMetrics.usableBottom - cursorY);
-          return {
-            fillableNow: fillableNow,
-            metrics: imgMetrics,
-            fromPrevPage: false
-          };
+          return { fillableNow: fillableNow, metrics: imgMetrics, fromPrevPage: false };
         }
-
+        
         const prevRect = prev.getBoundingClientRect();
         const prevBottomDocY = getDocYFromRectTop(prevRect.bottom);
-
+        
         // prevBottom nằm ở trang trước (thường vậy). Nếu không, vẫn fallback.
         const prevMetrics = getPageMetricsForY(prevBottomDocY);
         const prevCursorY = Math.min(Math.max(prevBottomDocY, prevMetrics.usableTop), prevMetrics.usableBottom);
-
+        
         const fillablePrev = Math.max(0, prevMetrics.usableBottom - prevCursorY);
         const wasteRatio = fillablePrev / USABLE_CONTENT_HEIGHT;
-
+        
         console.log('[Anti-waste] Image near top of page, using previous page fillable:', {
           imgTopInPage: imgTopInPage.toFixed(0) + 'px',
           prevBottomDocY: prevBottomDocY.toFixed(0) + 'px',
@@ -1986,15 +1910,10 @@
           threshold: (WASTE_THRESHOLD * 100) + '%',
           action: wasteRatio > WASTE_THRESHOLD ? '✅ WILL SCALE (waste > threshold)' : '⚠️ ALLOW PAGE BREAK (waste <= threshold)'
         });
-
-        return {
-          fillableNow: fillablePrev,
-          metrics: prevMetrics,
-          fromPrevPage: true,
-          prevEl: prev
-        };
+        
+        return { fillableNow: fillablePrev, metrics: prevMetrics, fromPrevPage: true, prevEl: prev };
       }
-
+      
       /**
        * Scale ảnh để vừa fillableNow
        */
@@ -2004,15 +1923,15 @@
           // Nên sẽ được gọi lại từ processContentImages sau khi ảnh load
           return;
         }
-
+        
         const container = img.parentElement;
         const containerWidth = container ? container.clientWidth : img.parentElement.clientWidth || 800;
         const maxRenderWidth = containerWidth * 0.95; // 95% của container width
-
+        
         // Tính chiều cao ảnh ở maxRenderWidth
         const aspectRatio = img.naturalWidth / img.naturalHeight;
         const imgHeightAtMaxWidth = maxRenderWidth / aspectRatio;
-
+        
         // Case 1: Ảnh fit bình thường
         if (imgHeightAtMaxWidth <= fillableNow) {
           img.style.maxWidth = maxRenderWidth + 'px';
@@ -2021,14 +1940,14 @@
           img.style.height = 'auto';
           return;
         }
-
+        
         // Case 2: Ảnh không fit - tính scale
         const scaleToFit = fillableNow / imgHeightAtMaxWidth;
-
+        
         // Tính wasteRatio dựa trên USABLE_CONTENT_HEIGHT
         // Waste Ratio = Remaining Height / USABLE CONTENT HEIGHT
         const wasteRatio = fillableNow / USABLE_CONTENT_HEIGHT;
-
+        
         // Debug log chi tiết
         console.log('[Anti-waste] Waste calculation:', {
           remainingHeight: fillableNow.toFixed(0) + 'px',
@@ -2037,16 +1956,16 @@
           threshold: (WASTE_THRESHOLD * 100) + '%',
           shouldScale: wasteRatio > WASTE_THRESHOLD
         });
-
+        
         if (wasteRatio > WASTE_THRESHOLD) {
           // BẮT BUỘC scale để vừa fillableNow - KHÔNG QUAN TÂM minScale
           // Vì wasteRatio > 0.4 (40% của phần content khả dụng) nghĩa là trang còn nhiều khoảng trống, phải scale để tận dụng
           const renderWidth = maxRenderWidth * scaleToFit;
           const renderHeight = fillableNow;
-
+          
           // Tính waste ratio sau khi scale (ước tính)
           const estimatedNewWaste = Math.max(0, USABLE_CONTENT_HEIGHT - fillableNow - (imgHeightAtMaxWidth * scaleToFit)) / USABLE_CONTENT_HEIGHT;
-
+          
           img.style.maxWidth = renderWidth + 'px';
           img.style.maxHeight = renderHeight + 'px';
           img.style.width = 'auto';
@@ -2056,7 +1975,7 @@
           img.style.pageBreakInside = 'avoid';
           img.style.display = 'block';
           img.style.margin = '10px auto';
-
+          
           console.log('[Anti-waste] ✅✅✅ FORCED SCALE (waste=' + (wasteRatio * 100).toFixed(1) + '% > 40%):', {
             originalSize: img.naturalWidth + 'x' + img.naturalHeight,
             scaledSize: renderWidth.toFixed(0) + 'x' + renderHeight.toFixed(0),
@@ -2069,7 +1988,7 @@
           img.style.maxWidth = maxRenderWidth + 'px';
           img.style.maxHeight = 'none';
           img.style.pageBreakBefore = 'auto';
-
+          
           console.log('[Anti-waste] ⚠️ ALLOW PAGE BREAK (wasteRatio <= 40%):', {
             wasteRatio: (wasteRatio * 100).toFixed(1) + '%',
             fillableNow: fillableNow.toFixed(0) + 'px',
@@ -2078,7 +1997,7 @@
           });
         }
       }
-
+      
       /**
        * Xử lý tất cả ảnh content
        */
@@ -2093,9 +2012,9 @@
           'p img, ' +
           'figure img'
         );
-
+        
         console.log('[Anti-waste] Found', contentImages.length, 'content images to process');
-
+        
         // Debug: log tất cả ảnh được tìm thấy
         if (contentImages.length > 0) {
           contentImages.forEach(function(img, idx) {
@@ -2104,21 +2023,21 @@
             console.log('[Anti-waste] Image', idx + 1, '- src:', src.substring(0, 50), 'parent:', parent);
           });
         }
-
+        
         if (contentImages.length === 0) {
           console.warn('[Anti-waste] No content images found!');
           return;
         }
-
+        
         contentImages.forEach(function(img, index) {
           // Bỏ qua ảnh đã được xử lý (có data attribute)
           if (img.dataset.antiWasteProcessed === 'true') {
             return;
           }
-
+          
           // Đánh dấu đã xử lý
           img.dataset.antiWasteProcessed = 'true';
-
+          
           // Đợi ảnh load xong
           if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
             // Delay nhỏ để đảm bảo layout đã ổn định
@@ -2127,9 +2046,9 @@
               const fillableNow = info.fillableNow;
               // Waste Ratio = Remaining Height / USABLE CONTENT HEIGHT
               const wasteRatio = fillableNow / USABLE_CONTENT_HEIGHT;
-
+              
               console.log('[Anti-waste] Image', index + 1, '- fillableNow:', fillableNow.toFixed(0), 'px, usableContentHeight:', USABLE_CONTENT_HEIGHT.toFixed(0), 'px, wasteRatio:', (wasteRatio * 100).toFixed(1) + '%', info.fromPrevPage ? '(from prev page)' : '');
-
+              
               // Nếu fillableNow nằm ở trang trước và >40% của phần content khả dụng => ép ảnh "được phép kéo lên"
               if (info.fromPrevPage && wasteRatio > WASTE_THRESHOLD) {
                 // Ép wrapper/ảnh tránh break trước nó
@@ -2140,7 +2059,7 @@
                 img.style.pageBreakBefore = 'avoid';
                 console.log('[Anti-waste] ✅ Forced break-before: avoid to pull image up');
               }
-
+              
               scaleImageToFit(img, fillableNow, USABLE_CONTENT_HEIGHT, info.fromPrevPage);
             }, 50);
           } else {
@@ -2151,9 +2070,9 @@
                 const fillableNow = info.fillableNow;
                 // Waste Ratio = Remaining Height / USABLE CONTENT HEIGHT
                 const wasteRatio = fillableNow / USABLE_CONTENT_HEIGHT;
-
+                
                 console.log('[Anti-waste] Image', index + 1, '(loaded) - fillableNow:', fillableNow.toFixed(0), 'px, usableContentHeight:', USABLE_CONTENT_HEIGHT.toFixed(0), 'px, wasteRatio:', (wasteRatio * 100).toFixed(1) + '%', info.fromPrevPage ? '(from prev page)' : '');
-
+                
                 // Nếu fillableNow nằm ở trang trước và >40% của phần content khả dụng => ép ảnh "được phép kéo lên"
                 if (info.fromPrevPage && wasteRatio > WASTE_THRESHOLD) {
                   // Ép wrapper/ảnh tránh break trước nó
@@ -2164,13 +2083,13 @@
                   img.style.pageBreakBefore = 'avoid';
                   console.log('[Anti-waste] ✅ Forced break-before: avoid to pull image up');
                 }
-
+                
                 scaleImageToFit(img, fillableNow, USABLE_CONTENT_HEIGHT, info.fromPrevPage);
               }, 50);
               img.removeEventListener('load', loadHandler);
             };
             img.addEventListener('load', loadHandler);
-
+            
             // Fallback: nếu ảnh không load được sau 2s, xử lý với kích thước mặc định
             setTimeout(function() {
               if (!img.complete || img.naturalWidth === 0) {
@@ -2181,10 +2100,10 @@
           }
         });
       }
-
+      
       // Expose function globally để Puppeteer có thể gọi
       window.processAntiWasteImages = processContentImages;
-
+      
       // Chạy khi DOM ready
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
@@ -2195,34 +2114,34 @@
         console.log('[Anti-waste] DOM already ready - scheduling processContentImages');
         setTimeout(processContentImages, 300);
       }
-
+      
       // Chạy lại sau khi tất cả ảnh load xong (quan trọng cho Puppeteer)
       window.addEventListener('load', function() {
         console.log('[Anti-waste] Window load event - scheduling processContentImages');
         setTimeout(processContentImages, 800);
       });
-
+      
       // Chạy lại nhiều lần để đảm bảo layout đã ổn định (quan trọng cho Puppeteer)
       setTimeout(function() {
         console.log('[Anti-waste] First delayed run (800ms)');
         processContentImages();
       }, 800);
-
+      
       setTimeout(function() {
         console.log('[Anti-waste] Second delayed run (1500ms)');
         processContentImages();
       }, 1500);
-
+      
       setTimeout(function() {
         console.log('[Anti-waste] Third delayed run (2500ms)');
         processContentImages();
       }, 2500);
-
+      
       setTimeout(function() {
         console.log('[Anti-waste] Fourth delayed run (3500ms)');
         processContentImages();
       }, 3500);
-
+      
       // Retry logic: nếu vẫn còn ảnh chưa được xử lý, retry
       setTimeout(function() {
         const unprocessedImages = document.querySelectorAll(
@@ -2239,7 +2158,7 @@
           processContentImages();
         }
       }, 3000);
-
+      
       // Sử dụng MutationObserver để xử lý ảnh được thêm động
       const observer = new MutationObserver(function(mutations) {
         mutations.forEach(function(mutation) {
@@ -2249,7 +2168,7 @@
                 const info = getFillableNowForImage(node);
                 const fillableNow = info.fillableNow;
                 const wasteRatio = fillableNow / info.metrics.pageUsableHeight;
-
+                
                 if (info.fromPrevPage && wasteRatio > WASTE_THRESHOLD) {
                   const wrapper = node.parentElement || node;
                   wrapper.style.breakBefore = 'avoid';
@@ -2257,7 +2176,7 @@
                   node.style.breakBefore = 'avoid';
                   node.style.pageBreakBefore = 'avoid';
                 }
-
+                
                 scaleImageToFit(node, fillableNow, info.metrics.pageUsableHeight, info.fromPrevPage);
               } else {
                 const images = node.querySelectorAll && node.querySelectorAll('img');
@@ -2267,7 +2186,7 @@
                       const info = getFillableNowForImage(img);
                       const fillableNow = info.fillableNow;
                       const wasteRatio = fillableNow / info.metrics.pageUsableHeight;
-
+                      
                       if (info.fromPrevPage && wasteRatio > WASTE_THRESHOLD) {
                         const wrapper = img.parentElement || img;
                         wrapper.style.breakBefore = 'avoid';
@@ -2275,7 +2194,7 @@
                         img.style.breakBefore = 'avoid';
                         img.style.pageBreakBefore = 'avoid';
                       }
-
+                      
                       scaleImageToFit(img, fillableNow, info.metrics.pageUsableHeight, info.fromPrevPage);
                     }
                   });
@@ -2285,7 +2204,7 @@
           });
         });
       });
-
+      
       observer.observe(document.body, {
         childList: true,
         subtree: true
