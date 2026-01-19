@@ -1,88 +1,12 @@
-import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
-import Quill from 'quill';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { ApiTechPack, TechPack } from '../../../types/techpack';
 import { useAuth } from '../../../contexts/AuthContext';
-import { Info, Upload, X, AlertCircle, CheckCircle, Plus, Edit, Trash2 } from 'lucide-react';
+import { Info, Upload, X, AlertCircle, CheckCircle, Plus, Edit, Trash2, Copy } from 'lucide-react';
 import { useI18n } from '../../../lib/i18n';
 import { api } from '../../../lib/api';
 import ZoomableImage from '../../common/ZoomableImage';
 import Modal from '../shared/Modal';
-
-// Import Clipboard and Delta for custom plain text paste handler
-const Clipboard: any = Quill.import('modules/clipboard');
-const Delta: any = Quill.import('delta');
-
-// Track if paste handler is currently processing to prevent duplicate execution
-// Use WeakMap to track per-instance to avoid conflicts between multiple editors
-const pasteInProgress = new WeakMap<any, boolean>();
-
-// Custom clipboard class that forces plain text paste only
-// This prevents any HTML formatting, boxes, or duplicate content
-class PlainTextClipboard extends Clipboard {
-  onPaste(e: ClipboardEvent) {
-    // Check if paste is already in progress for this Quill instance
-    if (pasteInProgress.get(this.quill)) {
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      return false;
-    }
-
-    if (!e || !e.clipboardData) {
-      // Fallback to default if clipboard data unavailable
-      return super.onPaste(e);
-    }
-
-    // Mark as processing for this instance
-    pasteInProgress.set(this.quill, true);
-
-    try {
-      // Prevent default paste behavior completely
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-
-      // Get plain text only - no HTML, no formatting
-      const text = e.clipboardData.getData('text/plain') || '';
-      
-      if (!text.trim()) {
-        pasteInProgress.delete(this.quill);
-        return false;
-      }
-
-      // Get current selection
-      const range = this.quill.getSelection(true);
-      const index = range ? range.index : this.quill.getLength();
-      const length = range ? range.length : 0;
-
-      // Insert plain text only - no formatting attributes
-      const delta = new Delta()
-        .retain(index)
-        .delete(length)
-        .insert(text);
-
-      // Use 'user' source but ensure it only fires once
-      this.quill.updateContents(delta, 'user');
-      this.quill.setSelection(index + text.length, 0, 'silent');
-      
-      // Clear the flag after a short delay to allow the operation to complete
-      setTimeout(() => {
-        pasteInProgress.delete(this.quill);
-      }, 100);
-      
-      return false; // Prevent further processing
-    } catch (error) {
-      pasteInProgress.delete(this.quill);
-      console.error('Paste error:', error);
-      return false;
-    }
-  }
-}
-
-// Register custom clipboard globally
-Quill.register('modules/clipboard', PlainTextClipboard, true);
+import Textarea from '../shared/Textarea';
 
 interface PackingTabProps {
   techPack: TechPack;
@@ -92,62 +16,37 @@ interface PackingTabProps {
   isReadOnly?: boolean;
 }
 
-const quillModules = {
-  toolbar: [
-    [{ header: [1, 2, 3, 4, 5, false] }],
-    [{ font: [] }],
-    [{ size: [] }],
-    ['bold', 'italic', 'underline', 'strike', 'blockquote', 'code-block'],
-    [{ color: [] }, { background: [] }],
-    [{ script: 'sub' }, { script: 'super' }],
-    [{ list: 'ordered' }, { list: 'bullet' }, { list: 'check' }],
-    [{ indent: '-1' }, { indent: '+1' }],
-    [{ align: [] }],
-    ['link', 'image', 'video'],
-    ['clean'],
-  ],
-  clipboard: {
-    matchVisual: false,
-  },
-  history: {
-    delay: 500,
-    maxStack: 100,
-    userOnly: true,
-  },
-};
-
-const quillFormats = [
-  'header',
-  'font',
-  'size',
-  'bold',
-  'italic',
-  'underline',
-  'strike',
-  'blockquote',
-  'code-block',
-  'color',
-  'background',
-  'script',
-  'list',
-  'bullet',
-  'check',
-  'indent',
-  'align',
-  'link',
-  'image',
-  'video',
-];
-
 interface PackingItem {
   id: string;
   imageUrl: string;
-  noteHtml: string;
+  noteText: string; // Plain text, not HTML
 }
 
 // Simple ID generator
 const generateId = (): string => {
   return `packing-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+};
+
+// Helper to extract plain text from HTML
+const htmlToPlainText = (html: string): string => {
+  if (!html) return '';
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  return doc.body.textContent || doc.body.innerText || '';
+};
+
+// Helper to convert plain text to HTML (escape and wrap in <p>)
+const plainTextToHtml = (text: string): string => {
+  if (!text) return '';
+  // Escape HTML entities
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+  // Wrap in <p> tags, preserving line breaks
+  return escaped.split('\n').map(line => `<p>${line || '<br>'}</p>`).join('');
 };
 
 // Helper to extract list of packing items (ảnh + ghi chú) từ HTML cũ
@@ -172,16 +71,13 @@ const parsePackingNotes = (html?: string): PackingItem[] => {
 
         const imageUrl = imageEl?.getAttribute('src') || '';
 
-        const noteClone = noteEl.cloneNode(true) as HTMLElement;
-        // Không mang theo ảnh trong note
-        noteClone.querySelectorAll('img').forEach((img) => img.remove());
-
-        const noteHtml = noteClone.innerHTML.trim();
+        // Convert HTML to plain text
+        const noteText = htmlToPlainText(noteEl.innerHTML || '');
 
         return {
           id: generateId() + '-' + index,
           imageUrl,
-          noteHtml,
+          noteText,
         };
       });
     }
@@ -189,18 +85,18 @@ const parsePackingNotes = (html?: string): PackingItem[] => {
     // Fallback: HTML cũ chỉ có 1 block text, không có cấu trúc packing-layout
     const bodyClone = doc.body.cloneNode(true) as HTMLElement;
     bodyClone.querySelectorAll('img').forEach((img) => img.remove());
-    const noteHtml = bodyClone.innerHTML.trim() || html;
+    const noteText = htmlToPlainText(bodyClone.innerHTML || html);
 
     return [{
       id: generateId(),
       imageUrl: '',
-      noteHtml,
+      noteText,
     }];
   } catch {
     return [{
       id: generateId(),
       imageUrl: '',
-      noteHtml: html || '',
+      noteText: htmlToPlainText(html || ''),
     }];
   }
 };
@@ -212,15 +108,17 @@ const buildPackingNotesHtml = (items: PackingItem[]): string => {
   const blocks = items
     .map((item) => {
       const hasImage = item.imageUrl && item.imageUrl.trim().length > 0;
-      const hasNote = item.noteHtml && item.noteHtml.trim().length > 0;
+      const hasNote = item.noteText && item.noteText.trim().length > 0;
       if (!hasImage && !hasNote) return '';
 
       const imgBlock = hasImage
         ? `<div class="packing-layout__image"><img src="${item.imageUrl}" alt="Packing Image" /></div>`
         : '';
 
-      const noteBlock = hasNote
-        ? `<div class="packing-layout__note">${item.noteHtml}</div>`
+      // Convert plain text to HTML
+      const noteHtml = hasNote ? plainTextToHtml(item.noteText) : '';
+      const noteBlock = noteHtml
+        ? `<div class="packing-layout__note">${noteHtml}</div>`
         : '';
 
       return `<div class="packing-layout">${imgBlock}${noteBlock}</div>`;
@@ -257,10 +155,9 @@ const getPublicImageUrl = (rawUrl: string): string => {
   return `${FILE_BASE_URL}/${sanitizedPath}`;
 };
 
-const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate, canEdit: propCanEdit, isReadOnly: propIsReadOnly }) => {
+const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate, canEdit: propCanEdit }) => {
   const { user } = useAuth();
   const { t } = useI18n();
-  const quillRef = useRef<ReactQuill>(null);
   
   // Use canEdit from props if provided, otherwise calculate it
   let canEdit: boolean;
@@ -343,26 +240,23 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate, canEd
     setItems(parsedItems);
   }, [techPack.packingNotes]);
 
-  const handleChange = (content: string) => {
-    setModalNoteValue(content);
+  const handleNoteChange = (value: string) => {
+    setModalNoteValue(value);
   };
 
-  const handleClearAll = () => {
-    setItems([]);
+  const handleDuplicate = (item: PackingItem) => {
     setEditingId(null);
-    setModalNoteValue('');
-    setModalImageUrl('');
-    onUpdate?.({ packingNotes: '' });
+    setModalNoteValue(item.noteText || '');
+    setModalImageUrl(item.imageUrl || '');
+    setUploadError(null);
+    setShowModal(true);
   };
 
   const wordCount = useMemo(() => {
-    const combinedHtml = items.map((i) => i.noteHtml).join(' ');
-    const text = combinedHtml
-      ?.replace(/<[^>]+>/g, ' ')
-      ?.replace(/\s+/g, ' ')
-      ?.trim();
+    const combinedText = items.map((i) => i.noteText || '').join(' ');
+    const text = combinedText.trim();
     if (!text) return 0;
-    return text.split(' ').length;
+    return text.split(/\s+/).filter(Boolean).length;
   }, [items]);
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -419,22 +313,25 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate, canEd
 
   const openEditModal = (item: PackingItem) => {
     setEditingId(item.id);
-    setModalNoteValue(item.noteHtml || '');
+    setModalNoteValue(item.noteText || '');
     setModalImageUrl(item.imageUrl || '');
     setUploadError(null);
     setShowModal(true);
   };
 
   const handleDeleteItem = (id: string) => {
+    if (!window.confirm(t('form.packing.deleteConfirm'))) {
+      return;
+    }
     const nextItems = items.filter((i) => i.id !== id);
     setItems(nextItems);
     updatePackingNotes(nextItems);
   };
 
   const handleSaveModal = () => {
-    const plainNote = modalNoteValue.replace(/<[^>]+>/g, '').trim();
+    const noteText = modalNoteValue.trim();
     const hasImage = modalImageUrl && modalImageUrl.trim().length > 0;
-    const hasNote = plainNote.length > 0;
+    const hasNote = noteText.length > 0;
 
     // Nếu không có gì thì không lưu
     if (!hasImage && !hasNote) {
@@ -447,14 +344,14 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate, canEd
     if (editingId) {
       nextItems = items.map((item) =>
         item.id === editingId
-          ? { ...item, imageUrl: modalImageUrl, noteHtml: modalNoteValue }
+          ? { ...item, imageUrl: modalImageUrl, noteText }
           : item
       );
     } else {
       const newItem: PackingItem = {
         id: generateId(),
         imageUrl: modalImageUrl,
-        noteHtml: modalNoteValue,
+        noteText,
       };
       nextItems = [...items, newItem];
     }
@@ -477,32 +374,22 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate, canEd
           <div className="flex items-center gap-3 text-sm text-gray-500">
             <span>{t('form.packing.wordCount', { count: wordCount })}</span>
             <span>•</span>
-            <span>{t('form.packing.charCount', { count: Math.max(items.map(i => i.noteHtml || '').join('').length, 0) })}</span>
+            <span>{t('form.packing.charCount', { count: Math.max(items.map(i => i.noteText || '').join('').length, 0) })}</span>
           </div>
         </div>
 
         {/* Danh sách packing giống Construction: 1 dòng ảnh + ghi chú + thao tác */}
         <div className="mb-4 flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-gray-800">{t('form.packing.listTitle') || 'Danh sách packing'}</h3>
+          <h3 className="text-lg font-semibold text-gray-800">{t('form.packing.listTitle')}</h3>
           {canEdit && (
             <div className="flex items-center gap-2">
-              {items.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleClearAll}
-                  className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100"
-                >
-                  <Trash2 className="w-3 h-3 mr-1" />
-                  {t('form.packing.clearAll') || 'Xoá hết'}
-                </button>
-              )}
               <button
                 type="button"
                 onClick={openAddModal}
                 className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 <Plus className="w-4 h-4 mr-2" />
-                {t('form.packing.addButton') || 'Thêm packing'}
+                {t('form.packing.addButton')}
               </button>
             </div>
           )}
@@ -513,13 +400,13 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate, canEd
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  {t('form.packing.imageColumn') || 'Ảnh'}
+                  {t('form.packing.imageColumn')}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  {t('form.packing.noteColumn') || 'Ghi chú'}
+                  {t('form.packing.noteColumn')}
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                  {t('common.actions') || 'Thao tác'}
+                  {t('common.actions')}
                 </th>
               </tr>
             </thead>
@@ -527,12 +414,11 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate, canEd
               {items.length === 0 ? (
                 <tr>
                   <td colSpan={3} className="px-6 py-10 text-center text-sm text-gray-500">
-                    {t('form.packing.empty') || 'Chưa có thông tin packing. Bấm "Thêm packing" để nhập.'}
+                    {t('form.packing.empty')}
                   </td>
                 </tr>
               ) : (
                 items.map((item) => {
-                  const plainNote = item.noteHtml?.replace(/<[^>]+>/g, '').trim();
                   return (
                     <tr key={item.id}>
                       <td className="px-6 py-4 text-sm text-gray-700">
@@ -557,11 +443,11 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate, canEd
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700 align-top">
-                        {plainNote ? (
-                          <p className="whitespace-pre-wrap">{plainNote}</p>
+                        {item.noteText ? (
+                          <p className="whitespace-pre-wrap">{item.noteText}</p>
                         ) : (
                           <span className="text-gray-400 italic">
-                            {t('form.packing.noNote') || 'Chưa có ghi chú'}
+                            {t('form.packing.noNote')}
                           </span>
                         )}
                       </td>
@@ -573,15 +459,23 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate, canEd
                                 type="button"
                                 onClick={() => openEditModal(item)}
                                 className="text-blue-600 hover:text-blue-900"
-                                title={t('common.edit') || 'Sửa'}
+                                title={t('common.edit')}
                               >
                                 <Edit className="w-4 h-4" />
                               </button>
                               <button
                                 type="button"
+                                onClick={() => handleDuplicate(item)}
+                                className="text-purple-600 hover:text-purple-900"
+                                title={t('form.packing.duplicate')}
+                              >
+                                <Copy className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => handleDeleteItem(item.id)}
                                 className="text-red-600 hover:text-red-900"
-                                title={t('common.delete') || 'Xoá'}
+                                title={t('common.delete')}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -604,7 +498,7 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate, canEd
             setShowModal(false);
             setUploadError(null);
           }}
-          title={t('form.packing.modalTitle') || 'Chi tiết Packing'}
+          title={t('form.packing.modalTitle')}
           size="lg"
           footer={
             <>
@@ -616,14 +510,14 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate, canEd
                 }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                {t('common.cancel') || 'Huỷ'}
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
                 onClick={handleSaveModal}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                {t('form.saveDraft') || 'Lưu'}
+                {t('form.saveDraft')}
               </button>
             </>
           }
@@ -632,7 +526,7 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate, canEd
             {/* Image field */}
             <div>
               <label className="text-sm font-medium text-gray-700 mb-2 block">
-                {t('form.packing.imageLabel') || 'Packing Image'}
+                {t('form.packing.imageLabel')}
               </label>
               <div
                 className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md transition-colors ${
@@ -667,9 +561,9 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate, canEd
                           </button>
                         )}
                       </div>
-                      <p className="text-xs text-green-600 flex items-center justify-center">
+                        <p className="text-xs text-green-600 flex items-center justify-center">
                         <CheckCircle className="w-3 h-3 mr-1" />
-                        {t('form.packing.imageUploaded') || 'Image uploaded successfully'}
+                        {t('form.packing.imageUploaded')}
                       </p>
                     </>
                   ) : (
@@ -682,7 +576,7 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate, canEd
                             !canEdit ? 'pointer-events-none opacity-60' : ''
                           }`}
                         >
-                          <span>{t('form.uploadImage') || 'Upload image'}</span>
+                          <span>{t('form.uploadImage')}</span>
                           <input
                             id="packing-image-upload"
                             type="file"
@@ -692,17 +586,17 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate, canEd
                             disabled={!canEdit || uploading}
                           />
                         </label>
-                        <p className="pl-1">{t('form.orDragAndDrop') || 'or drag and drop'}</p>
+                        <p className="pl-1">{t('form.orDragAndDrop')}</p>
                       </div>
                       <p className="text-xs text-gray-500">
-                        {t('form.packing.imageHint') || 'PNG, JPG, GIF up to 5MB. One packing image only.'}
+                        {t('form.packing.imageHint')}
                       </p>
                     </>
                   )}
                   {uploading && (
                     <div className="flex items-center justify-center text-xs text-blue-600">
                       <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-2"></div>
-                      {t('form.uploading') || 'Uploading...'}
+                      {t('form.uploading')}
                     </div>
                   )}
                   {uploadError && (
@@ -715,21 +609,15 @@ const PackingTab: React.FC<PackingTabProps> = ({ techPack, mode, onUpdate, canEd
               </div>
             </div>
 
-            {/* Note field */}
-            <div className={`rounded-xl border ${canEdit ? 'border-gray-200' : 'border-gray-100 bg-gray-50'}`}>
-              <ReactQuill
-                key={`quill-${canEdit ? 'editable' : 'readonly'}`}
-                ref={quillRef}
-                theme="snow"
-                value={modalNoteValue}
-                onChange={handleChange}
-                readOnly={!canEdit}
-                modules={canEdit ? quillModules : { toolbar: false }}
-                formats={quillFormats}
-                placeholder={canEdit ? t('form.packing.placeholder') : ''}
-                className="min-h-[260px]"
-              />
-            </div>
+            {/* Note field - Textarea giống Construction */}
+            <Textarea
+              label={t('form.packing.noteLabel')}
+              value={modalNoteValue}
+              onChange={handleNoteChange}
+              placeholder={t('form.packing.placeholder')}
+              rows={6}
+              disabled={!canEdit}
+            />
           </div>
         </Modal>
 

@@ -326,16 +326,11 @@
       flex-direction: column;
       page-break-inside: avoid !important;
       page-break-after: always !important;
-      /* Luôn kết thúc trang sau mỗi item */
       page-break-before: always !important;
-      /* LUÔN bắt đầu ở trang mới (kể cả item đầu tiên) */
-      overflow: hidden;
-      /* Ẩn phần tràn để tránh trang trống */
-      min-height: calc(100vh - 20mm);
-      /* Đảm bảo chiếm hết chiều cao trang trừ margin */
-      height: calc(100vh - 20mm);
-      /* Cố định chiều cao để vừa 1 trang */
+      /* ❌ BỎ: min-height: calc(100vh - 20mm); */
+      /* ❌ BỎ: height: calc(100vh - 20mm); */
       box-sizing: border-box;
+      padding-bottom: 20px; /* Thêm padding để không bị sát đáy */
     }
 
     .construction-header {
@@ -356,51 +351,53 @@
       display: flex;
       flex-direction: column;
       flex: 1;
-      gap: 15px;
+      gap: 10px;
       page-break-inside: avoid !important;
       page-break-after: avoid !important;
       page-break-before: avoid !important;
       min-height: 0;
       box-sizing: border-box;
+      /* KHÔNG dùng overflow:hidden để ảnh có thể scale tự do */
     }
 
     .construction-image-wrapper {
       display: flex;
-      align-items: center;
+      align-items: center; /* ✅ ĐỔI từ stretch sang center */
       justify-content: center;
-      page-break-inside: avoid !important;
-      page-break-after: avoid !important;
-      page-break-before: avoid !important;
       width: 100%;
-      min-height: 400px;
-      max-height: 600px;
-      overflow: hidden;
-      box-sizing: border-box;
+      flex: 0 1 auto; /* ✅ ĐỔI từ 1 1 auto sang 0 1 auto - không tự giãn */
+      min-height: 200px; /* Chiều cao tối thiểu hợp lý */
+      max-height: 650px; /* ✅ THÊM chiều cao tối đa */
     }
 
     .construction-image {
-      max-width: 100% !important;
-      max-height: 600px !important;
-      width: auto !important;
-      height: auto !important;
-      border: 2px solid #ddd;
-      border-radius: 8px;
-      padding: 10px;
+      width: 100% !important;
+      height: 100% !important;
+      /* Ép ảnh scale theo wrapper - KHÔNG dùng max-width/max-height làm trần */
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 5px;
       background: #f9f9f9;
       object-fit: contain !important;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      /* Giữ tỷ lệ, không crop, không méo - scale tối đa trong wrapper */
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
       page-break-inside: avoid !important;
       display: block !important;
-      margin: 0 auto !important;
+      margin: 0;
+      /* KHÔNG dùng margin: auto vì dễ làm ảnh co lại */
     }
 
     .construction-text {
-      padding: 15px;
+      padding: 8px 10px;
       background: #fff;
       page-break-inside: avoid !important;
       page-break-after: avoid !important;
       page-break-before: avoid !important;
       box-sizing: border-box;
+      flex-shrink: 0;
+      flex-grow: 0;
+      /* Text section chỉ chiếm không gian thực tế cần thiết, KHÔNG mở rộng */
+      /* Khi text ngắn → ảnh sẽ tự động scale lớn lên để lấp phần trống */
     }
 
     .construction-item-title {
@@ -723,36 +720,90 @@
       box-sizing: border-box;
     }
 
-    /* CSS đặc biệt cho ảnh trong phần Packing - đảm bảo luôn fit trong 1 trang A4 */
-    .pp .section-content img {
-      max-width: 100% !important;
-      max-height: 700px !important;
-      /* A4 landscape usable height ~ 700-750px */
-      width: auto !important;
-      height: auto !important;
-      object-fit: contain !important;
-      display: block !important;
-      margin: 0 auto 15px auto !important;
-      page-break-before: auto;
-      page-break-after: auto;
-      page-break-inside: avoid !important;
-      order: -1; /* Đưa ảnh lên trước text */
+    /* CSS cho phần Packing - Layout: ảnh trên (90%), chữ dưới (10%) */
+    .pp .section-content {
+      display: flex !important;
+      flex-direction: column !important;
+      min-height: calc(100vh - 20mm - 120px - 76px);
+      /* Trừ header (~120px) và footer (~76px) và margins (~20mm) */
+      box-sizing: border-box;
     }
 
-    /* Nếu ảnh nằm trong container có background/border */
-    .pp .section-content>div {
+    .pp .section-content > div {
+      display: flex !important;
+      flex-direction: column !important;
+      flex: 1;
+      min-height: 0;
+      box-sizing: border-box;
+    }
+
+    /* Packing item - mỗi item = 1 trang */
+    .pp.packing-item {
       display: flex;
       flex-direction: column;
+      page-break-inside: avoid !important;
+      page-break-after: always !important;
+      min-height: calc(100vh - 20mm - 120px - 76px);
+      box-sizing: border-box;
     }
 
-    .pp .section-content>div img {
+    /* Packing layout - đổi từ row sang column */
+    .pp .packing-layout {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 10px !important;
+      flex: 1;
+      min-height: 0;
+      box-sizing: border-box;
+    }
+
+    /* Ảnh trong phần Packing - chiếm 90% diện tích khả dụng */
+    .pp .packing-layout__image,
+    .pp .section-content img,
+    .pp .section-content .packing-layout__image {
+      flex: 0 0 90% !important;
+      /* Chiếm 90% diện tích khả dụng */
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      min-height: 0;
+      max-height: none !important;
+      box-sizing: border-box;
+      width: 100% !important;
+    }
+
+    .pp .packing-layout__image img,
+    .pp .section-content img {
+      width: 100% !important;
+      height: 100% !important;
       max-width: 100% !important;
-      max-height: 700px !important;
-      width: auto !important;
-      height: auto !important;
+      max-height: 100% !important;
       object-fit: contain !important;
-      order: -1; /* Đưa ảnh lên trước text */
-      margin-bottom: 15px !important;
+      display: block !important;
+      margin: 0 !important;
+      page-break-inside: avoid !important;
+      box-sizing: border-box;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      padding: 8px;
+      background: #f9f9f9;
+    }
+
+    /* Text/Note trong phần Packing - chiếm 10% diện tích khả dụng */
+    .pp .packing-layout__note,
+    .pp .section-content > div > *:not(.packing-layout__image):not(img) {
+      flex: 0 0 10% !important;
+      /* Chiếm 10% diện tích khả dụng */
+      overflow-y: auto;
+      box-sizing: border-box;
+      min-height: 0;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #111827;
+      background: #ffffff;
+      border-radius: 6px;
+      padding: 12px 14px;
+      border-left: 3px solid #2563eb;
     }
 
     .packing-layout__note {
@@ -882,11 +933,8 @@
         break-before: page !important;
         /* LUÔN bắt đầu ở trang mới (kể cả item đầu tiên) */
         min-height: calc(100vh - 20mm) !important;
-        /* Chiếm hết chiều cao trang */
         height: calc(100vh - 20mm) !important;
-        /* Cố định chiều cao */
-        overflow: hidden !important;
-        /* Ẩn phần tràn để tránh trang trống */
+        /* Force height để ảnh có thể scale tối đa */
         display: flex !important;
         flex-direction: column !important;
         box-sizing: border-box !important;
@@ -895,30 +943,124 @@
       .construction-content {
         display: flex !important;
         flex-direction: column !important;
-        gap: 15px !important;
+        gap: 10px !important;
         break-inside: avoid !important;
         box-sizing: border-box !important;
+        /* KHÔNG dùng overflow:hidden để ảnh có thể scale tự do */
+        flex: 1 !important;
+        min-height: 0 !important;
       }
 
       .construction-image-wrapper {
         width: 100% !important;
-        min-height: 400px !important;
-        max-height: 600px !important;
-        overflow: hidden !important;
+        flex: 1 1 auto !important;
+        /* Chiếm TẤT CẢ không gian còn lại sau khi text đã chiếm phần của nó */
+        min-height: 0 !important;
+        /* Quan trọng: cho phép flex shrink */
+        max-height: none !important;
         break-inside: avoid !important;
+        box-sizing: border-box !important;
+        align-items: stretch !important;
       }
 
       .construction-image {
-        max-width: 100% !important;
-        max-height: 600px !important;
-        width: auto !important;
-        height: auto !important;
+        width: auto !important; /* ✅ ĐỔI từ 100% sang auto */
+        height: auto !important; /* ✅ ĐỔI từ 100% sang auto */
+        max-width: 100%;
+        max-height: 600px; /* ✅ THÊM giới hạn */
         object-fit: contain !important;
-        break-inside: avoid !important;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 5px;
+        background: #f9f9f9;
+      }
+
+      .construction-text {
+        flex-shrink: 0 !important;
+        flex-grow: 0 !important;
+        /* Text section chỉ chiếm không gian thực tế cần thiết, KHÔNG mở rộng */
+        /* Khi text ngắn → ảnh sẽ tự động scale lớn lên để lấp phần trống */
       }
 
       .construction-text {
         break-inside: avoid !important;
+      }
+
+      /* Packing item - mỗi item = 1 trang */
+      .pp.packing-item {
+        break-inside: avoid !important;
+        break-after: page !important;
+        break-before: page !important;
+        min-height: calc(100vh - 20mm) !important;
+        height: calc(100vh - 20mm) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        box-sizing: border-box !important;
+      }
+
+      /* Packing item đầu tiên - không break-before để tránh trang trống */
+      .pp.packing-item:first-of-type {
+        break-before: auto !important;
+        page-break-before: auto !important;
+      }
+
+      /* Packing layout - ảnh trên (90%), chữ dưới (10%) */
+      .pp .section-content {
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: calc(100vh - 20mm - 120px - 76px) !important;
+        box-sizing: border-box !important;
+      }
+
+      .pp .section-content > div {
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 !important;
+        min-height: 0 !important;
+        box-sizing: border-box !important;
+      }
+
+      .pp .packing-layout {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 10px !important;
+        flex: 1 !important;
+        min-height: 0 !important;
+        box-sizing: border-box !important;
+      }
+
+      .pp .packing-layout__image,
+      .pp .section-content img,
+      .pp .section-content .packing-layout__image {
+        flex: 0 0 90% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+      }
+
+      .pp .packing-layout__image img,
+      .pp .section-content img {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        object-fit: contain !important;
+        display: block !important;
+        margin: 0 !important;
+        break-inside: avoid !important;
+        box-sizing: border-box !important;
+      }
+
+      .pp .packing-layout__note,
+      .pp .section-content > div > *:not(.packing-layout__image):not(img) {
+        flex: 0 0 10% !important;
+        overflow-y: auto !important;
+        box-sizing: border-box !important;
+        min-height: 0 !important;
       }
 
       /* Đảm bảo thead lặp lại trên mỗi trang khi table bị ngắt trang */
@@ -1756,11 +1898,11 @@
         <% renderSectionHeader('Construction Details'); %>
       </div>
 
-      <div class="construction-content" style="page-break-inside: avoid !important; page-break-after: avoid !important; page-break-before: avoid !important;">
-        <!-- Image Section - Hiển thị trước -->
+      <div class="construction-content" style="page-break-inside: avoid !important; page-break-after: avoid !important; page-break-before: avoid !important; display: flex; flex-direction: column; flex: 1; min-height: 0;">
+        <!-- Image Section - Hiển thị trước, chiếm tối đa không gian còn lại -->
         <% if (item.imageUrl) { %>
-        <div class="construction-image-wrapper" style="page-break-inside: avoid !important; page-break-after: avoid !important; page-break-before: avoid !important; max-height: 100%; overflow: hidden;">
-          <img src="<%= item.imageUrl %>" alt="<%= item.pomName || 'Construction' %>" class="construction-image" style="page-break-inside: avoid !important; max-height: 100%; width: auto; height: auto; object-fit: contain;" />
+        <div class="construction-image-wrapper" style="page-break-inside: avoid !important; page-break-after: avoid !important; page-break-before: avoid !important; flex: 1 1 auto; min-height: 0; display: flex; align-items: stretch; justify-content: center;">
+          <img src="<%= item.imageUrl %>" alt="<%= item.pomName || 'Construction' %>" class="construction-image" style="page-break-inside: avoid !important; width: 100%; height: 100%; object-fit: contain;" />
         </div>
         <% } else { %>
         <div class="construction-image-wrapper" style="background: #f9f9f9; border: 2px dashed #ddd; border-radius: 8px; display: flex; align-items: center; justify-content: center; page-break-inside: avoid !important; page-break-after: avoid !important;">
@@ -1769,7 +1911,7 @@
         <% } %>
 
         <!-- Text Content Section - Hiển thị sau -->
-        <div class="construction-text" style="page-break-inside: avoid !important; page-break-after: avoid !important; overflow-y: auto;">
+        <div class="construction-text" style="page-break-inside: avoid !important; page-break-after: avoid !important; overflow-y: auto; flex-shrink: 0; flex-grow: 0;">
           <h3 class="construction-item-title">
             <% 
                                         const stepNo = item.stepNumber || (index + 1);
@@ -1818,16 +1960,43 @@
     <% }); %>
     <% } %>
 
-    <%# 6. PACKING %>
+    <%# 6. PACKING - Mỗi packing item = 1 trang, layout: ảnh trên (90%), chữ dưới (10%) %>
     <% if (packingNotes && packingNotes !=='—' ) { %>
-    <div class="section pp" style="page-break-before: always;">
-      <% renderSectionHeader('Labels - Packing'); %>
-      <div class="section-content" style="page-break-inside: avoid;">
-        <div style="background: #f8fafc; border: 1px solid #e1e7ee; border-radius: 6px; padding: 20px; font-size: 14px; line-height: 1.6; page-break-inside: avoid;">
-          <%- packingNotes %>
+      <%# Parse packingNotes HTML để tách từng .packing-layout item %>
+      <% 
+        // Tách các packing-layout items từ HTML
+        // Sử dụng regex để match từng <div class="packing-layout">...</div> (kể cả nested divs)
+        const packingLayoutRegex = /<div class="packing-layout">([\s\S]*?)<\/div>/g;
+        const packingItems = [];
+        let match;
+        let lastIndex = 0;
+        
+        while ((match = packingLayoutRegex.exec(packingNotes)) !== null) {
+          // Lấy toàn bộ match bao gồm cả thẻ mở và đóng
+          packingItems.push(match[0]);
+          lastIndex = packingLayoutRegex.lastIndex;
+        }
+        
+        // Nếu không tìm thấy packing-layout, coi toàn bộ packingNotes là 1 item
+        if (packingItems.length === 0) {
+          packingItems.push(packingNotes);
+        }
+      %>
+      <% packingItems.forEach((itemHtml, index) => { %>
+        <%# Mỗi packing item LUÔN bắt đầu ở trang mới (trừ item đầu tiên để tránh trang trống) %>
+        <% const breakBefore = index === 0 ? 'auto' : 'always'; %>
+        <div class="section pp packing-item" style="page-break-before: <%= breakBefore %> !important; page-break-inside: avoid !important; page-break-after: always !important;">
+          <%# Header lặp lại trên MỖI TRANG %>
+          <div style="page-break-inside: avoid !important; page-break-after: avoid !important; margin-bottom: 5px;">
+            <% renderSectionHeader('Labels - Packing'); %>
+          </div>
+          <div class="section-content" style="page-break-inside: avoid; display: flex; flex-direction: column; flex: 1; min-height: calc(100vh - 20mm - 120px - 76px);">
+            <div style="display: flex; flex-direction: column; flex: 1; min-height: 0; background: #f8fafc; border: 1px solid #e1e7ee; border-radius: 6px; padding: 20px; font-size: 14px; line-height: 1.6; page-break-inside: avoid;">
+              <%- itemHtml %>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      <% }); %>
     <% } %>
 
   </div>
@@ -2013,12 +2182,18 @@
         const aspectRatio = img.naturalWidth / img.naturalHeight;
         const imgHeightAtMaxWidth = maxRenderWidth / aspectRatio;
 
-        // Case 1: Ảnh fit bình thường
+        // Case 1: Ảnh fit bình thường - vẫn ép scale để tận dụng không gian
         if (imgHeightAtMaxWidth <= fillableNow) {
-          img.style.maxWidth = maxRenderWidth + 'px';
+          // Tính scale để ảnh chiếm hết fillableNow nếu có thể
+          const scaleToFill = Math.min(1, fillableNow / imgHeightAtMaxWidth);
+          const finalWidth = maxRenderWidth * scaleToFill;
+          const finalHeight = imgHeightAtMaxWidth * scaleToFill;
+          
+          img.style.width = finalWidth + 'px';
+          img.style.height = finalHeight + 'px';
+          img.style.maxWidth = 'none';
           img.style.maxHeight = 'none';
-          img.style.width = 'auto';
-          img.style.height = 'auto';
+          img.style.objectFit = 'contain';
           return;
         }
 
@@ -2047,15 +2222,16 @@
           // Tính waste ratio sau khi scale (ước tính)
           const estimatedNewWaste = Math.max(0, USABLE_CONTENT_HEIGHT - fillableNow - (imgHeightAtMaxWidth * scaleToFit)) / USABLE_CONTENT_HEIGHT;
 
-          img.style.maxWidth = renderWidth + 'px';
-          img.style.maxHeight = renderHeight + 'px';
-          img.style.width = 'auto';
-          img.style.height = 'auto';
+          // ÉP ảnh scale bằng width/height px thay vì maxWidth/maxHeight
+          img.style.width = renderWidth + 'px';
+          img.style.height = renderHeight + 'px';
+          img.style.maxWidth = 'none';
+          img.style.maxHeight = 'none';
           img.style.objectFit = 'contain';
           img.style.pageBreakBefore = 'avoid'; // QUAN TRỌNG: không được page-break
           img.style.pageBreakInside = 'avoid';
           img.style.display = 'block';
-          img.style.margin = '10px auto';
+          img.style.margin = '0';
 
           console.log('[Anti-waste] ✅✅✅ FORCED SCALE (waste=' + (wasteRatio * 100).toFixed(1) + '% > 40%):', {
             originalSize: img.naturalWidth + 'x' + img.naturalHeight,
@@ -2066,7 +2242,10 @@
           });
         } else {
           // Rule B: wasteRatio <= 0.4, cho phép page-break
-          img.style.maxWidth = maxRenderWidth + 'px';
+          // Vẫn dùng width/height để đảm bảo ảnh scale đúng
+          img.style.width = maxRenderWidth + 'px';
+          img.style.height = 'auto';
+          img.style.maxWidth = 'none';
           img.style.maxHeight = 'none';
           img.style.pageBreakBefore = 'auto';
 
