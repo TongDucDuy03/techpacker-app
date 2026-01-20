@@ -393,12 +393,30 @@ class PDFService {
   private async prepareBOMDataOptimized(
     bom: IBOMItem[], 
     currency: string,
+    techpackColorways: any[] = [],
     imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number }
   ): Promise<any[]> {
     if (!bom || bom.length === 0) return [];
     
     pdfLog(`📋 Processing ${bom.length} BOM items...`);
     const bomByPart: { [key: string]: any[] } = {};
+
+    // Map BOM item -> assigned Colorway code (from Colorways assignment in FE)
+    // We prefer mapping by bomItemId on Colorway parts to avoid relying on free-text fields.
+    const bomItemIdToColorwayCode = new Map<string, string>();
+    if (Array.isArray(techpackColorways)) {
+      for (const cw of techpackColorways) {
+        const cwCode = cw?.code ? this.normalizeText(cw.code) : undefined;
+        if (!cwCode) continue;
+        const parts = cw?.parts;
+        if (!Array.isArray(parts)) continue;
+        for (const part of parts) {
+          const bomItemId = part?.bomItemId ? String(part.bomItemId) : '';
+          if (!bomItemId) continue;
+          bomItemIdToColorwayCode.set(bomItemId, cwCode);
+        }
+      }
+    }
     
     // Collect all image URLs for batch compression
     const imageUrls: string[] = [];
@@ -433,11 +451,17 @@ class PDFService {
         bomByPart[partName] = [];
       }
       
+      const bomItemId = (item as any)?.id ? String((item as any).id) : ((item as any)?._id ? String((item as any)._id) : '');
+      const assignedColorCode = bomItemId ? bomItemIdToColorwayCode.get(bomItemId) : undefined;
+
+      // IMPORTANT: Color Code in PDF should come from assigned Colorway (if any)
+      const effectiveColorCode = assignedColorCode || (item.colorCode ? this.normalizeText(item.colorCode) : undefined);
+
       const colorways: string[] = [];
       if (item.color) {
         const colorText = this.normalizeText(item.color);
-        if (item.colorCode) {
-          colorways.push(`${colorText} (${this.normalizeText(item.colorCode)})`);
+        if (effectiveColorCode) {
+          colorways.push(`${colorText} (${effectiveColorCode})`);
         } else if (item.pantoneCode) {
           colorways.push(`${colorText} (Pantone: ${this.normalizeText(item.pantoneCode)})`);
         } else {
@@ -474,8 +498,8 @@ class PDFService {
 
       // Extract hexCode from colorCode if it's a hex color (starts with #)
       let hexCode: string | undefined;
-      if (item.colorCode) {
-        const colorCodeStr = String(item.colorCode).trim();
+      if (effectiveColorCode) {
+        const colorCodeStr = String(effectiveColorCode).trim();
         if (colorCodeStr.startsWith('#') && (colorCodeStr.length === 4 || colorCodeStr.length === 7)) {
           hexCode = colorCodeStr;
         }
@@ -495,7 +519,8 @@ class PDFService {
         colorways,
         // Add color fields for template compatibility
         color: item.color ? this.normalizeText(item.color) : undefined,
-        colorCode: item.colorCode ? this.normalizeText(item.colorCode) : undefined,
+        // Color Code shown in PDF table
+        colorCode: effectiveColorCode,
         hexCode: hexCode,
         pantone: item.pantoneCode ? this.normalizeText(item.pantoneCode) : undefined,
         pantoneCode: item.pantoneCode ? this.normalizeText(item.pantoneCode) : undefined,
@@ -953,7 +978,7 @@ class PDFService {
     const parallelStart = Date.now();
     
     const [bomParts, measurementData, sampleRounds, howToMeasures, colorways] = await Promise.all([
-      this.prepareBOMDataOptimized(techpack.bom || [], currency, {
+      this.prepareBOMDataOptimized(techpack.bom || [], currency, techpack.colorways || [], {
         quality: imageQuality,
         maxWidth: 800, // Smaller for BOM thumbnails
         maxHeight: 600,
