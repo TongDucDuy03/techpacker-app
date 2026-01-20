@@ -401,9 +401,9 @@ class PDFService {
     pdfLog(`📋 Processing ${bom.length} BOM items...`);
     const bomByPart: { [key: string]: any[] } = {};
 
-    // Map BOM item -> assigned Colorway code (from Colorways assignment in FE)
+    // Map BOM item -> list of assigned Colorway codes (from Colorways assignment in FE)
     // We prefer mapping by bomItemId on Colorway parts to avoid relying on free-text fields.
-    const bomItemIdToColorwayCode = new Map<string, string>();
+    const bomItemIdToColorwayCodes = new Map<string, Set<string>>();
     if (Array.isArray(techpackColorways)) {
       for (const cw of techpackColorways) {
         const cwCode = cw?.code ? this.normalizeText(cw.code) : undefined;
@@ -413,7 +413,10 @@ class PDFService {
         for (const part of parts) {
           const bomItemId = part?.bomItemId ? String(part.bomItemId) : '';
           if (!bomItemId) continue;
-          bomItemIdToColorwayCode.set(bomItemId, cwCode);
+          if (!bomItemIdToColorwayCodes.has(bomItemId)) {
+            bomItemIdToColorwayCodes.set(bomItemId, new Set<string>());
+          }
+          bomItemIdToColorwayCodes.get(bomItemId)!.add(cwCode);
         }
       }
     }
@@ -452,7 +455,11 @@ class PDFService {
       }
       
       const bomItemId = (item as any)?.id ? String((item as any).id) : ((item as any)?._id ? String((item as any)._id) : '');
-      const assignedColorCode = bomItemId ? bomItemIdToColorwayCode.get(bomItemId) : undefined;
+      const assignedCodesSet = bomItemId ? bomItemIdToColorwayCodes.get(bomItemId) : undefined;
+      const assignedColorCode =
+        assignedCodesSet && assignedCodesSet.size > 0
+          ? Array.from(assignedCodesSet).join(', ')
+          : undefined;
 
       // IMPORTANT: Color Code in PDF should come from assigned Colorway (if any)
       const effectiveColorCode = assignedColorCode || (item.colorCode ? this.normalizeText(item.colorCode) : undefined);

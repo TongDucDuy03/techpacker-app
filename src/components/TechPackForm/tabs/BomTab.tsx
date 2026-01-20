@@ -877,15 +877,15 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     if (!colorAssignmentModal || !assignColorwayToBomItem) return;
     const { colorway, bomItemId, bomItem } = colorAssignmentModal;
     // Chỉ cho phép chọn màu đã có trong Colorways (không tạo màu mới)
-    const targetPart = colorway.parts?.find(part => part.id === selectedPartId);
-    if (!targetPart) {
+      const targetPart = colorway.parts?.find(part => part.id === selectedPartId);
+      if (!targetPart) {
       showError(t('validation.colorwayPartRequired'));
-      return;
-    }
-    assignColorwayToBomItem(colorway.id, bomItemId, {
-      ...targetPart,
-      partName: targetPart.partName || bomItem.part || 'Unnamed Part',
-    });
+        return;
+      }
+      assignColorwayToBomItem(colorway.id, bomItemId, {
+        ...targetPart,
+        partName: targetPart.partName || bomItem.part || 'Unnamed Part',
+      });
     showSuccess(t('success.colorAssignmentSaved'));
     closeColorAssignmentModal();
   };
@@ -1894,27 +1894,27 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             </div>
 
             {colorAssignmentModal.colorway.parts && colorAssignmentModal.colorway.parts.length > 0 ? (
-              <div className="space-y-3">
-                <Select
-                  label={t('form.bom.colorwayParts')}
-                  value={selectedPartId}
-                  onChange={setSelectedPartId}
-                  options={colorAssignmentModal.colorway.parts.map(part => ({
-                    value: part.id,
+                <div className="space-y-3">
+                  <Select
+                    label={t('form.bom.colorwayParts')}
+                    value={selectedPartId}
+                    onChange={setSelectedPartId}
+                    options={colorAssignmentModal.colorway.parts.map(part => ({
+                      value: part.id,
                     label: `${part.colorName}`,
-                  }))}
-                  placeholder={t('form.bom.selectColorwayPart')}
-                />
-                {selectedPartId && (
-                  <div className="p-3 border border-gray-200 rounded-md text-sm flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.colorName}
-                        </p>
+                    }))}
+                    placeholder={t('form.bom.selectColorwayPart')}
+                  />
+                  {selectedPartId && (
+                    <div className="p-3 border border-gray-200 rounded-md text-sm flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.colorName}
+                          </p>
                         <p className="text-xs text-gray-500">{colorAssignmentModal.colorway.code}</p>
+                        </div>
                       </div>
-                    </div>
                     <div className="flex items-center gap-3">
                       {colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.imageUrl && (
                         <img
@@ -1931,13 +1931,13 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                         />
                       )}
                     </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500">
-                {t('form.bom.noColorwayPartsAvailable')}
-              </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">
+                  {t('form.bom.noColorwayPartsAvailable')}
+                </p>
             )}
           </div>
         </Modal>
@@ -2203,6 +2203,8 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             {canViewPrice && filteredBom.length > 0 && (
               <tfoot className="bg-gray-50">
                 <tr>
+                  {/* Empty cell under checkbox column */}
+                  <td className="px-4 py-3" />
                   {columns.map((column) => {
                     const isTotalPriceColumn = column.key === ('totalPrice' as keyof BomItem);
                     return (
@@ -2211,15 +2213,11 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                         className="px-6 py-3 text-sm font-semibold text-gray-900 text-right"
                         style={{ width: column.width }}
                       >
-                        {isTotalPriceColumn
-                          ? totalMaterialCost.toLocaleString('vi-VN', {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 2,
-                            })
-                          : ''}
+                        {isTotalPriceColumn ? String(totalMaterialCost) : null}
                       </td>
                     );
                   })}
+                  {/* Empty cell under actions column */}
                   <td className="px-6 py-3" />
                 </tr>
               </tfoot>
