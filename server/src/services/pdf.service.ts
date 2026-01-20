@@ -5,8 +5,19 @@ import { ITechPack, IBOMItem, IMeasurement, ISampleMeasurementRound, IHowToMeasu
 import fs from 'fs/promises';
 import { compressImageToDataURI, compressImagesBatch } from '../utils/image-compression.util';
 import { MeasurementUnit, parseMeasurementValue, formatMeasurementValueAsFraction, formatMeasurementValueNoRound } from '../utils/measurement-format.util';
+import getPDFTranslations, { PDFLanguage } from '../utils/pdf-translations';
+import { translateOptionValue } from '../utils/pdf-option-translations';
 
 type TechPackForPDF = ITechPack | any;
+
+// Debug logger for PDF export (avoid slowing down exports with heavy console output)
+const PDF_DEBUG = process.env.PDF_DEBUG === 'true' || process.env.DEBUG_PDF === 'true';
+const pdfLog = (...args: any[]) => {
+  if (PDF_DEBUG) console.log(...args);
+};
+const pdfWarn = (...args: any[]) => {
+  if (PDF_DEBUG) console.warn(...args);
+};
 
 export interface PDFOptions {
   format?: 'A4' | 'Letter' | 'Legal';
@@ -23,6 +34,7 @@ export interface PDFOptions {
   imageMaxHeight?: number; // Max height in pixels
   displayHeaderFooter?: boolean;
   chunkSize?: number;
+  language?: PDFLanguage;
 }
 
 export interface PDFGenerationResult {
@@ -37,6 +49,7 @@ class PDFService {
   private readonly templateDir: string;
   private readonly maxConcurrent: number = 2;
   private activeGenerations: number = 0;
+  private currentLanguage: PDFLanguage = 'en';
   
   // Export locks per techpackId to prevent concurrent exports
   // Auto-release locks older than 5 minutes to prevent stuck locks
@@ -78,7 +91,7 @@ class PDFService {
         // Ignore close errors
       }
       this.browser = null;
-      console.warn('⚠️  Browser was disconnected, resetting...');
+      pdfWarn('⚠️  Browser was disconnected, resetting...');
     }
 
     if (!this.browser) {
@@ -109,13 +122,13 @@ class PDFService {
 
         if (process.env.CHROME_PATH) {
           launchOptions.executablePath = process.env.CHROME_PATH;
-          console.log(`Using Chrome/Chromium from: ${process.env.CHROME_PATH}`);
+          pdfLog(`Using Chrome/Chromium from: ${process.env.CHROME_PATH}`);
         } else {
-          console.log('Using Puppeteer bundled Chromium');
+          pdfLog('Using Puppeteer bundled Chromium');
         }
 
         this.browser = await puppeteer.launch(launchOptions);
-        console.log('✅ Browser launched successfully with optimized settings');
+        pdfLog('✅ Browser launched successfully with optimized settings');
 
         // ✅ Add disconnected listener ONCE when browser is launched
         this.browser.on('disconnected', () => {
@@ -220,7 +233,7 @@ class PDFService {
       this.imageCache.set(cacheKey, compressed);
       return compressed;
     } catch (error) {
-      console.warn(`Image compression failed for ${resolvedUrl?.substring(0, 50)}..., using original URL`);
+      pdfWarn(`Image compression failed for ${resolvedUrl?.substring(0, 50)}..., using original URL`);
       this.imageCache.set(cacheKey, resolvedUrl);
       return resolvedUrl;
     }
@@ -253,7 +266,8 @@ class PDFService {
     if (!date) return '—';
     try {
       const d = typeof date === 'string' ? new Date(date) : date;
-      return d.toLocaleDateString('en-US', { 
+      const locale = this.currentLanguage === 'vi' ? 'vi-VN' : 'en-US';
+      return d.toLocaleDateString(locale, { 
         year: 'numeric', 
         month: 'short', 
         day: 'numeric' 
@@ -383,7 +397,7 @@ class PDFService {
   ): Promise<any[]> {
     if (!bom || bom.length === 0) return [];
     
-    console.log(`📋 Processing ${bom.length} BOM items...`);
+    pdfLog(`📋 Processing ${bom.length} BOM items...`);
     const bomByPart: { [key: string]: any[] } = {};
     
     // Collect all image URLs for batch compression
@@ -399,7 +413,7 @@ class PDFService {
     }
     
     // Compress all images in parallel with timeout
-    console.log(`🖼️  Compressing ${imageUrls.length} BOM images...`);
+    pdfLog(`🖼️  Compressing ${imageUrls.length} BOM images...`);
     const compressedImages = await compressImagesBatch(imageUrls, {
       quality: imageOptions?.quality || 65,
       maxWidth: imageOptions?.maxWidth || 800, // Smaller for thumbnails
@@ -502,7 +516,7 @@ class PDFService {
    * Optimized measurements preparation
    */
   private prepareMeasurementsOptimized(techpack: any): any {
-    console.log('📏 Processing measurements...');
+    pdfLog('📏 Processing measurements...');
     const sizeRange = techpack.measurementSizeRange || ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
     const baseSize = techpack.measurementBaseSize || sizeRange[0] || 'M';
     
@@ -582,7 +596,7 @@ class PDFService {
    * Optimized sample rounds preparation
    */
   private prepareSampleRoundsOptimized(techpack: any): any[] {
-    console.log('🔬 Processing sample rounds...');
+    pdfLog('🔬 Processing sample rounds...');
     const sizeRange = techpack.measurementSizeRange || ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
     const unit = (techpack.measurementUnit as string) || 'cm';
     
@@ -651,7 +665,7 @@ class PDFService {
     techpack: any,
     imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number }
   ): Promise<any[]> {
-    console.log('📐 Processing how to measure...');
+    pdfLog('📐 Processing how to measure...');
     const items = techpack.howToMeasure || [];
     
     // Collect image URLs
@@ -659,7 +673,7 @@ class PDFService {
     
     // Compress images in batch with timeout
     if (imageUrls.length > 0) {
-      console.log(`🖼️  Compressing ${imageUrls.length} how-to-measure images...`);
+      pdfLog(`🖼️  Compressing ${imageUrls.length} how-to-measure images...`);
       const compressedImages = await compressImagesBatch(imageUrls, {
         quality: imageOptions?.quality || 65,
         maxWidth: imageOptions?.maxWidth || 1000,
@@ -708,7 +722,7 @@ class PDFService {
     techpack: any,
     imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number }
   ): Promise<any[]> {
-    console.log('🎨 Processing colorways...');
+    pdfLog('🎨 Processing colorways...');
     const colorways = techpack.colorways || [];
     
     // Collect all image URLs (colorway images + part images)
@@ -730,7 +744,7 @@ class PDFService {
     
     // Compress all images with timeout
     if (imageUrls.length > 0) {
-      console.log(`🖼️  Compressing ${imageUrls.length} colorway images...`);
+      pdfLog(`🖼️  Compressing ${imageUrls.length} colorway images...`);
       const compressedImages = await compressImagesBatch(imageUrls, {
         quality: imageOptions?.quality || 65,
         maxWidth: imageOptions?.maxWidth || 1000,
@@ -840,7 +854,7 @@ class PDFService {
         status: rev.statusAtChange || '—',
       }));
     } catch (error: any) {
-      console.warn('⚠️ Revision fetch failed:', error.message);
+      pdfWarn('⚠️ Revision fetch failed:', error.message);
       return [];
     }
   }
@@ -850,9 +864,10 @@ class PDFService {
    */
   private async prepareTechPackDataAsync(
     techpack: TechPackForPDF,
-    imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number }
+    imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number },
+    language: PDFLanguage = 'en'
   ): Promise<any> {
-    console.log('📦 Starting ASYNC data preparation with image compression...');
+    pdfLog('📦 Starting ASYNC data preparation with image compression...');
     const startTime = Date.now();
 
     const currency = techpack.currency || 'USD';
@@ -908,10 +923,10 @@ class PDFService {
     };
 
     // Compress main images (logo and cover) first with timeout protection
-    console.log('🖼️  Compressing main images (logo, cover, design sketch)...');
-    console.log('   - companyLogoUrl:', (techpack as any).companyLogoUrl);
-    console.log('   - designSketchUrl:', (techpack as any).designSketchUrl);
-    console.log('   - coverImageUrl (raw):', (techpack as any).coverImageUrl);
+    pdfLog('🖼️  Compressing main images (logo, cover, design sketch)...');
+    pdfLog('   - companyLogoUrl:', (techpack as any).companyLogoUrl);
+    pdfLog('   - designSketchUrl:', (techpack as any).designSketchUrl);
+    pdfLog('   - coverImageUrl (raw):', (techpack as any).coverImageUrl);
 
     // ✅ FIX: compressedCover và compressedDesignSketch đều dùng designSketchUrl (cover = design sketch trong model này)
     // Nếu có coverImageUrl riêng thì dùng, không thì dùng designSketchUrl cho cả 2
@@ -934,7 +949,7 @@ class PDFService {
       }).catch(() => this.getPlaceholderSVG()),
     ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : this.getPlaceholderSVG()));
 
-    console.log('🚀 Processing data in parallel with image compression...');
+    pdfLog('🚀 Processing data in parallel with image compression...');
     const parallelStart = Date.now();
     
     const [bomParts, measurementData, sampleRounds, howToMeasures, colorways] = await Promise.all([
@@ -957,7 +972,7 @@ class PDFService {
       }),
     ]);
     
-    console.log(`✅ Parallel processing completed in ${Date.now() - parallelStart}ms`);
+    pdfLog(`✅ Parallel processing completed in ${Date.now() - parallelStart}ms`);
 
     const uniqueSuppliers = new Set<string>();
     let approvedCount = 0;
@@ -989,7 +1004,13 @@ class PDFService {
     };
 
     const prepTime = Date.now() - startTime;
-    console.log(`✅ ASYNC data preparation completed in ${prepTime}ms`);
+    pdfLog(`✅ ASYNC data preparation completed in ${prepTime}ms`);
+
+    const translatedGender = translateOptionValue(language, 'gender', techpack.gender || '—');
+    const translatedProductClass = translateOptionValue(language, 'productClass', techpack.category || articleSummary?.technicalInfo?.productClass || '—');
+    const translatedFitType = translateOptionValue(language, 'fitType', techpack.fitType || articleSummary?.technicalInfo?.fitType || '—');
+    const translatedPricePoint = translateOptionValue(language, 'pricePoint', techpack.pricePoint || articleSummary?.generalInfo?.pricePoint || '—');
+    const translatedLifecycleStage = translateOptionValue(language, 'lifecycleStage', techpack.lifecycleStage || techpack.status || '—');
 
     return {
       meta: {
@@ -998,10 +1019,10 @@ class PDFService {
         version: (techpack as any).sampleType || (techpack as any).version || '—',
         season: techpack.season || '—',
         brand: techpack.brand || '—',
-        category: techpack.category || '—',
-        productClass: techpack.category || '—',
-        gender: techpack.gender || '—',
-        fitType: techpack.fitType || '—',
+        category: translatedProductClass || techpack.category || '—',
+        productClass: translatedProductClass || techpack.category || '—',
+        gender: translatedGender || techpack.gender || '—',
+        fitType: translatedFitType || techpack.fitType || '—',
         collectionName: techpack.collectionName || '—',
         supplier: techpack.supplier || '—',
         updatedAt: this.formatDate(techpack.updatedAt),
@@ -1010,10 +1031,10 @@ class PDFService {
         designSketchUrl: compressedDesignSketch,
         productDescription: techpack.productDescription || techpack.description || '—',
         fabricDescription: techpack.fabricDescription || '—',
-        lifecycleStage: techpack.lifecycleStage || '—',
+        lifecycleStage: translatedLifecycleStage || techpack.lifecycleStage || '—',
         status: techpack.status || '—',
         targetMarket: techpack.targetMarket || '—',
-        pricePoint: techpack.pricePoint || '—',
+        pricePoint: translatedPricePoint || techpack.pricePoint || '—',
         retailPrice: techpack.retailPrice,
         currency: currency,
         description: techpack.description || techpack.productDescription || '—',
@@ -1053,7 +1074,7 @@ class PDFService {
     try {
       // Check if page is still available and ready
       if (page.isClosed()) {
-        console.warn('Page is closed, skipping image loading');
+        pdfWarn('Page is closed, skipping image loading');
         return;
       }
 
@@ -1062,7 +1083,7 @@ class PDFService {
 
       // Check again after wait
       if (page.isClosed()) {
-        console.warn('Page closed during wait, skipping image loading');
+        pdfWarn('Page closed during wait, skipping image loading');
         return;
       }
 
@@ -1082,7 +1103,7 @@ class PDFService {
 
             const checkComplete = () => {
               if (loaded + timedOut >= total) {
-                console.log(`Images loaded: ${loaded}/${total}, timed out: ${timedOut}`);
+                pdfLog(`Images loaded: ${loaded}/${total}, timed out: ${timedOut}`);
                 resolve();
               }
             };
@@ -1091,7 +1112,7 @@ class PDFService {
               batch.forEach(img => {
                 const timeoutId = setTimeout(() => {
                   timedOut++;
-                  console.warn(`Image timeout: ${img.src.substring(0, 50)}...`);
+                  pdfWarn(`Image timeout: ${img.src.substring(0, 50)}...`);
                   checkComplete();
                 }, timeout);
 
@@ -1103,7 +1124,7 @@ class PDFService {
 
                 img.onload = cleanup;
                 img.onerror = () => {
-                  console.warn(`Image load error: ${img.src.substring(0, 50)}...`);
+                  pdfWarn(`Image load error: ${img.src.substring(0, 50)}...`);
                   cleanup();
                 };
               });
@@ -1116,12 +1137,12 @@ class PDFService {
 
             setTimeout(() => {
               if (loaded + timedOut < total) {
-                console.warn(`Global image timeout: ${loaded + timedOut}/${total} processed`);
+                pdfWarn(`Global image timeout: ${loaded + timedOut}/${total} processed`);
                 resolve();
               }
             }, timeout * 2);
           } catch (error) {
-            console.warn('Error in image loading evaluation:', error);
+            pdfWarn('Error in image loading evaluation:', error);
             resolve(); // Resolve anyway to continue
           }
         });
@@ -1129,7 +1150,7 @@ class PDFService {
     } catch (error: any) {
       // If page.evaluate fails, it's likely page is closed or not ready
       // Continue anyway as images might already be loaded
-      console.warn('Image loading error (continuing):', error.message || error);
+      pdfWarn('Image loading error (continuing):', error.message || error);
     }
   }
 
@@ -1150,7 +1171,7 @@ class PDFService {
     const now = Date.now();
     for (const [id, lock] of this.exportLocks.entries()) {
       if (now - lock.startTime > this.LOCK_TIMEOUT) {
-        console.warn(`🧹 Removing stale lock for TechPack ${id} (age: ${Math.round((now - lock.startTime) / 1000)}s)`);
+        pdfWarn(`🧹 Removing stale lock for TechPack ${id} (age: ${Math.round((now - lock.startTime) / 1000)}s)`);
         this.exportLocks.delete(id);
       }
     }
@@ -1166,7 +1187,7 @@ class PDFService {
 
     // Set lock
     this.exportLocks.set(techpackId, { requestId, startTime: Date.now() });
-    console.log(`🔒 Set export lock for TechPack ${techpackId} [${requestId}]`);
+    pdfLog(`🔒 Set export lock for TechPack ${techpackId} [${requestId}]`);
 
     this.activeGenerations++;
     const totalStartTime = Date.now();
@@ -1174,10 +1195,10 @@ class PDFService {
     let context: BrowserContext | null = null;
 
     try {
-      console.log('═══════════════════════════════════════════════════════');
-      console.log(`🚀 Starting ASYNC PDF generation [${requestId}]`);
-      console.log(`📦 TechPack ID: ${techpackId}`);
-      console.log('📊 Data sizes:', {
+      pdfLog('═══════════════════════════════════════════════════════');
+      pdfLog(`🚀 Starting ASYNC PDF generation [${requestId}]`);
+      pdfLog(`📦 TechPack ID: ${techpackId}`);
+      pdfLog('📊 Data sizes:', {
         bom: techpack.bom?.length || 0,
         measurements: techpack.measurements?.length || 0,
         sampleRounds: techpack.sampleMeasurementRounds?.length || 0,
@@ -1193,7 +1214,7 @@ class PDFService {
       // ✅ REQUIREMENT 1: Create isolated incognito context for each export
       try {
         context = await browser.createIncognitoBrowserContext();
-        console.log(`🔒 Created isolated incognito context [${requestId}]`);
+        pdfLog(`🔒 Created isolated incognito context [${requestId}]`);
       } catch (error: any) {
         throw new Error(`Failed to create incognito context [${requestId}]: ${error.message}`);
       }
@@ -1208,7 +1229,7 @@ class PDFService {
       try {
         page = await context.newPage();
         pageId = page.url(); // Use URL as page identifier
-        console.log(`📄 Created new page in isolated context [${requestId}] [pageId: ${pageId}]`);
+        pdfLog(`📄 Created new page in isolated context [${requestId}] [pageId: ${pageId}]`);
       } catch (error: any) {
         // Clean up context if page creation fails
         if (context) {
@@ -1226,7 +1247,7 @@ class PDFService {
       // Capture pageId in closure for event listeners
       const capturedPageId = pageId;
       page.on('close', () => {
-        console.log(`⚠️  Page closed event [${requestId}] [pageId: ${capturedPageId}]`);
+        pdfLog(`⚠️  Page closed event [${requestId}] [pageId: ${capturedPageId}]`);
       });
       
       page.on('framedetached', (frame) => {
@@ -1249,7 +1270,7 @@ class PDFService {
       page.setDefaultNavigationTimeout(this.PAGE_SET_CONTENT_TIMEOUT);
       
       // ✅ REQUIREMENT 3: Navigate to blank page first (no waitForNavigation after setContent)
-      console.log(`🔄 Navigating to blank page [${requestId}]`);
+      pdfLog(`🔄 Navigating to blank page [${requestId}]`);
       if (page.isClosed()) {
         throw new Error(`Page already closed before navigation [${requestId}]`);
       }
@@ -1277,17 +1298,22 @@ class PDFService {
       };
 
       // PARALLEL: Prepare data AND fetch revisions at the same time
-      console.log('🔄 Running parallel operations...');
+      pdfLog('🔄 Running parallel operations...');
+      const language: PDFLanguage = options.language === 'vi' ? 'vi' : 'en';
+      this.currentLanguage = language;
       const [templateData, revisionHistory] = await Promise.all([
-        this.prepareTechPackDataAsync(techpack, imageOptions),
+        this.prepareTechPackDataAsync(techpack, imageOptions, language),
         this.fetchRevisionHistoryAsync(techpack._id)
       ]);
       
       templateData.revisionHistory = revisionHistory;
-      console.log(`✅ Got ${revisionHistory.length} revisions`);
+      const translations = getPDFTranslations(language);
+      templateData.translations = translations;
+      templateData.language = language;
+      pdfLog(`✅ Got ${revisionHistory.length} revisions`);
 
       // Load template
-      console.log('📄 Loading template...');
+      pdfLog('📄 Loading template...');
       const templatePath = path.join(this.templateDir, 'techpack-full-template.ejs');
       let templateContent: string;
       
@@ -1299,16 +1325,16 @@ class PDFService {
       }
 
       // Render HTML
-      console.log('🎨 Rendering HTML...');
+      pdfLog('🎨 Rendering HTML...');
       const renderStart = Date.now();
       const html = await ejs.render(templateContent, templateData, {
         async: false,
         root: this.templateDir,
       });
-      console.log(`✅ HTML rendered in ${Date.now() - renderStart}ms`);
+      pdfLog(`✅ HTML rendered in ${Date.now() - renderStart}ms`);
 
       // Load content
-      console.log(`📥 Loading content into page [${requestId}]`);
+      pdfLog(`📥 Loading content into page [${requestId}]`);
       const contentStart = Date.now();
       
       // ✅ REQUIREMENT 2: Check page state before setContent
@@ -1322,10 +1348,10 @@ class PDFService {
         waitUntil: 'domcontentloaded', // Chỉ đợi DOM ready, không đợi network idle
         timeout: this.PAGE_SET_CONTENT_TIMEOUT,
       });
-      console.log(`✅ Content loaded in ${Date.now() - contentStart}ms [${requestId}]`);
+      pdfLog(`✅ Content loaded in ${Date.now() - contentStart}ms [${requestId}]`);
 
       // Wait for layout to settle and ensure page is stable
-      console.log(`⏳ Waiting for layout to settle [${requestId}]`);
+      pdfLog(`⏳ Waiting for layout to settle [${requestId}]`);
       await new Promise(resolve => setTimeout(resolve, 1500)); // Increased wait time
       
       // ✅ REQUIREMENT 2: Check if page is still available
@@ -1347,7 +1373,7 @@ class PDFService {
       }
       
       // Load images
-      console.log('🖼️  Loading images (with timeout)...');
+      pdfLog('🖼️  Loading images (with timeout)...');
       const imageStart = Date.now();
       await this.waitForImagesOptimized(page);
       
@@ -1357,7 +1383,7 @@ class PDFService {
       }
       
       // Additional image optimization: compress any remaining large images
-      console.log('🔧 Optimizing images in page...');
+      pdfLog('🔧 Optimizing images in page...');
       try {
         await page.evaluate((maxWidth: number, maxHeight: number) => {
         const images = Array.from(document.querySelectorAll('img')) as HTMLImageElement[];
@@ -1397,28 +1423,28 @@ class PDFService {
               img.src = compressedDataUrl;
             } catch (e) {
               // If compression fails, keep original
-              console.warn('Image compression failed:', e);
+              pdfWarn('Image compression failed:', e);
             }
           }
         });
       }, imageOptions.maxWidth, imageOptions.maxHeight);
       } catch (error: any) {
         // If page.evaluate fails, continue anyway - images are already compressed
-        console.warn('Page image optimization failed (continuing):', error.message || error);
+        pdfWarn('Page image optimization failed (continuing):', error.message || error);
       }
       
-      console.log(`✅ Images processed in ${Date.now() - imageStart}ms`);
+      pdfLog(`✅ Images processed in ${Date.now() - imageStart}ms`);
 
       // Run anti-waste script to scale images and prevent page breaks
       try {
-        console.log('🔧 Running anti-waste script to optimize image placement...');
+        pdfLog('🔧 Running anti-waste script to optimize image placement...');
         await page.evaluate(() => {
           const win = window as any;
           if (typeof win.processAntiWasteImages === 'function') {
-            console.log('[Anti-waste] Called from Puppeteer');
+            pdfLog('[Anti-waste] Called from Puppeteer');
             win.processAntiWasteImages();
           } else {
-            console.warn('[Anti-waste] processAntiWasteImages function not found');
+            pdfWarn('[Anti-waste] processAntiWasteImages function not found');
           }
         });
         
@@ -1433,13 +1459,13 @@ class PDFService {
           }
         });
         
-        console.log('✅ Anti-waste script executed');
+        pdfLog('✅ Anti-waste script executed');
       } catch (error: any) {
-        console.warn('Anti-waste script execution failed (continuing):', error.message || error);
+        pdfWarn('Anti-waste script execution failed (continuing):', error.message || error);
       }
 
       // Generate PDF
-      console.log('📄 Generating PDF...');
+      pdfLog('📄 Generating PDF...');
       const pdfStart = Date.now();
       const pdfOptions: any = {
         format: options.format || 'A4',
@@ -1456,7 +1482,7 @@ class PDFService {
         preferCSSPageSize: true,
       };
       
-      console.log('📋 PDF Options initialized:', {
+      pdfLog('📋 PDF Options initialized:', {
         displayHeaderFooter: pdfOptions.displayHeaderFooter,
         margin: pdfOptions.margin,
         format: pdfOptions.format,
@@ -1481,17 +1507,17 @@ class PDFService {
           }
           
           if (!footerTemplate.includes('pageNumber') || !footerTemplate.includes('totalPages')) {
-            console.warn('⚠️  Footer template missing pageNumber or totalPages - Puppeteer may not render page numbers');
+            pdfWarn('⚠️  Footer template missing pageNumber or totalPages - Puppeteer may not render page numbers');
           }
           
           // Set footer template vào pdfOptions
           pdfOptions.footerTemplate = footerTemplate;
           pdfOptions.displayHeaderFooter = true;
           
-          console.log('✅ Footer template loaded, length:', footerTemplate.length);
-          console.log('📋 Footer template preview (first 200 chars):', footerTemplate.substring(0, 200));
-          console.log('📋 Footer template has pageNumber:', footerTemplate.includes('pageNumber'));
-          console.log('📋 Footer template has totalPages:', footerTemplate.includes('totalPages'));
+          pdfLog('✅ Footer template loaded, length:', footerTemplate.length);
+          pdfLog('📋 Footer template preview (first 200 chars):', footerTemplate.substring(0, 200));
+          pdfLog('📋 Footer template has pageNumber:', footerTemplate.includes('pageNumber'));
+          pdfLog('📋 Footer template has totalPages:', footerTemplate.includes('totalPages'));
         } catch (error: any) {
           console.error('❌ Could not load footer template:', error.message || error);
           // Fallback: Tắt footerTemplate nếu có lỗi
@@ -1524,7 +1550,7 @@ class PDFService {
       }
 
       // Log PDF options để debug footer
-      console.log('📋 PDF Options before generation:', {
+      pdfLog('📋 PDF Options before generation:', {
         displayHeaderFooter: pdfOptions.displayHeaderFooter,
         hasHeaderTemplate: !!pdfOptions.headerTemplate,
         hasFooterTemplate: !!pdfOptions.footerTemplate,
@@ -1533,9 +1559,9 @@ class PDFService {
         orientation: pdfOptions.orientation,
       });
       
-      console.log(`📄 Generating PDF [${requestId}]`);
+      pdfLog(`📄 Generating PDF [${requestId}]`);
       const pdfBuffer = await page.pdf(pdfOptions);
-      console.log(`✅ PDF generated in ${Date.now() - pdfStart}ms [${requestId}]`);
+      pdfLog(`✅ PDF generated in ${Date.now() - pdfStart}ms [${requestId}]`);
 
       // ✅ REQUIREMENT 2: Close page only after PDF is successfully generated
       // Don't close here - will be closed in finally block
@@ -1545,13 +1571,13 @@ class PDFService {
       const filename = `Techpack_${techpack.articleCode}_${sampleType}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_');
 
       const totalTime = Date.now() - totalStartTime;
-      console.log('═══════════════════════════════════════════════════════');
-      console.log(`✅ PDF GENERATION SUCCESSFUL [${requestId}]`);
-      console.log(`📦 TechPack ID: ${techpackId}`);
-      console.log(`📊 Total time: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s)`);
-      console.log(`📄 File: ${filename}`);
-      console.log(`📦 Size: ${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB`);
-      console.log('═══════════════════════════════════════════════════════');
+      pdfLog('═══════════════════════════════════════════════════════');
+      pdfLog(`✅ PDF GENERATION SUCCESSFUL [${requestId}]`);
+      pdfLog(`📦 TechPack ID: ${techpackId}`);
+      pdfLog(`📊 Total time: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s)`);
+      pdfLog(`📄 File: ${filename}`);
+      pdfLog(`📦 Size: ${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB`);
+      pdfLog('═══════════════════════════════════════════════════════');
 
       return {
         buffer: pdfBuffer,
@@ -1576,7 +1602,7 @@ class PDFService {
       // Close page first
       if (page && !page.isClosed()) {
         try {
-          console.log(`🧹 Closing page [${requestId}]`);
+          pdfLog(`🧹 Closing page [${requestId}]`);
           await page.close();
         } catch (cleanupError: any) {
           // Ignore cleanup errors if page is already closed
@@ -1590,7 +1616,7 @@ class PDFService {
       // Close context (incognito browser context)
       if (context) {
         try {
-          console.log(`🧹 Closing incognito context [${requestId}]`);
+          pdfLog(`🧹 Closing incognito context [${requestId}]`);
           await context.close();
         } catch (cleanupError: any) {
           console.error(`Context cleanup error [${requestId}]:`, cleanupError.message || cleanupError);
@@ -1601,7 +1627,7 @@ class PDFService {
       // ✅ REQUIREMENT 2: Always remove lock in finally, even if error occurs early
       if (this.exportLocks.has(techpackId)) {
         this.exportLocks.delete(techpackId);
-        console.log(`🔓 Released export lock for TechPack ${techpackId} [${requestId}]`);
+        pdfLog(`🔓 Released export lock for TechPack ${techpackId} [${requestId}]`);
       }
       
       this.activeGenerations--;
@@ -1656,11 +1682,12 @@ class PDFService {
       
       // Validate footer có chứa pageNumber và totalPages
       if (!footerHTML.includes('pageNumber') || !footerHTML.includes('totalPages')) {
-        console.warn('⚠️  Footer template missing pageNumber or totalPages classes');
+        pdfWarn('⚠️  Footer template missing pageNumber or totalPages classes');
       }
       
-      console.log('✅ Footer template generated, length:', footerHTML.length);
-      console.log('📋 Footer template full content:', footerHTML);
+    pdfLog('✅ Footer template generated, length:', footerHTML.length);
+    // Avoid dumping full footer HTML to logs (very noisy); enable with PDF_DEBUG if needed.
+    pdfLog('📋 Footer template preview (first 200 chars):', footerHTML.substring(0, 200));
       
       return footerHTML;
     } catch (error: any) {
@@ -1676,7 +1703,7 @@ class PDFService {
   clearCaches(): void {
     this.imageCache.clear();
     this.templateCache.clear();
-    console.log('🧹 Caches cleared');
+    pdfLog('🧹 Caches cleared');
   }
 }
 

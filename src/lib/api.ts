@@ -491,10 +491,14 @@ class ApiClient {
    * @param options PDF export options (orientation, format)
    * @returns Blob of PDF file
    */
-  async exportTechPackPDF(id: string, options?: { orientation?: 'portrait' | 'landscape'; format?: 'A4' | 'Letter' | 'Legal' }): Promise<Blob> {
+  async exportTechPackPDF(
+    id: string,
+    options?: { orientation?: 'portrait' | 'landscape'; format?: 'A4' | 'Letter' | 'Legal'; language?: 'en' | 'vi' }
+  ): Promise<Blob> {
     const params: any = {};
     if (options?.orientation) params.orientation = options.orientation;
     if (options?.format) params.format = options.format;
+    if (options?.language) params.language = options.language;
 
     const response = await this.axiosInstance.get(`/techpacks/${id}/pdf`, {
       params,

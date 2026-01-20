@@ -1183,7 +1183,7 @@ const loadCachedPagination = (): Omit<TechPackListResponse, 'data'> => {
 export const TechPackProvider = ({ children }: { children: ReactNode }) => {
   // Access auth state to decide when to load protected data
   const auth = useAuth();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [techPacks, setTechPacks] = useState<ApiTechPack[]>(() => loadCachedTechPacks());
   const [loading, setLoading] = useState<boolean>(true);
   const [pagination, setPagination] = useState<Omit<TechPackListResponse, 'data'>>(() => loadCachedPagination());
@@ -2017,6 +2017,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
       const blob = await api.exportTechPackPDF(state.techpack.id, {
         orientation: 'portrait',
         format: 'A4',
+        language: lang === 'vi' ? 'vi' : 'en',
       });
 
       // Create download link

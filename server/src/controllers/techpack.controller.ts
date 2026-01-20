@@ -16,6 +16,7 @@ import { cacheService, CacheKeys, CacheTTL } from '../services/cache.service';
 import CacheInvalidationUtil from '../utils/cache-invalidation.util';
 import _ from 'lodash';
 import { hasEditAccess } from '../utils/access-control.util';
+import { PDFLanguage } from '../utils/pdf-translations';
 
 /**
  * Helper function to merge arrays of subdocuments
@@ -2180,7 +2181,7 @@ export class TechPackController {
     
     try {
       const { id } = req.params;
-      const { orientation, format } = req.query;
+      const { orientation, format, language } = req.query;
       const user = req.user!;
 
       // Get techpack (technicalDesignerId is now a string field, no need to populate)
@@ -2206,6 +2207,7 @@ export class TechPackController {
 
       // Prepare PDF options - Default to landscape for better table display
       // Reduced image quality and size limits for smaller PDF files
+      const pdfLanguage: PDFLanguage = language === 'vi' ? 'vi' : 'en';
       const pdfOptions = {
         format: (format as 'A4' | 'Letter' | 'Legal') || 'A4',
         orientation: (orientation as 'portrait' | 'landscape') || 'landscape',
@@ -2214,6 +2216,7 @@ export class TechPackController {
         imageQuality: 65, // Reduced from 90 to 65 for better compression (target: <10MB)
         imageMaxWidth: 1200, // Max width in pixels
         imageMaxHeight: 800, // Max height in pixels
+        language: pdfLanguage,
         margin: {
           top: '10mm',
           bottom: '15mm', // Tăng lên 15mm để đảm bảo footer có đủ không gian hiển thị số trang

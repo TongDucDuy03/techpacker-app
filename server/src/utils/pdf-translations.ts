@@ -101,6 +101,30 @@ export interface PDFTranslations {
   qty: string;
   uom: string;
   colorCode: string;
+
+  // Additional PDF-only labels
+  sizeRange: string;
+  notesLabel: string;
+  sizeWidthUsage: string;
+  constructionDetails: string;
+  steps: string;
+  tips: string;
+  commonMistakes: string;
+  labelsPacking: string;
+  gender: string;
+  targetMarket: string;
+  ranking: string;
+  retailPrice: string;
+  minusTolerance: string;
+  plusTolerance: string;
+  requested: string;
+  measured: string;
+  diff: string;
+  revised: string;
+  pom: string;
+  point: string;
+  unitLabel: string;
+  byLabel: string;
 }
 
 const translations: Record<PDFLanguage, PDFTranslations> = {
@@ -185,6 +209,28 @@ const translations: Record<PDFLanguage, PDFTranslations> = {
     qty: 'Qty',
     uom: 'UOM',
     colorCode: 'Color Code',
+    sizeRange: 'Size Range',
+    notesLabel: 'Notes',
+    sizeWidthUsage: 'Size/Width/Usage',
+    constructionDetails: 'Construction Details',
+    steps: 'Steps',
+    tips: 'Tips',
+    commonMistakes: 'Common Mistakes',
+    labelsPacking: 'Labels - Packing',
+    gender: 'Gender',
+    targetMarket: 'Target Market',
+    ranking: 'Ranking',
+    retailPrice: 'Retail Price',
+    minusTolerance: '-Tol',
+    plusTolerance: '+Tol',
+    requested: 'Requested',
+    measured: 'Measured',
+    diff: 'Diff',
+    revised: 'Revised',
+    pom: 'POM',
+    point: 'Point',
+    unitLabel: 'Unit',
+    byLabel: 'By',
   },
   vi: {
     productName: 'Tên sản phẩm',
@@ -267,6 +313,28 @@ const translations: Record<PDFLanguage, PDFTranslations> = {
     qty: 'SL',
     uom: 'ĐVT',
     colorCode: 'Mã màu',
+    sizeRange: 'Dải size',
+    notesLabel: 'Ghi chú',
+    sizeWidthUsage: 'Kích thước/Bề rộng/Cách dùng',
+    constructionDetails: 'Hướng dẫn cấu trúc',
+    steps: 'Các bước',
+    tips: 'Mẹo',
+    commonMistakes: 'Lỗi thường gặp',
+    labelsPacking: 'Nhãn - Đóng gói',
+    gender: 'Giới tính',
+    targetMarket: 'Thị trường mục tiêu',
+    ranking: 'Phân hạng',
+    retailPrice: 'Giá bán lẻ',
+    minusTolerance: '-Dung sai',
+    plusTolerance: '+Dung sai',
+    requested: 'Yêu cầu',
+    measured: 'Đo được',
+    diff: 'Chênh lệch',
+    revised: 'Điều chỉnh',
+    pom: 'POM',
+    point: 'Điểm đo',
+    unitLabel: 'Đơn vị',
+    byLabel: 'Bởi',
   },
 };
 
