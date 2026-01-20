@@ -1548,7 +1548,7 @@ const translations: Record<LanguageCode, TranslationDict> = {
     'form.packing.tip2': 'Dùng công cụ ảnh hoặc dán ảnh inline để minh họa các bước gấp, bố cục thùng carton hoặc yêu cầu nhãn.',
     'form.packing.tip3': 'Checklist có thể tạo bằng nút checklist hoặc danh sách bullet.',
     'form.packing.tip4': 'Toàn bộ nội dung sẽ được nhúng vào file Techpack PDF chính xác như hiển thị tại đây.',
-    'form.packing.modalTitle': 'Chi tiết cấu trúc',
+    'form.packing.modalTitle': 'Chi tiết đóng gói & gấp',
     'form.packing.imageLabel': 'Ảnh minh họa',
     'form.packing.noteLabel': 'Ghi chú',
     'form.packing.listTitle': 'Danh sách cấu trúc',
