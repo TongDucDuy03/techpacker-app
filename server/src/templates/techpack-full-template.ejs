@@ -400,6 +400,17 @@
       /* Khi text ngắn → ảnh sẽ tự động scale lớn lên để lấp phần trống */
     }
 
+    .construction-note {
+      white-space: pre-wrap !important;     /* Giữ xuống dòng như UI */
+      overflow-wrap: anywhere !important;   /* Cắt chuỗi dài */
+      word-break: break-word !important;
+      font-weight: 400 !important;
+      line-height: 1.5;
+      font-size: 14px;
+      margin-top: 4px;
+      margin-bottom: 8px;
+    }
+
     .construction-item-title {
       font-size: 16px;
       font-weight: bold;
@@ -747,6 +758,16 @@
       box-sizing: border-box;
     }
 
+    /* =========================
+       PACKING (.pp) - FIX LAYOUT
+       ========================= */
+
+    /* 1) Reset rule cũ layout ngang - xóa max-width:50% */
+    .pp .packing-layout__image {
+      max-width: none !important;
+      width: 100% !important;
+    }
+
     /* Packing layout - đổi từ row sang column */
     .pp .packing-layout {
       display: flex !important;
@@ -757,23 +778,16 @@
       box-sizing: border-box;
     }
 
-    /* Ảnh trong phần Packing - chiếm 90% diện tích khả dụng */
-    .pp .packing-layout__image,
-    .pp .section-content img,
-    .pp .section-content .packing-layout__image {
-      flex: 0 0 90% !important;
-      /* Chiếm 90% diện tích khả dụng */
+    /* Ảnh trong phần Packing - chiếm phần còn lại */
+    .pp .packing-layout__image {
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
       min-height: 0;
-      max-height: none !important;
       box-sizing: border-box;
-      width: 100% !important;
     }
 
-    .pp .packing-layout__image img,
-    .pp .section-content img {
+    .pp .packing-layout__image img {
       width: 100% !important;
       height: 100% !important;
       max-width: 100% !important;
@@ -789,14 +803,11 @@
       background: #f9f9f9;
     }
 
-    /* Text/Note trong phần Packing - chiếm 10% diện tích khả dụng */
-    .pp .packing-layout__note,
-    .pp .section-content > div > *:not(.packing-layout__image):not(img) {
-      flex: 0 0 10% !important;
-      /* Chiếm 10% diện tích khả dụng */
+    /* Text/Note trong phần Packing - chỉ cao theo nội dung */
+    .pp .packing-layout__note {
+      flex: 0 0 auto !important;
       overflow-y: auto;
       box-sizing: border-box;
-      min-height: 0;
       font-size: 14px;
       line-height: 1.6;
       color: #111827;
@@ -806,7 +817,8 @@
       border-left: 3px solid #2563eb;
     }
 
-    .packing-layout__note {
+    /* Packing layout note - chỉ áp dụng ngoài .pp để tránh conflict */
+    body:not(.pp) .packing-layout__note {
       flex: 1;
       font-size: 14px;
       line-height: 1.6;
@@ -932,9 +944,7 @@
         /* Luôn kết thúc trang sau mỗi item */
         break-before: page !important;
         /* LUÔN bắt đầu ở trang mới (kể cả item đầu tiên) */
-        min-height: calc(100vh - 20mm) !important;
-        height: calc(100vh - 20mm) !important;
-        /* Force height để ảnh có thể scale tối đa */
+        /* Không dùng 100vh ở đây, chiều cao sẽ được override bằng mm ở block cuối CSS */
         display: flex !important;
         flex-direction: column !important;
         box-sizing: border-box !important;
@@ -960,14 +970,15 @@
         max-height: none !important;
         break-inside: avoid !important;
         box-sizing: border-box !important;
-        align-items: stretch !important;
+        align-items: center !important;
+        justify-content: center !important;
       }
 
       .construction-image {
-        width: auto !important; /* ✅ ĐỔI từ 100% sang auto */
-        height: auto !important; /* ✅ ĐỔI từ 100% sang auto */
-        max-width: 100%;
-        max-height: 600px; /* ✅ THÊM giới hạn */
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
         object-fit: contain !important;
         border: 1px solid #ddd;
         border-radius: 4px;
@@ -1004,63 +1015,74 @@
         page-break-before: auto !important;
       }
 
-      /* Packing layout - ảnh trên (90%), chữ dưới (10%) */
-      .pp .section-content {
+      /* =========================
+         PACKING (.pp) - FIX LAYOUT PRINT
+         ========================= */
+
+      /* Packing item = full page usable height */
+      .pp.packing-item {
+        height: calc(100vh - 20mm) !important;
+        min-height: calc(100vh - 20mm) !important;
         display: flex !important;
         flex-direction: column !important;
-        min-height: calc(100vh - 20mm - 120px - 76px) !important;
+      }
+
+      /* Vùng content phải là flex column và có chiều cao thật */
+      .pp .section-content {
+        flex: 1 !important;
+        min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
         box-sizing: border-box !important;
       }
 
       .pp .section-content > div {
-        display: flex !important;
-        flex-direction: column !important;
         flex: 1 !important;
         min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
         box-sizing: border-box !important;
       }
 
+      /* Packing layout: ảnh ăn phần còn lại, note auto theo nội dung */
       .pp .packing-layout {
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 10px !important;
         flex: 1 !important;
         min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
         box-sizing: border-box !important;
       }
 
-      .pp .packing-layout__image,
-      .pp .section-content img,
-      .pp .section-content .packing-layout__image {
-        flex: 0 0 90% !important;
+      /* Ảnh chiếm phần còn lại (quan trọng nhất) */
+      .pp .packing-layout__image {
+        flex: 1 1 0 !important;     /* CHIẾM HẾT PHẦN CÒN LẠI */
+        min-height: 0 !important;
+        max-width: none !important;   /* kill max-width:50% */
+        width: 100% !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        min-height: 0 !important;
-        max-height: none !important;
-        width: 100% !important;
         box-sizing: border-box !important;
       }
 
-      .pp .packing-layout__image img,
-      .pp .section-content img {
+      /* Ảnh fill wrapper */
+      .pp .packing-layout__image img {
         width: 100% !important;
         height: 100% !important;
-        max-width: 100% !important;
         max-height: 100% !important;
         object-fit: contain !important;
         display: block !important;
-        margin: 0 !important;
         break-inside: avoid !important;
         box-sizing: border-box !important;
       }
 
-      .pp .packing-layout__note,
-      .pp .section-content > div > *:not(.packing-layout__image):not(img) {
-        flex: 0 0 10% !important;
-        overflow-y: auto !important;
+      /* Note: chỉ cao theo nội dung, không được flex:1 */
+      .pp .packing-layout__note {
+        flex: 0 0 auto !important;
+        max-height: 28% !important;     /* giới hạn để ảnh luôn được to */
+        overflow: visible !important;   /* hoặc auto nếu note dài - FIX: không để hidden làm mất note */
+        display: block !important;
         box-sizing: border-box !important;
-        min-height: 0 !important;
       }
 
       /* Đảm bảo thead lặp lại trên mỗi trang khi table bị ngắt trang */
@@ -1215,6 +1237,220 @@
 
     .total-pages::before {
       content: counter(pages);
+    }
+
+    /* =========================
+       PACKING - FILL ALL HEIGHT (NO WASTE)
+       ========================= */
+
+    /* 1) Không khóa chiều cao bằng calc(px) ở chế độ thường */
+    .pp.packing-item {
+      min-height: 0 !important;
+      height: auto !important;
+    }
+
+    .pp .section-content {
+      min-height: 0 !important;    /* kill: calc(100vh - ...px) */
+      flex: 1 !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+
+    /* div wrapper đang bọc itemHtml */
+    .pp .section-content > div {
+      flex: 1 !important;
+      min-height: 0 !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+
+    /* 2) packing-layout phải chiếm hết chiều cao còn lại */
+    .pp .packing-layout {
+      flex: 1 !important;
+      min-height: 0 !important;
+      height: 100% !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+
+    /* 3) Ảnh phải flex-grow để ăn hết phần thừa */
+    .pp .packing-layout__image {
+      flex: 1 1 0 !important;
+      min-height: 0 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+
+    /* Ảnh fill wrapper */
+    .pp .packing-layout__image img {
+      width: 100% !important;
+      height: 100% !important;
+      max-height: 100% !important;
+      object-fit: contain !important;
+    }
+
+    /* Note chỉ cao theo nội dung */
+    .pp .packing-layout__note {
+      flex: 0 0 auto !important;
+      max-height: none !important;
+      overflow: visible !important;
+    }
+
+    /* 4) Print: ép packing item luôn full page usable */
+    @media print {
+      .pp.packing-item {
+        height: calc(100vh - 20mm) !important;
+        min-height: calc(100vh - 20mm) !important;
+        display: flex !important;
+        flex-direction: column !important;
+      }
+    }
+
+    /* =========================
+       PACKING - FIX GAP BOTTOM (PRINT)
+       Use page mm instead of 100vh
+       A4 landscape height = 210mm
+       @page margin: top 4mm, bottom 15mm => usable = 191mm
+       ========================= */
+    @media print {
+      /* Tránh reserve thêm khoảng trống toàn tài liệu (đặc biệt khi footer fixed) */
+      body { margin-bottom: 0 !important; }
+      .section:last-of-type { margin-bottom: 0 !important; }
+
+      /* Khóa chiều cao mỗi trang PACKING theo đúng page box (usable = 191mm) */
+      .pp.packing-item {
+        height: 191mm !important;
+        min-height: 191mm !important;
+        display: flex !important;
+        flex-direction: column !important;
+        box-sizing: border-box !important;
+      }
+
+      /* Content ăn hết phần còn lại sau header */
+      .pp .section-content {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        box-sizing: border-box !important;
+      }
+
+      .pp .section-content > div {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        box-sizing: border-box !important;
+      }
+
+      /* packing-layout phải full height */
+      .pp .packing-layout {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+      }
+
+      /* Ảnh ăn hết phần thừa => hết gap */
+      .pp .packing-layout__image {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+      }
+
+      .pp .packing-layout__image img {
+        width: 100% !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        object-fit: contain !important;
+      }
+
+      /* Note chỉ theo nội dung */
+      .pp .packing-layout__note {
+        flex: 0 0 auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+      }
+
+      /* =========================
+         CONSTRUCTION - LIKE PACKING (NO WASTE)
+         ========================= */
+
+      /* Mỗi construction item = đúng 1 trang usable height */
+      .construction-item {
+        height: 191mm !important;
+        min-height: 191mm !important;
+        display: flex !important;
+        flex-direction: column !important;
+        box-sizing: border-box !important;
+        padding-bottom: 0 !important;
+      }
+
+      /* container nội dung phải ăn hết phần còn lại sau header */
+      .construction-content {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        box-sizing: border-box !important;
+      }
+
+      /* ẢNH phải ăn toàn bộ phần còn lại */
+      .construction-image-wrapper {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-sizing: border-box !important;
+      }
+
+      /* Ảnh fill wrapper */
+      .construction-image {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        object-fit: contain !important;
+        box-sizing: border-box !important;
+      }
+
+      /* TEXT chỉ theo nội dung */
+      .construction-text {
+        flex: 0 0 auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        box-sizing: border-box !important;
+      }
+
+      /* Note-only pages cho phần dư của note */
+      .construction-notes-page{
+        height: 191mm !important;
+        min-height: 191mm !important;
+        display: flex !important;
+        flex-direction: column !important;
+        break-before: page !important;
+        break-after: page !important;
+        box-sizing: border-box !important;
+      }
+
+      .construction-notes-content{
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        padding: 8px 10px;
+        box-sizing: border-box;
+      }
+
+      /* cho phép note dài tự ngắt trang trong note-only pages */
+      .construction-notes-content .construction-note{
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+      }
     }
   </style>
 </head>
@@ -1889,6 +2125,19 @@
     <% } %>
 
     <%# 5. CONSTRUCTION - Mỗi construction = 1 trang, header lặp lại mỗi trang, ảnh không được tràn %>
+    <% 
+      function splitByLines(text, maxLines) {
+        const lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
+        const chunks = [];
+        for (let i = 0; i < lines.length; i += maxLines) {
+          chunks.push(lines.slice(i, i + maxLines).join('\n'));
+        }
+        return chunks.filter(c => c.trim().length > 0);
+      }
+
+      // 10% page ~ 4 dòng với font 14px; có thể chỉnh nếu cần
+      const NOTE_MAX_LINES_ON_IMAGE_PAGE = 4;
+    %>
     <% if (howToMeasures && howToMeasures.length> 0) { %>
     <% howToMeasures.forEach((item, index)=> { %>
     <%# Mỗi construction item LUÔN bắt đầu ở trang mới (kể cả item đầu tiên) %>
@@ -1901,7 +2150,7 @@
       <div class="construction-content" style="page-break-inside: avoid !important; page-break-after: avoid !important; page-break-before: avoid !important; display: flex; flex-direction: column; flex: 1; min-height: 0;">
         <!-- Image Section - Hiển thị trước, chiếm tối đa không gian còn lại -->
         <% if (item.imageUrl) { %>
-        <div class="construction-image-wrapper" style="page-break-inside: avoid !important; page-break-after: avoid !important; page-break-before: avoid !important; flex: 1 1 auto; min-height: 0; display: flex; align-items: stretch; justify-content: center;">
+        <div class="construction-image-wrapper" style="page-break-inside: avoid !important; page-break-after: avoid !important; page-break-before: avoid !important; flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center;">
           <img src="<%= item.imageUrl %>" alt="<%= item.pomName || 'Construction' %>" class="construction-image" style="page-break-inside: avoid !important; width: 100%; height: 100%; object-fit: contain;" />
         </div>
         <% } else { %>
@@ -1911,19 +2160,20 @@
         <% } %>
 
         <!-- Text Content Section - Hiển thị sau -->
-        <div class="construction-text" style="page-break-inside: avoid !important; page-break-after: avoid !important; overflow-y: auto; flex-shrink: 0; flex-grow: 0;">
-          <h3 class="construction-item-title">
-            <% 
-                                        const stepNo = item.stepNumber || (index + 1);
-                                        const rawNote = item.note && String(item.note).trim() && item.note !== '—' ? String(item.note).trim() : '';
-                                        // Ưu tiên hiển thị NOTE ở vị trí tiêu đề (thay cho "Construction Point")
-                                        const titleName = rawNote
-                                          ? rawNote
-                                          : ((item.pomName && item.pomName !== '—') ? item.pomName : '');
-                                      %>
-            <%= stepNo %><%= titleName ? '. ' + titleName : '' %>
-          </h3>
-          <%# Ẩn description và block NOTES theo yêu cầu (note đã được đưa lên tiêu đề) %>
+        <%
+          const stepNo = item.stepNumber || (index + 1);
+          const titleBase = (item.pomName && item.pomName !== '—') ? item.pomName : 'Construction';
+          const noteRaw = (item.note && item.note !== '—') ? String(item.note) : '';
+          const noteText = noteRaw.replace(/\r\n/g, '\n').trim();
+          const noteChunks = noteText ? splitByLines(noteText, NOTE_MAX_LINES_ON_IMAGE_PAGE) : [];
+          const firstChunk = noteChunks.length ? noteChunks[0] : '';
+          const remainingChunks = noteChunks.length > 1 ? noteChunks.slice(1) : [];
+        %>
+        <div class="construction-text" style="page-break-inside: avoid !important; page-break-after: avoid !important; flex-shrink: 0; flex-grow: 0;">
+          <% if (noteText) { %>
+            <div class="construction-note"><%= firstChunk %></div>
+          <% } %>
+
           <% if (item.steps && item.steps.length > 0) { %>
           <div class="construction-section">
             <strong class="construction-label">Steps:</strong>
@@ -1957,30 +2207,65 @@
         </div>
       </div>
     </div>
+
+    <% if (noteText && remainingChunks.length > 0) { %>
+      <% remainingChunks.forEach((chunk, ci) => { %>
+        <div class="section construction-notes-page">
+          <div style="page-break-inside: avoid !important; page-break-after: avoid !important; margin-bottom: 5px;">
+            <% renderSectionHeader('Construction Details'); %>
+          </div>
+
+          <div class="construction-notes-content">
+            <div class="construction-note"><%= chunk %></div>
+          </div>
+        </div>
+      <% }); %>
+    <% } %>
     <% }); %>
     <% } %>
 
     <%# 6. PACKING - Mỗi packing item = 1 trang, layout: ảnh trên (90%), chữ dưới (10%) %>
     <% if (packingNotes && packingNotes !=='—' ) { %>
-      <%# Parse packingNotes HTML để tách từng .packing-layout item %>
+      <%# Parse packingNotes HTML để tách từng .packing-layout item - FIX: dùng parser đếm thẻ div đúng cách %>
       <% 
-        // Tách các packing-layout items từ HTML
-        // Sử dụng regex để match từng <div class="packing-layout">...</div> (kể cả nested divs)
-        const packingLayoutRegex = /<div class="packing-layout">([\s\S]*?)<\/div>/g;
-        const packingItems = [];
-        let match;
-        let lastIndex = 0;
-        
-        while ((match = packingLayoutRegex.exec(packingNotes)) !== null) {
-          // Lấy toàn bộ match bao gồm cả thẻ mở và đóng
-          packingItems.push(match[0]);
-          lastIndex = packingLayoutRegex.lastIndex;
+        function extractDivBlocksByClass(html, className) {
+          const blocks = [];
+          if (!html) return blocks;
+
+          const openRe = new RegExp('<div\\s+[^>]*class=["\'][^"\']*\\b' + className + '\\b[^"\']*["\'][^>]*>', 'gi');
+          let m;
+
+          while ((m = openRe.exec(html)) !== null) {
+            const start = m.index;
+            let i = openRe.lastIndex;
+            let depth = 1;
+
+            while (i < html.length && depth > 0) {
+              const nextOpen = html.indexOf('<div', i);
+              const nextClose = html.indexOf('</div', i);
+
+              if (nextClose === -1) break;
+
+              if (nextOpen !== -1 && nextOpen < nextClose) {
+                depth++;
+                i = nextOpen + 4;
+              } else {
+                depth--;
+                const closeEnd = html.indexOf('>', nextClose);
+                if (closeEnd === -1) break;
+                i = closeEnd + 1;
+              }
+            }
+
+            blocks.push(html.slice(start, i));
+            openRe.lastIndex = i; // continue after this block
+          }
+
+          return blocks;
         }
-        
-        // Nếu không tìm thấy packing-layout, coi toàn bộ packingNotes là 1 item
-        if (packingItems.length === 0) {
-          packingItems.push(packingNotes);
-        }
+
+        const packingItems = extractDivBlocksByClass(packingNotes, 'packing-layout');
+        if (packingItems.length === 0) packingItems.push(packingNotes);
       %>
       <% packingItems.forEach((itemHtml, index) => { %>
         <%# Mỗi packing item LUÔN bắt đầu ở trang mới (trừ item đầu tiên để tránh trang trống) %>
@@ -1990,8 +2275,8 @@
           <div style="page-break-inside: avoid !important; page-break-after: avoid !important; margin-bottom: 5px;">
             <% renderSectionHeader('Labels - Packing'); %>
           </div>
-          <div class="section-content" style="page-break-inside: avoid; display: flex; flex-direction: column; flex: 1; min-height: calc(100vh - 20mm - 120px - 76px);">
-            <div style="display: flex; flex-direction: column; flex: 1; min-height: 0; background: #f8fafc; border: 1px solid #e1e7ee; border-radius: 6px; padding: 20px; font-size: 14px; line-height: 1.6; page-break-inside: avoid;">
+          <div class="section-content" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+            <div style="display: flex; flex-direction: column; flex: 1; min-height: 0; background: #f8fafc; border: 1px solid #e1e7ee; border-radius: 6px; padding: 12px;">
               <%- itemHtml %>
             </div>
           </div>
@@ -2265,12 +2550,7 @@
         // Tìm tất cả ảnh trong construction, notes, nhưng BỎ QUA phần Packing (.pp)
         // vì Packing cần export đúng y như nội dung người dùng nhập (không auto-scale).
         const contentImages = document.querySelectorAll(
-          '.notes img, ' +
-          '.construction-image, ' +
-          '.construction-image-wrapper img, ' +
-          'div[style*="background"] img, ' +
-          'p img, ' +
-          'figure img'
+          '.notes img'
         );
 
         console.log('[Anti-waste] Found', contentImages.length, 'content images to process');
@@ -2404,9 +2684,9 @@
 
       // Retry logic: nếu vẫn còn ảnh chưa được xử lý, retry
       setTimeout(function() {
-        const unprocessedImages = document.querySelectorAll(
-          '.notes img, .construction-image, .construction-image-wrapper img'
-        );
+         const unprocessedImages = document.querySelectorAll(
+           '.notes img'
+         );
         let unprocessedCount = 0;
         unprocessedImages.forEach(function(img) {
           if (!img.dataset.antiWasteProcessed) {
