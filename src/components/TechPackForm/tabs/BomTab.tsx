@@ -235,28 +235,9 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     bomItem: BomItem;
     bomItemId: string;
   } | null>(null);
-  const [assignmentMode, setAssignmentMode] = useState<'existing' | 'new'>('existing');
   const [selectedPartId, setSelectedPartId] = useState<string>('');
   // Multi-select state for bulk actions
   const [selectedBomIds, setSelectedBomIds] = useState<Set<string>>(new Set());
-  
-  const [newAssignmentForm, setNewAssignmentForm] = useState<{
-    colorName: string;
-    hexCode: string;
-    pantoneCode: string;
-    colorType: ColorwayPart['colorType'];
-  }>({
-    colorName: '',
-    hexCode: '#000000',
-    pantoneCode: '',
-    colorType: 'Solid',
-  });
-  const colorTypeOptions = [
-    { value: 'Solid', label: 'Solid' },
-    { value: 'Print', label: 'Print' },
-    { value: 'Embroidery', label: 'Embroidery' },
-    { value: 'Applique', label: 'Applique' },
-  ];
 
   const resolveBomItemIdentifiers = useCallback((item: BomItem): string[] => {
     const ids: string[] = [];
@@ -300,21 +281,12 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     const assignment = findAssignmentForBom(colorAssignmentModal.colorway, colorAssignmentModal.bomItem);
     const hasExistingParts = (colorAssignmentModal.colorway.parts || []).length > 0;
     if (assignment) {
-      setAssignmentMode('existing');
       setSelectedPartId(assignment.id);
     } else if (hasExistingParts) {
-      setAssignmentMode('existing');
       setSelectedPartId(colorAssignmentModal.colorway.parts?.[0]?.id || '');
     } else {
-      setAssignmentMode('new');
       setSelectedPartId('');
     }
-    setNewAssignmentForm({
-      colorName: assignment?.colorName || colorAssignmentModal.bomItem.materialName || colorAssignmentModal.bomItem.part || '',
-      hexCode: assignment?.hexCode || colorAssignmentModal.colorway.hexColor || '#000000',
-      pantoneCode: assignment?.pantoneCode || colorAssignmentModal.colorway.pantoneCode || '',
-      colorType: assignment?.colorType || 'Solid',
-    });
   }, [colorAssignmentModal, findAssignmentForBom]);
   
   const firstErrorFieldRef = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
@@ -387,34 +359,70 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     setColorAssignmentModal({ colorway, bomItem: item, bomItemId: String(bomId) });
   }, []);
 
+  const assignColorwayDirectly = useCallback((colorway: Colorway, item: BomItem) => {
+    if (!assignColorwayToBomItem) return;
+    const bomId = (item as any)?.id || (item as any)?._id;
+    if (!bomId) {
+      showWarning(t('form.bom.saveBeforeAssignColor'));
+      return;
+    }
+    // Assign directly from colorway (no parts required)
+    assignColorwayToBomItem(colorway.id, String(bomId), {
+      partName: item.part || 'Unnamed Part',
+      colorName: colorway.name || 'Unnamed',
+      hexCode: colorway.hexColor || '#f3f4f6',
+      pantoneCode: colorway.pantoneCode || undefined,
+      colorType: 'Solid',
+      imageUrl: colorway.imageUrl || undefined,
+    });
+    showSuccess(t('success.colorAssignmentSaved'));
+  }, [assignColorwayToBomItem, t]);
+
   const renderColorwayCell = useCallback((colorway: Colorway, item: BomItem) => {
     const assignment = findAssignmentForBom(colorway, item);
     const swatchColor = assignment?.hexCode || colorway.hexColor || '#f3f4f6';
+
+    const hasParts = (colorway.parts || []).length > 0;
+    const thumbUrl = getMaterialImageUrl(assignment?.imageUrl || colorway.imageUrl);
+
     return (
       <button
         type="button"
-        onClick={() => openColorAssignment(colorway, item)}
-        className={`w-full text-left px-3 py-2 rounded-lg border transition ${
-          assignment ? 'border-gray-200 hover:border-blue-400' : 'border-dashed border-gray-300 text-gray-400 hover:text-blue-600'
+        onClick={() => (hasParts ? openColorAssignment(colorway, item) : assignColorwayDirectly(colorway, item))}
+        className={`w-full px-3 py-2 rounded-lg border transition ${
+          assignment
+            ? 'border-gray-200 hover:border-blue-400'
+            : 'border-dashed border-gray-300 text-gray-400 hover:text-blue-600'
         }`}
       >
         {assignment ? (
           <>
-            <div className="flex items-center space-x-2">
-              <span className="w-4 h-4 rounded border border-gray-200" style={{ backgroundColor: swatchColor }} />
-              <span className="text-sm font-medium text-gray-900 truncate">{assignment.colorName || 'Unnamed'}</span>
+            <div className="flex flex-col items-center space-y-2 text-center">
+              {thumbUrl ? (
+                <img
+                  src={thumbUrl}
+                  alt="color thumbnail"
+                  className="w-10 h-10 object-contain border border-gray-200 rounded bg-white"
+                />
+              ) : (
+                <span className="w-8 h-8 rounded border border-gray-200" style={{ backgroundColor: swatchColor }} />
+              )}
+              <span className="text-xs font-medium text-gray-900 break-all leading-snug">
+                {assignment.colorName || colorway.name || 'Unnamed'}
+              </span>
             </div>
-            <div className="text-xs text-gray-500 flex items-center justify-between mt-1">
-              <span>{assignment.pantoneCode || 'No Pantone'}</span>
-              <span>{assignment.colorType || 'Solid'}</span>
+            <div className="mt-1 text-[11px] text-gray-500 text-center break-all">
+              {colorway.code || '—'}
             </div>
           </>
         ) : (
-          <div className="text-xs font-medium">Assign color</div>
+          <div className="text-xs font-medium text-center">
+            {t('form.bom.assignColor')}
+          </div>
         )}
       </button>
     );
-  }, [findAssignmentForBom, openColorAssignment]);
+  }, [assignColorwayDirectly, findAssignmentForBom, openColorAssignment, t]);
 
   const activeAssignment = colorAssignmentModal
     ? findAssignmentForBom(colorAssignmentModal.colorway, colorAssignmentModal.bomItem)
@@ -458,6 +466,59 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     
     // Auto-calculate totalPrice when quantity or unitPrice changes
     if (field === 'quantity' || field === 'unitPrice') {
+      // === Decimal math helpers (avoid JS float errors like 1.235 * 1.25 => 1.5437500000000002) ===
+      const normalizeDecimal = (raw: string) => {
+        const s = String(raw ?? '').trim();
+        if (!s) return '';
+        // Only '.' is allowed as decimal separator in UI (Input component blocks ',')
+        const sign = s.startsWith('-') ? '-' : '';
+        const body = sign ? s.slice(1) : s;
+        // Allow transitional states handled elsewhere (e.g. "0.")
+        if (body === '.' || body === '') return s;
+        // Remove leading zeros but keep "0" for numbers < 1
+        const [iRaw, fRaw = ''] = body.split('.');
+        const i = (iRaw.replace(/^0+(?=\d)/, '') || '0');
+        const f = fRaw.replace(/[^0-9]/g, '');
+        return sign + (f.length ? `${i}.${f}` : i);
+      };
+
+      const multiplyDecimalStrings = (aRaw: string, bRaw: string) => {
+        const a = normalizeDecimal(aRaw);
+        const b = normalizeDecimal(bRaw);
+        if (!a || !b) return '';
+        if (a.endsWith('.') || b.endsWith('.')) return ''; // transitional state
+
+        const neg = (a.startsWith('-') ? 1 : 0) ^ (b.startsWith('-') ? 1 : 0);
+        const aBody = a.startsWith('-') ? a.slice(1) : a;
+        const bBody = b.startsWith('-') ? b.slice(1) : b;
+
+        const [ai, af = ''] = aBody.split('.');
+        const [bi, bf = ''] = bBody.split('.');
+        const aScale = af.length;
+        const bScale = bf.length;
+        const scale = aScale + bScale;
+
+        const aIntStr = `${ai}${af}`.replace(/^0+(?=\d)/, '') || '0';
+        const bIntStr = `${bi}${bf}`.replace(/^0+(?=\d)/, '') || '0';
+
+        const product = (BigInt(aIntStr) * BigInt(bIntStr)).toString();
+
+        // Insert decimal point
+        let out = product;
+        if (scale > 0) {
+          const pad = scale - out.length + 1;
+          if (pad > 0) out = '0'.repeat(pad) + out;
+          const idx = out.length - scale;
+          out = `${out.slice(0, idx)}.${out.slice(idx)}`;
+          // Trim trailing zeros in fractional part
+          out = out.replace(/\.?0+$/, (m) => (m.startsWith('.') ? '' : m));
+        }
+
+        // Clean "-0"
+        if (out === '0') return '0';
+        return neg ? `-${out}` : out;
+      };
+
       // Helper to parse value, preserving string if it's a transitional state like "0."
       const parseNumericValue = (val: string | number | undefined | null): number | null | undefined => {
         if (val === undefined || val === null || val === '') return null;
@@ -482,7 +543,9 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       // Only calculate if both quantity > 0 and unitPrice are provided and not undefined (undefined means transitional state)
       if (quantity !== null && quantity !== undefined && quantity > 0 && 
           unitPrice !== undefined && unitPrice !== null && unitPrice > 0) {
-        updatedFormData.totalPrice = quantity * unitPrice;
+        // Lưu dạng string chính xác theo decimal math (không bị lỗi float)
+        const total = multiplyDecimalStrings(String(updatedFormData.quantity ?? quantity), String(updatedFormData.unitPrice ?? unitPrice));
+        updatedFormData.totalPrice = total || undefined;
       } else {
         updatedFormData.totalPrice = undefined;
       }
@@ -608,7 +671,10 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     const hasUnitPrice = formData.unitPrice !== undefined && formData.unitPrice !== null && formData.unitPrice !== '';
     const unitPrice = hasUnitPrice ? Number(formData.unitPrice) : undefined;
     // Only calculate totalPrice if both quantity > 0 and unitPrice are provided
-    const totalPrice = quantity !== null && quantity > 0 && unitPrice !== undefined ? quantity * unitPrice : undefined;
+    const totalPrice =
+      quantity !== null && quantity > 0 && unitPrice !== undefined && formData.totalPrice !== undefined && formData.totalPrice !== null && formData.totalPrice !== ''
+        ? Number(formData.totalPrice)
+        : (quantity !== null && quantity > 0 && unitPrice !== undefined ? Number(String(quantity)) * Number(String(unitPrice)) : undefined);
     
     const normalizedImageUrl = formData.imageUrl?.trim();
     const bomItem: BomItem = {
@@ -624,7 +690,8 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       materialComposition: formData.materialComposition || '',
       colorCode: formData.colorCode || '',
       supplierCode: formData.supplierCode || '',
-      imageUrl: normalizedImageUrl ? normalizedImageUrl : undefined,
+      // IMPORTANT: allow clearing image by sending empty string (''), so backend merge overwrites old imageUrl
+      imageUrl: normalizedImageUrl === '' ? '' : (normalizedImageUrl ? normalizedImageUrl : undefined),
       unitPrice: unitPrice,
       totalPrice: totalPrice,
     };
@@ -809,29 +876,16 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   const handleSaveColorAssignment = () => {
     if (!colorAssignmentModal || !assignColorwayToBomItem) return;
     const { colorway, bomItemId, bomItem } = colorAssignmentModal;
-    if (assignmentMode === 'existing') {
-      const targetPart = colorway.parts?.find(part => part.id === selectedPartId);
-      if (!targetPart) {
-        showError(t('validation.colorwayPartRequired'));
-        return;
-      }
-      assignColorwayToBomItem(colorway.id, bomItemId, {
-        ...targetPart,
-        partName: targetPart.partName || bomItem.part || 'Unnamed Part',
-      });
-    } else {
-      if (!newAssignmentForm.colorName.trim() || !newAssignmentForm.hexCode.trim()) {
-        showError(t('validation.colorNameAndHexRequired'));
-        return;
-      }
-      assignColorwayToBomItem(colorway.id, bomItemId, {
-        partName: bomItem.part || newAssignmentForm.colorName,
-        colorName: newAssignmentForm.colorName.trim(),
-        hexCode: newAssignmentForm.hexCode.trim(),
-        pantoneCode: newAssignmentForm.pantoneCode.trim() || undefined,
-        colorType: newAssignmentForm.colorType,
-      });
+    // Chỉ cho phép chọn màu đã có trong Colorways (không tạo màu mới)
+    const targetPart = colorway.parts?.find(part => part.id === selectedPartId);
+    if (!targetPart) {
+      showError(t('validation.colorwayPartRequired'));
+      return;
     }
+    assignColorwayToBomItem(colorway.id, bomItemId, {
+      ...targetPart,
+      partName: targetPart.partName || bomItem.part || 'Unnamed Part',
+    });
     showSuccess(t('success.colorAssignmentSaved'));
     closeColorAssignmentModal();
   };
@@ -1238,7 +1292,11 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       key: 'quantity' as keyof BomItem,
       header: t('form.bom.quantityShort'),
       width: '8%',
-      render: (value: number | null | undefined) => (value !== undefined && value !== null) ? value.toFixed(2) : '-',
+      // Hiển thị đúng giá trị người dùng nhập, không làm tròn về 2 chữ số thập phân
+      render: (value: number | string | null | undefined) => {
+        if (value === null || value === undefined || value === '') return '-';
+        return String(value);
+      },
     },
     {
       key: 'uom' as keyof BomItem,
@@ -1269,20 +1327,45 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
           key: 'unitPrice' as keyof BomItem,
           header: t('form.bom.unitPrice'),
           width: '10%',
-          render: (value: number) =>
-            value !== undefined && value !== null
-              ? Number(value).toLocaleString('vi-VN')
-              : '-',
+          // Hiển thị đúng giá trị (không làm tròn mặc định của toLocaleString)
+          render: (value: number | string | null | undefined) => {
+            if (value === undefined || value === null || value === '') return '-';
+            return String(value);
+          },
         },
         {
           key: 'totalPrice' as keyof BomItem,
           header: t('form.bom.totalPrice'),
           width: '10%',
-          render: (value: number) => {
-            // totalPrice is already calculated in tableDataWithErrors
-            return value !== undefined && value !== null
-              ? Number(value).toLocaleString('vi-VN')
-              : '-';
+          // totalPrice được lưu dạng string đã format để không bị làm tròn
+          render: (_value: number | string | null | undefined, item: BomItem) => {
+            // Ưu tiên hiển thị theo phép nhân decimal chính xác từ quantity × unitPrice
+            const q = item.quantity;
+            const up = item.unitPrice;
+            if (q !== undefined && q !== null && up !== undefined && up !== null) {
+              // Local helper duplicated (small) to avoid float display errors in table
+              const toParts = (n: number) => {
+                const s = String(n);
+                const [i, f = ''] = s.split('.');
+                return { i: i.replace(/^0+(?=\d)/, '') || '0', f: f.replace(/[^0-9]/g, ''), sign: s.startsWith('-') ? '-' : '' };
+              };
+              const a = toParts(q);
+              const b = toParts(up);
+              const scale = a.f.length + b.f.length;
+              const aInt = BigInt(`${a.i}${a.f}`.replace(/^0+(?=\d)/, '') || '0');
+              const bInt = BigInt(`${b.i}${b.f}`.replace(/^0+(?=\d)/, '') || '0');
+              let out = (aInt * bInt).toString();
+              if (scale > 0) {
+                const pad = scale - out.length + 1;
+                if (pad > 0) out = '0'.repeat(pad) + out;
+                const idx = out.length - scale;
+                out = `${out.slice(0, idx)}.${out.slice(idx)}`;
+                out = out.replace(/\.?0+$/, (m) => (m.startsWith('.') ? '' : m));
+              }
+              return out || '-';
+            }
+            if (_value === undefined || _value === null || _value === '') return '-';
+            return String(_value);
           },
         }
       );
@@ -1785,6 +1868,11 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               <button
                 type="button"
                 onClick={handleSaveColorAssignment}
+                disabled={
+                  !colorAssignmentModal.colorway.parts ||
+                  colorAssignmentModal.colorway.parts.length === 0 ||
+                  !selectedPartId
+                }
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
               >
                 {t('common.save')}
@@ -1801,123 +1889,55 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               <div className="text-right">
                 <p className="text-xs uppercase text-gray-500">{t('form.tab.colorways')}</p>
                 <p className="text-sm font-semibold text-gray-800">{colorAssignmentModal.colorway.name}</p>
+                <p className="text-xs text-gray-500">{colorAssignmentModal.colorway.code}</p>
               </div>
             </div>
 
-            <div className="flex items-center space-x-4">
-              <label className="inline-flex items-center space-x-2 text-sm text-gray-700">
-                <input
-                  type="radio"
-                  className="rounded text-blue-600"
-                  value="existing"
-                  checked={assignmentMode === 'existing'}
-                  onChange={() => setAssignmentMode('existing')}
-                  disabled={!colorAssignmentModal.colorway.parts || colorAssignmentModal.colorway.parts.length === 0}
+            {colorAssignmentModal.colorway.parts && colorAssignmentModal.colorway.parts.length > 0 ? (
+              <div className="space-y-3">
+                <Select
+                  label={t('form.bom.colorwayParts')}
+                  value={selectedPartId}
+                  onChange={setSelectedPartId}
+                  options={colorAssignmentModal.colorway.parts.map(part => ({
+                    value: part.id,
+                    label: `${part.colorName}`,
+                  }))}
+                  placeholder={t('form.bom.selectColorwayPart')}
                 />
-                <span>{t('form.bom.useExistingColor')}</span>
-              </label>
-              <label className="inline-flex items-center space-x-2 text-sm text-gray-700">
-                <input
-                  type="radio"
-                  className="rounded text-blue-600"
-                  value="new"
-                  checked={assignmentMode === 'new'}
-                  onChange={() => setAssignmentMode('new')}
-                />
-                <span>{t('form.bom.createNewColor')}</span>
-              </label>
-            </div>
-
-            {assignmentMode === 'existing' ? (
-              colorAssignmentModal.colorway.parts && colorAssignmentModal.colorway.parts.length > 0 ? (
-                <div className="space-y-3">
-                  <Select
-                    label={t('form.bom.colorwayParts')}
-                    value={selectedPartId}
-                    onChange={setSelectedPartId}
-                    options={colorAssignmentModal.colorway.parts.map(part => ({
-                      value: part.id,
-                      label: `${part.partName} • ${part.colorName}`,
-                    }))}
-                    placeholder={t('form.bom.selectColorwayPart')}
-                  />
-                  {selectedPartId && (
-                    <div className="p-3 border border-gray-200 rounded-md text-sm flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <span
-                          className="w-6 h-6 rounded border border-gray-200"
-                          style={{
-                            backgroundColor:
-                              colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.hexCode ||
-                              colorAssignmentModal.colorway.hexColor ||
-                              '#f3f4f6',
-                          }}
-                        />
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            {colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.colorName}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Pantone:{' '}
-                            {colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.pantoneCode ||
-                              '—'}
-                          </p>
-                        </div>
+                {selectedPartId && (
+                  <div className="p-3 border border-gray-200 rounded-md text-sm flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.colorName}
+                        </p>
+                        <p className="text-xs text-gray-500">{colorAssignmentModal.colorway.code}</p>
                       </div>
-                      <span className="text-xs text-gray-500 uppercase">
-                        {colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.colorType || 'Solid'}
-                      </span>
                     </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">
-                  {t('form.bom.noColorwayPartsAvailable')}
-                </p>
-              )
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input
-                    label={t('form.bom.colorName')}
-                    value={newAssignmentForm.colorName}
-                    onChange={(value) => setNewAssignmentForm(prev => ({ ...prev, colorName: String(value) }))}
-                    placeholder={t('form.bom.colorNamePlaceholder')}
-                  />
-                  <Input
-                    label={t('form.bom.pantoneCode')}
-                    value={newAssignmentForm.pantoneCode}
-                    onChange={(value) => setNewAssignmentForm(prev => ({ ...prev, pantoneCode: String(value) }))}
-                    placeholder={t('form.bom.pantoneCodePlaceholder')}
-                  />
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">{t('form.bom.hexColor')}</label>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <input
-                        type="color"
-                        value={newAssignmentForm.hexCode}
-                        onChange={(e) => setNewAssignmentForm(prev => ({ ...prev, hexCode: e.target.value }))}
-                        className="w-12 h-10 border rounded cursor-pointer"
-                      />
-                      <input
-                        type="text"
-                        value={newAssignmentForm.hexCode}
-                        onChange={(e) => setNewAssignmentForm(prev => ({ ...prev, hexCode: e.target.value }))}
-                        className="flex-1 px-3 py-2 border rounded-md text-sm font-mono"
-                        placeholder="#000000"
-                      />
+                    <div className="flex items-center gap-3">
+                      {colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.imageUrl && (
+                        <img
+                          src={getMaterialImageUrl(colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.imageUrl)}
+                          alt="color thumbnail"
+                          className="w-12 h-12 object-contain border border-gray-200 rounded bg-white"
+                        />
+                      )}
+                      {colorAssignmentModal.colorway.imageUrl && !colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.imageUrl && (
+                        <img
+                          src={getMaterialImageUrl(colorAssignmentModal.colorway.imageUrl)}
+                          alt="colorway thumbnail"
+                          className="w-12 h-12 object-contain border border-gray-200 rounded bg-white"
+                        />
+                      )}
                     </div>
                   </div>
-                  <Select
-                    label={t('form.bom.colorType')}
-                    value={newAssignmentForm.colorType}
-                    onChange={(value) =>
-                      setNewAssignmentForm(prev => ({ ...prev, colorType: value as ColorwayPart['colorType'] }))
-                    }
-                    options={colorTypeOptions}
-                  />
-                </div>
+                )}
               </div>
+            ) : (
+              <p className="text-sm text-gray-500">
+                {t('form.bom.noColorwayPartsAvailable')}
+              </p>
             )}
           </div>
         </Modal>

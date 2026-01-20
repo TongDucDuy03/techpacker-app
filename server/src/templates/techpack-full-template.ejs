@@ -1459,155 +1459,155 @@
   <% const t = translations || {}; %>
   <div class="container">
     <%# Function để tạo header cho mỗi section %>
-    <% function renderSectionHeader(sectionTitle) { %>
-    <div class="page-header">
-      <div class="page-title">
-        <%= sectionTitle %>
+      <% function renderSectionHeader(sectionTitle) { %>
+        <div class="page-header">
+          <div class="page-title">
+            <%= sectionTitle %>
         <!--  <span class="version-text">Version <%= meta.version || '1' %></span>-->
-      </div>
-      <table>
-        <colgroup>
-          <col style="width: 8%;" />
+          </div>
+          <table>
+            <colgroup>
+              <col style="width: 8%;" />
           <col style="width: 10%;" />
           <col style="width: 19%;" />
-          <col style="width: 12%;" />
+              <col style="width: 12%;" />
           <col style="width: 21%;" />
           <col style="width: 11%;" />
           <col style="width: 11%;" />
-          <col style="width: 8%;" />
-        </colgroup>
-        <tr>
-          <td class="logo-cell" rowspan="4" style="width: 8%;">
-            <% const hasLogo=images && images.companyLogo && images.companyLogo !=='—' &&
+              <col style="width: 8%;" />
+            </colgroup>
+            <tr>
+              <td class="logo-cell" rowspan="4" style="width: 8%;">
+                <% const hasLogo=images && images.companyLogo && images.companyLogo !=='—' &&
                   !images.companyLogo.includes('No Image'); %>
-            <% if (hasLogo) { %>
+                  <% if (hasLogo) { %>
             <img src="<%= images.companyLogo %>" alt="Company Logo" style="max-width: 65px; max-height: 70px; object-fit: contain;display: block; margin: auto;" />
-            <% } else { %>
+                    <% } else { %>
             <strong style="font-size: 14px; display: block; text-align: center;">
-              <%= meta.brand || 'Company' %>
-            </strong>
+                        <%= meta.brand || 'Company' %>
+                      </strong>
             <small style="font-size: 14px; display: block; text-align: center; color: #666;">Logo</small>
-            <% } %>
-          </td>
+                      <% } %>
+              </td>
           <td class="label" style="width: 10%;"><%= t.productCode || 'Product Code' %></td>
           <td class="value" style="width: 19%; word-break: break-word; overflow-wrap: break-word;">
-            <%= meta.articleCode || '-' %>
-          </td>
+                <%= meta.articleCode || '-' %>
+              </td>
           <td class="label" rowspan="2" style="width: 12%;"><%= t.description || 'Description' %></td>
           <td class="value" rowspan="2" colspan="1" style="width: 21%; word-break: break-word; overflow-wrap: break-word;">
-            <%= meta.description || meta.productDescription || '' %>
-          </td>
+                <%= meta.description || meta.productDescription || '' %>
+              </td>
           <td class="label" rowspan="2" style="width: 11%; vertical-align: middle;"><%= t.productType || 'Product Type' %></td>
           <td class="value" rowspan="2" style="width: 11%; vertical-align: middle;">
-            <%= meta.category || 'Tops' %>
-          </td>
+                <%= meta.category || 'Tops' %>
+              </td>
           <td class="logo-cell product-cell" rowspan="4" style="width: 8%;">
-            <div class="product-images">
+                <div class="product-images">
               <% const hasDesignSketch = images && images.coverImage && images.coverImage !== '—' &&
                     !images.coverImage.includes('No Image'); %>
-              <% if (hasDesignSketch) { %>
+                    <% if (hasDesignSketch) { %>
               <img src="<%= images.coverImage %>" alt="Product" style="display: block; margin: auto;" />
-              <% } else { %>
+                      <% } else { %>
               <div style="width:100%; height:100%; border:1px solid #ccc; background:#f9f9f9;"></div>
-              <% } %>
-            </div>
-          </td>
-        </tr>
-        <tr>
+                        <% } %>
+                </div>
+              </td>
+            </tr>
+            <tr>
           <td class="label"><%= t.productName || 'Product Name' %></td>
           <td class="value" style="width: 19%; word-break: break-word; overflow-wrap: break-word;">
-            <%= meta.productName || meta.articleName || '-' %>
-          </td>
-        </tr>
-        <tr>
+                <%= meta.productName || meta.articleName || '-' %>
+              </td>
+            </tr>
+            <tr>
           <td class="label"><%= t.createdOn || 'Created On' %></td>
-          <td class="value">
-            <%= meta.createdAt || '-' %>
-          </td>
+              <td class="value">
+                <%= meta.createdAt || '-' %>
+              </td>
           <td class="label" rowspan="2" style="width: 12%;"><%= t.materialDescription || 'Material Description' %></td>
           <td class="value" rowspan="2" colspan="1" style="width: 21%; word-break: break-word; overflow-wrap: break-word;">
-            <%= meta.fabricDescription || '-' %>
-            <% if (meta.materialComposition) { %><br>
-            <%= meta.materialComposition %>
-            <% } %>
+                <%= meta.fabricDescription || '-' %>
+                  <% if (meta.materialComposition) { %><br>
+                    <%= meta.materialComposition %>
+                      <% } %>
             <% if (meta.supplier) { %><br><%= t.supplier || 'Supplier' %>: <%= meta.supplier %>
-            <% } %>
-          </td>
+                            <% } %>
+              </td>
           <td class="label" style="width: 11%;"><%= t.season || 'Season' %></td>
           <td class="value" style="width: 11%;">
-            <%= meta.season || 'Active Development' %>
-          </td>
-        </tr>
-        <tr>
+                <%= meta.season || 'Active Development' %>
+              </td>
+            </tr>
+            <tr>
           <td class="label"><%= t.lastModified || 'Last Modified' %></td>
-          <td class="value">
-            <%= meta.updatedAt || '-' %>
-          </td>
+              <td class="value">
+                <%= meta.updatedAt || '-' %>
+              </td>
           <td class="label" style="width: 11%;"><%= t.productProgress || 'Product Progress' %></td>
           <td class="value" style="width: 11%;">
-            <%= meta.lifecycleStage || meta.status || 'Production' %>
-          </td>
-        </tr>
-      </table>
-    </div>
-    <% } %>
+                <%= meta.lifecycleStage || meta.status || 'Production' %>
+              </td>
+            </tr>
+          </table>
+        </div>
+        <% } %>
 
-    <%# 1. ARTICLE INFORMATION %>
+          <%# 1. ARTICLE INFORMATION %>
     <div class="section" style="page-break-inside: avoid; page-break-after: avoid; page-break-before: avoid;">
       <% renderSectionHeader(t.productInfo || 'Product Info'); %>
       <!-- Info Grid Section - placed before Design Sketch -->
       <div class="section-content" style="margin-top: 2px; margin-bottom: 4px;">
-        <div class="info-grid">
-          <div class="info-item">
+                  <div class="info-grid">
+                    <div class="info-item">
             <strong><%= t.gender || 'Gender' %></strong>
-            <span>
-              <%= meta.gender || 'Unisex' %>
-            </span>
-          </div>
-          <div class="info-item">
+                      <span>
+                        <%= meta.gender || 'Unisex' %>
+                      </span>
+                    </div>
+                    <div class="info-item">
             <strong><%= t.productType || 'Product Type' %></strong>
-            <span>
-              <%= meta.productClass || meta.category || '-' %>
-            </span>
-          </div>
-          <div class="info-item">
+                      <span>
+                        <%= meta.productClass || meta.category || '-' %>
+                      </span>
+                    </div>
+                    <div class="info-item">
             <strong><%= t.productFit || 'Product Fit' %></strong>
-            <span>
+                      <span>
               <%= (meta.fitType && meta.fitType.trim()) ? meta.fitType : '—' %>
-            </span>
-          </div>
-          <div class="info-item">
+                      </span>
+                    </div>
+                    <div class="info-item">
             <strong><%= t.technicalDesigner || 'Technical Designer' %></strong>
-            <span>
-              <%= meta.designer || meta.technicalDesigner || '-' %>
-            </span>
-          </div>
-          <div class="info-item">
+                      <span>
+                        <%= meta.designer || meta.technicalDesigner || '-' %>
+                      </span>
+                    </div>
+                    <div class="info-item">
             <strong><%= t.brand || 'Brand' %></strong>
-            <span>
-              <%= meta.brand || '-' %>
-            </span>
-          </div>
-          <div class="info-item">
+                      <span>
+                        <%= meta.brand || '-' %>
+                      </span>
+                    </div>
+                    <div class="info-item">
             <strong><%= t.targetMarket || 'Target Market' %></strong>
-            <span>
-              <%= meta.targetMarket || '-' %>
-            </span>
-          </div>
-          <div class="info-item">
+                      <span>
+                        <%= meta.targetMarket || '-' %>
+                      </span>
+                    </div>
+                    <div class="info-item">
             <strong><%= t.ranking || 'Ranking' %></strong>
-            <span>
-              <%= meta.pricePoint || '-' %>
-            </span>
-          </div>
-          <div class="info-item">
+                      <span>
+                        <%= meta.pricePoint || '-' %>
+                      </span>
+                    </div>
+                    <div class="info-item">
             <strong><%= t.retailPrice || 'Retail Price' %></strong>
-            <span>
-              <%= meta.retailPrice ? meta.retailPrice + ' ' + (meta.currency || 'USD' ) : '-' %>
-            </span>
-          </div>
-        </div>
-      </div>
+                      <span>
+                        <%= meta.retailPrice ? meta.retailPrice + ' ' + (meta.currency || 'USD' ) : '-' %>
+                      </span>
+                    </div>
+                  </div>
+                    </div>
       <!-- Design Sketch Section - placed after info grid -->
       <div style="margin-top: 2px; margin-bottom: 4px; width: 100%; overflow: hidden; max-height: calc(100vh - 350px);">
         <!-- <div style="font-weight: 700; font-size: 12px; text-transform: uppercase; border-bottom: 2px solid #333; padding-bottom: 5px;">
@@ -1629,21 +1629,21 @@
         <% if (hasDesignSketch) { %>
         <div class="image-box image-box--sketch" style="page-break-inside: avoid; page-break-after: avoid;">
           <img src="<%= designSketchImg %>" alt="Design Sketch" />
-        </div>
+                              </div>
         <% } else { %>
         <div class="image-box image-box--sketch image-box--empty" style="page-break-inside: avoid; page-break-after: avoid;">
           No design sketch
-        </div>
-        <% } %>
-      </div>
-    </div>
+                          </div>
+                          <% } %>
+                </div>
+            </div>
 
-    <%# 2. BILL OF MATERIALS %>
-    <% if (bom && bom.parts && bom.parts.length> 0) { %>
-    <div class="section">
+            <%# 2. BILL OF MATERIALS %>
+              <% if (bom && bom.parts && bom.parts.length> 0) { %>
+                <div class="section">
       <% renderSectionHeader(t.billOfMaterials || 'Bill of Materials'); %>
-      <div class="section-content">
-        <% const fabrics=[]; const trims=[]; const labels=[]; const packaging=[]; bom.parts.forEach(part=>
+                    <div class="section-content">
+                      <% const fabrics=[]; const trims=[]; const labels=[]; const packaging=[]; bom.parts.forEach(part=>
                         { part.items.forEach(item => { const partName = (part.partName || '').toLowerCase(); const
                         materialName = (item.materialName || '').toLowerCase(); if (partName.includes('fabric') ||
                         partName.includes('main') || materialName.includes('fabric')) { fabrics.push({...item, part:
@@ -1653,11 +1653,11 @@
                         materialName.includes('clip') || materialName.includes('bag')) { packaging.push({...item, part:
                         part.partName}); } else { trims.push({...item, part: part.partName}); } }); }); %>
 
-        <% if (fabrics.length> 0) { %>
-        <h3>Fabric</h3>
-        <table>
-          <thead>
-            <tr>
+                        <% if (fabrics.length> 0) { %>
+                          <h3>Fabric</h3>
+                          <table>
+                            <thead>
+                              <tr>
               <th style="width: 10%"><%= t.part || 'Part' %></th>
               <th style="width: 25%"><%= t.materialName || 'Material Name' %></th>
               <th style="width: 15%"><%= t.placement || 'Placement' %></th>
@@ -1667,38 +1667,38 @@
               <th style="width: 12%"><%= t.supplier || 'Supplier' %></th>
               <th style="width: 16%"><%= t.comments || 'Comments' %></th>
               <th style="width: 10%"><%= t.colorCode || 'Color Code' %></th>
-            </tr>
-          </thead>
-          <tbody>
-            <% fabrics.forEach((item, idx)=> { %>
-            <tr class="<%= idx % 2 === 1 ? 'alt-row' : '' %>">
-              <td>
-                <%= item.part || '-' %>
-              </td>
-              <td>
-                <%= item.materialName || '-' %>
-                <% if (item.sizeWidthUsage && item.sizeWidthUsage !=='—' ) { %><br /><small>
-                  <%= item.sizeWidthUsage %>
-                </small>
-                <% } %>
-              </td>
-              <td>
-                <%= item.placement || 'None' %>
-              </td>
-              <td>
-                <%= item.size || '-' %>
-              </td>
-              <td>
-                <%= item.quantity || '0' %>
-              </td>
-              <td>
-                <%= item.uom || 'Yards' %>
-              </td>
-              <td>
-                <%= item.supplier || '-' %>
-              </td>
-              <td>
-                <%= item.comments || '-' %>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <% fabrics.forEach((item, idx)=> { %>
+                                <tr class="<%= idx % 2 === 1 ? 'alt-row' : '' %>">
+                                  <td>
+                                    <%= item.part || '-' %>
+                                  </td>
+                                  <td>
+                                    <%= item.materialName || '-' %>
+                                      <% if (item.sizeWidthUsage && item.sizeWidthUsage !=='—' ) { %><br /><small>
+                                          <%= item.sizeWidthUsage %>
+                                        </small>
+                                        <% } %>
+                                  </td>
+                                  <td>
+                                    <%= item.placement || 'None' %>
+                                  </td>
+                                  <td>
+                                    <%= item.size || '-' %>
+                                  </td>
+                                  <td>
+                                    <%= item.quantity || '0' %>
+                                  </td>
+                                  <td>
+                                    <%= item.uom || 'Yards' %>
+                                  </td>
+                                  <td>
+                                    <%= item.supplier || '-' %>
+                                  </td>
+                                  <td>
+                                    <%= item.comments || '-' %>
               </td>
               <td style="font-size: 14px; line-height: 1.4; vertical-align: top;">
                 <% if (item.colorCode || item.color || item.pantone || item.hexCode) { %>
@@ -1708,29 +1708,29 @@
                 <% } else if (item.color) { %>
                 <span style="font-weight: 600; font-size: 14px;"><%= item.color %></span>
                 <% if (item.pantone || item.hexCode) { %><br /><% } %>
-                <% } %>
+                                        <% } %>
                 <% if (!item.colorCode && item.pantone) { %>
                 <span style="font-size: 14px;"><%= item.pantone %></span><br />
-                <% } %>
+                                        <% } %>
                 <% if (item.hexCode) { %>
                 <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
                 <span style="font-size: 14px;"><%= item.hexCode %></span>
                 <% } %>
                 <% } else { %>
                 -
-                <% } %>
-              </td>
-            </tr>
-            <% }); %>
-          </tbody>
-        </table>
-        <% } %>
+                                    <% } %>
+                                  </td>
+                                </tr>
+                                <% }); %>
+                            </tbody>
+                          </table>
+                          <% } %>
 
-        <% if (trims.length> 0) { %>
-        <h3>Trims</h3>
-        <table>
-          <thead>
-            <tr>
+                            <% if (trims.length> 0) { %>
+                              <h3>Trims</h3>
+                              <table>
+                                <thead>
+                                  <tr>
               <th style="width: 10%"><%= t.part || 'Part' %></th>
               <th style="width: 25%"><%= t.materialName || 'Material Name' %></th>
               <th style="width: 15%"><%= t.placement || 'Placement' %></th>
@@ -1740,34 +1740,34 @@
               <th style="width: 12%"><%= t.supplier || 'Supplier' %></th>
               <th style="width: 16%"><%= t.comments || 'Comments' %></th>
               <th style="width: 10%"><%= t.colorCode || 'Color Code' %></th>
-            </tr>
-          </thead>
-          <tbody>
-            <% trims.forEach((item, idx)=> { %>
-            <tr class="<%= idx % 2 === 1 ? 'alt-row' : '' %>">
-              <td>
-                <%= item.part || '-' %>
-              </td>
-              <td>
-                <%= item.materialName || '-' %>
-              </td>
-              <td>
-                <%= item.placement || '-' %>
-              </td>
-              <td>
-                <%= item.sizeWidthUsage || item.size || '-' %>
-              </td>
-              <td>
-                <%= item.quantity || '0' %>
-              </td>
-              <td>
-                <%= item.uom || 'Each' %>
-              </td>
-              <td>
-                <%= item.supplier || '-' %>
-              </td>
-              <td>
-                <%= item.comments || '-' %>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <% trims.forEach((item, idx)=> { %>
+                                    <tr class="<%= idx % 2 === 1 ? 'alt-row' : '' %>">
+                                      <td>
+                                        <%= item.part || '-' %>
+                                      </td>
+                                      <td>
+                                        <%= item.materialName || '-' %>
+                                      </td>
+                                      <td>
+                                        <%= item.placement || '-' %>
+                                      </td>
+                                      <td>
+                                        <%= item.sizeWidthUsage || item.size || '-' %>
+                                      </td>
+                                      <td>
+                                        <%= item.quantity || '0' %>
+                                      </td>
+                                      <td>
+                                        <%= item.uom || 'Each' %>
+                                      </td>
+                                      <td>
+                                        <%= item.supplier || '-' %>
+                                      </td>
+                                      <td>
+                                        <%= item.comments || '-' %>
               </td>
               <td style="font-size: 14px; line-height: 1.4; vertical-align: top;">
                 <% if (item.colorCode || item.color || item.pantone || item.hexCode) { %>
@@ -1777,29 +1777,29 @@
                 <% } else if (item.color) { %>
                 <span style="font-weight: 600; font-size: 14px;"><%= item.color %></span>
                 <% if (item.pantone || item.hexCode) { %><br /><% } %>
-                <% } %>
+                                            <% } %>
                 <% if (!item.colorCode && item.pantone) { %>
                 <span style="font-size: 14px;"><%= item.pantone %></span><br />
-                <% } %>
+                                            <% } %>
                 <% if (item.hexCode) { %>
                 <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
                 <span style="font-size: 14px;"><%= item.hexCode %></span>
                 <% } %>
                 <% } else { %>
                 -
-                <% } %>
-              </td>
-            </tr>
-            <% }); %>
-          </tbody>
-        </table>
-        <% } %>
+                                        <% } %>
+                                      </td>
+                                    </tr>
+                                    <% }); %>
+                                </tbody>
+                              </table>
+                              <% } %>
 
-        <% if (labels.length> 0) { %>
-        <h3>Labels</h3>
-        <table>
-          <thead>
-            <tr>
+                                <% if (labels.length> 0) { %>
+                                  <h3>Labels</h3>
+                                  <table>
+                                    <thead>
+                                      <tr>
               <th style="width: 12%"><%= t.part || 'Part' %></th>
               <th style="width: 28%"><%= t.materialName || 'Material Name' %></th>
               <th style="width: 22%"><%= t.placement || 'Placement' %></th>
@@ -1807,28 +1807,28 @@
               <th style="width: 8%"><%= t.uom || 'UOM' %></th>
               <th style="width: 22%"><%= t.comments || 'Comments' %></th>
               <th style="width: 12%"><%= t.colorCode || 'Color Code' %></th>
-            </tr>
-          </thead>
-          <tbody>
-            <% labels.forEach((item, idx)=> { %>
-            <tr class="<%= idx % 2 === 1 ? 'alt-row' : '' %>">
-              <td>
-                <%= item.part || '-' %>
-              </td>
-              <td>
-                <%= item.materialName || '-' %>
-              </td>
-              <td>
-                <%= item.placement || '-' %>
-              </td>
-              <td>
-                <%= item.quantity || '1' %>
-              </td>
-              <td>
-                <%= item.uom || 'Each' %>
-              </td>
-              <td>
-                <%= item.comments || '-' %>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      <% labels.forEach((item, idx)=> { %>
+                                        <tr class="<%= idx % 2 === 1 ? 'alt-row' : '' %>">
+                                          <td>
+                                            <%= item.part || '-' %>
+                                          </td>
+                                          <td>
+                                            <%= item.materialName || '-' %>
+                                          </td>
+                                          <td>
+                                            <%= item.placement || '-' %>
+                                          </td>
+                                          <td>
+                                            <%= item.quantity || '1' %>
+                                          </td>
+                                          <td>
+                                            <%= item.uom || 'Each' %>
+                                          </td>
+                                          <td>
+                                            <%= item.comments || '-' %>
               </td>
               <td style="font-size: 14px; line-height: 1.4; vertical-align: top;">
                 <% if (item.colorCode || item.color || item.pantone || item.hexCode) { %>
@@ -1838,29 +1838,29 @@
                 <% } else if (item.color) { %>
                 <span style="font-weight: 600; font-size: 14px;"><%= item.color %></span>
                 <% if (item.pantone || item.hexCode) { %><br /><% } %>
-                <% } %>
+                                                <% } %>
                 <% if (!item.colorCode && item.pantone) { %>
                 <span style="font-size: 14px;"><%= item.pantone %></span><br />
-                <% } %>
+                                                <% } %>
                 <% if (item.hexCode) { %>
                 <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
                 <span style="font-size: 14px;"><%= item.hexCode %></span>
                 <% } %>
                 <% } else { %>
                 -
-                <% } %>
-              </td>
-            </tr>
-            <% }); %>
-          </tbody>
-        </table>
-        <% } %>
+                                            <% } %>
+                                          </td>
+                                        </tr>
+                                        <% }); %>
+                                    </tbody>
+                                  </table>
+                                  <% } %>
 
-        <% if (packaging.length> 0) { %>
-        <h3>Packaging</h3>
-        <table>
-          <thead>
-            <tr>
+                                    <% if (packaging.length> 0) { %>
+                                      <h3>Packaging</h3>
+                                      <table>
+                                        <thead>
+                                          <tr>
               <th style="width: 12%"><%= t.part || 'Part' %></th>
               <th style="width: 28%"><%= t.materialName || 'Material Name' %></th>
               <th style="width: 10%"><%= t.qty || 'Qty' %></th>
@@ -1868,28 +1868,28 @@
               <th style="width: 18%"><%= t.supplier || 'Supplier' %></th>
               <th style="width: 22%"><%= t.comments || 'Comments' %></th>
               <th style="width: 12%"><%= t.colorCode || 'Color Code' %></th>
-            </tr>
-          </thead>
-          <tbody>
-            <% packaging.forEach((item, idx)=> { %>
-            <tr class="<%= idx % 2 === 1 ? 'alt-row' : '' %>">
-              <td>
-                <%= item.part || '-' %>
-              </td>
-              <td>
-                <%= item.materialName || '-' %>
-              </td>
-              <td>
-                <%= item.quantity || '1' %>
-              </td>
-              <td>
-                <%= item.uom || 'Each' %>
-              </td>
-              <td>
-                <%= item.supplier || '-' %>
-              </td>
-              <td>
-                <%= item.comments || '-' %>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          <% packaging.forEach((item, idx)=> { %>
+                                            <tr class="<%= idx % 2 === 1 ? 'alt-row' : '' %>">
+                                              <td>
+                                                <%= item.part || '-' %>
+                                              </td>
+                                              <td>
+                                                <%= item.materialName || '-' %>
+                                              </td>
+                                              <td>
+                                                <%= item.quantity || '1' %>
+                                              </td>
+                                              <td>
+                                                <%= item.uom || 'Each' %>
+                                              </td>
+                                              <td>
+                                                <%= item.supplier || '-' %>
+                                              </td>
+                                              <td>
+                                                <%= item.comments || '-' %>
               </td>
               <td style="font-size: 14px; line-height: 1.4; vertical-align: top;">
                 <% if (item.colorCode || item.color || item.pantone || item.hexCode) { %>
@@ -1899,33 +1899,33 @@
                 <% } else if (item.color) { %>
                 <span style="font-weight: 600; font-size: 14px;"><%= item.color %></span>
                 <% if (item.pantone || item.hexCode) { %><br /><% } %>
-                <% } %>
+                                                    <% } %>
                 <% if (!item.colorCode && item.pantone) { %>
                 <span style="font-size: 14px;"><%= item.pantone %></span><br />
-                <% } %>
+                                                    <% } %>
                 <% if (item.hexCode) { %>
                 <span style="display:inline-block; width:12px; height:12px; border:1px solid #999; border-radius:2px; background-color:<%= item.hexCode %>; vertical-align:middle; margin-right:4px;"></span>
                 <span style="font-size: 14px;"><%= item.hexCode %></span>
                 <% } %>
                 <% } else { %>
                 -
+                                                <% } %>
+                                              </td>
+                                            </tr>
+                                            <% }); %>
+                                        </tbody>
+                                      </table>
+                                      <% } %>
+                    </div>
+                </div>
                 <% } %>
-              </td>
-            </tr>
-            <% }); %>
-          </tbody>
-        </table>
-        <% } %>
-      </div>
-    </div>
-    <% } %>
 
-    <%# 3. MEASUREMENTS %>
-    <% if (measurements && measurements.rows && measurements.rows.length> 0) { %>
-    <div class="section">
+                  <%# 3. MEASUREMENTS %>
+                    <% if (measurements && measurements.rows && measurements.rows.length> 0) { %>
+                      <div class="section">
       <% renderSectionHeader(`${t.measurements || 'Measurements'} - ${t.comments || 'Comments'}`); %>
-      <div class="section-content">
-        <% if (measurements.sizeRange && measurements.sizeRange.length> 0) { %>
+                          <div class="section-content">
+                            <% if (measurements.sizeRange && measurements.sizeRange.length> 0) { %>
         <div style="margin-bottom: 5px">
           <strong><%= t.sizeRange || 'Size Range' %>:</strong>
           <% if (measurements.unit) { %>
@@ -1933,96 +1933,96 @@
           <% } %>
           <div style="margin-top: 3px">
             <% const baseSize = measurements.baseSize; %>
-            <% measurements.sizeRange.forEach(size=> { %>
+                                  <% measurements.sizeRange.forEach(size=> { %>
             <span class="size-badge" style="<%= size === baseSize ? 'background: #79e5a5; color: #000;' : '' %>">
-              <%= size %>
-            </span>
-            <% }); %>
-          </div>
-        </div>
-        <% } %>
+                                      <%= size %>
+                                    </span>
+                                    <% }); %>
+                                </div>
+                              </div>
+                              <% } %>
 
-        <div style="overflow-x: auto">
-          <table class="measurement-table">
-            <thead>
-              <tr>
+                                <div style="overflow-x: auto">
+                                  <table class="measurement-table">
+                                    <thead>
+                                      <tr>
                 <th><%= t.pomCode || 'POM Code' %></th>
                 <th><%= t.pomName || 'Measurement Point' %></th>
                 <th><%= t.minusTolerance || '-Tol' %></th>
                 <th><%= t.plusTolerance || '+Tol' %></th>
-                <% if (measurements.sizeRange) { measurements.sizeRange.forEach(size=> { %>
-                <th>
-                  <%= size %>
-                </th>
-                <% }); } %>
-              </tr>
-            </thead>
-            <tbody>
-              <% measurements.rows.forEach((row, index)=> {
+                                        <% if (measurements.sizeRange) { measurements.sizeRange.forEach(size=> { %>
+                                          <th>
+                                            <%= size %>
+                                          </th>
+                                          <% }); } %>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      <% measurements.rows.forEach((row, index)=> {
                                         const highlightCodes = ['BL20', 'BL21', 'AB11', 'AB30', 'AB70', 'AH10', 'SL10'];
                                         const shouldHighlight = highlightCodes.some(code =>
                                         row.pomCode?.includes(code));
                                         const baseSize = measurements.baseSize;
                                         %>
               <tr style="<%= shouldHighlight ? 'background: #ffe;' : (index % 2 === 1 ? 'background: #e8e8e8;' : '') %>">
-                <td>
-                  <%= row.pomCode || '-' %>
-                </td>
-                <td>
-                  <%= row.pomName || '-' %>
-                </td>
-                <td>
+                                          <td>
+                                            <%= row.pomCode || '-' %>
+                                          </td>
+                                          <td>
+                                            <%= row.pomName || '-' %>
+                                          </td>
+                                          <td>
                   <%= row.minusToleranceFormatted || (row.minusTolerance !== undefined ? row.minusTolerance : '0') %>
-                </td>
-                <td>
+                                          </td>
+                                          <td>
                   <%= row.plusToleranceFormatted || (row.plusTolerance !== undefined ? row.plusTolerance : '0') %>
-                </td>
-                <% if (measurements.sizeRange) { measurements.sizeRange.forEach(size=> { %>
-                <td style="<%= size === baseSize ? 'background: #79e5a5;' : '' %>">
-                  <%= row.sizes?.[size] || '-' %>
-                </td>
-                <% }); } %>
-              </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
+                                          </td>
+                                          <% if (measurements.sizeRange) { measurements.sizeRange.forEach(size=> { %>
+                                            <td style="<%= size === baseSize ? 'background: #79e5a5;' : '' %>">
+                                              <%= row.sizes?.[size] || '-' %>
+                                            </td>
+                                            <% }); } %>
+                                        </tr>
+                                        <% }); %>
+                                    </tbody>
+                                  </table>
+                                </div>
 
-        <% if (measurements.notes || measurements.comments) { %>
-        <div class="notes">
+                                <% if (measurements.notes || measurements.comments) { %>
+                                  <div class="notes">
           <strong><%= t.notesLabel || t.notes || 'Notes' %>:</strong>
-          <%= measurements.notes || measurements.comments %>
-        </div>
-        <% } %>
-      </div>
-    </div>
-    <% } %>
+                                    <%= measurements.notes || measurements.comments %>
+                                  </div>
+                                  <% } %>
+                          </div>
+                      </div>
+                      <% } %>
 
-    <%# 3B. SAMPLE MEASUREMENT ROUNDS %>
-    <% if (sampleMeasurementRounds && sampleMeasurementRounds.length> 0) { %>
-    <% sampleMeasurementRounds.forEach((round, roundIndex)=> { %>
-    <div class="section">
+                        <%# 3B. SAMPLE MEASUREMENT ROUNDS %>
+                          <% if (sampleMeasurementRounds && sampleMeasurementRounds.length> 0) { %>
+                            <% sampleMeasurementRounds.forEach((round, roundIndex)=> { %>
+                              <div class="section">
       <% renderSectionHeader(`${t.sampleMeasurements || 'Sample Measurements'} - ${round.name}`); %>
-      <div class="section-content">
+          <div class="section-content">
         <div class="info-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 5px">
-          <div class="info-item">
+              <div class="info-item">
             <strong><%= t.measurementDate || 'Measurement Date' %></strong>
-            <span><%= round.measurementDate || ' -' %></span>
-          </div>
-          <div class="info-item">
+                <span><%= round.measurementDate || ' -' %></span>
+                              </div>
+                              <div class="info-item">
             <strong><%= t.reviewer || 'Reviewer' %></strong>
-            <span>
-              <%= round.reviewer || '-' %>
-            </span>
-          </div>
+                                <span>
+                                  <%= round.reviewer || '-' %>
+                                </span>
+                              </div>
 
-        </div>
+  </div>
 
-        <% if (round.measurements && round.measurements.length> 0) { %>
-        <div style="overflow-x: auto">
+  <% if (round.measurements && round.measurements.length> 0) { %>
+    <div style="overflow-x: auto">
           <table class="measurement-table" style="font-size: 14px">
-            <thead>
-              <tr>
+        <thead>
+          <tr>
                 <th style="width: 8%"><%= t.pom || 'POM' %></th>
                 <th style="width: 12%"><%= t.point || 'Point' %></th>
                 <th style="width: 5%"><%= t.minusTolerance || '-Tol' %></th>
@@ -2032,30 +2032,30 @@
                 <th style="width: 7%"><%= t.diff || 'Diff' %></th>
                 <th style="width: 8%"><%= t.revised || 'Revised' %></th>
                 <th style="width: 37%"><%= t.comments || 'Comments' %></th>
-              </tr>
-            </thead>
-            <tbody>
-              <% round.measurements.forEach((entry, idx)=> { %>
-              <tr style="<%= idx % 2 === 1 ? 'background: #e8e8e8;' : '' %>">
-                <td>
-                  <%= entry.pomCode || '-' %>
-                </td>
-                <td style="text-align: left">
-                  <%= entry.pomName || '-' %>
-                </td>
-                <td>
+          </tr>
+        </thead>
+        <tbody>
+          <% round.measurements.forEach((entry, idx)=> { %>
+            <tr style="<%= idx % 2 === 1 ? 'background: #e8e8e8;' : '' %>">
+              <td>
+                <%= entry.pomCode || '-' %>
+              </td>
+              <td style="text-align: left">
+                <%= entry.pomName || '-' %>
+              </td>
+              <td>
                   <%= entry.toleranceMinusFormatted || entry.toleranceMinus || '0' %>
-                </td>
-                <td>
+              </td>
+              <td>
                   <%= entry.tolerancePlusFormatted || entry.tolerancePlus || '0' %>
-                </td>
-                <td>
-                  <% const baseSize=measurements?.baseSize || 'M' ; %>
+              </td>
+              <td>
+                <% const baseSize=measurements?.baseSize || 'M' ; %>
                   <%= entry.requested?.[baseSize] || '-' %>
-                </td>
-                <td>
-                  <%= entry.measured?.[baseSize] || '-' %>
-                </td>
+              </td>
+              <td>
+                <%= entry.measured?.[baseSize] || '-' %>
+              </td>
                 <td style="
                   white-space: nowrap;
                   word-break: normal;
@@ -2063,47 +2063,47 @@
                   <%= parseFloat(entry.diffDisplay?.[baseSize] || 0) > 0 ? 'color: red; font-weight: bold;' : '' %>
                 ">
                   <%= entry.diffDisplay?.[baseSize] || '-' %>
-                </td>
-                <td>
-                  <%= entry.revised?.[baseSize] || '-' %>
-                </td>
+              </td>
+              <td>
+                <%= entry.revised?.[baseSize] || '-' %>
+              </td>
                 <td style="text-align: left; font-size: 14px">
-                  <%= entry.comments?.[baseSize] || '-' %>
-                </td>
-              </tr>
-              <% }); %>
-            </tbody>
-          </table>
-        </div>
-        <% } %>
-        <% if (round.overallComments && round.overallComments !=='—' ) { %>
+                <%= entry.comments?.[baseSize] || '-' %>
+              </td>
+            </tr>
+            <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+      <% if (round.overallComments && round.overallComments !=='—' ) { %>
         <div class="notes" style="margin-top: 5px; page-break-before: avoid !important; page-break-inside: avoid;">
           <strong>OVERALL COMMENTS:</strong>
           <%- round.overallComments %>
         </div>
         <% } %>
-        <% if (round.editorContent && round.editorContent.trim() !=='' ) { %>
+          <% if (round.editorContent && round.editorContent.trim() !=='' ) { %>
         <div class="notes" style="margin-top: 5px; page-break-before: avoid !important; page-break-inside: avoid;">
-          <strong>DETAILS:</strong>
-          <%- round.editorContent %>
-        </div>
-        <% } %>
-      </div>
-    </div>
-    <% }); %>
-    <% } %>
+              <strong>DETAILS:</strong>
+              <%- round.editorContent %>
+            </div>
+            <% } %>
+              </div>
+              </div>
+              <% }); %>
+                <% } %>
 
     <%# 4. COLORWAYS - LUÔN bắt đầu ở trang mới, không được chia cắt, và LUÔN kết thúc bằng ngắt trang %>
-    <% if (colorways && colorways.length> 0) { %>
+                    <% if (colorways && colorways.length> 0) { %>
     <div class="section section--colorways" style="page-break-before: always !important; page-break-inside: avoid !important; page-break-after: always !important;">
       <% renderSectionHeader(t.colorways || 'Colorways'); %>
       <div class="section-content" style="page-break-inside: avoid !important; page-break-after: avoid !important;">
         <div class="colorways-grid" style="page-break-inside: avoid !important; page-break-after: avoid !important;">
-          <% colorways.forEach(color=> { %>
+                              <% colorways.forEach(color=> { %>
           <div class="colorway-card" style="page-break-inside: avoid !important;">
             <div class="colorway-card-text">
               <div class="colorway-card-title">
-                <%= color.name || 'Color' %>
+                                    <%= color.name || 'Color' %>
               </div>
               <div class="colorway-card-code">
                 <%= t.code || 'Code' %>: <%= color.code || '000' %>
@@ -2113,13 +2113,13 @@
             <div class="colorway-card-image" style="page-break-inside: avoid !important;">
               <img src="<%= color.imageUrl %>" alt="Colorway Image" />
             </div>
-            <% } %>
-          </div>
-          <% }); %>
-        </div>
-      </div>
-    </div>
-    <% } %>
+                                          <% } %>
+                                </div>
+                                <% }); %>
+                            </div>
+                          </div>
+                      </div>
+                      <% } %>
 
     <%# 5. CONSTRUCTION - Mỗi construction = 1 trang, header lặp lại mỗi trang, ảnh không được tràn %>
     <% 
@@ -2135,8 +2135,8 @@
       // 10% page ~ 4 dòng với font 14px; có thể chỉnh nếu cần
       const NOTE_MAX_LINES_ON_IMAGE_PAGE = 4;
     %>
-    <% if (howToMeasures && howToMeasures.length> 0) { %>
-    <% howToMeasures.forEach((item, index)=> { %>
+                          <% if (howToMeasures && howToMeasures.length> 0) { %>
+                                  <% howToMeasures.forEach((item, index)=> { %>
     <%# Mỗi construction item LUÔN bắt đầu ở trang mới (kể cả item đầu tiên) %>
     <div class="section construction-item" style="page-break-before: always !important; page-break-inside: avoid !important; page-break-after: always !important;">
       <%# Header lặp lại trên MỖI TRANG - không được break với content %>
@@ -2154,7 +2154,7 @@
         <div class="construction-image-wrapper" style="background: #f9f9f9; border: 2px dashed #ddd; border-radius: 8px; display: flex; align-items: center; justify-content: center; page-break-inside: avoid !important; page-break-after: avoid !important;">
           <span style="color: #999; font-size: 14px;"><%= t.noImage || 'No Image' %></span>
         </div>
-        <% } %>
+                                            <% } %>
 
         <!-- Text Content Section - Hiển thị sau -->
         <%
@@ -2169,7 +2169,7 @@
         <div class="construction-text" style="page-break-inside: avoid !important; page-break-after: avoid !important; flex-shrink: 0; flex-grow: 0;">
           <% if (noteText) { %>
             <div class="construction-note"><%= firstChunk %></div>
-          <% } %>
+                                                <% } %>
 
           <% if (item.steps && item.steps.length > 0) { %>
           <div class="construction-section">
@@ -2177,52 +2177,52 @@
             <ol class="construction-list">
               <% item.steps.forEach(step => { %>
               <li><%= step %></li>
-              <% }); %>
-            </ol>
-          </div>
-          <% } %>
+                                                          <% }); %>
+                                                      </ol>
+                                                    </div>
+                                                    <% } %>
           <% if (item.tips && item.tips.length > 0) { %>
           <div class="construction-tips">
             <strong>💡 <%= t.tips || 'Tips' %>:</strong>
             <ul class="construction-list">
               <% item.tips.forEach(tip => { %>
               <li><%= tip %></li>
-              <% }); %>
-            </ul>
-          </div>
-          <% } %>
+                                                              <% }); %>
+                                                          </ul>
+                                                        </div>
+                                                        <% } %>
           <% if (item.commonMistakes && item.commonMistakes.length > 0) { %>
           <div class="construction-mistakes">
             <strong>⚠️ <%= t.commonMistakes || 'Common Mistakes' %>:</strong>
             <ul class="construction-list">
               <% item.commonMistakes.forEach(mistake => { %>
               <li><%= mistake %></li>
-              <% }); %>
-            </ul>
-          </div>
-          <% } %>
-        </div>
-      </div>
-    </div>
+                                                                  <% }); %>
+                                                              </ul>
+                                                            </div>
+                                                            <% } %>
+                                        </div>
+                                          </div>
+                                      </div>
 
     <% if (noteText && remainingChunks.length > 0) { %>
       <% remainingChunks.forEach((chunk, ci) => { %>
         <div class="section construction-notes-page">
           <div style="page-break-inside: avoid !important; page-break-after: avoid !important; margin-bottom: 5px;">
             <% renderSectionHeader(t.constructionDetails || t.howToMeasure || 'Construction Details'); %>
-          </div>
+                                    </div>
 
           <div class="construction-notes-content">
             <div class="construction-note"><%= chunk %></div>
-          </div>
-        </div>
+                                </div>
+                            </div>
       <% }); %>
     <% } %>
     <% }); %>
-    <% } %>
+                            <% } %>
 
     <%# 6. PACKING - Mỗi packing item = 1 trang, layout: ảnh trên (90%), chữ dưới (10%) %>
-    <% if (packingNotes && packingNotes !=='—' ) { %>
+                                <% if (packingNotes && packingNotes !=='—' ) { %>
       <%# Parse packingNotes HTML để tách từng .packing-layout item - FIX: dùng parser đếm thẻ div đúng cách %>
       <% 
         function extractDivBlocksByClass(html, className) {
@@ -2271,17 +2271,17 @@
           <%# Header lặp lại trên MỖI TRANG %>
           <div style="page-break-inside: avoid !important; page-break-after: avoid !important; margin-bottom: 5px;">
             <% renderSectionHeader(t.labelsPacking || 'Labels - Packing'); %>
-          </div>
+                                        </div>
           <div class="section-content" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
             <div style="display: flex; flex-direction: column; flex: 1; min-height: 0; background: #f8fafc; border: 1px solid #e1e7ee; border-radius: 6px; padding: 12px;">
               <%- itemHtml %>
-            </div>
-          </div>
+                                      </div>
+                                  </div>
         </div>
       <% }); %>
-    <% } %>
+                                  <% } %>
 
-  </div>
+                                        </div>
 
   <!-- Footer - Fixed at bottom of every page -->
   <!-- NOTE: Footer này chỉ hiển thị khi KHÔNG dùng Puppeteer footerTemplate -->
@@ -2289,14 +2289,14 @@
   <div class="pdf-footer" id="html-footer" style="display: none;">
     <div class="pdf-footer__left">
       <%= (t.createdBy || 'Created by') + ': ' %><%= meta.technicalDesignerId || meta.designer || meta.technicalDesigner || 'Technical Designer' %>
-    </div>
+                                                  </div>
     <div class="pdf-footer__center">
       <%= (t.byLabel || 'By') + ': ' %>iBC connecting
-    </div>
+                                                </div>
     <div class="pdf-footer__right">
       <%= t.page || 'Page' %> <span class="page-number">-</span> / <span class="total-pages">-</span>
-    </div>
-  </div>
+                                                </div>
+                                              </div>
 
   <!-- Script để xử lý anti-waste: scale ảnh khi trang còn trống >40% -->
   <script>

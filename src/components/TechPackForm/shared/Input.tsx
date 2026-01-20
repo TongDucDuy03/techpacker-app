@@ -28,7 +28,13 @@ const Input: React.FC<InputProps> = ({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isNumeric) {
       const raw = e.target.value;
-      const normalized = raw.replace(/,/g, '.');
+
+      // Không cho phép dấu phẩy, chỉ chấp nhận dấu chấm làm phân cách thập phân
+      if (raw.includes(',')) {
+        return;
+      }
+
+      const normalized = raw;
       
       // Allow transitional states (empty, minus sign, dot, number ending with dot, etc.)
       // This allows typing "0.", "0.0", "0.05", etc. without losing the decimal point
