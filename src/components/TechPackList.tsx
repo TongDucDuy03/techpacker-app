@@ -604,28 +604,29 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
         />
       </Card>
 
-      <CreateTechPackWorkflow
-        visible={showCreateWorkflow}
-        onCancel={() => setShowCreateWorkflow(false)}
-        onCreateTechPack={() => {
-          setShowCreateWorkflow(false);
-          if (onCreateTechPack) {
-            onCreateTechPack();
-          }
-        }}
-        onSuccess={async (newTechPack) => {
-          setShowCreateWorkflow(false);
-          
-          if (addTechPackToList && newTechPack) {
-            addTechPackToList(newTechPack);
-          }
-          
-          loadTechPacks({ page: 1, limit: 10 }).catch(error => {
-            console.error('Failed to refresh techpack list:', error);
-            loadTechPacks({ page: 1, limit: 10 }).catch(fallbackError => {
-              console.error('Failed to refresh techpack list (fallback):', fallbackError);
+      {showCreateWorkflow && (
+        <CreateTechPackWorkflow
+          visible={showCreateWorkflow}
+          onCancel={() => setShowCreateWorkflow(false)}
+          onCreateTechPack={() => {
+            setShowCreateWorkflow(false);
+            if (onCreateTechPack) {
+              onCreateTechPack();
+            }
+          }}
+          onSuccess={async (newTechPack) => {
+            setShowCreateWorkflow(false);
+            
+            if (addTechPackToList && newTechPack) {
+              addTechPackToList(newTechPack);
+            }
+            
+            loadTechPacks({ page: 1, limit: 10 }).catch(error => {
+              console.error('Failed to refresh techpack list:', error);
+              loadTechPacks({ page: 1, limit: 10 }).catch(fallbackError => {
+                console.error('Failed to refresh techpack list (fallback):', fallbackError);
+              });
             });
-          });
           
           await new Promise(resolve => setTimeout(resolve, 100));
           
@@ -633,7 +634,8 @@ const TechPackListComponent: React.FC<TechPackListProps> = ({
             onEditTechPack(newTechPack);
           }
         }}
-      />
+        />
+      )}
     </div>
   );
 };

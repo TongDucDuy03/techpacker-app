@@ -267,10 +267,15 @@ class PDFService {
     try {
       const d = typeof date === 'string' ? new Date(date) : date;
       const locale = this.currentLanguage === 'vi' ? 'vi-VN' : 'en-US';
-      return d.toLocaleDateString(locale, { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
+      // Show date + time (HH:mm:ss) as requested
+      return d.toLocaleString(locale, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
       });
     } catch {
       return '—';
@@ -513,6 +518,7 @@ class PDFService {
       }
 
       bomByPart[partName].push({
+        bomItemId: bomItemId || undefined,
         materialName: this.normalizeText(item.materialName),
         imageUrl,
         placement: this.normalizeText(item.placement),
@@ -805,6 +811,7 @@ class PDFService {
           ? (imageMap.get(colorway.imageUrl) || this.getPlaceholderSVG())
           : this.getPlaceholderSVG(),
         parts: (colorway.parts || []).map((part: IColorwayPart) => ({
+          bomItemId: (part as any).bomItemId ? String((part as any).bomItemId) : undefined,
           partName: part.partName || '—',
           colorName: part.colorName || '—',
           pantoneCode: part.pantoneCode || '—',
@@ -837,6 +844,7 @@ class PDFService {
       notes: colorway.notes || '—',
       imageUrl: this.getPlaceholderSVG(),
       parts: (colorway.parts || []).map((part: IColorwayPart) => ({
+        bomItemId: (part as any).bomItemId ? String((part as any).bomItemId) : undefined,
         partName: part.partName || '—',
         colorName: part.colorName || '—',
         pantoneCode: part.pantoneCode || '—',

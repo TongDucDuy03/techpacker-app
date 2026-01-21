@@ -74,6 +74,43 @@ const getDraftStorageKey = (techpackId?: string) => `${TECHPACK_DRAFT_STORAGE_PR
 
 const safeString = (value?: string | null): string => (typeof value === 'string' ? value.trim() : '');
 
+// Normalize any possible id value (string/ObjectId/object) into a trimmed string
+// Supports MongoDB ObjectId-like objects that may appear in some API responses.
+const normalizeId = (value: any): string => {
+  if (value === null || value === undefined) return '';
+
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'bigint') return String(value);
+
+  if (typeof value === 'object') {
+    // MongoDB ObjectId-like objects
+    const bsontype = (value as any)?._bsontype;
+    const ctorName = (value as any)?.constructor?.name;
+    if (bsontype === 'ObjectID' || bsontype === 'ObjectId' || ctorName === 'ObjectID' || ctorName === 'ObjectId') {
+      if (typeof (value as any).toHexString === 'function') {
+        const hex = (value as any).toHexString();
+        return typeof hex === 'string' ? hex.trim() : '';
+      }
+      if (typeof (value as any).toString === 'function') {
+        const str = (value as any).toString();
+        return typeof str === 'string' ? str.trim() : '';
+      }
+      return '';
+    }
+
+    // Plain objects containing id/_id
+    if ((value as any)._id) return normalizeId((value as any)._id);
+    if ((value as any).id) return normalizeId((value as any).id);
+
+    if (typeof (value as any).toString === 'function') {
+      const str = (value as any).toString();
+      return typeof str === 'string' ? str.trim() : '';
+    }
+  }
+
+  return '';
+};
+
 const normalizeHexColor = (value?: string | null): string => {
   const raw = safeString(value);
   if (!raw) return '';
@@ -127,8 +164,8 @@ const buildBomLookup = (bomItems?: BomItem[]): BomLookup => {
 
   (bomItems || []).forEach(item => {
     const rawIds = [
-      safeString((item as any)?.id),
-      safeString((item as any)?._id),
+      normalizeId((item as any)?.id),
+      normalizeId((item as any)?._id),
     ].filter(Boolean) as string[];
 
     rawIds.forEach(id => {
@@ -151,7 +188,7 @@ const buildBomLookup = (bomItems?: BomItem[]): BomLookup => {
 const resolveBomItem = (lookup: BomLookup | undefined, bomItemId?: string, partName?: string): BomItem | undefined => {
   if (!lookup) return undefined;
 
-  const normalizedId = safeString(bomItemId);
+  const normalizedId = normalizeId(bomItemId);
   if (normalizedId) {
     const directMatch = lookup.byId.get(normalizedId) || lookup.byId.get(normalizedId.toLowerCase());
     if (directMatch) {
@@ -185,10 +222,10 @@ const sanitizeColorwayPart = (
 
   const linkedBom = resolveBomItem(bomLookup, (part as any)?.bomItemId || part?.bomItemId, part?.partName);
   const resolvedBomItemId =
-    safeString(part?.bomItemId) ||
-    safeString((part as any)?.bomItemId) ||
-    safeString((linkedBom as any)?._id) ||
-    safeString((linkedBom as any)?.id);
+    normalizeId(part?.bomItemId) ||
+    normalizeId((part as any)?.bomItemId) ||
+    normalizeId((linkedBom as any)?._id) ||
+    normalizeId((linkedBom as any)?.id);
 
   const resolvedPartName =
     safeString(part?.partName) ||
@@ -202,7 +239,7 @@ const sanitizeColorwayPart = (
     `Color ${partIndex + 1}`;
 
   return {
-    id: safeString((part as any)?.id) || safeString((part as any)?._id) || `part_${colorwayIndex}_${partIndex}`,
+    id: normalizeId((part as any)?.id) || normalizeId((part as any)?._id) || `part_${colorwayIndex}_${partIndex}`,
     bomItemId: resolvedBomItemId || undefined,
     partName: resolvedPartName,
     colorName: resolvedColorName,
@@ -821,6 +858,10 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
     const parts = Array.isArray(colorway?.parts)
       ? colorway.parts.map((part: any, partIndex: number) => ({
           id: part?.id || part?._id || `part_${index}_${partIndex}`,
+          _id: part?._id,
+          // 🔗 CRITICAL: preserve bomItemId so each color assignment stays tied to its own BOM row
+          // ✅ Normalize bomItemId to a stable string so refresh/F5 can match reliably
+          bomItemId: normalizeId(part?.bomItemId) || undefined,
           partName: part?.partName || part?.name || '',
           colorName: part?.colorName || part?.color || '',
           pantoneCode: part?.pantoneCode || part?.pantone || '',
@@ -1673,7 +1714,9 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
             payload._id = partObjectId;
           }
 
-          if (part.bomItemId) payload.bomItemId = part.bomItemId;
+          // Always send bomItemId as a normalized string (backend may return ObjectId-ish shapes)
+          const normalizedBomItemId = normalizeId(part.bomItemId);
+          if (normalizedBomItemId) payload.bomItemId = normalizedBomItemId;
           if (part.pantoneCode) payload.pantoneCode = part.pantoneCode.trim();
           if (normalizedHex) payload.hexCode = normalizedHex;
           if (part.rgbCode) payload.rgbCode = part.rgbCode.trim();
@@ -1739,11 +1782,20 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           brand: techpackData.articleInfo.brand,
           retailPrice: techpackData.articleInfo.retailPrice || undefined, // ✅ FIXED: Get from articleInfo, not root level
           currency: techpackData.articleInfo.currency || 'USD', // ✅ FIXED: Get from articleInfo, not root level
-          bom: (techpackData.bom || []).map((item: any) => ({
-            ...item,
-            size: item.size || '', // ✅ FIXED: Ensure size is always present (can be empty string)
-            placement: item.placement || '', // ✅ FIXED: Ensure placement is always present (can be empty string)
-          })),
+          bom: (techpackData.bom || []).map((item: any) => {
+            const mapped: any = {
+              ...item,
+              size: item.size || '', // ✅ Ensure size is always present (can be empty string)
+              placement: item.placement || '', // ✅ Ensure placement is always present (can be empty string)
+            };
+            // 🛡️ CRITICAL: preserve server _id so colorway parts keep the same bomItemId after save
+            if (item.id && objectIdPattern.test(String(item.id))) {
+              mapped._id = String(item.id);
+            } else if (item._id && objectIdPattern.test(String(item._id))) {
+              mapped._id = String(item._id);
+            }
+            return mapped;
+          }),
           measurements: measurementsPayload,
           colorways: colorwaysPayload,
           howToMeasure: howToMeasuresPayload,
@@ -1883,11 +1935,20 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
             retailPrice: techpackData.articleInfo.retailPrice || undefined, // ✅ FIXED: Add retailPrice to create payload
             notes: techpackData.articleInfo.notes,
           },
-          bom: (techpackData.bom || []).map((item: any) => ({
-            ...item,
-            size: item.size || '', // ✅ FIXED: Ensure size is always present (can be empty string)
-            placement: item.placement || '', // ✅ FIXED: Ensure placement is always present (can be empty string)
-          })),
+          bom: (techpackData.bom || []).map((item: any) => {
+            const mapped: any = {
+              ...item,
+              size: item.size || '', // ✅ Ensure size is always present (can be empty string)
+              placement: item.placement || '', // ✅ Ensure placement is always present (can be empty string)
+            };
+            // Preserve _id when creating based on existing data (clone/copy flows)
+            if (item.id && objectIdPattern.test(String(item.id))) {
+              mapped._id = String(item.id);
+            } else if (item._id && objectIdPattern.test(String(item._id))) {
+              mapped._id = String(item._id);
+            }
+            return mapped;
+          }),
           measurements: measurementsPayload,
           colorways: colorwaysPayload,
           howToMeasures: howToMeasuresPayload,
@@ -2656,7 +2717,13 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         if (colorway.id !== colorwayId) return colorway;
 
         const parts = colorway.parts || [];
-        const existingIndex = parts.findIndex(part => part.bomItemId === bomItemId);
+        // ✅ CRITICAL FIX: Only find existing part by bomItemId (not by other fields)
+        // This ensures each BOM item gets its own part, even if they share the same colorway
+        const existingIndex = parts.findIndex(part => {
+          const partBomId = normalizeId(part.bomItemId);
+          const targetBomId = normalizeId(bomItemId);
+          return partBomId && targetBomId && partBomId === targetBomId;
+        });
         const existingPart = existingIndex >= 0 ? parts[existingIndex] : undefined;
         const linkedBom = resolveBomItem(bomLookup, bomItemId, partData.partName || existingPart?.partName);
 
@@ -2679,21 +2746,42 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           colorway.hexColor ||
           '#000000';
 
+        // ✅ CRITICAL FIX: Always generate new ID if partData explicitly has id: undefined
+        // This ensures we create a new part instead of updating an existing one
+        const partDataId = (partData as any)?.id;
+        const partData_Id = (partData as any)?._id;
+        const shouldCreateNew = partDataId === undefined && partData_Id === undefined && !existingPart;
+        const newPartId = shouldCreateNew 
+          ? generateClientId('colorway-part')
+          : (existingPart?.id || generateClientId('colorway-part'));
+
         const updatedPart: ColorwayPart = {
           ...existingPart,
           ...partData,
-          id: existingPart?.id || generateClientId('colorway-part'),
-          bomItemId,
+          // ✅ CRITICAL: Remove id/_id from partData if they're undefined to avoid overwriting
+          id: newPartId,
+          bomItemId, // ✅ Always set bomItemId to ensure correct mapping
           partName: resolvedPartName,
           colorName: resolvedColorName,
           hexCode: resolvedHex,
           colorType: (partData.colorType as ColorwayPart['colorType']) || existingPart?.colorType || 'Solid',
         };
 
+        // ✅ CRITICAL FIX: Always append new part if it doesn't exist for this bomItemId
+        // This ensures multiple BOM items can share the same colorway without overwriting each other
         const nextParts =
           existingIndex >= 0
             ? parts.map((part, idx) => (idx === existingIndex ? updatedPart : part))
             : [...parts, updatedPart];
+
+        console.log('[assignColorwayToBomItem]', {
+          colorwayId,
+          bomItemId,
+          existingIndex,
+          partsBefore: parts.length,
+          partsAfter: nextParts.length,
+          partBomIds: nextParts.map(p => p.bomItemId),
+        });
 
         return {
           ...colorway,

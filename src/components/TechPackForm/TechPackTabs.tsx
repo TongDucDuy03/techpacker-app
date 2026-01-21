@@ -33,6 +33,26 @@ import { showError, showWarning } from '../../lib/toast';
 import { Modal } from 'antd';
 import { DEFAULT_MEASUREMENT_BASE_HIGHLIGHT_COLOR, DEFAULT_MEASUREMENT_ROW_STRIPE_COLOR } from '../../constants/measurementDisplay';
 
+// Normalize possible MongoDB ObjectId-ish values into a stable string for bomItemId matching
+const normalizeId = (value: any): string => {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'bigint') return String(value);
+  if (typeof value === 'object') {
+    const bsontype = (value as any)?._bsontype;
+    const ctorName = (value as any)?.constructor?.name;
+    if (bsontype === 'ObjectID' || bsontype === 'ObjectId' || ctorName === 'ObjectID' || ctorName === 'ObjectId') {
+      if (typeof (value as any).toHexString === 'function') return String((value as any).toHexString()).trim();
+      if (typeof (value as any).toString === 'function') return String((value as any).toString()).trim();
+      return '';
+    }
+    if ((value as any)._id) return normalizeId((value as any)._id);
+    if ((value as any).id) return normalizeId((value as any).id);
+    if (typeof (value as any).toString === 'function') return String((value as any).toString()).trim();
+  }
+  return '';
+};
+
 interface TechPackTabsProps {
   onBackToList: () => void;
   mode?: 'create' | 'edit' | 'view';
@@ -246,6 +266,9 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
         const parts = Array.isArray(colorway?.parts)
           ? colorway.parts.map((part: any, partIndex: number) => ({
               id: part?.id || part?._id || `part_${index}_${partIndex}`,
+              // 🔗 CRITICAL: preserve bomItemId so the same colorway can be assigned to multiple BOM rows
+              // Without this, reload/F5 falls back to partName matching and only one row can resolve.
+              bomItemId: normalizeId(part?.bomItemId) || undefined,
               partName: part?.partName || part?.name || '',
               colorName: part?.colorName || part?.color || '',
               pantoneCode: part?.pantoneCode || part?.pantone || '',

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 import { TechPackList } from './components/TechPackList';
@@ -85,6 +85,67 @@ function AppContent() {
   const { user } = useAuth();
   const { t } = useI18n();
 
+  // Persist last opened techpack (to restore UI after refresh/F5)
+  const LAST_OPENED_TECHPACK_KEY = 'techpack:lastOpened';
+
+  const persistLastOpened = useCallback((mode: 'edit' | 'view', techPackId: string) => {
+    try {
+      localStorage.setItem(
+        LAST_OPENED_TECHPACK_KEY,
+        JSON.stringify({ mode, techPackId, savedAt: new Date().toISOString() })
+      );
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
+
+  const clearLastOpened = useCallback(() => {
+    try {
+      localStorage.removeItem(LAST_OPENED_TECHPACK_KEY);
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
+
+  // Restore last opened techpack after hard refresh (F5)
+  useEffect(() => {
+    if (currentTab !== 'list') return;
+    if (selectedTechPack) return;
+    if (!getTechPack) return;
+
+    let parsed: any = null;
+    try {
+      const raw = localStorage.getItem(LAST_OPENED_TECHPACK_KEY);
+      if (!raw) return;
+      parsed = JSON.parse(raw);
+    } catch {
+      return;
+    }
+
+    const techPackId = String(parsed?.techPackId || '').trim();
+    const mode = parsed?.mode === 'edit' ? 'edit' : parsed?.mode === 'view' ? 'view' : null;
+    if (!techPackId || !mode) return;
+
+    // Fetch full detail from API to hydrate form state (BOM/measurements/etc.)
+    setLoadingTechPack(true);
+    (async () => {
+      try {
+        const fullTechPack = await getTechPack(techPackId);
+        if (fullTechPack) {
+          setSelectedTechPack(fullTechPack);
+          setCurrentTab(mode);
+        } else {
+          clearLastOpened();
+        }
+      } catch {
+        clearLastOpened();
+      } finally {
+        setLoadingTechPack(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTab, selectedTechPack, getTechPack, clearLastOpened]);
+
   // Permission checks based on user role
   const canCreate = user?.role === 'admin' || user?.role === 'designer';
   const canEdit = user?.role === 'admin' || user?.role === 'designer';
@@ -123,10 +184,12 @@ function AppContent() {
         });
         setSelectedTechPack(fullTechPack);
         setCurrentTab('view');
+        persistLastOpened('view', techPackId);
       } else {
         // Fallback: dùng data từ list nếu fetch fail
         setSelectedTechPack(techPack);
         setCurrentTab('view');
+        persistLastOpened('view', techPackId);
       }
     } catch (error: any) {
       console.error('[App] Failed to fetch full techpack for view:', error);
@@ -144,6 +207,7 @@ function AppContent() {
       // For other errors, fallback: dùng data từ list nếu fetch fail
       setSelectedTechPack(techPack);
       setCurrentTab('view');
+      if (techPackId) persistLastOpened('view', techPackId);
     } finally {
       setLoadingTechPack(false);
     }
@@ -170,16 +234,19 @@ function AppContent() {
       if (fullTechPack) {
         setSelectedTechPack(fullTechPack);
         setCurrentTab('edit');
+        persistLastOpened('edit', techPackId);
       } else {
         // Fallback: dùng data từ list nếu fetch fail
         setSelectedTechPack(techPack);
         setCurrentTab('edit');
+        persistLastOpened('edit', techPackId);
       }
     } catch (error) {
       console.error('[App] Failed to fetch full techpack for edit:', error);
       // Fallback: dùng data từ list nếu fetch fail
       setSelectedTechPack(techPack);
       setCurrentTab('edit');
+      if (techPackId) persistLastOpened('edit', techPackId);
     } finally {
       setLoadingTechPack(false);
     }
@@ -188,6 +255,7 @@ function AppContent() {
   const handleBackToList = async () => {
     setSelectedTechPack(null);
     setCurrentTab('list');
+    clearLastOpened();
     // Refresh the list when returning to it, khôi phục trang đã lưu hoặc dùng trang hiện tại từ pagination
     if (context?.loadTechPacks) {
       try {

@@ -191,6 +191,41 @@ type ColumnType = {
   sortable?: boolean;
 };
 
+// Normalize any possible id value (string/ObjectId/object) into a trimmed string
+// Supports MongoDB ObjectId-like objects that may appear in some API responses.
+const normalizeId = (value: any): string => {
+  if (value === null || value === undefined) return '';
+
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'bigint') return String(value);
+
+  if (typeof value === 'object') {
+    const bsontype = (value as any)?._bsontype;
+    const ctorName = (value as any)?.constructor?.name;
+    if (bsontype === 'ObjectID' || bsontype === 'ObjectId' || ctorName === 'ObjectID' || ctorName === 'ObjectId') {
+      if (typeof (value as any).toHexString === 'function') {
+        const hex = (value as any).toHexString();
+        return typeof hex === 'string' ? hex.trim() : '';
+      }
+      if (typeof (value as any).toString === 'function') {
+        const str = (value as any).toString();
+        return typeof str === 'string' ? str.trim() : '';
+      }
+      return '';
+    }
+
+    if ((value as any)._id) return normalizeId((value as any)._id);
+    if ((value as any).id) return normalizeId((value as any).id);
+
+    if (typeof (value as any).toString === 'function') {
+      const str = (value as any).toString();
+      return typeof str === 'string' ? str.trim() : '';
+    }
+  }
+
+  return '';
+};
+
 const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   const context = useTechPack();
   const {
@@ -241,16 +276,36 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
 
   const resolveBomItemIdentifiers = useCallback((item: BomItem): string[] => {
     const ids: string[] = [];
-    if ((item as any)?.id) ids.push(String((item as any).id));
-    if ((item as any)?._id) ids.push(String((item as any)._id));
-    return ids;
+    if ((item as any)?.id) ids.push(normalizeId((item as any).id));
+    if ((item as any)?._id) ids.push(normalizeId((item as any)._id));
+    return ids.filter(Boolean);
   }, []);
 
   const findAssignmentForBom = useCallback((colorway: Colorway, item: BomItem): ColorwayPart | undefined => {
     if (!colorway?.parts || colorway.parts.length === 0) return undefined;
+
     const candidateIds = resolveBomItemIdentifiers(item);
-    const byId = colorway.parts.find(part => part.bomItemId && candidateIds.includes(part.bomItemId));
-    if (byId) return byId;
+
+    // 1. Ưu tiên mapping theo bomItemId (id/_id) – đây là cách mới, chính xác theo từng dòng
+    if (candidateIds.length > 0) {
+      const byId = colorway.parts.find(part => {
+        const partBomId = normalizeId(part.bomItemId);
+        if (!partBomId) return false;
+
+        const partKey = partBomId.toLowerCase();
+        return candidateIds.some(id => normalizeId(id).toLowerCase() === partKey);
+      });
+      if (byId) return byId;
+
+      // Nếu trong colorway đã có bất kỳ part nào có bomItemId,
+      // thì coi như đang dùng cơ chế mới → KHÔNG fallback theo tên nữa
+      const anyHasBomId = colorway.parts.some(part => !!part.bomItemId);
+      if (anyHasBomId) {
+        return undefined;
+      }
+    }
+
+    // 2. Fallback legacy: chỉ dùng cho dữ liệu rất cũ không có bomItemId
     const normalizedPart = (item.part || '').trim().toLowerCase();
     if (!normalizedPart) return undefined;
     return colorway.parts.find(part => (part.partName || '').trim().toLowerCase() === normalizedPart);
@@ -433,7 +488,10 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     const ids = resolveBomItemIdentifiers(item);
     let count = 0;
     colorways.forEach(colorway => {
-      if (colorway.parts?.some(part => part.bomItemId && ids.includes(part.bomItemId))) {
+      if (colorway.parts?.some(part => {
+        const partBomId = normalizeId(part.bomItemId);
+        return partBomId && ids.includes(partBomId);
+      })) {
         count += 1;
       }
     });
@@ -882,8 +940,15 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       showError(t('validation.colorwayPartRequired'));
         return;
       }
+      // Cho phép cùng một màu gán cho nhiều dòng BOM mà không ghi đè lẫn nhau:
+      // tạo một "instance" mới của ColorwayPart với id/_id mới, chỉ giữ lại thông tin màu.
       assignColorwayToBomItem(colorway.id, bomItemId, {
-        ...targetPart,
+        ...(targetPart as any),
+        // Xóa id và _id để context + backend tạo bản ghi mới thay vì update bản cũ
+        id: undefined,
+        _id: undefined,
+        // Gán bomItemId của dòng hiện tại (mỗi dòng 1 mapping riêng)
+        bomItemId,
         partName: targetPart.partName || bomItem.part || 'Unnamed Part',
       });
     showSuccess(t('success.colorAssignmentSaved'));
