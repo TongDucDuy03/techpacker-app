@@ -207,6 +207,20 @@ const MeasurementTab: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showRoundModal, setShowRoundModal] = useState(false);
+  const [deleteRoundDialog, setDeleteRoundDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'danger' | 'warning' | 'info';
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm?: (() => void) | (() => Promise<void>);
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info',
+  });
   const [selectedMeasurementIds, setSelectedMeasurementIds] = useState<Set<string>>(new Set());
   const [roundForm, setRoundForm] = useState<RoundModalFormState>(() => ({
     name: '',
@@ -850,12 +864,91 @@ type RoundModalFormState = {
     ]
   );
 
-  const handleDeleteSampleRound = useCallback((roundId: string) => {
-    if (!deleteSampleMeasurementRound) return;
-    if (window.confirm('Are you sure you want to remove this sample round?')) {
-      deleteSampleMeasurementRound(roundId);
-    }
-  }, [deleteSampleMeasurementRound]);
+  const handleDeleteSampleRound = useCallback(
+    async (roundId: string) => {
+      if (!deleteSampleMeasurementRound || !saveTechPack || !state?.techpack) return;
+
+      const rounds = sampleMeasurementRounds || [];
+      const roundIndex = rounds.findIndex(r => r.id === roundId);
+      if (roundIndex === -1) return;
+
+      // Enforce deletion order: only allow deleting the last round
+      const isLastRound = roundIndex === rounds.length - 1;
+      if (!isLastRound) {
+        const lastRoundName = rounds[rounds.length - 1]?.name || `Sample Round ${rounds.length}`;
+        setDeleteRoundDialog({
+          isOpen: true,
+          title: t('sample.round.delete.order.title'),
+          message: t('sample.round.delete.order.message').replace('{name}', lastRoundName),
+          type: 'warning',
+          confirmText: t('common.close'),
+          cancelText: '',
+          onConfirm: () => setDeleteRoundDialog(prev => ({ ...prev, isOpen: false })),
+        });
+        return;
+      }
+
+      const roundToDelete = rounds[roundIndex];
+
+      setDeleteRoundDialog({
+        isOpen: true,
+        title: t('sample.round.delete.confirm.title'),
+        message: t('sample.round.delete.confirm.message'),
+        type: 'danger',
+        confirmText: t('common.delete'),
+        cancelText: t('common.cancel'),
+        onConfirm: async () => {
+          setDeleteRoundDialog(prev => ({ ...prev, isOpen: false }));
+
+          const updatedRounds = rounds.filter(r => r.id !== roundId);
+
+          // Recompute measurements to match the requested values of the round being deleted
+          let nextMeasurements = Array.isArray(state.techpack.measurements) ? state.techpack.measurements : [];
+          if (roundToDelete?.measurements?.length) {
+            const byPom = new Map<string, any>();
+            roundToDelete.measurements.forEach(entry => {
+              if (entry?.pomCode) byPom.set(entry.pomCode, entry);
+            });
+
+            nextMeasurements = nextMeasurements.map(measurement => {
+              const entry = byPom.get(measurement.pomCode);
+              const requested = entry?.requested;
+              if (!requested) return measurement;
+
+              const updatedSizes: Record<string, number> = { ...(measurement.sizes || {}) };
+              Object.entries(requested).forEach(([sizeKey, requestedValue]) => {
+                if (requestedValue === null || requestedValue === undefined || String(requestedValue).trim() === '') return;
+                const numValue = parseMeasurementValue(String(requestedValue));
+                if (numValue === undefined || Number.isNaN(numValue)) return;
+                updatedSizes[sizeKey] = numValue;
+              });
+
+              return { ...measurement, sizes: updatedSizes };
+            });
+          }
+
+          const normalizedMeasurements = normalizeMeasurementBaseSizes(
+            Array.isArray(nextMeasurements) ? nextMeasurements : [],
+            state.techpack.measurementBaseSize
+          ).normalized;
+
+          deleteSampleMeasurementRound(roundId);
+          await saveTechPack({
+            ...state.techpack,
+            sampleMeasurementRounds: updatedRounds,
+            measurements: normalizedMeasurements,
+          });
+        },
+      });
+    },
+    [
+      deleteSampleMeasurementRound,
+      saveTechPack,
+      state?.techpack,
+      sampleMeasurementRounds,
+      t,
+    ]
+  );
 
   const handleSaveSampleRound = useCallback(async (roundId: string) => {
     if (!saveTechPack || !state?.techpack) return;
@@ -1644,6 +1737,23 @@ type RoundModalFormState = {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
+      <ConfirmationDialog
+        isOpen={deleteRoundDialog.isOpen}
+        title={deleteRoundDialog.title}
+        message={deleteRoundDialog.message}
+        type={deleteRoundDialog.type}
+        confirmText={deleteRoundDialog.confirmText}
+        onConfirm={() => {
+          const fn = deleteRoundDialog.onConfirm;
+          if (!fn) {
+            setDeleteRoundDialog(prev => ({ ...prev, isOpen: false }));
+            return;
+          }
+          void Promise.resolve(fn()).finally(() => {
+            // keep closed (onConfirm may have already closed)
+          });
+        }}
+      />
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between">

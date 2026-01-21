@@ -7,7 +7,7 @@ interface Props {
   confirmText?: string;
   cancelText?: string;
   onConfirm: () => void;
-  onCancel: () => void;
+  onCancel?: () => void;
   type?: 'danger' | 'warning' | 'info';
 }
 
@@ -16,7 +16,7 @@ const ConfirmationDialog: React.FC<Props> = ({
   title,
   message,
   confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  cancelText,
   onConfirm,
   onCancel,
   type = 'info'
@@ -34,18 +34,22 @@ const ConfirmationDialog: React.FC<Props> = ({
     }
   };
 
+  const showCancel = Boolean(cancelText);
+
   return (
     <div style={styles.overlay}>
       <div style={styles.dialog}>
         <h3 style={styles.title}>{title}</h3>
         <p style={styles.message}>{message}</p>
         <div style={styles.buttonContainer}>
-          <button
-            onClick={onCancel}
-            style={styles.cancelButton}
-          >
-            {cancelText}
-          </button>
+          {showCancel && (
+            <button
+              onClick={onCancel}
+              style={styles.cancelButton}
+            >
+              {cancelText}
+            </button>
+          )}
           <button
             onClick={onConfirm}
             style={{

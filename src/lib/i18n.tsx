@@ -188,6 +188,12 @@ const translations: Record<LanguageCode, TranslationDict> = {
     'sample.measurementId': 'Measurement ID',
     'sample.removeRoundAria': 'Remove sample round',
 
+    // Sample rounds - dialogs
+    'sample.round.delete.order.title': 'Cannot delete sample round',
+    'sample.round.delete.order.message': 'You must delete the last sample round ({name}) before deleting this one.',
+    'sample.round.delete.confirm.title': 'Delete sample round?',
+    'sample.round.delete.confirm.message': 'Are you sure you want to remove this sample round? This will revert measurements based on the round requested values.',
+
     // Common
     'common.language': 'Language',
     'common.language.english': 'English',
@@ -1389,6 +1395,12 @@ const translations: Record<LanguageCode, TranslationDict> = {
     'sample.pomName': 'Tên POM',
     'sample.measurementId': 'ID Measurement',
     'sample.removeRoundAria': 'Xóa vòng mẫu',
+
+    // Sample rounds - dialogs
+    'sample.round.delete.order.title': 'Không thể xóa vòng mẫu',
+    'sample.round.delete.order.message': 'Bạn phải xóa vòng mẫu cuối cùng ({name}) trước rồi mới có thể xóa vòng này.',
+    'sample.round.delete.confirm.title': 'Xóa vòng mẫu?',
+    'sample.round.delete.confirm.message': 'Bạn có chắc muốn xóa vòng mẫu này không? Hệ thống sẽ đưa bảng thông số về giá trị yêu cầu của vòng vừa xóa.',
 
     // Common
     'common.language': 'Ngôn ngữ',

@@ -506,10 +506,13 @@ const generateEntriesForRequestedSource = (
     Object.keys(fallback).forEach(size => sizeSet.add(size));
 
     sizeSet.forEach(size => {
-      if (fallback[size] !== undefined) {
-        merged[size] = fallback[size];
-      } else if (measurement?.sizes && measurement.sizes[size] !== undefined) {
+      // Ưu tiên giá trị MỚI từ bảng chính (measurement.sizes) thay vì giá trị cũ từ round trước
+      // Điều này đảm bảo khi user edit bảng chính, round mới sẽ phản ánh giá trị mới
+      if (measurement?.sizes && measurement.sizes[size] !== undefined) {
         merged[size] = String(measurement.sizes[size]);
+      } else if (fallback[size] !== undefined) {
+        // Chỉ dùng fallback nếu size không còn tồn tại trong bảng chính
+        merged[size] = fallback[size];
       } else {
         merged[size] = '';
       }
