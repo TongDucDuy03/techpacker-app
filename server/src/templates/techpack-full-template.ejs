@@ -1799,12 +1799,15 @@
                                   <table class="measurement-table">
                                     <thead>
                                       <tr>
-                <th><%= t.pomCode || 'POM Code' %></th>
-                <th><%= t.pomName || 'Measurement Point' %></th>
-                <th><%= t.minusTolerance || '-Tol' %></th>
-                <th><%= t.plusTolerance || '+Tol' %></th>
+                                        <% const sizeCount = measurements.sizeRange ? measurements.sizeRange.length : 0; %>
+                                        <% const fixedColsWidth = 40; // POM Code (6%) + POM Name (25%) + -Tol (4%) + +Tol (5%) %>
+                                        <% const sizeColWidth = sizeCount > 0 ? 60 / sizeCount : 0; %>
+                <th style="width: 6%"><%= t.pomCode || 'POM Code' %></th>
+                <th style="width: 25%"><%= t.pomName || 'Measurement Point' %></th>
+                <th style="width: 4%"><%= t.minusTolerance || '-Tol' %></th>
+                <th style="width: 5%"><%= t.plusTolerance || '+Tol' %></th>
                                         <% if (measurements.sizeRange) { measurements.sizeRange.forEach(size=> { %>
-                                          <th>
+                                          <th style="width: <%= sizeColWidth %>%">
                                             <%= size %>
                                           </th>
                                           <% }); } %>
