@@ -1438,9 +1438,9 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   // ✅ FIX: Sticky column widths (px) - must match colgroup
   const STICKY_COLUMN_WIDTHS = {
     checkbox: 48, // w-12 = 3rem = 48px
-    part: 180,    // Fixed width for Part column
+    part: 100,    // Fixed width for Part column (3/4 of 180px)
     materialName: 240, // Fixed width for Material Name column
-    image: 120,   // Fixed width for Image column
+    image: 100,   // Fixed width for Image column
   };
 
   // ✅ FIX: Calculate left offsets from actual widths (with box-sizing: border-box)
@@ -2417,7 +2417,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
             style={{ 
               position: 'relative', 
               tableLayout: 'fixed',
-              borderCollapse: 'separate',
+              borderCollapse: 'collapse', // ✅ collapse để bỏ hoàn toàn khoảng trống giữa các cột
               borderSpacing: 0
             }} // ✅ table-layout: fixed + borderCollapse để tránh sub-pixel issues
           >
@@ -2446,7 +2446,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                 {/* ✅ FIX: Make checkbox column sticky with solid background and high z-index */}
                 <th 
                   scope="col" 
-                  className="px-4 py-3 sticky"
+                  className="px-1 py-3 sticky"
                   style={{ 
                     width: `${STICKY_COLUMN_WIDTHS.checkbox}px`, // ✅ Fixed width from constant
                     minWidth: `${STICKY_COLUMN_WIDTHS.checkbox}px`, // ✅ Force min width
@@ -2479,7 +2479,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                     <th
                       key={column.key as string}
                       scope="col"
-                      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${isStickyColumn ? 'sticky' : ''}`}
+                      className={`px-1 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${isStickyColumn ? 'sticky' : ''}`}
                       style={{ 
                         width: column.width,
                         ...(isStickyColumn ? {
@@ -2532,7 +2532,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                     >
                       {/* ✅ FIX: Make checkbox column sticky with solid background and proper z-index */}
                       <td 
-                        className="px-4 py-4 sticky"
+                        className="px-1 py-4 sticky"
                         style={{
                           width: `${STICKY_COLUMN_WIDTHS.checkbox}px`, // ✅ Fixed width from constant
                           minWidth: `${STICKY_COLUMN_WIDTHS.checkbox}px`, // ✅ Force min width
@@ -2568,7 +2568,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                         return (
                           <td
                             key={column.key as string}
-                            className={`px-6 py-4 whitespace-nowrap text-sm ${isStickyColumn ? 'sticky' : ''} ${
+                            className={`px-1 py-4 whitespace-nowrap text-sm ${isStickyColumn ? 'sticky' : ''} ${
                               hasErrors && errors[column.key as string] ? 'text-red-600' : 'text-gray-700'
                             }`}
                             style={{
