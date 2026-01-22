@@ -143,9 +143,17 @@ const sampleRoundQuillModules = {
         }
         
         const data = await response.json();
-        const imageUrl = data.url.startsWith('/') 
-          ? `${window.location.origin}${data.url}`
-          : data.url;
+        let imageUrl = data.url;
+        
+        // Resolve relative URLs to absolute URLs
+        if (imageUrl && imageUrl.startsWith('/')) {
+          // If it's a relative path, use API_UPLOAD_BASE
+          imageUrl = `${API_UPLOAD_BASE}${imageUrl}`;
+        } else if (imageUrl && !imageUrl.startsWith('http://') && !imageUrl.startsWith('https://') && !imageUrl.startsWith('data:')) {
+          // If it's a relative path without leading slash, add it
+          imageUrl = `${API_UPLOAD_BASE}/${imageUrl}`;
+        }
+        
         return imageUrl;
       } catch (error) {
         console.error('Image upload error:', error);
