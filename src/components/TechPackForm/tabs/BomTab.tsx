@@ -1435,25 +1435,47 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     return false;
   }, [user, techpack]);
 
+  // ✅ FIX: Sticky column widths (px) - must match colgroup
+  const STICKY_COLUMN_WIDTHS = {
+    checkbox: 48, // w-12 = 3rem = 48px
+    part: 180,    // Fixed width for Part column
+    materialName: 240, // Fixed width for Material Name column
+    image: 120,   // Fixed width for Image column
+  };
+
+  // ✅ FIX: Calculate left offsets from actual widths (with box-sizing: border-box)
+  const STICKY_W = [
+    STICKY_COLUMN_WIDTHS.checkbox,
+    STICKY_COLUMN_WIDTHS.part,
+    STICKY_COLUMN_WIDTHS.materialName,
+    STICKY_COLUMN_WIDTHS.image,
+  ];
+
+  // left cho: checkbox + 3 cột sticky (tính tổng width từ trái sang phải)
+  const STICKY_LEFT = STICKY_W.reduce<number[]>((acc, _w, i) => {
+    acc[i] = (i === 0) ? 0 : acc[i - 1] + STICKY_W[i - 1];
+    return acc;
+  }, []);
+
   // Table columns configuration with error highlighting
   const columns = useMemo<ColumnType[]>(() => {
     const baseColumns: ColumnType[] = [
     {
       key: 'part' as keyof BomItem,
       header: t('form.bom.part'),
-      width: '15%',
+      width: `${STICKY_COLUMN_WIDTHS.part}px`, // ✅ Fixed px width
       sortable: true,
     },
     {
       key: 'materialName' as keyof BomItem,
       header: t('form.bom.materialName'),
-      width: '20%',
+      width: `${STICKY_COLUMN_WIDTHS.materialName}px`, // ✅ Fixed px width
       sortable: true,
     },
     {
       key: 'imageUrl' as keyof BomItem,
       header: t('form.bom.image'),
-      width: '120px',
+      width: `${STICKY_COLUMN_WIDTHS.image}px`, // ✅ Fixed px width
       render: (value: string, item: BomItem) => {
         const resolvedSrc = getMaterialImageUrl(value);
         return (
@@ -1471,17 +1493,17 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     {
       key: 'placement' as keyof BomItem,
       header: t('form.bom.placement'),
-      width: '15%',
+      width: '180px', // ✅ Fixed px width
     },
     {
       key: 'size' as keyof BomItem,
       header: t('form.bom.size'),
-      width: '8%',
+      width: '100px', // ✅ Fixed px width
     },
     {
       key: 'quantity' as keyof BomItem,
       header: t('form.bom.quantityShort'),
-      width: '8%',
+      width: '100px', // ✅ Fixed px width
       // Hiển thị đúng giá trị người dùng nhập, không làm tròn về 2 chữ số thập phân
       render: (value: number | string | null | undefined) => {
         if (value === null || value === undefined || value === '') return '-';
@@ -1491,17 +1513,17 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     {
       key: 'uom' as keyof BomItem,
       header: t('form.bom.uom'),
-      width: '8%',
+      width: '80px', // ✅ Fixed px width
     },
     {
       key: 'supplier' as keyof BomItem,
       header: t('form.bom.supplier'),
-      width: '15%',
+      width: '180px', // ✅ Fixed px width
     },
     {
       key: 'comments' as keyof BomItem,
       header: t('form.bom.comments'),
-      width: '11%',
+      width: '150px', // ✅ Fixed px width
       render: (value: string) => (
         <span className="text-xs text-gray-600 truncate" title={value}>
           {value || '-'}
@@ -1516,7 +1538,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
         {
           key: 'unitPrice' as keyof BomItem,
           header: t('form.bom.unitPrice'),
-          width: '10%',
+          width: '120px', // ✅ Fixed px width
           // Hiển thị đúng giá trị (không làm tròn mặc định của toLocaleString)
           render: (value: number | string | null | undefined) => {
             if (value === undefined || value === null || value === '') return '-';
@@ -1526,7 +1548,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
         {
           key: 'totalPrice' as keyof BomItem,
           header: t('form.bom.totalPrice'),
-          width: '10%',
+          width: '120px', // ✅ Fixed px width
           // totalPrice được lưu dạng string đã format để không bị làm tròn
           render: (_value: number | string | null | undefined, item: BomItem) => {
             // Ưu tiên hiển thị theo phép nhân decimal chính xác từ quantity × unitPrice
@@ -2389,11 +2411,53 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
           </div>
         )}
 
-        <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="overflow-x-auto max-h-[600px] overflow-y-auto" style={{ position: 'relative' }}>
+          <table 
+            className="min-w-full divide-y divide-gray-200" 
+            style={{ 
+              position: 'relative', 
+              tableLayout: 'fixed',
+              borderCollapse: 'separate',
+              borderSpacing: 0
+            }} // ✅ table-layout: fixed + borderCollapse để tránh sub-pixel issues
+          >
+            {/* ✅ FIX: colgroup với width cố định (px) cho tất cả columns */}
+            <colgroup>
+              {/* Checkbox column */}
+              <col style={{ width: `${STICKY_COLUMN_WIDTHS.checkbox}px` }} />
+              {/* Sticky columns */}
+              {columns.slice(0, 3).map((col, idx) => {
+                const widths = [STICKY_COLUMN_WIDTHS.part, STICKY_COLUMN_WIDTHS.materialName, STICKY_COLUMN_WIDTHS.image];
+                return <col key={`col-${col.key}`} style={{ width: `${widths[idx]}px` }} />;
+              })}
+              {/* Non-sticky columns */}
+              {columns.slice(3).map((col) => {
+                const widthStr = String(col.width || '150px');
+                const widthPx = widthStr.includes('px') 
+                  ? parseFloat(widthStr) 
+                  : (widthStr.includes('%') ? 150 : 150); // Fallback 150px
+                return <col key={`col-${col.key}`} style={{ width: `${widthPx}px` }} />;
+              })}
+              {/* Actions column */}
+              <col style={{ width: '80px' }} />
+            </colgroup>
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-4 py-3 w-12">
+                {/* ✅ FIX: Make checkbox column sticky with solid background and high z-index */}
+                <th 
+                  scope="col" 
+                  className="px-4 py-3 sticky"
+                  style={{ 
+                    width: `${STICKY_COLUMN_WIDTHS.checkbox}px`, // ✅ Fixed width from constant
+                    minWidth: `${STICKY_COLUMN_WIDTHS.checkbox}px`, // ✅ Force min width
+                    maxWidth: `${STICKY_COLUMN_WIDTHS.checkbox}px`, // ✅ Force max width
+                    left: STICKY_LEFT[0], // ✅ Use calculated left offset
+                    backgroundColor: '#f9fafb', // ✅ Solid gray-50 background
+                    zIndex: 60, // ✅ Highest z-index for checkbox header
+                    boxSizing: 'border-box', // ✅ CRITICAL: Include padding in width calculation
+                    overflow: 'hidden', // ✅ Clip any content that might peek through
+                  }}
+                >
                   <button
                     onClick={toggleSelectAllBom}
                     className="flex items-center justify-center w-5 h-5 text-gray-400 hover:text-gray-600 focus:outline-none"
@@ -2406,16 +2470,38 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                     )}
                   </button>
                 </th>
-                {columns.map((column) => (
-                  <th
-                    key={column.key as string}
-                    scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    style={{ width: column.width }}
-                  >
-                    {column.header}
-                  </th>
-                ))}
+                {columns.map((column, colIndex) => {
+                  // ✅ FIX: Make first 3 columns (Part, Material Name, Image) sticky
+                  const isStickyColumn = colIndex < 3; // part, materialName, imageUrl
+                  const stickyIdx = colIndex + 1; // +1 vì stickyIdx[0] là checkbox
+                  
+                  return (
+                    <th
+                      key={column.key as string}
+                      scope="col"
+                      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${isStickyColumn ? 'sticky' : ''}`}
+                      style={{ 
+                        width: column.width,
+                        ...(isStickyColumn ? {
+                          minWidth: column.width, // ✅ Force min width
+                          maxWidth: column.width, // ✅ Force max width
+                        } : {}),
+                        boxSizing: 'border-box', // ✅ CRITICAL: Include padding in width calculation
+                        ...(isStickyColumn ? { 
+                          left: STICKY_LEFT[stickyIdx], // ✅ Use calculated left offset from STICKY_LEFT array
+                          backgroundColor: '#f9fafb', // ✅ Solid gray-50 background
+                          zIndex: 50 - colIndex, // ✅ Decreasing z-index: 50, 49, 48 (left to right)
+                          overflow: 'hidden', // ✅ Clip any content that might peek through
+                        } : {
+                          zIndex: 1, // ✅ Normal columns have low z-index to stay below sticky
+                          position: 'relative' // ✅ Ensure stacking context
+                        })
+                      }}
+                    >
+                      {column.header}
+                    </th>
+                  );
+                })}
                 <th scope="col" className="relative px-6 py-3">
                   <span className="sr-only">Actions</span>
                 </th>
@@ -2444,7 +2530,20 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                       key={uniqueKey}
                       className={`hover:bg-gray-50 ${hasErrors ? 'bg-red-50 border-l-4 border-red-500' : ''} ${isSelected ? 'bg-blue-50' : ''}`}
                     >
-                      <td className="px-4 py-4">
+                      {/* ✅ FIX: Make checkbox column sticky with solid background and proper z-index */}
+                      <td 
+                        className="px-4 py-4 sticky"
+                        style={{
+                          width: `${STICKY_COLUMN_WIDTHS.checkbox}px`, // ✅ Fixed width from constant
+                          minWidth: `${STICKY_COLUMN_WIDTHS.checkbox}px`, // ✅ Force min width
+                          maxWidth: `${STICKY_COLUMN_WIDTHS.checkbox}px`, // ✅ Force max width
+                          left: STICKY_LEFT[0], // ✅ Use calculated left offset
+                          backgroundColor: isSelected ? '#dbeafe' : (hasErrors ? '#fee2e2' : '#ffffff'), // ✅ Solid background
+                          zIndex: 55, // ✅ Higher than other sticky body columns (40, 39, 38) but lower than header (60)
+                          boxSizing: 'border-box', // ✅ CRITICAL: Include padding in width calculation
+                          overflow: 'hidden', // ✅ Clip any content that might peek through
+                        }}
+                      >
                         <button
                           onClick={() => item.id && toggleBomSelection(item.id)}
                           className="flex items-center justify-center w-5 h-5 text-gray-400 hover:text-gray-600 focus:outline-none"
@@ -2457,14 +2556,36 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                           )}
                         </button>
                       </td>
-                      {columns.map((column) => {
+                      {columns.map((column, colIndex) => {
                         const value = item[column.key];
+                        // ✅ FIX: Make first 3 columns (Part, Material Name, Image) sticky
+                        const isStickyColumn = colIndex < 3; // part, materialName, imageUrl (chỉ 3 cột, không tính checkbox)
+                        const stickyIdx = colIndex + 1; // +1 vì stickyIdx[0] là checkbox
+                        
+                        // Get background color for sticky cells to match row - always solid
+                        const bgColor = isSelected ? '#dbeafe' : (hasErrors ? '#fee2e2' : '#ffffff');
+                        
                         return (
                           <td
                             key={column.key as string}
-                            className={`px-6 py-4 whitespace-nowrap text-sm ${
+                            className={`px-6 py-4 whitespace-nowrap text-sm ${isStickyColumn ? 'sticky' : ''} ${
                               hasErrors && errors[column.key as string] ? 'text-red-600' : 'text-gray-700'
                             }`}
+                            style={{
+                              boxSizing: 'border-box', // ✅ CRITICAL: Include padding in width calculation
+                              ...(isStickyColumn ? {
+                                width: column.width, // ✅ Explicit width for sticky columns
+                                minWidth: column.width, // ✅ Force min width
+                                maxWidth: column.width, // ✅ Force max width
+                                left: STICKY_LEFT[stickyIdx], // ✅ Use calculated left offset from STICKY_LEFT array
+                                backgroundColor: bgColor, // ✅ Solid background - never transparent
+                                zIndex: 40 - colIndex, // ✅ Decreasing z-index: 40, 39, 38 (left to right)
+                                overflow: 'hidden', // ✅ Clip any content that might peek through
+                              } : {
+                                zIndex: 1, // ✅ Normal columns have low z-index to stay below sticky
+                                position: 'relative' // ✅ Ensure stacking context
+                              })
+                            }}
                             title={hasErrors && errors[column.key as string] ? errors[column.key as string] : undefined}
                           >
                             {column.render ? column.render(value, item, mapIndex) : (value || '-')}
