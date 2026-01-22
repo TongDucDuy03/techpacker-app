@@ -52,7 +52,7 @@ const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto"
+      className="fixed inset-0 z-[1000] overflow-y-auto"
       aria-labelledby="modal-title"
       role="dialog"
       aria-modal="true"
@@ -62,12 +62,14 @@ const Modal: React.FC<ModalProps> = ({
         }
       }}
     >
-      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        <div
-          className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
-          aria-hidden="true"
-        />
+      {/* Backdrop - nằm dưới dialog */}
+      <div
+        className="absolute inset-0 bg-gray-500/75 transition-opacity"
+        aria-hidden="true"
+      />
 
+      {/* Dialog container - nằm trên backdrop */}
+      <div className="relative z-[1001] flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">
           &#8203;
         </span>

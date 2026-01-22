@@ -2565,10 +2565,14 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                         // Get background color for sticky cells to match row - always solid
                         const bgColor = isSelected ? '#dbeafe' : (hasErrors ? '#fee2e2' : '#ffffff');
                         
+                        // ✅ FIX: Allow Material Name to wrap instead of being truncated
+                        const isMaterialNameColumn = column.key === 'materialName';
+                        const shouldWrap = isMaterialNameColumn;
+                        
                         return (
                           <td
                             key={column.key as string}
-                            className={`px-1 py-4 whitespace-nowrap text-sm ${isStickyColumn ? 'sticky' : ''} ${
+                            className={`px-1 py-4 text-sm ${shouldWrap ? '' : 'whitespace-nowrap'} ${isStickyColumn ? 'sticky' : ''} ${
                               hasErrors && errors[column.key as string] ? 'text-red-600' : 'text-gray-700'
                             }`}
                             style={{
@@ -2580,7 +2584,9 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                                 left: STICKY_LEFT[stickyIdx], // ✅ Use calculated left offset from STICKY_LEFT array
                                 backgroundColor: bgColor, // ✅ Solid background - never transparent
                                 zIndex: 40 - colIndex, // ✅ Decreasing z-index: 40, 39, 38 (left to right)
-                                overflow: 'hidden', // ✅ Clip any content that might peek through
+                                overflow: 'hidden', // ✅ Clip overflow but allow text to wrap within cell
+                                wordBreak: shouldWrap ? 'break-word' : 'normal', // ✅ Break long words in Material Name
+                                whiteSpace: shouldWrap ? 'normal' : 'nowrap', // ✅ Allow wrapping for Material Name
                               } : {
                                 zIndex: 1, // ✅ Normal columns have low z-index to stay below sticky
                                 position: 'relative' // ✅ Ensure stacking context

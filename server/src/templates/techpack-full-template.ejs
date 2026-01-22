@@ -1701,9 +1701,9 @@
             <%# 2. BILL OF MATERIALS %>
               <% if (bom && bom.parts && bom.parts.length > 0) { %>
                 <div class="section">
-                  <% renderSectionHeader(t.billOfMaterials || 'Bill of Materials'); %>
+      <% renderSectionHeader(t.billOfMaterials || 'Bill of Materials'); %>
 
-                  <div class="section-content">
+                    <div class="section-content">
                     <%
                       // Flatten bom items
                       const allBomItems = [];
@@ -1734,35 +1734,35 @@
                     %>
 
                     <% if (allBomItems.length > 0) { %>
-                      <table class="bom-table">
-                        <thead>
-                          <tr>
-                            <th style="width: 10%"><%= t.part || 'Part' %></th>
-                            <th style="width: 25%"><%= t.materialName || 'Material Name' %></th>
-                            <th style="width: 15%"><%= t.placement || 'Placement' %></th>
-                            <th style="width: 8%"><%= t.sizeWidthUsage || 'Size/Width/Usage' %></th>
-                            <th style="width: 4%"><%= t.qty || 'Qty' %></th>
-                            <th style="width: 4%"><%= t.uom || 'UOM' %></th>
-                            <th style="width: 9%"><%= t.supplier || 'Supplier' %></th>
-                            <th style="width: 10%"><%= t.comments || 'Comments' %></th>
+                          <table class="bom-table">
+                            <thead>
+                              <tr>
+              <th style="width: 10%"><%= t.part || 'Part' %></th>
+              <th style="width: 25%"><%= t.materialName || 'Material Name' %></th>
+              <th style="width: 15%"><%= t.placement || 'Placement' %></th>
+              <th style="width: 8%"><%= t.sizeWidthUsage || 'Size/Width/Usage' %></th>
+              <th style="width: 4%"><%= t.qty || 'Qty' %></th>
+              <th style="width: 4%"><%= t.uom || 'UOM' %></th>
+              <th style="width: 9%"><%= t.supplier || 'Supplier' %></th>
+              <th style="width: 10%"><%= t.comments || 'Comments' %></th>
 
-                            <% bomColorways.forEach(cw => { %>
-                              <th style="width: <%= bomColorColWidth %>%"><%= cw.code %></th>
-                            <% }); %>
-                          </tr>
-                        </thead>
+              <% bomColorways.forEach(cw => { %>
+              <th style="width: <%= bomColorColWidth %>%"><%= cw.code %></th>
+              <% }); %>
+                              </tr>
+                            </thead>
 
-                        <tbody>
+                            <tbody>
                           <% allBomItems.forEach((item, idx) => { %>
-                            <tr class="<%= idx % 2 === 1 ? 'alt-row' : '' %>">
+                                <tr class="<%= idx % 2 === 1 ? 'alt-row' : '' %>">
                               <td><%= item.part || '-' %></td>
 
-                              <td>
-                                <%= item.materialName || '-' %>
+                                  <td>
+                                    <%= item.materialName || '-' %>
                                 <% if (item.sizeWidthUsage && !isDash(item.sizeWidthUsage)) { %>
                                   <br /><small><%= item.sizeWidthUsage %></small>
-                                <% } %>
-                              </td>
+                                        <% } %>
+                                  </td>
 
                               <td><%= item.placement || '-' %></td>
                               <td><%= item.sizeWidthUsage || item.size || '-' %></td>
@@ -1771,7 +1771,7 @@
                               <td><%= item.supplier || '-' %></td>
                               <td><%= item.comments || '-' %></td>
 
-                              <% bomColorways.forEach(cw => { %>
+              <% bomColorways.forEach(cw => { %>
                                 <%
                                   // Find assigned for this bom item id
                                   const assigned = (cw.parts || []).find(p =>
@@ -1820,31 +1820,31 @@
                                   const showImage = !!resolvedImg;
                                 %>
 
-                                <td class="bom-color-cell">
-                                  <% if (assigned) { %>
+                <td class="bom-color-cell">
+                  <% if (assigned) { %>
                                     <div class="bom-color-chip <%= showImage ? 'has-img' : 'no-img' %>">
                                       <% if (showImage) { %>
                                         <img src="<%= resolvedImg %>" alt="colorway" />
-                                      <% } %>
+                                                    <% } %>
 
-                                      <div class="bom-color-text">
+                      <div class="bom-color-text">
                                         <div class="bom-color-name"><%= displayName || '-' %></div>
                                         <div class="bom-color-code"><%= displayCode || '-' %></div>
-                                      </div>
-                                    </div>
-                                  <% } else { %>
-                                    -
-                                  <% } %>
-                                </td>
-                              <% }); %>
-                            </tr>
-                          <% }); %>
-                        </tbody>
-                      </table>
-                    <% } %>
-                  </div>
+                                                  </div>
+                    </div>
+                  <% } else { %>
+                    -
+                                                <% } %>
+                                              </td>
+              <% }); %>
+                                            </tr>
+                                            <% }); %>
+                                        </tbody>
+                                      </table>
+                                      <% } %>
+                    </div>
                 </div>
-              <% } %>
+                <% } %>
 
 
                   <%# 3. MEASUREMENTS %>
