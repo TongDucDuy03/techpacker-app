@@ -1881,7 +1881,7 @@
                 <th style="width: 4%"><%= t.minusTolerance || '-Tol' %></th>
                 <th style="width: 5%"><%= t.plusTolerance || '+Tol' %></th>
                                         <% if (measurements.sizeRange) { measurements.sizeRange.forEach(size=> { %>
-                                          <th style="width: <%= sizeColWidth %>%">
+                                          <th style="width: <%= sizeColWidth %>%; text-align: center;">
                                             <%= size %>
                                           </th>
                                           <% }); } %>
@@ -1908,7 +1908,7 @@
                   <%= row.plusToleranceFormatted || (row.plusTolerance !== undefined ? row.plusTolerance : '0') %>
                                           </td>
                                           <% if (measurements.sizeRange) { measurements.sizeRange.forEach(size=> { %>
-                                            <td style="<%= size === baseSize ? 'background: #79e5a5;' : '' %>">
+                                            <td style="text-align: center; <%= size === baseSize ? 'background: #79e5a5;' : '' %>">
                                               <%= row.sizes?.[size] || '-' %>
                                             </td>
                                             <% }); } %>
