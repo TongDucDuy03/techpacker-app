@@ -309,7 +309,11 @@ const sanitizeColorway = (rawColorway: PartialColorway, index: number, bomLookup
     notes: safeString(rawColorway.notes) || safeString((rawColorway as any).notes) || undefined,
     collectionName: safeString(rawColorway.collectionName) || safeString((rawColorway as any).collectionName) || undefined,
     imageUrl: (() => {
-      const url = safeString(rawColorway.imageUrl) || safeString((rawColorway as any).imageUrl);
+      const rawUrl = rawColorway.imageUrl ?? (rawColorway as any).imageUrl;
+      if (rawUrl === null || rawUrl === undefined || rawUrl === '') {
+        return undefined;
+      }
+      const url = safeString(rawUrl);
       return url || undefined;
     })(),
     parts: sanitizedParts,
@@ -1741,7 +1745,13 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           notes: colorway.notes?.trim() || undefined,
           season: colorway.season?.trim() || undefined,
           collectionName: colorway.collectionName?.trim() || undefined,
-          imageUrl: colorway.imageUrl?.trim() || undefined,
+          imageUrl: (() => {
+            const url = colorway.imageUrl?.trim();
+            if (!url || url === '') {
+              return null; // Send null to server to delete image
+            }
+            return url;
+          })(),
           approved: colorway.approvalStatus === 'Approved',
           isDefault: !!colorway.isDefault,
           parts: partsPayload,

@@ -846,7 +846,15 @@ export class SubdocumentController {
       // Keep a snapshot of the old techpack for revision comparison BEFORE mutation
       const oldTechPack = techpack.toObject({ virtuals: true });
 
-      Object.assign(colorway, req.body);
+      // Handle imageUrl deletion: if imageUrl is null or empty string, delete the field
+      const updateData = { ...req.body };
+      if (updateData.imageUrl === null || updateData.imageUrl === '' || updateData.imageUrl === undefined) {
+        // Delete imageUrl field by setting it to undefined
+        colorway.imageUrl = undefined;
+        delete updateData.imageUrl;
+      }
+
+      Object.assign(colorway, updateData);
       techpack.updatedBy = user._id;
       techpack.updatedByName = `${user.firstName} ${user.lastName}`;
       await techpack.save();

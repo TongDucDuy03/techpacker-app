@@ -231,7 +231,7 @@ const ColorwayTab: React.FC = () => {
   };
 
   const handleRemoveImage = () => {
-    setFormData(prev => ({ ...prev, imageUrl: undefined }));
+    setFormData(prev => ({ ...prev, imageUrl: null as any }));
     setImagePreview(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -369,7 +369,7 @@ const ColorwayTab: React.FC = () => {
       supplier: formData.supplier || '',
       notes: formData.notes || '',
       collectionName: formData.collectionName,
-      imageUrl: formData.imageUrl || undefined,
+      imageUrl: formData.imageUrl !== null && formData.imageUrl !== undefined && formData.imageUrl !== '' ? formData.imageUrl : undefined,
       parts: (formData.parts || []).map(part => ({ ...part })),
     };
 
@@ -400,7 +400,7 @@ const ColorwayTab: React.FC = () => {
       pantoneCode: '',
       supplier: '',
       notes: '',
-      imageUrl: undefined,
+      imageUrl: null as any,
     });
     setShowAddForm(false);
     setEditingIndex(null);
@@ -594,7 +594,7 @@ const ColorwayTab: React.FC = () => {
               {/* Image Preview */}
               <div className="w-full h-[180px] rounded-xl border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center relative">
                 <ZoomableImage
-                  src={imagePreview || (formData.imageUrl ? resolveImageUrl(formData.imageUrl) : '')}
+                  src={imagePreview || (formData.imageUrl && formData.imageUrl !== null ? resolveImageUrl(formData.imageUrl) : '')}
                   alt="Colorway preview"
                   containerClassName="w-full h-full"
                   className="bg-white"
@@ -625,11 +625,11 @@ const ColorwayTab: React.FC = () => {
                   ) : (
                     <>
                       <Upload className="w-4 h-4" />
-                      {formData.imageUrl || imagePreview ? t('form.colorway.changeImage') : t('form.uploadImage')}
+                      {(formData.imageUrl && formData.imageUrl !== null) || imagePreview ? t('form.colorway.changeImage') : t('form.uploadImage')}
                     </>
                   )}
                 </button>
-                {(formData.imageUrl || imagePreview) && (
+                {((formData.imageUrl && formData.imageUrl !== null) || imagePreview) && (
                   <button
                     type="button"
                     onClick={handleRemoveImage}
