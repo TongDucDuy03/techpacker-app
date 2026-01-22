@@ -161,6 +161,8 @@ export interface ColorwayPart {
   imageUrl?: string;
   supplier?: string;
   colorType: 'Solid' | 'Print' | 'Embroidery' | 'Applique';
+  /** Used for BOM custom assignment (custom text/color). */
+  isCustomText?: boolean;
 }
 
 export interface Colorway {

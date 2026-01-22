@@ -271,6 +271,13 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     bomItemId: string;
   } | null>(null);
   const [selectedPartId, setSelectedPartId] = useState<string>('');
+  const [assignmentMode, setAssignmentMode] = useState<'colorway' | 'custom'>('colorway');
+  const [customColorName, setCustomColorName] = useState<string>('');
+  const [customColorCode, setCustomColorCode] = useState<string>('');
+  const [customColorImageUrl, setCustomColorImageUrl] = useState<string>('');
+  const [isUploadingCustomImage, setIsUploadingCustomImage] = useState(false);
+  const [customImageUploadError, setCustomImageUploadError] = useState<string | null>(null);
+  const customImageInputRef = useRef<HTMLInputElement | null>(null);
   // Multi-select state for bulk actions
   const [selectedBomIds, setSelectedBomIds] = useState<Set<string>>(new Set());
 
@@ -335,12 +342,44 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     if (!colorAssignmentModal) return;
     const assignment = findAssignmentForBom(colorAssignmentModal.colorway, colorAssignmentModal.bomItem);
     const hasExistingParts = (colorAssignmentModal.colorway.parts || []).length > 0;
+    
     if (assignment) {
-      setSelectedPartId(assignment.id);
+      // Use explicit flag to avoid mis-detection when custom assignment also has an image
+      const inferredLegacyCustom =
+        !!assignment.pantoneCode &&
+        assignment.pantoneCode.trim() !== '' &&
+        assignment.pantoneCode !== colorAssignmentModal.colorway.code &&
+        assignment.pantoneCode !== (colorAssignmentModal.colorway.pantoneCode || '');
+      const isCustomText = !!((assignment as any)?.isCustomText) || inferredLegacyCustom;
+      if (isCustomText) {
+        setAssignmentMode('custom');
+        setCustomColorName(assignment.colorName || '');
+        setCustomColorCode(assignment.pantoneCode || '');
+        setCustomColorImageUrl((assignment.imageUrl as any) || '');
+        setCustomImageUploadError(null);
+        setSelectedPartId('');
+      } else {
+        setAssignmentMode('colorway');
+        setSelectedPartId(assignment.id);
+        setCustomColorName('');
+        setCustomColorCode('');
+        setCustomColorImageUrl('');
+        setCustomImageUploadError(null);
+      }
     } else if (hasExistingParts) {
+      setAssignmentMode('colorway');
       setSelectedPartId(colorAssignmentModal.colorway.parts?.[0]?.id || '');
+      setCustomColorName('');
+      setCustomColorCode('');
+      setCustomColorImageUrl('');
+      setCustomImageUploadError(null);
     } else {
+      setAssignmentMode('colorway');
       setSelectedPartId('');
+      setCustomColorName('');
+      setCustomColorCode('');
+      setCustomColorImageUrl('');
+      setCustomImageUploadError(null);
     }
   }, [colorAssignmentModal, findAssignmentForBom]);
   
@@ -438,7 +477,17 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     const swatchColor = assignment?.hexCode || colorway.hexColor || '#f3f4f6';
 
     const hasParts = (colorway.parts || []).length > 0;
-    const thumbUrl = getMaterialImageUrl(assignment?.imageUrl || colorway.imageUrl);
+    const inferredLegacyCustom =
+      !!assignment?.pantoneCode &&
+      assignment.pantoneCode.trim() !== '' &&
+      assignment.pantoneCode !== colorway.code &&
+      assignment.pantoneCode !== (colorway.pantoneCode || '');
+    const isCustomText = !!(assignment && (assignment as any)?.isCustomText) || inferredLegacyCustom;
+    
+    // Hiển thị ảnh nếu assignment hoặc colorway có ảnh (kể cả custom text)
+    const thumbUrl = assignment?.imageUrl
+      ? getMaterialImageUrl(assignment.imageUrl)
+      : (colorway.imageUrl ? getMaterialImageUrl(colorway.imageUrl) : null);
 
     return (
       <button
@@ -467,7 +516,8 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               </span>
             </div>
             <div className="mt-1 text-[11px] text-gray-500 text-center break-all">
-              {colorway.code || '—'}
+              {/* Custom text shows custom code; normal shows colorway code */}
+              {isCustomText ? (assignment.pantoneCode || '—') : (colorway.code || '—')}
             </div>
           </>
         ) : (
@@ -929,15 +979,89 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
   const closeColorAssignmentModal = () => {
     setColorAssignmentModal(null);
     setSelectedPartId('');
+    setAssignmentMode('colorway');
+    setCustomColorName('');
+    setCustomColorCode('');
+    setCustomColorImageUrl('');
+    setIsUploadingCustomImage(false);
+    setCustomImageUploadError(null);
+    if (customImageInputRef.current) customImageInputRef.current.value = '';
   };
+
+  const handleCustomAssignmentImageUpload = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const input = event.target;
+      const file = input.files?.[0];
+      if (!file) return;
+
+      const validationMessage = validateMaterialImageFile(file);
+      if (validationMessage) {
+        setCustomImageUploadError(validationMessage);
+        input.value = '';
+        return;
+      }
+
+      setIsUploadingCustomImage(true);
+      setCustomImageUploadError(null);
+
+      const formDataObj = new FormData();
+      formDataObj.append('bomImage', file);
+
+      try {
+        const response = await api.post('/techpacks/upload-bom-image', formDataObj, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        const uploadedUrl = response.data?.data?.url || '';
+        setCustomColorImageUrl(uploadedUrl);
+        showSuccess(t('success.bomImageUploaded'));
+      } catch (error: any) {
+        const errorMessage = error.response?.data?.message || error.message || t('error.uploadImage');
+        setCustomImageUploadError(errorMessage);
+        showError(errorMessage);
+      } finally {
+        setIsUploadingCustomImage(false);
+        input.value = '';
+      }
+    },
+    [t]
+  );
+
+  const handleRemoveCustomAssignmentImage = useCallback(() => {
+    setCustomColorImageUrl('');
+    setCustomImageUploadError(null);
+    if (customImageInputRef.current) customImageInputRef.current.value = '';
+  }, []);
 
   const handleSaveColorAssignment = () => {
     if (!colorAssignmentModal || !assignColorwayToBomItem) return;
     const { colorway, bomItemId, bomItem } = colorAssignmentModal;
-    // Chỉ cho phép chọn màu đã có trong Colorways (không tạo màu mới)
+    
+    if (assignmentMode === 'custom') {
+      // Nhập text tùy chỉnh
+      if (!customColorName || !customColorName.trim()) {
+        showError(t('validation.colorwayPartRequired') || 'Vui lòng nhập tên màu');
+        return;
+      }
+      // Tạo ColorwayPart mới với text tùy chỉnh
+      assignColorwayToBomItem(colorway.id, bomItemId, {
+        id: undefined,
+        _id: undefined,
+        bomItemId,
+        partName: bomItem.part || 'Unnamed Part',
+        colorName: customColorName.trim(),
+        colorType: 'Solid',
+        // Mark for UI/PDF to treat this as custom text assignment
+        ...( { isCustomText: true } as any ),
+        // Save custom code
+        pantoneCode: customColorCode.trim() || undefined,
+        // Allow uploading an image for custom assignment (stored, but UI/PDF can decide whether to show)
+        imageUrl: customColorImageUrl.trim() || undefined,
+      });
+    } else {
+      // Chọn từ colorway parts
       const targetPart = colorway.parts?.find(part => part.id === selectedPartId);
       if (!targetPart) {
-      showError(t('validation.colorwayPartRequired'));
+        showError(t('validation.colorwayPartRequired'));
         return;
       }
       // Cho phép cùng một màu gán cho nhiều dòng BOM mà không ghi đè lẫn nhau:
@@ -951,6 +1075,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
         bomItemId,
         partName: targetPart.partName || bomItem.part || 'Unnamed Part',
       });
+    }
     showSuccess(t('success.colorAssignmentSaved'));
     closeColorAssignmentModal();
   };
@@ -1934,11 +2059,13 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                 type="button"
                 onClick={handleSaveColorAssignment}
                 disabled={
-                  !colorAssignmentModal.colorway.parts ||
-                  colorAssignmentModal.colorway.parts.length === 0 ||
-                  !selectedPartId
+                  assignmentMode === 'colorway' 
+                    ? (!colorAssignmentModal.colorway.parts ||
+                       colorAssignmentModal.colorway.parts.length === 0 ||
+                       !selectedPartId)
+                    : !customColorName || !customColorName.trim()
                 }
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t('common.save')}
               </button>
@@ -1958,52 +2085,167 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               </div>
             </div>
 
-            {colorAssignmentModal.colorway.parts && colorAssignmentModal.colorway.parts.length > 0 ? (
-                <div className="space-y-3">
-                  <Select
-                    label={t('form.bom.colorwayParts')}
-                    value={selectedPartId}
-                    onChange={setSelectedPartId}
-                    options={colorAssignmentModal.colorway.parts.map(part => ({
-                      value: part.id,
-                    label: `${part.colorName}`,
-                    }))}
-                    placeholder={t('form.bom.selectColorwayPart')}
+            <div className="space-y-4">
+              {/* Radio buttons để chọn chế độ */}
+              <div className="flex gap-4 border-b border-gray-200 pb-3">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="assignmentMode"
+                    value="colorway"
+                    checked={assignmentMode === 'colorway'}
+                    onChange={(e) => {
+                      setAssignmentMode('colorway');
+                      setCustomColorName('');
+                    }}
+                    className="mr-2"
                   />
-                  {selectedPartId && (
-                    <div className="p-3 border border-gray-200 rounded-md text-sm flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            {colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.colorName}
-                          </p>
-                        <p className="text-xs text-gray-500">{colorAssignmentModal.colorway.code}</p>
+                  <span className="text-sm font-medium text-gray-700">
+                    {t('form.bom.selectFromColorway')}
+                  </span>
+                </label>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="assignmentMode"
+                    value="custom"
+                    checked={assignmentMode === 'custom'}
+                    onChange={(e) => {
+                      setAssignmentMode('custom');
+                      setSelectedPartId('');
+                    }}
+                    className="mr-2"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    {t('form.bom.enterCustomText')}
+                  </span>
+                </label>
+              </div>
+
+              {/* Nội dung theo chế độ đã chọn */}
+              {assignmentMode === 'colorway' ? (
+                colorAssignmentModal.colorway.parts && colorAssignmentModal.colorway.parts.length > 0 ? (
+                  <div className="space-y-3">
+                    <Select
+                      label={t('form.bom.colorwayParts')}
+                      value={selectedPartId}
+                      onChange={setSelectedPartId}
+                      options={colorAssignmentModal.colorway.parts.map(part => ({
+                        value: part.id,
+                        label: `${part.colorName}`,
+                      }))}
+                      placeholder={t('form.bom.selectColorwayPart')}
+                    />
+                    {selectedPartId && (
+                      <div className="p-3 border border-gray-200 rounded-md text-sm flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.colorName}
+                            </p>
+                            <p className="text-xs text-gray-500">{colorAssignmentModal.colorway.code}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.imageUrl && (
+                            <img
+                              src={getMaterialImageUrl(colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.imageUrl)}
+                              alt="color thumbnail"
+                              className="w-12 h-12 object-contain border border-gray-200 rounded bg-white"
+                            />
+                          )}
+                          {colorAssignmentModal.colorway.imageUrl && !colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.imageUrl && (
+                            <img
+                              src={getMaterialImageUrl(colorAssignmentModal.colorway.imageUrl)}
+                              alt="colorway thumbnail"
+                              className="w-12 h-12 object-contain border border-gray-200 rounded bg-white"
+                            />
+                          )}
                         </div>
                       </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    {t('form.bom.noColorwayPartsAvailable')}
+                  </p>
+                )
+              ) : (
+                <div className="space-y-3">
+                  <Input
+                    label={t('form.bom.customColorName')}
+                    value={customColorName}
+                    onChange={setCustomColorName}
+                    placeholder={t('form.bom.enterColorName')}
+                  />
+                  <Input
+                    label={t('form.bom.customColorCode')}
+                    value={customColorCode}
+                    onChange={setCustomColorCode}
+                    placeholder={t('form.bom.enterColorCode')}
+                  />
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-gray-700">
+                      {t('form.bom.customColorImage') || 'Custom image'}
+                    </div>
                     <div className="flex items-center gap-3">
-                      {colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.imageUrl && (
-                        <img
-                          src={getMaterialImageUrl(colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.imageUrl)}
-                          alt="color thumbnail"
-                          className="w-12 h-12 object-contain border border-gray-200 rounded bg-white"
-                        />
-                      )}
-                      {colorAssignmentModal.colorway.imageUrl && !colorAssignmentModal.colorway.parts.find(part => part.id === selectedPartId)?.imageUrl && (
-                        <img
-                          src={getMaterialImageUrl(colorAssignmentModal.colorway.imageUrl)}
-                          alt="colorway thumbnail"
-                          className="w-12 h-12 object-contain border border-gray-200 rounded bg-white"
-                        />
+                      <input
+                        ref={customImageInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleCustomAssignmentImageUpload}
+                        disabled={isUploadingCustomImage}
+                        className="hidden"
+                        id="custom-color-image-upload"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => document.getElementById('custom-color-image-upload')?.click()}
+                        disabled={isUploadingCustomImage}
+                        className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        <Upload className="w-4 h-4" />
+                        {isUploadingCustomImage ? (t('common.loading') || 'Loading...') : (t('common.upload') || 'Upload')}
+                      </button>
+                      {customColorImageUrl && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveCustomAssignmentImage}
+                          className="px-3 py-2 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-md hover:bg-red-50"
+                        >
+                          {t('common.remove') || 'Remove'}
+                        </button>
                       )}
                     </div>
+                    {customImageUploadError && (
+                      <div className="text-xs text-red-600">{customImageUploadError}</div>
+                    )}
+                    {customColorImageUrl && (
+                      <div className="flex items-center gap-3 p-2 border border-gray-200 rounded-md bg-white">
+                        <img
+                          src={getMaterialImageUrl(customColorImageUrl)}
+                          alt="custom color"
+                          className="w-12 h-12 object-contain border border-gray-200 rounded bg-white"
+                        />
+                        <div className="text-xs text-gray-600 break-all">{customColorImageUrl}</div>
+                      </div>
+                    )}
+                  </div>
+                  {customColorName && (
+                    <div className="p-3 border border-gray-200 rounded-md text-sm">
+                      <div className="flex items-center space-x-3">
+                        <div>
+                          <p className="font-medium text-gray-900">{customColorName}</p>
+                          <p className="text-xs text-gray-500">
+                            {customColorCode || colorAssignmentModal.colorway.code}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
-              ) : (
-                <p className="text-sm text-gray-500">
-                  {t('form.bom.noColorwayPartsAvailable')}
-                </p>
-            )}
+              )}
+            </div>
           </div>
         </Modal>
       )}

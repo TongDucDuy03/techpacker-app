@@ -249,6 +249,7 @@ const sanitizeColorwayPart = (
     imageUrl: safeString((part as any)?.imageUrl) || undefined,
     supplier: safeString(part?.supplier) || linkedBom?.supplier || undefined,
     colorType: resolvedColorType,
+    isCustomText: Boolean((part as any)?.isCustomText) || undefined,
   } as ColorwayPart;
 };
 
@@ -1726,6 +1727,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           if (part.rgbCode) payload.rgbCode = part.rgbCode.trim();
           if (part.supplier) payload.supplier = part.supplier.trim();
           if (part.imageUrl) payload.imageUrl = part.imageUrl.trim();
+          if ((part as any).isCustomText === true) payload.isCustomText = true;
 
           return payload;
         });

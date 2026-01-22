@@ -665,19 +665,32 @@
     }
 
     .bom-color-chip {
-      display: block;
-      text-align: left;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      text-align: center;
     }
 
     .bom-color-chip img {
-      width: 22px;
-      height: 22px;
+      width: 24px;
+      height: 24px;
+      min-width: 24px;
+      min-height: 24px;
       object-fit: contain;
       border: 1px solid #ccc;
       border-radius: 3px;
       background: #fff;
-      display: block;
-      margin-bottom: 3px;
+      flex-shrink: 0;
+    }
+
+    .bom-color-text {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      width: 100%;
     }
 
     .bom-color-name {
@@ -685,6 +698,7 @@
       font-size: 11px;
       line-height: 1.2;
       word-break: break-word;
+      text-align: center;
     }
 
     .bom-color-code {
@@ -692,6 +706,7 @@
       color: #555;
       line-height: 1.2;
       word-break: break-word;
+      text-align: center;
     }
 
     .alt-row {
@@ -1684,94 +1699,153 @@
             </div>
 
             <%# 2. BILL OF MATERIALS %>
-              <% if (bom && bom.parts && bom.parts.length> 0) { %>
+              <% if (bom && bom.parts && bom.parts.length > 0) { %>
                 <div class="section">
-      <% renderSectionHeader(t.billOfMaterials || 'Bill of Materials'); %>
-                    <div class="section-content">
-                      <% const allBomItems = []; bom.parts.forEach(part => { 
-                        part.items.forEach(item => { 
-                          allBomItems.push({...item, part: part.partName}); 
-                        }); 
-                      }); %>
+                  <% renderSectionHeader(t.billOfMaterials || 'Bill of Materials'); %>
 
-                        <% if (allBomItems.length > 0) { %>
-                          <table class="bom-table">
-                            <thead>
-                              <tr>
-              <% const bomColorways = (colorways || []).filter(cw => cw && cw.code && cw.code !== '—'); %>
-              <% const bomColorColWidth = bomColorways.length > 0 ? Math.max(8, Math.floor(18 / bomColorways.length)) : 10; %>
-              <th style="width: 10%"><%= t.part || 'Part' %></th>
-              <th style="width: 25%"><%= t.materialName || 'Material Name' %></th>
-              <th style="width: 15%"><%= t.placement || 'Placement' %></th>
-              <th style="width: 8%"><%= t.sizeWidthUsage || 'Size/Width/Usage' %></th>
-              <th style="width: 4%"><%= t.qty || 'Qty' %></th>
-              <th style="width: 4%"><%= t.uom || 'UOM' %></th>
-              <th style="width: 9%"><%= t.supplier || 'Supplier' %></th>
-              <th style="width: 10%"><%= t.comments || 'Comments' %></th>
-              <% bomColorways.forEach(cw => { %>
-              <th style="width: <%= bomColorColWidth %>%"><%= cw.code %></th>
-              <% }); %>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              <% allBomItems.forEach((item, idx)=> { %>
-                                <tr class="<%= idx % 2 === 1 ? 'alt-row' : '' %>">
-                                  <td>
-                                    <%= item.part || '-' %>
-                                  </td>
-                                  <td>
-                                    <%= item.materialName || '-' %>
-                                      <% if (item.sizeWidthUsage && item.sizeWidthUsage !=='—' ) { %><br /><small>
-                                          <%= item.sizeWidthUsage %>
-                                        </small>
-                                        <% } %>
-                                  </td>
-                                  <td>
-                                    <%= item.placement || '-' %>
-                                  </td>
-                                  <td>
-                                    <%= item.sizeWidthUsage || item.size || '-' %>
-                                  </td>
-                                  <td>
-                                    <%= item.quantity || '0' %>
-                                  </td>
-                                  <td>
-                                    <%= item.uom || 'Each' %>
-                                  </td>
-                                  <td>
-                                    <%= item.supplier || '-' %>
-                                  </td>
-                                  <td>
-                                    <%= item.comments || '-' %>
-              </td>
-              <% bomColorways.forEach(cw => { %>
-                <% const assigned = (cw.parts || []).find(p => p && p.bomItemId && item.bomItemId && String(p.bomItemId) === String(item.bomItemId)); %>
-                <td class="bom-color-cell">
-                  <% if (assigned) { %>
-                    <div class="bom-color-chip">
-                      <% if (assigned.imageUrl && assigned.imageUrl !== '—' && !assigned.imageUrl.includes('No Image')) { %>
-                        <img src="<%= assigned.imageUrl %>" alt="color" />
-                      <% } else if (cw.imageUrl && cw.imageUrl !== '—' && !cw.imageUrl.includes('No Image')) { %>
-                        <img src="<%= cw.imageUrl %>" alt="colorway" />
-                                        <% } %>
-                      <div class="bom-color-text">
-                        <div class="bom-color-name"><%= assigned.colorName || cw.name %></div>
-                        <div class="bom-color-code"><%= cw.code %></div>
+                  <div class="section-content">
+                    <%
+                      // Flatten bom items
+                      const allBomItems = [];
+                      (bom.parts || []).forEach(part => {
+                        (part.items || []).forEach(item => {
+                          allBomItems.push({ ...item, part: part.partName });
+                        });
+                      });
+
+                      // Helpers
+                      const normalize = (v) => (v == null ? '' : String(v)).trim();
+                      const isDash = (v) => normalize(v) === '—';
+
+                      const isValidImg = (u) => {
+                        const s = normalize(u);
+                        if (!s || s === '—') return false;
+                        if (s.toLowerCase().includes('no image')) return false;
+                        return true;
+                      };
+
+                      // Only show colorways with valid code
+                      const bomColorways = (colorways || []).filter(cw => cw && normalize(cw.code) && !isDash(cw.code));
+
+                      // column width for colorways
+                      const bomColorColWidth = bomColorways.length > 0
+                        ? Math.max(8, Math.floor(18 / bomColorways.length))
+                        : 10;
+                    %>
+
+                    <% if (allBomItems.length > 0) { %>
+                      <table class="bom-table">
+                        <thead>
+                          <tr>
+                            <th style="width: 10%"><%= t.part || 'Part' %></th>
+                            <th style="width: 25%"><%= t.materialName || 'Material Name' %></th>
+                            <th style="width: 15%"><%= t.placement || 'Placement' %></th>
+                            <th style="width: 8%"><%= t.sizeWidthUsage || 'Size/Width/Usage' %></th>
+                            <th style="width: 4%"><%= t.qty || 'Qty' %></th>
+                            <th style="width: 4%"><%= t.uom || 'UOM' %></th>
+                            <th style="width: 9%"><%= t.supplier || 'Supplier' %></th>
+                            <th style="width: 10%"><%= t.comments || 'Comments' %></th>
+
+                            <% bomColorways.forEach(cw => { %>
+                              <th style="width: <%= bomColorColWidth %>%"><%= cw.code %></th>
+                            <% }); %>
+                          </tr>
+                        </thead>
+
+                        <tbody>
+                          <% allBomItems.forEach((item, idx) => { %>
+                            <tr class="<%= idx % 2 === 1 ? 'alt-row' : '' %>">
+                              <td><%= item.part || '-' %></td>
+
+                              <td>
+                                <%= item.materialName || '-' %>
+                                <% if (item.sizeWidthUsage && !isDash(item.sizeWidthUsage)) { %>
+                                  <br /><small><%= item.sizeWidthUsage %></small>
+                                <% } %>
+                              </td>
+
+                              <td><%= item.placement || '-' %></td>
+                              <td><%= item.sizeWidthUsage || item.size || '-' %></td>
+                              <td><%= item.quantity || '0' %></td>
+                              <td><%= item.uom || 'Each' %></td>
+                              <td><%= item.supplier || '-' %></td>
+                              <td><%= item.comments || '-' %></td>
+
+                              <% bomColorways.forEach(cw => { %>
+                                <%
+                                  // Find assigned for this bom item id
+                                  const assigned = (cw.parts || []).find(p =>
+                                    p && p.bomItemId && item.bomItemId &&
+                                    String(p.bomItemId) === String(item.bomItemId)
+                                  );
+
+                                  const cwCode = normalize(cw && cw.code);
+                                  const cwName = normalize(cw && cw.name);
+
+                                  const pantone = normalize(assigned && assigned.pantoneCode);
+
+                                  // Phát hiện custom text:
+                                  // - Nếu backend lưu flag isCustomText/customText → ưu tiên dùng
+                                  // - Hoặc pantoneCode tồn tại và khác với mã code/pantone mặc định của colorway (legacy data)
+                                  const hasCwCode = !!cwCode && cwCode !== '—';
+                                  const isExplicitCustom = !!(assigned && (assigned.isCustomText || assigned.customText));
+                                  const isLegacyCustom =
+                                    !!pantone &&
+                                    (!hasCwCode || pantone !== cwCode) &&
+                                    pantone !== normalize(cw && cw.pantoneCode);
+
+                                  const isCustomText = isExplicitCustom || isLegacyCustom;
+
+                                  // Choose code:
+                                  // - custom text => pantoneCode (mã màu tùy chỉnh)
+                                  // - colorway chuẩn => cw.code
+                                  const displayCode = isCustomText ? pantone : cwCode;
+
+                                  // Choose name: ưu tiên assigned.colorName, fallback cw.name
+                                  const displayName = normalize((assigned && assigned.colorName) ? assigned.colorName : cwName);
+
+                                  // Choose image (cho cả colorway chuẩn và custom text nếu có ảnh):
+                                  // ưu tiên assigned imageUrl/dataUri -> cw imageUrl/dataUri
+                                  const assignedImgUrl = normalize(assigned && assigned.imageUrl);
+                                  const assignedDataUri = normalize(assigned && assigned.imageDataUri);
+                                  const cwImgUrl = normalize(cw && cw.imageUrl);
+                                  const cwDataUri = normalize(cw && cw.imageDataUri);
+
+                                  const resolvedImg =
+                                    (isValidImg(assignedImgUrl) ? assignedImgUrl : '') ||
+                                    (assignedDataUri ? assignedDataUri : '') ||
+                                    (isValidImg(cwImgUrl) ? cwImgUrl : '') ||
+                                    (cwDataUri ? cwDataUri : '');
+
+                                  const showImage = !!resolvedImg;
+                                %>
+
+                                <td class="bom-color-cell">
+                                  <% if (assigned) { %>
+                                    <div class="bom-color-chip <%= showImage ? 'has-img' : 'no-img' %>">
+                                      <% if (showImage) { %>
+                                        <img src="<%= resolvedImg %>" alt="colorway" />
+                                      <% } %>
+
+                                      <div class="bom-color-text">
+                                        <div class="bom-color-name"><%= displayName || '-' %></div>
+                                        <div class="bom-color-code"><%= displayCode || '-' %></div>
                                       </div>
-                    </div>
-                  <% } else { %>
-                    -
-                                    <% } %>
-                                  </td>
-              <% }); %>
-                                </tr>
-                                <% }); %>
-                            </tbody>
-                          </table>
-                          <% } %>
-                    </div>
+                                    </div>
+                                  <% } else { %>
+                                    -
+                                  <% } %>
+                                </td>
+                              <% }); %>
+                            </tr>
+                          <% }); %>
+                        </tbody>
+                      </table>
+                    <% } %>
+                  </div>
                 </div>
-                <% } %>
+              <% } %>
+
 
                   <%# 3. MEASUREMENTS %>
                     <% if (measurements && measurements.rows && measurements.rows.length> 0) { %>

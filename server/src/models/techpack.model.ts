@@ -126,6 +126,7 @@ export interface IColorwayPart {
   imageUrl?: string;
   supplier?: string;
   colorType?: 'Solid' | 'Print' | 'Embroidery' | 'Applique';
+  isCustomText?: boolean;
 }
 
 export interface IHowToMeasure {
@@ -301,6 +302,7 @@ const ColorwayPartSchema = new Schema<IColorwayPart>({
   imageUrl: { type: String },
   supplier: { type: String },
   colorType: { type: String, enum: ['Solid', 'Print', 'Embroidery', 'Applique'], default: 'Solid' },
+  isCustomText: { type: Boolean, default: false },
 }, { _id: true });
 
 const ColorwaySchema = new Schema<IColorway>({
