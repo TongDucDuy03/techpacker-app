@@ -384,6 +384,8 @@ const ColorwayTab: React.FC = () => {
   };
 
   const resetForm = () => {
+    // Clear image preview and URL first
+    setImagePreview(null);
     setFormData({
       name: '',
       code: '',
@@ -400,20 +402,9 @@ const ColorwayTab: React.FC = () => {
       notes: '',
       imageUrl: undefined,
     });
-    setPartFormData({
-      bomItemId: undefined,
-      partName: '',
-      colorName: '',
-      pantoneCode: '',
-      hexCode: '#000000',
-      rgbCode: '',
-      colorType: 'Solid',
-    });
-    setImagePreview(null);
     setShowAddForm(false);
     setEditingIndex(null);
     validation.reset();
-    partValidation.reset();
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
