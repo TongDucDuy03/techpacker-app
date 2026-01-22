@@ -124,8 +124,8 @@ const sampleRoundQuillModules = {
     [{ list: 'ordered' }, { list: 'bullet' }],
     [{ indent: '-1' }, { indent: '+1' }],
     [{ align: [] }],
-    ['link', 'image'],
-    ['clean'],
+    ['image'],
+    
   ],
   imageUploader: {
     upload: async (file: File) => {
@@ -133,7 +133,7 @@ const sampleRoundQuillModules = {
       formData.append('file', file);
       
       try {
-        const response = await fetch(`${API_BASE_URL}/api/upload-image`, {
+        const response = await fetch(`${API_UPLOAD_BASE}/api/upload-image`, {
           method: 'POST',
           body: formData,
         });
