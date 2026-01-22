@@ -27,6 +27,7 @@ import { useI18n } from '../../../lib/i18n';
 import { normalizeMeasurementBaseSizes } from '../../../utils/measurements';
 import Quill from 'quill';
 import ImageUploader from 'quill-image-uploader';
+import { api } from '../../../lib/api';
 
 // Progression validation result
 interface ProgressionValidation {
@@ -111,8 +112,20 @@ class PlainTextClipboard extends Clipboard {
 // Register custom clipboard globally
 Quill.register('modules/clipboard', PlainTextClipboard, true);
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
-const API_UPLOAD_BASE = API_BASE_URL.replace(/\/api\/v1$/, '');
+// Helper function to resolve image URL (handles both absolute and relative paths)
+const resolveImageUrl = (url?: string | null): string | null => {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001/api/v1';
+  const API_UPLOAD_BASE = API_BASE_URL.replace(/\/api\/v1$/, '');
+  if (url.startsWith('/')) {
+    return `${API_UPLOAD_BASE}${url}`;
+  }
+  return `${API_UPLOAD_BASE}/${url}`;
+};
+
 const sampleRoundQuillModules = {
   toolbar: [
     [{ header: [1, 2, 3, 4, 5, false] }],
@@ -133,23 +146,24 @@ const sampleRoundQuillModules = {
       formData.append('file', file);
       
       try {
-        const response = await fetch(`${API_UPLOAD_BASE}/api/upload-image`, {
-          method: 'POST',
-          body: formData,
+        const response = await api.post('/techpacks/upload-editor-image', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
         });
         
-        if (!response.ok) {
-          throw new Error('Upload failed');
+        if (response.data.success && response.data.data?.url) {
+          const imageUrl = response.data.data.url;
+          // Resolve URL to full path (handles relative URLs)
+          const resolvedUrl = resolveImageUrl(imageUrl);
+          return resolvedUrl || imageUrl;
+        } else {
+          throw new Error(response.data.message || 'Upload failed');
         }
-        
-        const data = await response.json();
-        const imageUrl = data.url.startsWith('/') 
-          ? `${window.location.origin}${data.url}`
-          : data.url;
-        return imageUrl;
-      } catch (error) {
+      } catch (error: any) {
         console.error('Image upload error:', error);
-        throw error;
+        const errorMessage = error.response?.data?.message || error.message || 'Upload failed';
+        throw new Error(errorMessage);
       }
     }
   },

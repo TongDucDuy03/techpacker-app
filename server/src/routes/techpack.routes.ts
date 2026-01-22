@@ -728,6 +728,27 @@ router.post(
 );
 
 /**
+ * @route POST /api/techpacks/upload-editor-image
+ * @desc Upload an image for rich text editor (used in Measurement comments, etc.)
+ * @access Private (Admin and Designer only)
+ */
+router.post(
+  '/upload-editor-image',
+  requireAuth,
+  requireRole([UserRole.Admin, UserRole.Designer]),
+  upload.single('file'),
+  processUploadedImage,
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded.' });
+    }
+    // The backend serves static files from /uploads at root level
+    const fileUrl = `/uploads/${req.file.filename}`;
+    return res.status(200).json({ success: true, message: 'File uploaded successfully', data: { url: fileUrl } });
+  }
+);
+
+/**
  * @route GET /api/techpacks/:id/pdf
  * @desc Export TechPack as PDF
  * @access Private (with TechPack access control)
