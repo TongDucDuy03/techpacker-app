@@ -200,7 +200,7 @@ export class TechPackController {
 
   async getTechPacks(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { page = 1, limit = config.defaultPageSize, q = '', status, season, brand, sortBy = 'updatedAt', sortOrder = 'desc' } = req.query;
+      const { page = 1, limit = config.defaultPageSize, q = '', status, season, brand, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
       const user = req.user!;
       
       // Validate user._id is a valid ObjectId
@@ -290,8 +290,7 @@ export class TechPackController {
       // Build filter conditions separately to combine properly
       const filterConditions: any = {};
       
-      // Status filter - show all statuses including Archived by default
-      // Only filter by status if explicitly requested
+      // Status filter - exclude Archived by default unless explicitly requested
       if (status) {
         // User explicitly requested a status filter
         // Handle both "Archived" and "Process" (legacy "In Review") values
@@ -303,9 +302,10 @@ export class TechPackController {
         } else {
           filterConditions.status = status;
         }
+      } else {
+        // Default: exclude Archived techpacks unless user explicitly filters for them
+        filterConditions.status = { $ne: 'Archived' };
       }
-      // If no status filter, don't add any status filter condition
-      // This allows all statuses (including Archived) to be shown
 
       if (season) filterConditions.season = season;
       if (brand) filterConditions.brand = brand;
