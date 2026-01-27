@@ -756,10 +756,10 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
         return;
       }
       Modal.confirm({
-        title: 'Xác nhận cập nhật',
-        content: 'Bạn có muốn cập nhật TechPack này?',
-        okText: 'Cập nhật',
-        cancelText: 'Hủy',
+        title: t('techpack.confirmUpdate.title'),
+        content: t('techpack.confirmUpdate.content'),
+        okText: t('techpack.confirmUpdate.okText'),
+        cancelText: t('techpack.confirmUpdate.cancelText'),
         onOk: async () => {
           console.log('[TechPackTabs] Calling saveTechPack (update confirmed)...');
           await saveTechPack();
@@ -771,10 +771,10 @@ const TechPackTabs: React.FC<TechPackTabsProps> = ({ onBackToList, mode = 'creat
 
     // ✅ FIXED: Create flow now also has confirmation (same as update)
     Modal.confirm({
-      title: 'Xác nhận lưu',
-      content: 'Bạn có muốn lưu TechPack này?',
-      okText: 'Lưu',
-      cancelText: 'Hủy',
+      title: t('techpack.confirmCreate.title'),
+      content: t('techpack.confirmCreate.content'),
+      okText: t('techpack.confirmCreate.okText'),
+      cancelText: t('techpack.confirmCreate.cancelText'),
       onOk: async () => {
         console.log('[TechPackTabs] Calling saveTechPack (create confirmed)...');
         await saveTechPack();

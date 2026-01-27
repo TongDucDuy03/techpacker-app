@@ -543,6 +543,16 @@ const translations: Record<LanguageCode, TranslationDict> = {
     'form.unsavedChanges.okText': 'Exit',
     'form.unsavedChanges.cancelText': 'Continue editing',
     'form.unsavedChanges.label': 'Unsaved changes',
+
+    // TechPack save/update confirmations
+    'techpack.confirmUpdate.title': 'Confirm update',
+    'techpack.confirmUpdate.content': 'Do you want to update this TechPack?',
+    'techpack.confirmUpdate.okText': 'Update',
+    'techpack.confirmUpdate.cancelText': 'Cancel',
+    'techpack.confirmCreate.title': 'Confirm save',
+    'techpack.confirmCreate.content': 'Do you want to save this TechPack?',
+    'techpack.confirmCreate.okText': 'Save',
+    'techpack.confirmCreate.cancelText': 'Cancel',
     'form.newTechPack': 'New Tech Pack',
     'form.noArticleCode': 'No Article Code',
     'form.version': 'Version',
@@ -1836,6 +1846,16 @@ const translations: Record<LanguageCode, TranslationDict> = {
     'form.unsavedChanges.okText': 'Thoát',
     'form.unsavedChanges.cancelText': 'Tiếp tục chỉnh sửa',
     'form.unsavedChanges.label': 'Có thay đổi chưa lưu',
+
+    // TechPack save/update confirmations
+    'techpack.confirmUpdate.title': 'Xác nhận cập nhật',
+    'techpack.confirmUpdate.content': 'Bạn có muốn cập nhật TechPack này?',
+    'techpack.confirmUpdate.okText': 'Cập nhật',
+    'techpack.confirmUpdate.cancelText': 'Hủy',
+    'techpack.confirmCreate.title': 'Xác nhận lưu',
+    'techpack.confirmCreate.content': 'Bạn có muốn lưu TechPack này?',
+    'techpack.confirmCreate.okText': 'Lưu',
+    'techpack.confirmCreate.cancelText': 'Hủy',
     'form.newTechPack': 'Tech Pack mới',
     'form.noArticleCode': 'Chưa có mã sản phẩm',
     'form.version': 'Phiên bản',

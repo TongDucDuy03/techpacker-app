@@ -1766,7 +1766,7 @@
 
                               <td><%= item.placement || '-' %></td>
                               <td><%= item.sizeWidthUsage || item.size || '-' %></td>
-                              <td><%= item.quantity || '0' %></td>
+                              <td><%= (item.quantity === null || item.quantity === undefined || item.quantity === '' || item.quantity === 0 || item.quantity === '0') ? '' : item.quantity %></td>
                               <td><%= item.uom || 'Each' %></td>
                               <td><%= item.supplier || '-' %></td>
                               <td><%= item.comments || '-' %></td>

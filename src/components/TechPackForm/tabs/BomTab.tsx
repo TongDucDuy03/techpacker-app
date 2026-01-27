@@ -742,47 +742,24 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       return;
     }
 
-    // Check for duplicates
-    const duplicates = checkDuplicates(formData, editingIndex ?? undefined);
-    if (duplicates.length > 0) {
-      const shouldMerge = window.confirm(
-        t('form.bom.mergeDuplicatesConfirm', { count: duplicates.length })
-      );
-      
-      if (shouldMerge) {
-        // Merge with first duplicate
-        const duplicateIndex = bom.findIndex(item => 
-          item.part === formData.part && item.materialName === formData.materialName
-        );
-        if (duplicateIndex !== -1) {
-          const existing = bom[duplicateIndex];
-          const existingQty = existing.quantity !== undefined && existing.quantity !== null ? existing.quantity : 0;
-          const formQty = formData.quantity !== undefined && formData.quantity !== null && formData.quantity !== '' 
-            ? Number(formData.quantity) 
-            : 0;
-          const mergedItem: BomItem = {
-            ...existing,
-            quantity: existingQty + formQty,
-          };
-          updateBomItem(duplicateIndex, mergedItem);
-          showSuccess(t('success.bomQuantitiesMerged'));
-          resetForm();
-          return;
-        }
-      }
-    }
+    // Skip duplicate-merge prompt: allow adding even if same Part + Material Name
 
     // Calculate totalPrice if quantity and unitPrice are provided
-    const quantity = formData.quantity !== undefined && formData.quantity !== null && formData.quantity !== '' 
-      ? Number(formData.quantity) 
-      : null;
+    // IMPORTANT: when user clears Quantity, we store it as null (so backend merge can clear it)
+    const quantity =
+      formData.quantity === undefined || formData.quantity === null || formData.quantity === '' || formData.quantity === '-'
+        ? null
+        : Number(formData.quantity);
+    const normalizedQuantity = Number.isFinite(quantity as number) ? (quantity as number) : null;
+
     const hasUnitPrice = formData.unitPrice !== undefined && formData.unitPrice !== null && formData.unitPrice !== '';
     const unitPrice = hasUnitPrice ? Number(formData.unitPrice) : undefined;
+
     // Only calculate totalPrice if both quantity > 0 and unitPrice are provided
     const totalPrice =
-      quantity !== null && quantity > 0 && unitPrice !== undefined && formData.totalPrice !== undefined && formData.totalPrice !== null && formData.totalPrice !== ''
+      normalizedQuantity !== null && normalizedQuantity > 0 && unitPrice !== undefined && formData.totalPrice !== undefined && formData.totalPrice !== null && formData.totalPrice !== ''
         ? Number(formData.totalPrice)
-        : (quantity !== null && quantity > 0 && unitPrice !== undefined ? Number(String(quantity)) * Number(String(unitPrice)) : undefined);
+        : (normalizedQuantity !== null && normalizedQuantity > 0 && unitPrice !== undefined ? Number(String(normalizedQuantity)) * Number(String(unitPrice)) : undefined);
     
     const normalizedImageUrl = formData.imageUrl?.trim();
     const bomItem: BomItem = {
@@ -791,7 +768,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       materialName: formData.materialName!,
       placement: formData.placement || '',
       size: formData.size || '',
-      quantity: quantity,
+      quantity: normalizedQuantity,
       uom: formData.uom as any || 'm',
       supplier: formData.supplier || '',
       comments: formData.comments || '',
@@ -1333,12 +1310,14 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
     importPreview.forEach((item, idx) => {
       const validation = validateBomItem(item);
       if (validation.isValid) {
-        const quantity = item.quantity !== undefined && item.quantity !== null && item.quantity !== '' 
-          ? Number(item.quantity) 
-          : null;
+        const quantity =
+          item.quantity === undefined || item.quantity === null || item.quantity === '' || item.quantity === '-'
+            ? null
+            : Number(item.quantity);
+        const normalizedQuantity = Number.isFinite(quantity as number) ? (quantity as number) : null;
         const hasUnitPrice = item.unitPrice !== undefined && item.unitPrice !== null && item.unitPrice !== '';
         const unitPrice = hasUnitPrice ? Number(item.unitPrice) : undefined;
-        const totalPrice = item.totalPrice ?? (quantity !== null && quantity > 0 && unitPrice !== undefined ? quantity * unitPrice : undefined);
+        const totalPrice = item.totalPrice ?? (normalizedQuantity !== null && normalizedQuantity > 0 && unitPrice !== undefined ? normalizedQuantity * unitPrice : undefined);
         const trimmedImageUrl = typeof item.imageUrl === 'string' ? item.imageUrl.trim() : '';
         
         const bomItem: BomItem = {
@@ -1347,7 +1326,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
           materialName: item.materialName!,
           placement: item.placement || '',
           size: item.size || '',
-          quantity: quantity,
+          quantity: normalizedQuantity,
           uom: (item.uom || 'm') as any,
           supplier: item.supplier || '',
           supplierCode: item.supplierCode || '',
@@ -2441,19 +2420,21 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               {/* Actions column */}
               <col style={{ width: '80px' }} />
             </colgroup>
-            <thead className="bg-gray-50">
+            {/* ✅ FIX: Sticky header (keeps column labels visible while scrolling vertically) */}
+            <thead className="bg-gray-50 sticky top-0" style={{ zIndex: 70 }}>
               <tr>
                 {/* ✅ FIX: Make checkbox column sticky with solid background and high z-index */}
                 <th 
                   scope="col" 
-                  className="px-1 py-3 sticky"
+                  className="px-1 py-3 sticky top-0"
                   style={{ 
                     width: `${STICKY_COLUMN_WIDTHS.checkbox}px`, // ✅ Fixed width from constant
                     minWidth: `${STICKY_COLUMN_WIDTHS.checkbox}px`, // ✅ Force min width
                     maxWidth: `${STICKY_COLUMN_WIDTHS.checkbox}px`, // ✅ Force max width
                     left: STICKY_LEFT[0], // ✅ Use calculated left offset
                     backgroundColor: '#f9fafb', // ✅ Solid gray-50 background
-                    zIndex: 60, // ✅ Highest z-index for checkbox header
+                    zIndex: 80, // ✅ Highest z-index for checkbox header (above sticky body cells)
+                    top: 0, // ✅ Stick to top when scrolling vertically
                     boxSizing: 'border-box', // ✅ CRITICAL: Include padding in width calculation
                     overflow: 'hidden', // ✅ Clip any content that might peek through
                   }}
@@ -2479,7 +2460,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                     <th
                       key={column.key as string}
                       scope="col"
-                      className={`px-1 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${isStickyColumn ? 'sticky' : ''}`}
+                      className={`px-1 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 ${isStickyColumn ? '' : ''}`}
                       style={{ 
                         width: column.width,
                         ...(isStickyColumn ? {
@@ -2490,11 +2471,14 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                         ...(isStickyColumn ? { 
                           left: STICKY_LEFT[stickyIdx], // ✅ Use calculated left offset from STICKY_LEFT array
                           backgroundColor: '#f9fafb', // ✅ Solid gray-50 background
-                          zIndex: 50 - colIndex, // ✅ Decreasing z-index: 50, 49, 48 (left to right)
+                          zIndex: 75 - colIndex, // ✅ Above sticky body cells; keep left-to-right stacking
+                          top: 0, // ✅ Stick to top when scrolling vertically
                           overflow: 'hidden', // ✅ Clip any content that might peek through
                         } : {
-                          zIndex: 1, // ✅ Normal columns have low z-index to stay below sticky
-                          position: 'relative' // ✅ Ensure stacking context
+                          backgroundColor: '#f9fafb', // ✅ Solid background for header cells
+                          zIndex: 70, // ✅ Keep above body while scrolling
+                          position: 'sticky', // ✅ Make non-sticky columns also stick to top
+                          top: 0,
                         })
                       }}
                     >
@@ -2502,7 +2486,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                     </th>
                   );
                 })}
-                <th scope="col" className="relative px-6 py-3">
+                <th scope="col" className="px-6 py-3 sticky top-0" style={{ backgroundColor: '#f9fafb', zIndex: 70 }}>
                   <span className="sr-only">Actions</span>
                 </th>
               </tr>

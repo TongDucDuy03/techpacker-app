@@ -49,7 +49,7 @@ export interface BomItem {
   materialName: string;
   placement: string;
   size: string;
-  quantity?: number; // ✅ FIXED: Quantity is now optional
+  quantity?: number | null; // ✅ Quantity optional; null means user intentionally cleared it
   uom: 'm' | 'cm' | 'mm' | 'pcs' | 'kg' | 'g' | 'yards' | 'inches';
   supplier: string;
   comments?: string;

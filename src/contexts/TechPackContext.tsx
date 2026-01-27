@@ -988,7 +988,8 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
           materialName: item.materialName || '',
           placement: item.placement || '', // ✅ FIXED: Preserve placement (can be empty)
           size: item.size || '',
-          quantity: item.quantity !== undefined && item.quantity !== null ? item.quantity : undefined, // ✅ FIXED: Preserve undefined if not set (don't default to 0)
+          // Preserve null (explicitly cleared) vs undefined (missing)
+          quantity: item.quantity !== undefined ? item.quantity : undefined,
           uom: item.uom || 'm',
           supplier: item.supplier || '',
           comments: item.comments || '',

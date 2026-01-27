@@ -523,7 +523,14 @@ class PDFService {
         imageUrl,
         placement: this.normalizeText(item.placement),
         sizeWidthUsage: sizeInfo.length > 0 ? sizeInfo.join(' / ') : '—',
-        quantity: item.quantity || 0,
+        // Quantity: allow blank in PDF when user leaves it empty.
+        // Historically some flows stored empty quantity as 0; treat 0 as blank for export to match UX expectation.
+        quantity: (() => {
+          const q = (item as any).quantity;
+          // Treat empty and 0/"0" as blank for export (matches UI expectation when field is cleared)
+          if (q === null || q === undefined || q === '' || q === 0 || q === '0') return '';
+          return q;
+        })(),
         uom: this.normalizeText(item.uom),
         supplier: this.normalizeText(item.supplier),
         unitPrice: item.unitPrice ? `${item.unitPrice} ${currency}` : '—',

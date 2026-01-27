@@ -117,11 +117,13 @@ export const bomItemValidationSchema: FormValidationConfig = {
     // ✅ FIXED: Quantity is now optional (not required)
     min: 0.01,
     max: 100000,
-    custom: (value: number | undefined) => {
-      // Only validate if value is provided
-      if (value === null || value === undefined) return null; // ✅ FIXED: Allow undefined/null
-      if (Number.isNaN(Number(value)) || Number(value) <= 0) return 'Số lượng phải lớn hơn 0.';
-      if (Number(value) > 100000) return 'Số lượng quá lớn (tối đa 100,000).';
+    custom: (value: any) => {
+      // Only validate if value is provided.
+      // NOTE: numeric inputs in UI may temporarily emit '' or '-' while user is typing/clearing.
+      if (value === null || value === undefined || value === '' || value === '-') return null;
+      const n = Number(value);
+      if (Number.isNaN(n) || n <= 0) return 'Số lượng phải lớn hơn 0.';
+      if (n > 100000) return 'Số lượng quá lớn (tối đa 100,000).';
       return null;
     }
   },
