@@ -267,8 +267,12 @@ class PDFService {
     try {
       const d = typeof date === 'string' ? new Date(date) : date;
       const locale = this.currentLanguage === 'vi' ? 'vi-VN' : 'en-US';
+      // Ensure PDF timestamps match Vietnam time (UTC+7) regardless of server timezone.
+      // This fixes the common “PDF is off by 7 hours” issue when server runs in UTC.
+      const timeZone = 'Asia/Ho_Chi_Minh';
       // Show date + time (HH:mm:ss) as requested
       return d.toLocaleString(locale, {
+        timeZone,
         year: 'numeric',
         month: 'short',
         day: 'numeric',
