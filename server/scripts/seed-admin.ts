@@ -24,8 +24,8 @@ async function seedAdmin(options: SeedAdminOptions = {}) {
     console.log('✅ Connected to MongoDB');
 
     // Default admin credentials
-    const adminEmail = options.email || process.env.ADMIN_EMAIL || 'admin@techpacker.com';
-    const adminPassword = options.password || process.env.ADMIN_PASSWORD || 'Admin123!';
+    const adminEmail = options.email || process.env.ADMIN_EMAIL || 'tongducduy4@gmail.com';
+    const adminPassword = options.password || process.env.ADMIN_PASSWORD || 'Duydeptrai0910!';
     const firstName = options.firstName || process.env.ADMIN_FIRST_NAME || 'Admin';
     const lastName = options.lastName || process.env.ADMIN_LAST_NAME || 'User';
 

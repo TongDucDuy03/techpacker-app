@@ -1721,6 +1721,10 @@
                         const s = normalize(u);
                         if (!s || s === '—') return false;
                         if (s.toLowerCase().includes('no image')) return false;
+                        // PDF backend thường gán placeholder bằng SVG data URI (getPlaceholderSVG).
+                        // Trên UI, những placeholder này không được hiển thị như một swatch thực sự,
+                        // nên khi export PDF cũng KHÔNG nên hiển thị khung màu trống.
+                        if (s.toLowerCase().includes('data:image/svg+xml')) return false;
                         return true;
                       };
 
@@ -1816,14 +1820,19 @@
 
                                   // Choose image (cho cả colorway chuẩn và custom text nếu có ảnh):
                                   // Bám sát UI: chỉ dùng imageUrl, bỏ qua các dataUri placeholder ẩn.
-                                  // Ưu tiên ảnh gắn trực tiếp cho assignment, nếu không có thì (với colorway chuẩn) fallback sang ảnh colorway.
+                                  // Ưu tiên ảnh gắn trực tiếp cho assignment.
+                                  // CHỈ fallback sang ảnh colorway gốc nếu:
+                                  //   - assignment KHÔNG phải custom text
+                                  //   - Tên màu của assignment giống với tên colorway (người dùng không sửa tên)
                                   const assignedImgUrl = normalize(assigned && assigned.imageUrl);
                                   const cwImgUrl = normalize(cw && cw.imageUrl);
-
+                                  const colorNameMatchesBase = !!assigned && normalize(assigned.colorName) === cwName;
                                   const resolvedImg =
                                     (isValidImg(assignedImgUrl) ? assignedImgUrl : '') ||
                                     // Chỉ fallback sang ảnh colorway gốc nếu KHÔNG phải custom text
-                                    (!isCustomText && isValidImg(cwImgUrl) ? cwImgUrl : '');
+                                    // VÀ người dùng không đổi tên màu (khớp với UI: nếu chỉ gõ custom text,
+                                    // thì chỉ hiển thị chữ, không hiện ô màu mặc định).
+                                    (!isCustomText && colorNameMatchesBase && isValidImg(cwImgUrl) ? cwImgUrl : '');
 
                                   const showImage = !!resolvedImg;
                                 %>
@@ -1839,10 +1848,14 @@
                         </div>
                       </div>
                     <% } else { %>
-                      <!-- Không có ảnh: chỉ hiển thị text, KHÔNG render ô màu/khung -->
+                      <!-- Không có ảnh: chỉ hiển thị text, KHÔNG render ô màu/khung.
+                           Và CHỈ hiển thị mã màu nếu người dùng nhập pantoneCode cho assignment.
+                           Không tự động lặp lại colorCode mặc định của cột để khớp với UI. -->
                       <div class="bom-color-text">
                         <div class="bom-color-name"><%= displayName || '-' %></div>
-                        <div class="bom-color-code"><%= (isCustomText && !pantone) ? '' : displayCode %></div>
+                        <% if (pantone && pantone !== '—') { %>
+                          <div class="bom-color-code"><%= pantone %></div>
+                        <% } %>
                       </div>
                     <% } %>
                   <% } else { %>
@@ -2049,7 +2062,7 @@
                                     <%= color.name || 'Color' %>
               </div>
               <div class="colorway-card-code">
-                <%= t.code || 'Code' %>: <%= color.code || '000' %>
+                <%= t.code || 'Code' %>: <%= color.code || '' %>
               </div>
             </div>
             <% if (color.imageUrl && color.imageUrl !== '—' && !color.imageUrl.includes('No Image')) { %>
