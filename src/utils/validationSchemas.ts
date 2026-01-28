@@ -101,8 +101,8 @@ export const bomItemValidationSchema: FormValidationConfig = {
     }
   },
   supplierCode: {
-    required: true,
-    // Required field but no format validation - allow any input
+    required: false,
+    // Optional field; allow any input when provided
   },
   supplier: { 
     required: true, 

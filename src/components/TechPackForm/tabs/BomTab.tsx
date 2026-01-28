@@ -1896,7 +1896,6 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
               onChange={handleInputChange('supplierCode')}
               onBlur={() => validation.setFieldTouched('supplierCode')}
               placeholder={t('form.bom.supplierCode')}
-              required
               error={validation.getFieldProps('supplierCode').error}
               helperText={validation.getFieldProps('supplierCode').helperText}
               data-error={validation.getFieldProps('supplierCode').error ? 'true' : 'false'}
