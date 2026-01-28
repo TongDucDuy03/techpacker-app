@@ -287,6 +287,7 @@ const MeasurementTab: React.FC = () => {
   const [plusToleranceRaw, setPlusToleranceRaw] = useState<string>('');
   const [newSizeLabel, setNewSizeLabel] = useState('');
   const [pendingPresetId, setPendingPresetId] = useState(() => SIZE_PRESET_OPTIONS[0]?.id || 'standard_us_alpha');
+  const [draggingSize, setDraggingSize] = useState<string | null>(null);
   const [baseSizeSelectorValue, setBaseSizeSelectorValue] = useState('');
   const [pendingBaseSize, setPendingBaseSize] = useState<string | null>(null);
   const [showBaseSizeConfirm, setShowBaseSizeConfirm] = useState(false);
@@ -1349,6 +1350,36 @@ type RoundModalFormState = {
     setNewSizeLabel('');
   };
 
+  const handleSizeDragStart = (size: string) => {
+    setDraggingSize(size);
+  };
+
+  const handleSizeDragOver = (event: React.DragEvent<HTMLSpanElement>) => {
+    // Cho phép drop
+    event.preventDefault();
+  };
+
+  const handleSizeDrop = (targetSize: string) => {
+    if (!updateMeasurementSizeRange || !draggingSize || draggingSize === targetSize) {
+      setDraggingSize(null);
+      return;
+    }
+
+    const current = [...selectedSizes];
+    const fromIndex = current.indexOf(draggingSize);
+    const toIndex = current.indexOf(targetSize);
+    if (fromIndex === -1 || toIndex === -1) {
+      setDraggingSize(null);
+      return;
+    }
+
+    current.splice(fromIndex, 1);
+    current.splice(toIndex, 0, draggingSize);
+
+    updateMeasurementSizeRange(current);
+    setDraggingSize(null);
+  };
+
   const handleApplyPreset = () => {
     if (!updateMeasurementSizeRange) return;
     const preset = getPresetById(pendingPresetId);
@@ -1851,12 +1882,17 @@ type RoundModalFormState = {
             )}
             {selectedSizes.map(size => {
               const isBase = measurementBaseSize === size;
+              const isDragging = draggingSize === size;
               return (
                 <span
                   key={size}
-                  className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-sm font-medium ${
+                  draggable
+                  onDragStart={() => handleSizeDragStart(size)}
+                  onDragOver={handleSizeDragOver}
+                  onDrop={() => handleSizeDrop(size)}
+                  className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-sm font-medium cursor-move ${
                     isBase ? 'text-slate-900 font-semibold border-transparent shadow-sm' : 'border-gray-300 bg-gray-50 text-gray-700'
-                  }`}
+                  } ${isDragging ? 'opacity-60 ring-2 ring-blue-400' : ''}`}
                   style={isBase ? { backgroundColor: baseHighlightColor } : undefined}
                 >
                   {size}
