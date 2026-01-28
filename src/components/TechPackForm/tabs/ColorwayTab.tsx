@@ -663,7 +663,6 @@ const ColorwayTab: React.FC = () => {
               onChange={handleInputChange('code')}
               onBlur={validation.getFieldProps('code').onBlur}
               placeholder={t('form.colorway.codePlaceholder')}
-              required
               error={validation.getFieldProps('code').error}
               helperText={validation.getFieldProps('code').helperText}
             />
@@ -1057,9 +1056,6 @@ export const validateColorwaysForSave = (colorways: Colorway[]): { isValid: bool
     
     if (!item.name || item.name.trim().length < 2) {
       itemErrors.name = 'colorway.name.minLength';
-    }
-    if (!item.code || item.code.trim().length === 0) {
-      itemErrors.code = 'colorway.code.required';
     }
     
     if (Object.keys(itemErrors).length > 0) {

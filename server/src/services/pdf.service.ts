@@ -807,7 +807,8 @@ class PDFService {
       
       return colorways.map((colorway: IColorway) => ({
         name: colorway.name || '—',
-        code: colorway.code || '—',
+        // Keep empty code as empty so templates can still render the column (header can fall back to name).
+        code: colorway.code ?? '',
         pantoneCode: colorway.pantoneCode || '—',
         hexColor: colorway.hexColor || '—',
         rgbColor: colorway.rgbColor ? `rgb(${colorway.rgbColor.r}, ${colorway.rgbColor.g}, ${colorway.rgbColor.b})` : '—',
@@ -842,7 +843,8 @@ class PDFService {
     
     return colorways.map((colorway: IColorway) => ({
       name: colorway.name || '—',
-      code: colorway.code || '—',
+      // Keep empty code as empty so templates can still render the column (header can fall back to name).
+      code: colorway.code ?? '',
       pantoneCode: colorway.pantoneCode || '—',
       hexColor: colorway.hexColor || '—',
       rgbColor: colorway.rgbColor ? `rgb(${colorway.rgbColor.r}, ${colorway.rgbColor.g}, ${colorway.rgbColor.b})` : '—',

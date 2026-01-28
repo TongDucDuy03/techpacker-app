@@ -1724,8 +1724,9 @@
                         return true;
                       };
 
-                      // Only show colorways with valid code
-                      const bomColorways = (colorways || []).filter(cw => cw && normalize(cw.code) && !isDash(cw.code));
+                      // Show colorways even when code is empty (UI allows empty code).
+                      // We keep them in the PDF so export matches what user sees in the app.
+                      const bomColorways = (colorways || []).filter(cw => cw && (normalize(cw.code) || normalize(cw.name)) && !isDash(cw.code));
 
                       // column width for colorways
                       const bomColorColWidth = bomColorways.length > 0
@@ -1747,7 +1748,7 @@
               <th style="width: 10%"><%= t.comments || 'Comments' %></th>
 
               <% bomColorways.forEach(cw => { %>
-              <th style="width: <%= bomColorColWidth %>%"><%= cw.code %></th>
+              <th style="width: <%= bomColorColWidth %>%"><%= normalize(cw.code) || normalize(cw.name) || '—' %></th>
               <% }); %>
                               </tr>
                             </thead>
@@ -1793,49 +1794,61 @@
                                     !!pantone &&
                                     (!hasCwCode || pantone !== cwCode) &&
                                     pantone !== normalize(cw && cw.pantoneCode);
+                                  // Heuristic: chỉ nhập tên màu khác với colorway, không có ảnh và không có mã → xem là custom text
+                                  const assignedName = normalize(assigned && assigned.colorName);
+                                  const inferredNameOnlyCustom =
+                                    !!assignedName &&
+                                    assignedName !== cwName &&
+                                    !normalize(assigned && assigned.imageUrl) &&
+                                    !normalize(assigned && assigned.imageDataUri) &&
+                                    !pantone;
 
-                                  const isCustomText = isExplicitCustom || isLegacyCustom;
+                                  const isCustomText = isExplicitCustom || isLegacyCustom || inferredNameOnlyCustom;
 
                                   // Choose code:
-                                  // - custom text => pantoneCode (mã màu tùy chỉnh)
+                                  // - custom text => pantoneCode (mã màu tùy chỉnh). If user left it empty, keep it blank.
                                   // - colorway chuẩn => cw.code
-                                  const displayCode = isCustomText ? pantone : cwCode;
+                                  // Nếu rỗng thì để trống luôn, không hiển thị "—"
+                                  const displayCode = isCustomText ? (pantone || '') : (cwCode || '');
 
                                   // Choose name: ưu tiên assigned.colorName, fallback cw.name
                                   const displayName = normalize((assigned && assigned.colorName) ? assigned.colorName : cwName);
 
                                   // Choose image (cho cả colorway chuẩn và custom text nếu có ảnh):
-                                  // ưu tiên assigned imageUrl/dataUri -> cw imageUrl/dataUri
+                                  // Bám sát UI: chỉ dùng imageUrl, bỏ qua các dataUri placeholder ẩn.
+                                  // Ưu tiên ảnh gắn trực tiếp cho assignment, nếu không có thì (với colorway chuẩn) fallback sang ảnh colorway.
                                   const assignedImgUrl = normalize(assigned && assigned.imageUrl);
-                                  const assignedDataUri = normalize(assigned && assigned.imageDataUri);
                                   const cwImgUrl = normalize(cw && cw.imageUrl);
-                                  const cwDataUri = normalize(cw && cw.imageDataUri);
 
                                   const resolvedImg =
                                     (isValidImg(assignedImgUrl) ? assignedImgUrl : '') ||
-                                    (assignedDataUri ? assignedDataUri : '') ||
-                                    (isValidImg(cwImgUrl) ? cwImgUrl : '') ||
-                                    (cwDataUri ? cwDataUri : '');
+                                    // Chỉ fallback sang ảnh colorway gốc nếu KHÔNG phải custom text
+                                    (!isCustomText && isValidImg(cwImgUrl) ? cwImgUrl : '');
 
                                   const showImage = !!resolvedImg;
                                 %>
 
                 <td class="bom-color-cell">
                   <% if (assigned) { %>
-                                    <div class="bom-color-chip <%= showImage ? 'has-img' : 'no-img' %>">
-                                      <% if (showImage) { %>
-                                        <img src="<%= resolvedImg %>" alt="colorway" />
-                                                    <% } %>
-
+                    <% if (showImage) { %>
+                      <div class="bom-color-chip has-img">
+                        <img src="<%= resolvedImg %>" alt="colorway" />
+                        <div class="bom-color-text">
+                          <div class="bom-color-name"><%= displayName || '-' %></div>
+                          <div class="bom-color-code"><%= (isCustomText && !pantone) ? '' : displayCode %></div>
+                        </div>
+                      </div>
+                    <% } else { %>
+                      <!-- Không có ảnh: chỉ hiển thị text, KHÔNG render ô màu/khung -->
                       <div class="bom-color-text">
-                                        <div class="bom-color-name"><%= displayName || '-' %></div>
-                                        <div class="bom-color-code"><%= displayCode || '-' %></div>
-                                                  </div>
-                    </div>
+                        <div class="bom-color-name"><%= displayName || '-' %></div>
+                        <div class="bom-color-code"><%= (isCustomText && !pantone) ? '' : displayCode %></div>
+                      </div>
+                    <% } %>
                   <% } else { %>
                     -
-                                                <% } %>
-                                              </td>
+                  <% } %>
+                </td>
               <% }); %>
                                             </tr>
                                             <% }); %>

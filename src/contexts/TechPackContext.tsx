@@ -215,7 +215,7 @@ const sanitizeColorwayPart = (
   fallbackHex: string,
   bomLookup?: BomLookup
 ): ColorwayPart => {
-  const resolvedHex = normalizeHexColor(part?.hexCode) || fallbackHex || '#000000';
+  const resolvedHex = normalizeHexColor(part?.hexCode) || fallbackHex || '#f3f4f6';
   const resolvedColorType = allowedColorTypes.includes((part?.colorType as any))
     ? (part?.colorType as ColorwayPart['colorType'])
     : 'Solid';
@@ -257,9 +257,9 @@ const sanitizeColorway = (rawColorway: PartialColorway, index: number, bomLookup
   const rawName = safeString(rawColorway.name) || safeString((rawColorway as any).colorwayName);
   const rawCode = safeString(rawColorway.code) || safeString((rawColorway as any).colorwayCode);
   const sanitizedName = rawName || rawCode || `Colorway ${index + 1}`;
-  const sanitizedCode = rawCode
-    || sanitizedName.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').toUpperCase()
-    || `CW-${String(index + 1).padStart(2, '0')}`;
+  // IMPORTANT: Do NOT auto-generate code from name.
+  // If user leaves code empty, keep it empty.
+  const sanitizedCode = rawCode || '';
 
   const normalizedHex = normalizeHexColor(rawColorway.hexColor);
   const rawId = safeString(rawColorway.id as string) || safeString((rawColorway as any)._id);
@@ -289,7 +289,7 @@ const sanitizeColorway = (rawColorway: PartialColorway, index: number, bomLookup
     ? primaryPart.colorType
     : undefined;
   const sanitizedMaterialType = safeString(rawColorway.materialType) || materialFromPart || 'General';
-  const resolvedHex = normalizedHex || primaryPart?.hexCode || '#000000';
+  const resolvedHex = normalizedHex || primaryPart?.hexCode || '#f3f4f6';
   const sanitizedPantone = safeString(rawColorway.pantoneCode) || primaryPart?.pantoneCode || '';
 
   return {
@@ -1738,7 +1738,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         return {
           ...(colorway?._id && typeof colorway._id === 'string' && objectIdPattern.test(colorway._id) ? { _id: colorway._id } : {}),
           name: colorway.name.trim(),
-          code: colorway.code.trim(),
+          code: (colorway.code || '').trim(),
           ...(normalizedPlacement ? { placement: normalizedPlacement } : {}),
           ...(normalizedMaterialType ? { materialType: normalizedMaterialType } : {}),
           pantoneCode: colorway.pantoneCode?.trim() || undefined,
@@ -1761,7 +1761,8 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
         };
       });
 
-      const incompleteColorway = colorwaysPayload.find(cw => !cw.name || !cw.code);
+      // Colorway code is optional; only require name.
+      const incompleteColorway = colorwaysPayload.find(cw => !cw.name);
       if (incompleteColorway) {
         setState(prev => ({ ...prev, isSaving: false }));
         showError(t('form.colorway.requiredFields'));
@@ -2738,6 +2739,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           return partBomId && targetBomId && partBomId === targetBomId;
         });
         const existingPart = existingIndex >= 0 ? parts[existingIndex] : undefined;
+        const isCustomText = Boolean((partData as any)?.isCustomText || (existingPart as any)?.isCustomText);
         const linkedBom = resolveBomItem(bomLookup, bomItemId, partData.partName || existingPart?.partName);
 
         const resolvedPartName =
@@ -2752,12 +2754,19 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           linkedBom?.materialName ||
           resolvedPartName;
 
-        const resolvedHex =
-          partData.hexCode ||
-          existingPart?.hexCode ||
-          linkedBom?.colorCode ||
-          colorway.hexColor ||
-          '#000000';
+        const resolvedHex = isCustomText
+          ? (
+            partData.hexCode ||
+            existingPart?.hexCode ||
+            '#f3f4f6'
+          )
+          : (
+            partData.hexCode ||
+            existingPart?.hexCode ||
+            linkedBom?.colorCode ||
+            colorway.hexColor ||
+            '#f3f4f6'
+          );
 
         // ✅ CRITICAL FIX: Always generate new ID if partData explicitly has id: undefined
         // This ensures we create a new part instead of updating an existing one
@@ -2777,7 +2786,16 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           partName: resolvedPartName,
           colorName: resolvedColorName,
           hexCode: resolvedHex,
+          // Với custom text: KHÔNG kế thừa image/pantone từ colorway cũ nếu user không cung cấp
+          imageUrl: isCustomText
+            ? (partData.imageUrl || undefined)
+            : (partData.imageUrl ?? existingPart?.imageUrl),
+          pantoneCode: isCustomText
+            // Custom text: chỉ lấy pantoneCode nếu người dùng nhập; nếu không, bỏ hẳn (không fallback)
+            ? ((partData.pantoneCode !== undefined ? partData.pantoneCode : undefined) as any)
+            : (partData.pantoneCode || existingPart?.pantoneCode || linkedBom?.pantoneCode || undefined),
           colorType: (partData.colorType as ColorwayPart['colorType']) || existingPart?.colorType || 'Solid',
+          isCustomText: isCustomText || undefined,
         };
 
         // ✅ CRITICAL FIX: Always append new part if it doesn't exist for this bomItemId

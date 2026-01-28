@@ -474,7 +474,6 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
 
   const renderColorwayCell = useCallback((colorway: Colorway, item: BomItem) => {
     const assignment = findAssignmentForBom(colorway, item);
-    const swatchColor = assignment?.hexCode || colorway.hexColor || '#f3f4f6';
 
     const hasParts = (colorway.parts || []).length > 0;
     const inferredLegacyCustom =
@@ -482,12 +481,25 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
       assignment.pantoneCode.trim() !== '' &&
       assignment.pantoneCode !== colorway.code &&
       assignment.pantoneCode !== (colorway.pantoneCode || '');
-    const isCustomText = !!(assignment && (assignment as any)?.isCustomText) || inferredLegacyCustom;
+    // Heuristic: nếu chỉ nhập tên màu khác với colorway, không có ảnh và không có mã màu → coi là custom text
+    const inferredNameOnlyCustom =
+      !!assignment?.colorName &&
+      assignment.colorName.trim() !== '' &&
+      assignment.colorName.trim() !== (colorway.name || '').trim() &&
+      !assignment.imageUrl &&
+      !(assignment as any)?.imageDataUri &&
+      !(assignment.pantoneCode && assignment.pantoneCode.trim());
+
+    const isCustomText =
+      !!(assignment && (assignment as any)?.isCustomText) ||
+      inferredLegacyCustom ||
+      inferredNameOnlyCustom;
     
-    // Hiển thị ảnh nếu assignment hoặc colorway có ảnh (kể cả custom text)
+    // Chỉ hiển thị ảnh khi thực sự có URL ảnh (custom image hoặc image của colorway).
+    // Không còn hiển thị ô vuông màu thay thế.
     const thumbUrl = assignment?.imageUrl
       ? getMaterialImageUrl(assignment.imageUrl)
-      : (colorway.imageUrl ? getMaterialImageUrl(colorway.imageUrl) : null);
+      : (!isCustomText && colorway.imageUrl ? getMaterialImageUrl(colorway.imageUrl) : null);
 
     return (
       <button
@@ -508,17 +520,22 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                   alt="color thumbnail"
                   className="w-10 h-10 object-contain border border-gray-200 rounded bg-white"
                 />
-              ) : (
-                <span className="w-8 h-8 rounded border border-gray-200" style={{ backgroundColor: swatchColor }} />
-              )}
+              ) : null}
               <span className="text-xs font-medium text-gray-900 break-all leading-snug">
                 {assignment.colorName || colorway.name || 'Unnamed'}
               </span>
             </div>
-            <div className="mt-1 text-[11px] text-gray-500 text-center break-all">
-              {/* Custom text shows custom code; normal shows colorway code */}
-              {isCustomText ? (assignment.pantoneCode || '—') : (colorway.code || '—')}
-            </div>
+            {(() => {
+              // Custom text: chỉ hiển thị mã khi người dùng nhập, nếu không thì để trống (không hiển thị "--")
+              const displayCode = isCustomText
+                ? (assignment.pantoneCode || '').trim()
+                : (colorway.code || '').trim();
+              return displayCode ? (
+                <div className="mt-1 text-[11px] text-gray-500 text-center break-all">
+                  {displayCode}
+                </div>
+              ) : null;
+            })()}
           </>
         ) : (
           <div className="text-xs font-medium text-center">
@@ -1031,6 +1048,8 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
         ...( { isCustomText: true } as any ),
         // Save custom code
         pantoneCode: customColorCode.trim() || undefined,
+        // IMPORTANT: Do not default to black for custom text when user didn't pick a color
+        hexCode: undefined as any,
         // Allow uploading an image for custom assignment (stored, but UI/PDF can decide whether to show)
         imageUrl: customColorImageUrl.trim() || undefined,
       });
@@ -2237,7 +2256,7 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                         <div>
                           <p className="font-medium text-gray-900">{customColorName}</p>
                           <p className="text-xs text-gray-500">
-                            {customColorCode || colorAssignmentModal.colorway.code}
+                            {customColorCode || ''}
                           </p>
                         </div>
                       </div>

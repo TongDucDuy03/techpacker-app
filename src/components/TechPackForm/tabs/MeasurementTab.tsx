@@ -2347,10 +2347,15 @@ type RoundModalFormState = {
         )}
 
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          {/* Vertical scroll container: ~10 rows visible, header stays sticky while scrolling */}
+          <div className="max-h-[520px] overflow-y-auto">
+          <table className="min-w-full divide-y divide-gray-200 relative">
+            <thead className="bg-gray-50 sticky top-0 z-20">
               <tr>
-                <th scope="col" className="px-4 py-3 w-12">
+                <th
+                  scope="col"
+                  className="px-4 py-3 w-12 sticky left-0 z-30 bg-gray-50"
+                >
                   <button
                     type="button"
                     onClick={(e) => {
@@ -2368,13 +2373,22 @@ type RoundModalFormState = {
                     )}
                   </button>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky bg-gray-50 z-20"
+                  style={{ left: '3rem' }} // giữ cố định cột POM Code sau checkbox
+                >
                   {t('form.measurement.pomCodeColumn')}
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-48">
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-48 sticky bg-gray-50 z-20"
+                  style={{ left: '15rem' }} // giữ cố định cột POM Name
+                >
                   {t('form.measurement.pomNameColumn')}
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky bg-gray-50 z-20"
+                  style={{ left: '27rem' }} // giữ cố định cột Tolerance
+                >
                   {t('form.measurement.toleranceColumn')}
                 </th>
                 {selectedSizes.map(size => {
@@ -2441,7 +2455,7 @@ type RoundModalFormState = {
                       className={`transition-colors duration-150 hover:brightness-95 ${isSelected ? 'bg-blue-50' : ''}`}
                       style={isSelected ? undefined : { backgroundColor: rowBackgroundColor }}
                     >
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 sticky left-0 z-10 bg-white" style={isSelected ? undefined : { backgroundColor: rowBackgroundColor }}>
                         <button
                           type="button"
                           onClick={(e) => {
@@ -2460,8 +2474,11 @@ type RoundModalFormState = {
                         </button>
                       </td>
                       <td
-                        className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0"
-                        style={isSelected ? undefined : { backgroundColor: rowBackgroundColor }}
+                        className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky z-10"
+                        style={{
+                          left: '3rem',
+                          ...(isSelected ? {} : { backgroundColor: rowBackgroundColor }),
+                        }}
                       >
                         <div className="flex items-center">
                           {measurement.pomCode}
@@ -2475,7 +2492,13 @@ type RoundModalFormState = {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-700">
+                      <td
+                        className="px-6 py-4 text-sm text-gray-700 sticky z-10"
+                        style={{
+                          left: '15rem',
+                          ...(isSelected ? {} : { backgroundColor: rowBackgroundColor }),
+                        }}
+                      >
                         <div>
                           <div className="font-medium">{measurement.pomName}</div>
                           {measurement.notes && (
@@ -2483,7 +2506,13 @@ type RoundModalFormState = {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      <td
+                        className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 sticky z-10"
+                        style={{
+                          left: '27rem',
+                          ...(isSelected ? {} : { backgroundColor: rowBackgroundColor }),
+                        }}
+                      >
                         {toleranceDisplay}
                       </td>
                       {selectedSizes.map(size => {
@@ -2538,6 +2567,7 @@ type RoundModalFormState = {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 

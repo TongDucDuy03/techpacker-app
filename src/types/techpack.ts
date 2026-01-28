@@ -169,7 +169,7 @@ export interface Colorway {
   id: string;
   _id?: string;
   name: string;
-  code: string;
+  code?: string;
   placement?: string;
   materialType?: string;
   season?: string;

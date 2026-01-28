@@ -255,13 +255,11 @@ export const colorwayFormValidationSchema: FormValidationConfig = {
     }
   },
   code: {
-    required: true,
-    minLength: 1,
+    required: false,
     maxLength: 50,
     custom: (value: string) => {
-      if (!value || value.trim().length === 0) {
-        return 'Colorways • Colorway Code: Mã phối màu là bắt buộc';
-      }
+      // Optional: only validate when provided
+      if (!value || value.trim().length === 0) return null;
       return null;
     }
   },

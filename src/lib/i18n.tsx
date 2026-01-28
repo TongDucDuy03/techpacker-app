@@ -6,6 +6,8 @@ type TranslationDict = Record<string, string>;
 
 const translations: Record<LanguageCode, TranslationDict> = {
   en: {
+    // Colorways
+    'form.colorway.requiredFields': 'Please fill in required Colorway fields.',
     'nav.dashboard': 'Dashboard',
     'nav.techpacks': 'Tech Packs',
     'nav.measurements': 'Measurements',
@@ -1238,6 +1240,8 @@ const translations: Record<LanguageCode, TranslationDict> = {
     'error.addComment': 'Failed to add comment.',
   },
   vi: {
+    // Colorways
+    'form.colorway.requiredFields': 'Vui lòng nhập đầy đủ các trường bắt buộc của Colorway.',
     'nav.dashboard': 'Bảng điều khiển',
     'nav.techpacks': 'Tech Packs',
     'nav.measurements': 'Kích thước',

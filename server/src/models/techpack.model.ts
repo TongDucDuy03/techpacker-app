@@ -307,7 +307,7 @@ const ColorwayPartSchema = new Schema<IColorwayPart>({
 
 const ColorwaySchema = new Schema<IColorway>({
   name: { type: String, required: true },
-  code: { type: String, required: true },
+  code: { type: String, required: false },
   pantoneCode: { type: String },
   hexColor: { type: String },
   rgbColor: {
