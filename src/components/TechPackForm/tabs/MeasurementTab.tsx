@@ -196,6 +196,28 @@ const sampleRoundQuillFormats = [
   'image',
 ];
 
+// Sticky column layout for Measurements table (desktop)
+// Giống cách tính bên BOM: dùng width cố định (px) + tính left offset từ trái sang phải
+const MEAS_STICKY_COLUMN_WIDTHS = {
+  checkbox: 48,   // ~3rem
+  pomCode: 140,
+  pomName: 260,
+  tolerance: 140,
+};
+
+const MEAS_STICKY_W = [
+  MEAS_STICKY_COLUMN_WIDTHS.checkbox,
+  MEAS_STICKY_COLUMN_WIDTHS.pomCode,
+  MEAS_STICKY_COLUMN_WIDTHS.pomName,
+  MEAS_STICKY_COLUMN_WIDTHS.tolerance,
+];
+
+// left cho: checkbox + 3 cột sticky (POM Code, POM Name, Tolerance)
+const MEAS_STICKY_LEFT = MEAS_STICKY_W.reduce<number[]>((acc, _w, i) => {
+  acc[i] = i === 0 ? 0 : acc[i - 1] + MEAS_STICKY_W[i - 1];
+  return acc;
+}, []);
+
 const MeasurementTab: React.FC = () => {
   const { t } = useI18n();
   const context = useTechPack();
@@ -2354,7 +2376,12 @@ type RoundModalFormState = {
               <tr>
                 <th
                   scope="col"
-                  className="px-4 py-3 w-12 sticky left-0 z-30 bg-gray-50"
+                  className="px-4 py-3 sticky left-0 z-30 bg-gray-50"
+                  style={{
+                    left: `${MEAS_STICKY_LEFT[0]}px`,
+                    width: `${MEAS_STICKY_COLUMN_WIDTHS.checkbox}px`,
+                    minWidth: `${MEAS_STICKY_COLUMN_WIDTHS.checkbox}px`,
+                  }}
                 >
                   <button
                     type="button"
@@ -2375,19 +2402,31 @@ type RoundModalFormState = {
                 </th>
                 <th
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky bg-gray-50 z-20"
-                  style={{ left: '3rem' }} // giữ cố định cột POM Code sau checkbox
+                  style={{
+                    left: `${MEAS_STICKY_LEFT[1]}px`,
+                    width: `${MEAS_STICKY_COLUMN_WIDTHS.pomCode}px`,
+                    minWidth: `${MEAS_STICKY_COLUMN_WIDTHS.pomCode}px`,
+                  }} // giữ cố định cột POM Code sau checkbox
                 >
                   {t('form.measurement.pomCodeColumn')}
                 </th>
                 <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-48 sticky bg-gray-50 z-20"
-                  style={{ left: '15rem' }} // giữ cố định cột POM Name
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky bg-gray-50 z-20"
+                  style={{
+                    left: `${MEAS_STICKY_LEFT[2]}px`,
+                    width: `${MEAS_STICKY_COLUMN_WIDTHS.pomName}px`,
+                    minWidth: `${MEAS_STICKY_COLUMN_WIDTHS.pomName}px`,
+                  }} // giữ cố định cột POM Name
                 >
                   {t('form.measurement.pomNameColumn')}
                 </th>
                 <th
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky bg-gray-50 z-20"
-                  style={{ left: '27rem' }} // giữ cố định cột Tolerance
+                  style={{
+                    left: `${MEAS_STICKY_LEFT[3]}px`,
+                    width: `${MEAS_STICKY_COLUMN_WIDTHS.tolerance}px`,
+                    minWidth: `${MEAS_STICKY_COLUMN_WIDTHS.tolerance}px`,
+                  }} // giữ cố định cột Tolerance
                 >
                   {t('form.measurement.toleranceColumn')}
                 </th>
@@ -2455,7 +2494,15 @@ type RoundModalFormState = {
                       className={`transition-colors duration-150 hover:brightness-95 ${isSelected ? 'bg-blue-50' : ''}`}
                       style={isSelected ? undefined : { backgroundColor: rowBackgroundColor }}
                     >
-                      <td className="px-4 py-4 sticky left-0 z-10 bg-white" style={isSelected ? undefined : { backgroundColor: rowBackgroundColor }}>
+                      <td
+                        className="px-4 py-4 sticky left-0 z-10 bg-white"
+                        style={{
+                          left: `${MEAS_STICKY_LEFT[0]}px`,
+                          width: `${MEAS_STICKY_COLUMN_WIDTHS.checkbox}px`,
+                          minWidth: `${MEAS_STICKY_COLUMN_WIDTHS.checkbox}px`,
+                          ...(isSelected ? {} : { backgroundColor: rowBackgroundColor }),
+                        }}
+                      >
                         <button
                           type="button"
                           onClick={(e) => {
@@ -2476,7 +2523,9 @@ type RoundModalFormState = {
                       <td
                         className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky z-10"
                         style={{
-                          left: '3rem',
+                          left: `${MEAS_STICKY_LEFT[1]}px`,
+                          width: `${MEAS_STICKY_COLUMN_WIDTHS.pomCode}px`,
+                          minWidth: `${MEAS_STICKY_COLUMN_WIDTHS.pomCode}px`,
                           ...(isSelected ? {} : { backgroundColor: rowBackgroundColor }),
                         }}
                       >
@@ -2495,7 +2544,9 @@ type RoundModalFormState = {
                       <td
                         className="px-6 py-4 text-sm text-gray-700 sticky z-10"
                         style={{
-                          left: '15rem',
+                          left: `${MEAS_STICKY_LEFT[2]}px`,
+                          width: `${MEAS_STICKY_COLUMN_WIDTHS.pomName}px`,
+                          minWidth: `${MEAS_STICKY_COLUMN_WIDTHS.pomName}px`,
                           ...(isSelected ? {} : { backgroundColor: rowBackgroundColor }),
                         }}
                       >
@@ -2509,7 +2560,9 @@ type RoundModalFormState = {
                       <td
                         className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 sticky z-10"
                         style={{
-                          left: '27rem',
+                          left: `${MEAS_STICKY_LEFT[3]}px`,
+                          width: `${MEAS_STICKY_COLUMN_WIDTHS.tolerance}px`,
+                          minWidth: `${MEAS_STICKY_COLUMN_WIDTHS.tolerance}px`,
                           ...(isSelected ? {} : { backgroundColor: rowBackgroundColor }),
                         }}
                       >

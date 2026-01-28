@@ -1172,19 +1172,29 @@
         page-break-inside: avoid !important;
       }
 
-      /* Footer styles cho print */
-      .pdf-footer {
-        position: fixed !important;
-        bottom: 0 !important;
+      /* Overall Comments: mỗi ảnh là 1 "page block" cao 191mm giống construction */
+      .notes--overall {
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
       }
 
-      body {
-        margin-bottom: 8mm !important;
-      }
+      .notes--overall img {
+        display: block !important;
 
-      /* Đảm bảo content không đè lên footer */
-      .section:last-of-type {
-        margin-bottom: 9mm;
+        /* Mỗi ảnh coi như 1 trang riêng */
+        page-break-before: always !important;
+        page-break-after: always !important;
+
+        /* A4 landscape usable height (210 - 4 - 15 = 191mm) */
+        width: 100% !important;
+        height: 191mm !important;
+        max-width: none !important;
+        max-height: none !important;
+
+        object-fit: contain !important;
+        margin: 0 !important;
       }
     }
 
@@ -1380,8 +1390,8 @@
 
       /* Khóa chiều cao mỗi trang PACKING theo đúng page box (usable = 191mm) */
       .pp.packing-item {
-        height: 191mm !important;
-        min-height: 191mm !important;
+        height: 250mm !important;
+        min-height: 250mm !important;
         display: flex !important;
         flex-direction: column !important;
         box-sizing: border-box !important;
@@ -2033,7 +2043,7 @@
     </div>
     <% } %>
       <% if (round.overallComments && round.overallComments !=='—' ) { %>
-        <div class="notes" style="margin-top: 5px; page-break-before: avoid !important; page-break-inside: avoid;">
+        <div class="notes notes--overall" style="margin-top: 5px;">
           <strong>OVERALL COMMENTS:</strong>
           <%- round.overallComments %>
         </div>
@@ -2507,7 +2517,7 @@
         // Tìm tất cả ảnh trong construction, notes, nhưng BỎ QUA phần Packing (.pp)
         // vì Packing cần export đúng y như nội dung người dùng nhập (không auto-scale).
         const contentImages = document.querySelectorAll(
-          '.notes img'
+          '.notes:not(.notes--overall) img'
         );
 
          awLog('[Anti-waste] Found', contentImages.length, 'content images to process');
