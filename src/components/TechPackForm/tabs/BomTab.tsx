@@ -531,9 +531,9 @@ const BomTabComponent = forwardRef<BomTabRef>((props, ref) => {
                 ? (assignment.pantoneCode || '').trim()
                 : (colorway.code || '').trim();
               return displayCode ? (
-                <div className="mt-1 text-[11px] text-gray-500 text-center break-all">
+            <div className="mt-1 text-[11px] text-gray-500 text-center break-all">
                   {displayCode}
-                </div>
+            </div>
               ) : null;
             })()}
           </>

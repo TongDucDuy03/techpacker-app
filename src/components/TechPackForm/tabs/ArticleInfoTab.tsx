@@ -80,6 +80,11 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
   // This prevents the issue where deleting "1" causes it to reappear
   const [hasEditedSampleType, setHasEditedSampleType] = useState(false);
   const [localSampleType, setLocalSampleType] = useState('');
+  
+  // ===== FIX: Local state management for retailPrice =====
+  // This allows clearing the field completely (similar to sampleType/version)
+  const [hasEditedRetailPrice, setHasEditedRetailPrice] = useState(false);
+  const [localRetailPrice, setLocalRetailPrice] = useState<string>('');
 
   // Fallback if no techPack is passed
   const safeArticleInfo = articleInfo ?? {
@@ -108,6 +113,17 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
       setLocalSampleType(initialValue);
     }
   }, [safeArticleInfo.sampleType, safeArticleInfo.version, hasEditedSampleType]);
+
+  // Sync local retailPrice from props when user hasn't edited yet
+  useEffect(() => {
+    if (!hasEditedRetailPrice) {
+      const initialValue = safeArticleInfo.retailPrice;
+      // Convert to string, or empty string if undefined/null
+      // Handle both undefined and null as empty (user cleared the field)
+      const stringValue = initialValue !== undefined && initialValue !== null ? String(initialValue) : '';
+      setLocalRetailPrice(stringValue);
+    }
+  }, [safeArticleInfo.retailPrice, hasEditedRetailPrice]);
 
   // Fetch designers on component mount (only for preview display)
   useEffect(() => {
@@ -256,9 +272,19 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
   ];
 
   const handleInputChange = (field: keyof ArticleInfo) => (value: string | number) => {
-    const updatedArticleInfo = { ...safeArticleInfo, [field]: value };
+    // For retailPrice, convert empty string to undefined to allow clearing
+    let processedValue: string | number | undefined = value;
+    if (field === 'retailPrice') {
+      if (value === '' || value === null || value === undefined || value === '-') {
+        processedValue = undefined;
+      } else if (typeof value === 'string') {
+        const numValue = parseFloat(value);
+        processedValue = Number.isNaN(numValue) ? undefined : numValue;
+      }
+    }
+    const updatedArticleInfo = { ...safeArticleInfo, [field]: processedValue };
     onUpdate?.({ articleInfo: updatedArticleInfo });
-    validation.validateField(field, value);
+    validation.validateField(field, processedValue);
   };
 
   const handleSeasonChange = (value: string | number) => {
@@ -946,10 +972,49 @@ const ArticleInfoTab = forwardRef<ArticleInfoTabRef>((props: ArticleInfoTabProps
                       error={validation.getFieldProps('currency').error}
                       helperText={validation.getFieldProps('currency').helperText}
                     />
+                    {/* ===== FIXED: Retail Price Field (similar to sampleType/version) ===== */}
                     <Input
                       label={t('form.articleInfo.retailPrice')}
-                      value={safeArticleInfo.retailPrice || ''}
-                      onChange={handleInputChange('retailPrice')}
+                      value={localRetailPrice}
+                      onChange={(value) => {
+                        // Mark as edited to prevent fallback
+                        setHasEditedRetailPrice(true);
+                        
+                        // Allow empty string
+                        const newValue = value === null || value === undefined ? '' : String(value);
+                        setLocalRetailPrice(newValue);
+                        
+                        // Convert to number or null for parent update
+                        // Use null instead of undefined so it gets serialized in JSON and backend can detect it
+                        let processedValue: number | null | undefined;
+                        const trimmed = newValue.trim();
+                        if (trimmed === '' || trimmed === '-' || trimmed === '.') {
+                          // Empty or invalid input -> set to null to clear the field (null will be serialized in JSON)
+                          processedValue = null;
+                        } else {
+                          const numValue = parseFloat(trimmed.replace(',', '.'));
+                          if (Number.isNaN(numValue)) {
+                            processedValue = null;
+                          } else {
+                            // Allow 0 as a valid value (user might want to set price to 0)
+                            processedValue = numValue;
+                          }
+                        }
+                        
+                        // Update parent immediately
+                        const updatedArticleInfo = { ...safeArticleInfo, retailPrice: processedValue };
+                        onUpdate?.({ articleInfo: updatedArticleInfo });
+                        validation.validateField('retailPrice', processedValue);
+                      }}
+                      onBlur={() => {
+                        validation.setFieldTouched('retailPrice');
+                        // On blur, if the field is completely empty, ensure it's set to null (so it gets serialized)
+                        if (localRetailPrice.trim() === '' || localRetailPrice === '-' || localRetailPrice === '.') {
+                          const updatedArticleInfo = { ...safeArticleInfo, retailPrice: null };
+                          onUpdate?.({ articleInfo: updatedArticleInfo });
+                          validation.validateField('retailPrice', null);
+                        }
+                      }}
                       onBlur={() => validation.setFieldTouched('retailPrice')}
                       type="number"
                       min={0}

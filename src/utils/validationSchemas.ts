@@ -86,7 +86,26 @@ export const articleInfoValidationSchema: FormValidationConfig = {
       return null;
     }
   },
-  notes: { maxLength: 500 }
+  notes: { maxLength: 500 },
+  retailPrice: {
+    required: false,
+    min: 0,
+    custom: (value: number | string | undefined) => {
+      // Allow empty/undefined/null values (optional field)
+      if (value === null || value === undefined || value === '' || value === '-') {
+        return null;
+      }
+      // If value is provided, validate it's a valid number >= 0
+      const numValue = typeof value === 'string' ? parseFloat(value) : value;
+      if (Number.isNaN(numValue)) {
+        return 'Retail price must be a valid number';
+      }
+      if (numValue < 0) {
+        return 'Retail price cannot be negative';
+      }
+      return null;
+    }
+  }
 };
 
 export const bomItemValidationSchema: FormValidationConfig = {

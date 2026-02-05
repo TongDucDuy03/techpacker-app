@@ -959,7 +959,7 @@ const mapApiTechPackToFormState = (apiTechPack: ApiTechPack): Partial<ApiTechPac
       status: (apiTechPack as any).status || (apiTechPack as any).articleInfo?.status || 'Draft',
       category: resolvedProductClass,
       currency: (apiTechPack as any).currency || 'USD',
-      retailPrice: (apiTechPack as any).retailPrice || undefined,
+      retailPrice: (apiTechPack as any).retailPrice !== undefined && (apiTechPack as any).retailPrice !== null ? (apiTechPack as any).retailPrice : undefined,
       createdDate: (apiTechPack as any).createdAt,
       lastModified: (apiTechPack as any).updatedAt,
       createdAt: (apiTechPack as any).createdAt,
@@ -1794,7 +1794,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
           description: techpackData.articleInfo.notes,
           notes: techpackData.articleInfo.notes,
           brand: techpackData.articleInfo.brand,
-          retailPrice: techpackData.articleInfo.retailPrice || undefined, // ✅ FIXED: Get from articleInfo, not root level
+          retailPrice: techpackData.articleInfo.retailPrice !== undefined && techpackData.articleInfo.retailPrice !== null ? techpackData.articleInfo.retailPrice : undefined, // ✅ FIXED: Get from articleInfo, not root level
           currency: techpackData.articleInfo.currency || 'USD', // ✅ FIXED: Get from articleInfo, not root level
           bom: (techpackData.bom || []).map((item: any) => {
             const mapped: any = {
@@ -1946,7 +1946,7 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
             targetMarket: (techpackData.articleInfo as any).targetMarket,
             pricePoint: (techpackData.articleInfo as any).pricePoint,
             currency: techpackData.articleInfo.currency || 'USD', // ✅ FIXED: Add currency to create payload
-            retailPrice: techpackData.articleInfo.retailPrice || undefined, // ✅ FIXED: Add retailPrice to create payload
+            retailPrice: techpackData.articleInfo.retailPrice !== undefined && techpackData.articleInfo.retailPrice !== null ? techpackData.articleInfo.retailPrice : undefined, // ✅ FIXED: Add retailPrice to create payload
             notes: techpackData.articleInfo.notes,
           },
           bom: (techpackData.bom || []).map((item: any) => {
@@ -2761,10 +2761,10 @@ export const TechPackProvider = ({ children }: { children: ReactNode }) => {
             '#f3f4f6'
           )
           : (
-            partData.hexCode ||
-            existingPart?.hexCode ||
-            linkedBom?.colorCode ||
-            colorway.hexColor ||
+          partData.hexCode ||
+          existingPart?.hexCode ||
+          linkedBom?.colorCode ||
+          colorway.hexColor ||
             '#f3f4f6'
           );
 

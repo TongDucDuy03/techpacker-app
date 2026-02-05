@@ -1097,6 +1097,19 @@ export class TechPackController {
         if (articleInfo.pricePoint !== undefined) {
           updateData.pricePoint = articleInfo.pricePoint;
         }
+        // Handle retailPrice: explicitly check for null (which means user wants to clear the field)
+        // null will be serialized in JSON, undefined won't, so we check for null explicitly
+        if (articleInfo.retailPrice === null) {
+          // User wants to clear the field -> set to null, will be handled by $unset later
+          updateData.retailPrice = null;
+        } else if (articleInfo.retailPrice !== undefined) {
+          // Valid number value -> set it
+          updateData.retailPrice = articleInfo.retailPrice;
+        }
+        // If retailPrice is undefined, don't include it in updateData (field not being updated)
+        if (articleInfo.currency !== undefined) {
+          updateData.currency = articleInfo.currency;
+        }
         if (articleInfo.notes !== undefined) {
           updateData.notes = articleInfo.notes;
         }
@@ -1249,8 +1262,19 @@ export class TechPackController {
       // Keep a snapshot of the old techpack for revision comparison
       const oldTechPack = techpack.toObject({ virtuals: true }) as ITechPack;
 
+      // Handle retailPrice: if it's null/undefined, we need to unset it
+      const shouldUnsetRetailPrice = updateData.retailPrice === null || updateData.retailPrice === undefined;
+      if (shouldUnsetRetailPrice) {
+        delete updateData.retailPrice; // Remove from updateData so it's not set
+      }
+
       // Apply user's updates to the in-memory document
       Object.assign(techpack, updateData);
+      
+      // If retailPrice should be unset, remove it from the document
+      if (shouldUnsetRetailPrice) {
+        (techpack as any).retailPrice = undefined;
+      }
       
       // Mark array fields as modified to ensure Mongoose saves them correctly
       arrayFields.forEach(field => {
@@ -1270,6 +1294,15 @@ export class TechPackController {
       }
 
       // Save the TechPack document once, with both user updates and the new version
+      // If retailPrice should be unset, use updateOne with $unset and ensure it's not saved back
+      if (shouldUnsetRetailPrice) {
+        // Unset the field in the database
+        await TechPack.updateOne({ _id: techpack._id }, { $unset: { retailPrice: 1 } });
+        // Unmark the field so it won't be saved back with the old value
+        techpack.unmarkModified('retailPrice');
+        // Explicitly set to undefined to ensure it's not included in save
+        (techpack as any).retailPrice = undefined;
+      }
       const updatedTechPack = await techpack.save();
 
       // Populate sharedWith before returning to ensure frontend has access control data
