@@ -50,12 +50,12 @@ class PDFService {
   private readonly maxConcurrent: number = 2;
   private activeGenerations: number = 0;
   private currentLanguage: PDFLanguage = 'en';
-  
+
   // Export locks per techpackId to prevent concurrent exports
   // Auto-release locks older than 5 minutes to prevent stuck locks
   private exportLocks: Map<string, { requestId: string; startTime: number }> = new Map();
   private readonly LOCK_TIMEOUT = 5 * 60 * 1000; // 5 minutes
-  
+
   // Optimized timeout configurations (in milliseconds)
   private readonly BROWSER_LAUNCH_TIMEOUT = parseInt(process.env.PDF_BROWSER_LAUNCH_TIMEOUT || '300000', 10); // 5 minutes
   private readonly PAGE_SET_CONTENT_TIMEOUT = parseInt(process.env.PDF_PAGE_SET_CONTENT_TIMEOUT || '600000', 10); // 10 minutes
@@ -73,7 +73,7 @@ class PDFService {
       path.join(__dirname, '../templates'),
       path.join(__dirname, '../../src/templates'),
     ];
-    
+
     const fs = require('fs');
     this.templateDir = possiblePaths.find(p => fs.existsSync(p)) || possiblePaths[0];
   }
@@ -161,8 +161,8 @@ class PDFService {
     if (!text) return '—';
     const str = String(text);
     return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|\r\n|\r|\n/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim() || '—';
+      .replace(/\s+/g, ' ')
+      .trim() || '—';
   }
 
   /**
@@ -171,7 +171,7 @@ class PDFService {
    * With timeout protection
    */
   private async prepareImageUrlCompressed(
-    url?: string, 
+    url?: string,
     placeholder?: string,
     options?: { quality?: number; maxWidth?: number; maxHeight?: number }
   ): Promise<string> {
@@ -186,7 +186,7 @@ class PDFService {
     }
 
     const trimmedUrl = url.trim();
-    
+
     // If already a data URI, try to compress it
     if (trimmedUrl.startsWith('data:image/')) {
       try {
@@ -211,7 +211,7 @@ class PDFService {
     } else {
       const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       const serverUrl = process.env.SERVER_URL || `http://localhost:${process.env.PORT || 4001}`;
-      
+
       if (trimmedUrl.startsWith('/uploads/') || trimmedUrl.startsWith('/api/uploads/')) {
         resolvedUrl = `${serverUrl}${trimmedUrl}`;
       } else if (trimmedUrl.startsWith('/static/')) {
@@ -400,13 +400,13 @@ class PDFService {
    * Optimized BOM data preparation with image compression
    */
   private async prepareBOMDataOptimized(
-    bom: IBOMItem[], 
+    bom: IBOMItem[],
     currency: string,
     techpackColorways: any[] = [],
     imageOptions?: { quality?: number; maxWidth?: number; maxHeight?: number }
   ): Promise<any[]> {
     if (!bom || bom.length === 0) return [];
-    
+
     pdfLog(`📋 Processing ${bom.length} BOM items...`);
     const bomByPart: { [key: string]: any[] } = {};
 
@@ -429,11 +429,11 @@ class PDFService {
         }
       }
     }
-    
+
     // Collect all image URLs for batch compression
     const imageUrls: string[] = [];
     const imageIndices: number[] = [];
-    
+
     for (let i = 0; i < bom.length; i++) {
       const item = bom[i];
       if (item.imageUrl) {
@@ -441,7 +441,7 @@ class PDFService {
         imageIndices.push(i);
       }
     }
-    
+
     // Compress all images in parallel with timeout
     pdfLog(`🖼️  Compressing ${imageUrls.length} BOM images...`);
     const compressedImages = await compressImagesBatch(imageUrls, {
@@ -449,20 +449,20 @@ class PDFService {
       maxWidth: imageOptions?.maxWidth || 800, // Smaller for thumbnails
       maxHeight: imageOptions?.maxHeight || 600,
     }, this.MAX_IMAGES_PARALLEL, this.IMAGE_COMPRESSION_TIMEOUT);
-    
+
     // Create a map of original URL to compressed data URI
     const imageMap = new Map<string, string>();
     imageIndices.forEach((_idx, i) => {
       imageMap.set(imageUrls[i], compressedImages[i]);
     });
-    
+
     for (const item of bom) {
       const partName = this.normalizeText(item.part) || 'Unassigned';
-      
+
       if (!bomByPart[partName]) {
         bomByPart[partName] = [];
       }
-      
+
       const bomItemId = (item as any)?.id ? String((item as any).id) : ((item as any)?._id ? String((item as any)._id) : '');
       const assignedCodesSet = bomItemId ? bomItemIdToColorwayCodes.get(bomItemId) : undefined;
       const assignedColorCode =
@@ -500,7 +500,7 @@ class PDFService {
           try {
             imageUrl = await Promise.race([
               this.prepareImageUrlCompressed(item.imageUrl, this.getPlaceholderSVG(64, 64), imageOptions),
-              new Promise<string>((resolve) => 
+              new Promise<string>((resolve) =>
                 setTimeout(() => resolve(this.getPlaceholderSVG(64, 64)), this.IMAGE_COMPRESSION_TIMEOUT)
               ),
             ]);
@@ -568,7 +568,7 @@ class PDFService {
     pdfLog('📏 Processing measurements...');
     const sizeRange = techpack.measurementSizeRange || ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
     const baseSize = techpack.measurementBaseSize || sizeRange[0] || 'M';
-    
+
     const rows = (techpack.measurements || []).map((measurement: IMeasurement) => {
       const unit = (techpack.measurementUnit as string) || (measurement.unit as string) || 'cm';
       const row: any = {
@@ -648,7 +648,7 @@ class PDFService {
     pdfLog('🔬 Processing sample rounds...');
     const sizeRange = techpack.measurementSizeRange || ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
     const unit = (techpack.measurementUnit as string) || 'cm';
-    
+
     const measurementMap = new Map<string, IMeasurement>();
     (techpack.measurements || []).forEach((m: IMeasurement) => {
       measurementMap.set(m.pomCode, m);
@@ -716,10 +716,10 @@ class PDFService {
   ): Promise<any[]> {
     pdfLog('📐 Processing how to measure...');
     const items = techpack.howToMeasure || [];
-    
+
     // Collect image URLs
     const imageUrls = items.map((item: IHowToMeasure) => item.imageUrl).filter(Boolean);
-    
+
     // Compress images in batch with timeout
     if (imageUrls.length > 0) {
       pdfLog(`🖼️  Compressing ${imageUrls.length} how-to-measure images...`);
@@ -728,18 +728,18 @@ class PDFService {
         maxWidth: imageOptions?.maxWidth || 1000,
         maxHeight: imageOptions?.maxHeight || 700,
       }, this.MAX_IMAGES_PARALLEL, this.IMAGE_COMPRESSION_TIMEOUT);
-      
+
       const imageMap = new Map<string, string>();
       imageUrls.forEach((url: string, i: number) => {
         imageMap.set(url, compressedImages[i]);
       });
-      
+
       return items.map((item: IHowToMeasure) => ({
         stepNumber: item.stepNumber || 0,
         pomCode: item.pomCode || '—',
         pomName: item.pomName || '—',
         description: item.description || '—',
-        imageUrl: item.imageUrl 
+        imageUrl: item.imageUrl
           ? (imageMap.get(item.imageUrl) || this.getPlaceholderSVG())
           : this.getPlaceholderSVG(),
         steps: item.instructions || [],
@@ -749,7 +749,7 @@ class PDFService {
         note: (item as any).note || '',
       }));
     }
-    
+
     return items.map((item: IHowToMeasure) => ({
       stepNumber: item.stepNumber || 0,
       pomCode: item.pomCode || '—',
@@ -773,11 +773,11 @@ class PDFService {
   ): Promise<any[]> {
     pdfLog('🎨 Processing colorways...');
     const colorways = techpack.colorways || [];
-    
+
     // Collect all image URLs (colorway images + part images)
     const imageUrls: string[] = [];
     const urlToIndex: Map<string, { type: 'colorway' | 'part'; colorwayIdx: number; partIdx?: number }> = new Map();
-    
+
     colorways.forEach((colorway: IColorway, cIdx: number) => {
       if (colorway.imageUrl) {
         imageUrls.push(colorway.imageUrl);
@@ -790,7 +790,7 @@ class PDFService {
         }
       });
     });
-    
+
     // Compress all images with timeout
     if (imageUrls.length > 0) {
       pdfLog(`🖼️  Compressing ${imageUrls.length} colorway images...`);
@@ -799,12 +799,12 @@ class PDFService {
         maxWidth: imageOptions?.maxWidth || 1000,
         maxHeight: imageOptions?.maxHeight || 700,
       }, this.MAX_IMAGES_PARALLEL, this.IMAGE_COMPRESSION_TIMEOUT);
-      
+
       const imageMap = new Map<string, string>();
       imageUrls.forEach((url, i) => {
         imageMap.set(url, compressedImages[i]);
       });
-      
+
       return colorways.map((colorway: IColorway) => ({
         name: colorway.name || '—',
         // Keep empty code as empty so templates can still render the column (header can fall back to name).
@@ -819,7 +819,7 @@ class PDFService {
         season: colorway.season || techpack.season || '—',
         collectionName: colorway.collectionName || techpack.collectionName || '—',
         notes: colorway.notes || '—',
-        imageUrl: colorway.imageUrl 
+        imageUrl: colorway.imageUrl
           ? (imageMap.get(colorway.imageUrl) || this.getPlaceholderSVG())
           : this.getPlaceholderSVG(),
         parts: (colorway.parts || []).map((part: IColorwayPart) => ({
@@ -829,10 +829,10 @@ class PDFService {
           pantoneCode: part.pantoneCode || '—',
           hexCode: part.hexCode || '—',
           rgbCode: part.rgbCode || '—',
-          imageUrl: part.imageUrl 
+          imageUrl: part.imageUrl
             ? (imageMap.get(part.imageUrl) || this.getPlaceholderSVG())
             : this.getPlaceholderSVG(),
-          image: part.imageUrl 
+          image: part.imageUrl
             ? (imageMap.get(part.imageUrl) || this.getPlaceholderSVG())
             : this.getPlaceholderSVG(), // Add 'image' field for template compatibility
           supplier: part.supplier || '—',
@@ -840,7 +840,7 @@ class PDFService {
         })),
       }));
     }
-    
+
     return colorways.map((colorway: IColorway) => ({
       name: colorway.name || '—',
       // Keep empty code as empty so templates can still render the column (header can fall back to name).
@@ -876,10 +876,10 @@ class PDFService {
    */
   private async fetchRevisionHistoryAsync(techPackId: any): Promise<any[]> {
     const timeoutMs = 5000;
-    
+
     try {
       const Revision = (await import('../models/revision.model')).default;
-      
+
       const queryPromise = Revision.find({ techPackId })
         .select('version createdBy createdByName createdAt description changes statusAtChange')
         .populate('createdBy', 'firstName lastName')
@@ -888,19 +888,19 @@ class PDFService {
         .maxTimeMS(4000)
         .lean()
         .exec();
-      
+
       const revisions = await Promise.race([
         queryPromise,
-        new Promise<never>((_, reject) => 
+        new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('Revision query timeout')), timeoutMs)
         )
       ]);
-      
+
       return revisions.map((rev: any) => ({
         version: rev.version || '—',
-        modifiedBy: rev.createdByName || 
-          (rev.createdBy?.firstName && rev.createdBy?.lastName 
-            ? `${rev.createdBy.firstName} ${rev.createdBy.lastName}` 
+        modifiedBy: rev.createdByName ||
+          (rev.createdBy?.firstName && rev.createdBy?.lastName
+            ? `${rev.createdBy.firstName} ${rev.createdBy.lastName}`
             : '—'),
         modifiedAt: this.formatDate(rev.createdAt),
         description: rev.description || (rev.changes?.summary) || '—',
@@ -927,14 +927,14 @@ class PDFService {
     const imageQuality = imageOptions?.quality || 65;
     const imageMaxWidth = imageOptions?.maxWidth || 1200;
     const imageMaxHeight = imageOptions?.maxHeight || 800;
-    
+
     // technicalDesignerId is now stored as free-text (name) instead of populated user
-    const technicalDesignerName = 
+    const technicalDesignerName =
       typeof techpack.technicalDesignerId === 'string'
         ? (techpack.technicalDesignerId || '—')
         : ((techpack.technicalDesignerId as any)?.firstName &&
-      (techpack.technicalDesignerId as any)?.lastName
-        ? `${(techpack.technicalDesignerId as any).firstName} ${(techpack.technicalDesignerId as any).lastName}`
+          (techpack.technicalDesignerId as any)?.lastName
+          ? `${(techpack.technicalDesignerId as any).firstName} ${(techpack.technicalDesignerId as any).lastName}`
           : '—');
 
     const articleSummary = {
@@ -963,7 +963,7 @@ class PDFService {
       },
       fabricAndComposition: {
         fabricDescription: techpack.fabricDescription || '—',
-        materialInfo: techpack.bom?.find((item: IBOMItem) => 
+        materialInfo: techpack.bom?.find((item: IBOMItem) =>
           item.part?.toLowerCase().includes('main') || item.part?.toLowerCase().includes('fabric')
         )?.materialComposition || '—',
       },
@@ -1004,7 +1004,7 @@ class PDFService {
 
     pdfLog('🚀 Processing data in parallel with image compression...');
     const parallelStart = Date.now();
-    
+
     const [bomParts, measurementData, sampleRounds, howToMeasures, colorways] = await Promise.all([
       this.prepareBOMDataOptimized(techpack.bom || [], currency, techpack.colorways || [], {
         quality: imageQuality,
@@ -1024,12 +1024,12 @@ class PDFService {
         maxHeight: imageMaxHeight,
       }),
     ]);
-    
+
     pdfLog(`✅ Parallel processing completed in ${Date.now() - parallelStart}ms`);
 
     const uniqueSuppliers = new Set<string>();
     let approvedCount = 0;
-    
+
     bomParts.forEach((part: any) => {
       part.items.forEach((item: any) => {
         if (item.supplier && item.supplier !== '—') {
@@ -1090,7 +1090,7 @@ class PDFService {
         pricePoint: translatedPricePoint || techpack.pricePoint || '—',
         retailPrice: techpack.retailPrice,
         currency: currency,
-        description: techpack.description || techpack.productDescription || '—',
+        description: techpack.productDescription || '—',
         designer: technicalDesignerName,
         technicalDesignerId: technicalDesignerName, // Add technicalDesignerId to meta for footer template
         companyLogo: compressedLogo, // Add companyLogo to meta for header template
@@ -1144,7 +1144,7 @@ class PDFService {
         return new Promise<void>((resolve) => {
           try {
             const images = Array.from(document.images).filter(img => !img.complete);
-            
+
             if (images.length === 0) {
               resolve();
               return;
@@ -1219,7 +1219,7 @@ class PDFService {
     // Generate unique request ID for tracking
     const requestId = `pdf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const techpackId = (techpack._id || techpack.id)?.toString() || 'unknown';
-    
+
     // Clean up stale locks (older than LOCK_TIMEOUT)
     const now = Date.now();
     for (const [id, lock] of this.exportLocks.entries()) {
@@ -1228,7 +1228,7 @@ class PDFService {
         this.exportLocks.delete(id);
       }
     }
-    
+
     // Check and set lock for this techpack
     if (this.exportLocks.has(techpackId)) {
       const existingLock = this.exportLocks.get(techpackId)!;
@@ -1256,14 +1256,14 @@ class PDFService {
         measurements: techpack.measurements?.length || 0,
         sampleRounds: techpack.sampleMeasurementRounds?.length || 0,
       });
-      
+
       const browser = await this.getBrowser();
-      
+
       // Check browser is still connected
       if (!browser.isConnected()) {
         throw new Error(`Browser is not connected [${requestId}]`);
       }
-      
+
       // ✅ REQUIREMENT 1: Create isolated incognito context for each export
       try {
         context = await browser.createIncognitoBrowserContext();
@@ -1271,12 +1271,12 @@ class PDFService {
       } catch (error: any) {
         throw new Error(`Failed to create incognito context [${requestId}]: ${error.message}`);
       }
-      
+
       // Check context is valid
       if (!context) {
         throw new Error(`Context creation returned null [${requestId}]`);
       }
-      
+
       // ✅ REQUIREMENT 1: Create fresh page in isolated context
       let pageId: string = 'unknown';
       try {
@@ -1295,52 +1295,52 @@ class PDFService {
         }
         throw new Error(`Failed to create page in context [${requestId}]: ${error.message}`);
       }
-      
+
       // Set up event listeners for debugging
       // Capture pageId in closure for event listeners
       const capturedPageId = pageId;
       page.on('close', () => {
         pdfLog(`⚠️  Page closed event [${requestId}] [pageId: ${capturedPageId}]`);
       });
-      
+
       page.on('framedetached', (frame) => {
         console.error(`❌ Frame detached event [${requestId}] [pageId: ${capturedPageId}] [frame: ${frame.url()}]`);
       });
-      
+
       // ✅ Add page error handlers for crash detection
       page.on('error', (err) => {
         console.error(`❌ Page crashed [${requestId}] [pageId: ${capturedPageId}]:`, err);
       });
-      
+
       page.on('pageerror', (err) => {
         console.error(`❌ Page runtime error [${requestId}] [pageId: ${capturedPageId}]:`, err);
       });
-      
+
       // ❌ BỎ: browser.on('disconnected') - đã đưa lên getBrowser() để tránh leak listener
-      
+
       // Set timeouts for page operations
       page.setDefaultTimeout(this.PAGE_SET_CONTENT_TIMEOUT);
       page.setDefaultNavigationTimeout(this.PAGE_SET_CONTENT_TIMEOUT);
-      
+
       // ✅ REQUIREMENT 3: Navigate to blank page first (no waitForNavigation after setContent)
       pdfLog(`🔄 Navigating to blank page [${requestId}]`);
       if (page.isClosed()) {
         throw new Error(`Page already closed before navigation [${requestId}]`);
       }
-      
-      await page.goto('about:blank', { 
-        waitUntil: 'domcontentloaded', 
-        timeout: 10000 
+
+      await page.goto('about:blank', {
+        waitUntil: 'domcontentloaded',
+        timeout: 10000
       });
-      
+
       // Wait a bit to ensure page is fully ready
       await new Promise(resolve => setTimeout(resolve, 300));
-      
+
       // ✅ REQUIREMENT 2: Check page state before operations
       if (page.isClosed()) {
         throw new Error(`Page was closed after navigation [${requestId}]`);
       }
-      
+
       await page.setViewport({ width: 1920, height: 1080 });
 
       // Get image compression options from PDF options
@@ -1358,7 +1358,7 @@ class PDFService {
         this.prepareTechPackDataAsync(techpack, imageOptions, language),
         this.fetchRevisionHistoryAsync(techpack._id)
       ]);
-      
+
       templateData.revisionHistory = revisionHistory;
       const translations = getPDFTranslations(language);
       templateData.translations = translations;
@@ -1369,7 +1369,7 @@ class PDFService {
       pdfLog('📄 Loading template...');
       const templatePath = path.join(this.templateDir, 'techpack-full-template.ejs');
       let templateContent: string;
-      
+
       if (this.templateCache.has(templatePath)) {
         templateContent = this.templateCache.get(templatePath)!;
       } else {
@@ -1389,12 +1389,12 @@ class PDFService {
       // Load content
       pdfLog(`📥 Loading content into page [${requestId}]`);
       const contentStart = Date.now();
-      
+
       // ✅ REQUIREMENT 2: Check page state before setContent
       if (page.isClosed()) {
         throw new Error(`Page was closed before setContent [${requestId}]`);
       }
-      
+
       // ✅ REQUIREMENT 3: Use domcontentloaded (not networkidle0) - networkidle0 hay gây treo/dao động với nhiều ảnh
       // Images sẽ được đợi riêng bằng waitForImagesOptimized()
       await page.setContent(html, {
@@ -1406,12 +1406,12 @@ class PDFService {
       // Wait for layout to settle and ensure page is stable
       pdfLog(`⏳ Waiting for layout to settle [${requestId}]`);
       await new Promise(resolve => setTimeout(resolve, 1500)); // Increased wait time
-      
+
       // ✅ REQUIREMENT 2: Check if page is still available
       if (page.isClosed()) {
         throw new Error(`Page was closed unexpectedly after setContent [${requestId}]`);
       }
-      
+
       // Additional check: wait for page to be fully ready
       try {
         await page.evaluate(() => {
@@ -1424,68 +1424,68 @@ class PDFService {
         }
         // Other errors are OK, continue
       }
-      
+
       // Load images
       pdfLog('🖼️  Loading images (with timeout)...');
       const imageStart = Date.now();
       await this.waitForImagesOptimized(page);
-      
+
       // Check again before additional optimization
       if (page.isClosed()) {
         throw new Error('Page was closed during image loading');
       }
-      
+
       // Additional image optimization: compress any remaining large images
       pdfLog('🔧 Optimizing images in page...');
       try {
         await page.evaluate((maxWidth: number, maxHeight: number) => {
-        const images = Array.from(document.querySelectorAll('img')) as HTMLImageElement[];
-        images.forEach((img) => {
-          // Skip if already a data URI (already compressed)
-          if (img.src.startsWith('data:image/')) {
-            return;
-          }
-          
-          // Create canvas to compress image
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return;
-          
-          const originalWidth = img.naturalWidth || img.width;
-          const originalHeight = img.naturalHeight || img.height;
-          
-          // Calculate new dimensions
-          let newWidth = originalWidth;
-          let newHeight = originalHeight;
-          
-          if (originalWidth > maxWidth || originalHeight > maxHeight) {
-            const ratio = Math.min(maxWidth / originalWidth, maxHeight / originalHeight);
-            newWidth = originalWidth * ratio;
-            newHeight = originalHeight * ratio;
-          }
-          
-          // Only compress if size reduction is significant
-          if (newWidth < originalWidth * 0.9 || newHeight < originalHeight * 0.9) {
-            canvas.width = newWidth;
-            canvas.height = newHeight;
-            
-            // Draw and compress
-            ctx.drawImage(img, 0, 0, newWidth, newHeight);
-            try {
-              const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.65);
-              img.src = compressedDataUrl;
-            } catch (e) {
-              // If compression fails, keep original
-              pdfWarn('Image compression failed:', e);
+          const images = Array.from(document.querySelectorAll('img')) as HTMLImageElement[];
+          images.forEach((img) => {
+            // Skip if already a data URI (already compressed)
+            if (img.src.startsWith('data:image/')) {
+              return;
             }
-          }
-        });
-      }, imageOptions.maxWidth, imageOptions.maxHeight);
+
+            // Create canvas to compress image
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            const originalWidth = img.naturalWidth || img.width;
+            const originalHeight = img.naturalHeight || img.height;
+
+            // Calculate new dimensions
+            let newWidth = originalWidth;
+            let newHeight = originalHeight;
+
+            if (originalWidth > maxWidth || originalHeight > maxHeight) {
+              const ratio = Math.min(maxWidth / originalWidth, maxHeight / originalHeight);
+              newWidth = originalWidth * ratio;
+              newHeight = originalHeight * ratio;
+            }
+
+            // Only compress if size reduction is significant
+            if (newWidth < originalWidth * 0.9 || newHeight < originalHeight * 0.9) {
+              canvas.width = newWidth;
+              canvas.height = newHeight;
+
+              // Draw and compress
+              ctx.drawImage(img, 0, 0, newWidth, newHeight);
+              try {
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.65);
+                img.src = compressedDataUrl;
+              } catch (e) {
+                // If compression fails, keep original
+                pdfWarn('Image compression failed:', e);
+              }
+            }
+          });
+        }, imageOptions.maxWidth, imageOptions.maxHeight);
       } catch (error: any) {
         // If page.evaluate fails, continue anyway - images are already compressed
         pdfWarn('Page image optimization failed (continuing):', error.message || error);
       }
-      
+
       pdfLog(`✅ Images processed in ${Date.now() - imageStart}ms`);
 
       // Run anti-waste script to scale images and prevent page breaks
@@ -1500,10 +1500,10 @@ class PDFService {
             pdfWarn('[Anti-waste] processAntiWasteImages function not found');
           }
         });
-        
+
         // Wait a bit for the script to process images
         await page.waitForTimeout(500);
-        
+
         // Run again to ensure all images are processed
         await page.evaluate(() => {
           const win = window as any;
@@ -1511,7 +1511,7 @@ class PDFService {
             win.processAntiWasteImages();
           }
         });
-        
+
         pdfLog('✅ Anti-waste script executed');
       } catch (error: any) {
         pdfWarn('Anti-waste script execution failed (continuing):', error.message || error);
@@ -1534,7 +1534,7 @@ class PDFService {
         displayHeaderFooter: options.displayHeaderFooter !== false,
         preferCSSPageSize: true,
       };
-      
+
       pdfLog('📋 PDF Options initialized:', {
         displayHeaderFooter: pdfOptions.displayHeaderFooter,
         margin: pdfOptions.margin,
@@ -1550,23 +1550,23 @@ class PDFService {
           if (page.isClosed()) {
             throw new Error('Page was closed before getting footer template');
           }
-          
+
           // Get footer template
           const footerTemplate = await this.getFooterTemplate(templateData);
-          
+
           // Đảm bảo footer template không rỗng và có pageNumber/totalPages
           if (!footerTemplate || footerTemplate.trim().length === 0) {
             throw new Error('Footer template is empty');
           }
-          
+
           if (!footerTemplate.includes('pageNumber') || !footerTemplate.includes('totalPages')) {
             pdfWarn('⚠️  Footer template missing pageNumber or totalPages - Puppeteer may not render page numbers');
           }
-          
+
           // Set footer template vào pdfOptions
           pdfOptions.footerTemplate = footerTemplate;
           pdfOptions.displayHeaderFooter = true;
-          
+
           pdfLog('✅ Footer template loaded, length:', footerTemplate.length);
           pdfLog('📋 Footer template preview (first 200 chars):', footerTemplate.substring(0, 200));
           pdfLog('📋 Footer template has pageNumber:', footerTemplate.includes('pageNumber'));
@@ -1611,7 +1611,7 @@ class PDFService {
         format: pdfOptions.format,
         orientation: pdfOptions.orientation,
       });
-      
+
       pdfLog(`📄 Generating PDF [${requestId}]`);
       const pdfBuffer = await page.pdf(pdfOptions);
       pdfLog(`✅ PDF generated in ${Date.now() - pdfStart}ms [${requestId}]`);
@@ -1648,7 +1648,7 @@ class PDFService {
       console.error('📋 Page closed:', page?.isClosed() || 'N/A');
       console.error('📋 Context exists:', context ? 'Yes' : 'No');
       console.error('═══════════════════════════════════════════════════════');
-      
+
       throw new Error(`Failed to generate PDF: ${error.message}`);
     } finally {
       // ✅ REQUIREMENT 2: Cleanup an toàn - chỉ đóng trong finally
@@ -1665,7 +1665,7 @@ class PDFService {
         }
       }
       page = null;
-      
+
       // Close context (incognito browser context)
       if (context) {
         try {
@@ -1676,13 +1676,13 @@ class PDFService {
         }
       }
       context = null;
-      
+
       // ✅ REQUIREMENT 2: Always remove lock in finally, even if error occurs early
       if (this.exportLocks.has(techpackId)) {
         this.exportLocks.delete(techpackId);
         pdfLog(`🔓 Released export lock for TechPack ${techpackId} [${requestId}]`);
       }
-      
+
       this.activeGenerations--;
     }
   }
@@ -1695,11 +1695,11 @@ class PDFService {
   private async getHeaderTemplate(data: any): Promise<string> {
     try {
       const headerPath = path.join(this.templateDir, 'partials', 'header.ejs');
-      
+
       if (this.templateCache.has(headerPath)) {
         return ejs.render(this.templateCache.get(headerPath)!, { meta: data.meta });
       }
-      
+
       const headerContent = await fs.readFile(headerPath, 'utf-8');
       this.templateCache.set(headerPath, headerContent);
       return ejs.render(headerContent, { meta: data.meta });
@@ -1717,10 +1717,10 @@ class PDFService {
       // Inline footer template - no need to load from file
       // Puppeteer yêu cầu footer phải là một dòng HTML hợp lệ (không có line breaks)
       const designerName = data?.meta?.technicalDesignerId || data?.meta?.designer || data?.meta?.technicalDesigner;
-      const displayName = (designerName && String(designerName).trim() && designerName !== '—' && designerName !== '-') 
-        ? designerName 
+      const displayName = (designerName && String(designerName).trim() && designerName !== '—' && designerName !== '-')
+        ? designerName
         : 'Technical Designer';
-      
+
       // Escape HTML để tránh XSS và đảm bảo hiển thị đúng
       const safeDisplayName = String(displayName)
         .replace(/&/g, '&amp;')
@@ -1728,20 +1728,20 @@ class PDFService {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
-      
+
       // Tạo footer HTML - QUAN TRỌNG: Phải là một dòng duy nhất, không có line breaks
       // Puppeteer yêu cầu footer template phải được format trên một dòng
       const footerHTML = `<div style="width:100%;font-family:Arial,Helvetica,sans-serif;font-size:8pt;color:#1e293b;padding:2px 6mm;border-top:1px solid #333;display:flex;justify-content:space-between;align-items:center;box-sizing:border-box;background:#fff;height:20px;"><div style="text-align:left;flex:1;font-size:8pt;">Created by: ${safeDisplayName}</div><div style="text-align:center;flex:1;font-weight:600;font-size:8pt;color:#0f172a;">By: iBC connecting</div><div style="text-align:right;flex:1;font-size:8pt;">Page <span class="pageNumber"></span> / <span class="totalPages"></span></div></div>`;
-      
+
       // Validate footer có chứa pageNumber và totalPages
       if (!footerHTML.includes('pageNumber') || !footerHTML.includes('totalPages')) {
         pdfWarn('⚠️  Footer template missing pageNumber or totalPages classes');
       }
-      
-    pdfLog('✅ Footer template generated, length:', footerHTML.length);
-    // Avoid dumping full footer HTML to logs (very noisy); enable with PDF_DEBUG if needed.
-    pdfLog('📋 Footer template preview (first 200 chars):', footerHTML.substring(0, 200));
-      
+
+      pdfLog('✅ Footer template generated, length:', footerHTML.length);
+      // Avoid dumping full footer HTML to logs (very noisy); enable with PDF_DEBUG if needed.
+      pdfLog('📋 Footer template preview (first 200 chars):', footerHTML.substring(0, 200));
+
       return footerHTML;
     } catch (error: any) {
       console.error('❌ Error generating footer template:', error.message || error);
