@@ -1390,8 +1390,8 @@
 
       /* Khóa chiều cao mỗi trang PACKING theo đúng page box (usable = 191mm) */
       .pp.packing-item {
-        height: 250mm !important;
-        min-height: 250mm !important;
+        height: 191mm !important;
+        min-height: 191mm !important;
         display: flex !important;
         flex-direction: column !important;
         box-sizing: border-box !important;
@@ -2306,8 +2306,8 @@
          headerHeight: HEADER_HEIGHT + 'px',
          footerHeight: FOOTER_HEIGHT + 'px',
          margins: MARGINS_TOTAL.toFixed(0) + 'px',
-         usableContentHeight: USABLE_CONTENT_HEIGHT.toFixed(0) + 'px (100%)',
-         wasteThreshold40pct: (USABLE_CONTENT_HEIGHT * WASTE_THRESHOLD).toFixed(0) + 'px (40%)'
+         usableContentHeight: USABLE_CONTENT_HEIGHT.toFixed(0) + 'px (100' + '%' + '%)',
+         wasteThreshold40pct: (USABLE_CONTENT_HEIGHT * WASTE_THRESHOLD).toFixed(0) + 'px (40' + '%' + '%)'
        });
 
       // Giữ PAGE_USABLE_HEIGHT cho backward compatibility
