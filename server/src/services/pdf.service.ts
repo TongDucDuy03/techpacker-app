@@ -318,8 +318,14 @@ class PDFService {
       return this.formatInchFraction(Math.abs(numeric), unit);
     }
 
-    // Other units: keep number to preserve existing behavior
-    return numeric;
+    // cm/mm/inch-10: format as string to avoid floating-point precision issues
+    // (e.g. 35.1 stored as 35.099999999999994 would otherwise export incorrectly)
+    const formatted = formatMeasurementValueAsFraction(numeric, unit as MeasurementUnit);
+    // Trim trailing zeros to match UI display (35.10 -> 35.1)
+    if (formatted !== '-' && formatted.includes('.')) {
+      return formatted.replace(/\.?0+$/, '') || formatted;
+    }
+    return formatted;
   }
 
   /**

@@ -61,6 +61,7 @@ export function parseMeasurementValue(input: string | number | undefined): numbe
 /**
  * Format measurement value without rounding - preserves original precision
  * Matches frontend formatMeasurementValueNoRound
+ * Uses limited decimal places to avoid floating-point precision artifacts (e.g. 35.1 -> 35.099999999999994)
  */
 export function formatMeasurementValueNoRound(value: number | undefined | null, unit?: MeasurementUnit): string {
   if (value === undefined || value === null || Number.isNaN(value)) return '-';
@@ -69,16 +70,15 @@ export function formatMeasurementValueNoRound(value: number | undefined | null, 
 
   let str: string;
   if (unit === 'inch-10') {
-    // For inch-10, use up to 3 decimal places
     str = absValue.toFixed(3);
+  } else if (unit === 'mm' || unit === 'cm') {
+    // Use toFixed(2) to round away floating-point artifacts, then trim trailing zeros
+    str = absValue.toFixed(2);
   } else {
-    // Other units: high precision then trim trailing zeros
     str = absValue.toFixed(10);
   }
 
-  // Remove trailing zeros and optional dot
   str = str.replace(/\.?0+$/, '');
-
   return `${sign}${str}`;
 }
 
